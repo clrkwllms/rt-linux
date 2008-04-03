@@ -33,6 +33,7 @@
 #include <asm/smp.h>
 #include <asm/tlbflush.h>
 #include <asm/proto.h>
+#include <asm/kmemcheck.h>
 #include <asm-generic/sections.h>
 
 /*
@@ -491,7 +492,8 @@ static int spurious_fault(unsigned long address,
  *
  * This assumes no large pages in there.
  */
-static int vmalloc_fault(unsigned long address)
+static int vmalloc_fault(struct pt_regs *regs, unsigned long address,
+	unsigned long error_code)
 {
 #ifdef CONFIG_X86_32
 	unsigned long pgd_paddr;
@@ -509,8 +511,16 @@ static int vmalloc_fault(unsigned long address)
 	if (!pmd_k)
 		return -1;
 	pte_k = pte_offset_kernel(pmd_k, address);
-	if (!pte_present(*pte_k))
-		return -1;
+	if (!pte_present(*pte_k)) {
+		if (!pte_hidden(*pte_k))
+			return -1;
+
+		if (error_code & 2)
+			kmemcheck_access(regs, address, KMEMCHECK_WRITE);
+		else
+			kmemcheck_access(regs, address, KMEMCHECK_READ);
+		kmemcheck_show(regs);
+	}
 	return 0;
 #else
 	pgd_t *pgd, *pgd_ref;
@@ -599,6 +609,13 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 
 	si_code = SEGV_MAPERR;
 
+	/*
+	 * Detect and handle instructions that would cause a page fault for
+	 * both a tracked kernel page and a userspace page.
+	 */
+	if(kmemcheck_active(regs))
+		kmemcheck_hide(regs);
+
 	if (notify_page_fault(regs))
 		return;
 
@@ -621,7 +638,7 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (unlikely(address >= TASK_SIZE64)) {
 #endif
 		if (!(error_code & (PF_RSVD|PF_USER|PF_PROT)) &&
-		    vmalloc_fault(address) >= 0)
+		    vmalloc_fault(regs, address, error_code) >= 0)
 			return;
 
 		/* Can handle a stale RO->RW TLB */
