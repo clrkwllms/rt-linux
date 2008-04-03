@@ -57,6 +57,7 @@
 #include <asm/nmi.h>
 #include <asm/smp.h>
 #include <asm/io.h>
+#include <asm/kmemcheck.h>
 
 #include "mach_traps.h"
 
@@ -905,6 +906,14 @@ void __kprobes do_debug(struct pt_regs *regs, long error_code)
 	trace_hardirqs_fixup();
 
 	get_debugreg(condition, 6);
+
+	/* Catch kmemcheck conditions first of all! */
+	if (condition & DR_STEP) {
+		if (kmemcheck_active(regs)) {
+			kmemcheck_hide(regs);
+			return;
+		}
+	}
 
 	/*
 	 * The processor cleared BTF, so don't mark that we need it set.
