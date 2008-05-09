@@ -57,6 +57,7 @@
 #define _KERNPG_TABLE	(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED |	\
 			 _PAGE_DIRTY)
 
+/* Set of bits not changed in pte_modify */
 #define _PAGE_CHG_MASK	(PTE_MASK | _PAGE_ACCESSED | _PAGE_DIRTY)
 
 #define _PAGE_CACHE_MASK	(_PAGE_PCD | _PAGE_PWT)
@@ -284,11 +285,8 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
 	pteval_t val = pte_val(pte);
 
-	/*
-	 * Chop off the NX bit (if present), and add the NX portion of
-	 * the newprot (if present):
-	 */
-	val &= _PAGE_CHG_MASK & ~_PAGE_NX;
+	/* Extract unchanged bits from pte */
+	val &= _PAGE_CHG_MASK;
 	val |= pgprot_val(newprot) & __supported_pte_mask;
 
 	return __pte(val);
