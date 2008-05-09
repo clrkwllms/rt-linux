@@ -298,6 +298,17 @@ config KMEMCHECK_QUEUE_SIZE
 	  if the number of errors occuring between two bursts is larger than
 	  this number, the extra error reports will get lost.
 
+config KMEMCHECK_SHADOW_COPY_SHIFT
+	int "kmemcheck: shadow copy size (5 => 32 bytes, 6 => 64 bytes)"
+	depends on KMEMCHECK
+	range 2 8
+	default 6
+	help
+	  Select the number of shadow bytes to save along with each entry of
+	  the queue. These bytes indicate what parts of an allocation are
+	  initialized, uninitialized, etc. and will be displayed when an
+	  error is detected to help the debugging of a particular problem.
+
 config KMEMCHECK_PARTIAL_OK
 	bool "kmemcheck: allow partially uninitialized memory"
 	depends on KMEMCHECK
