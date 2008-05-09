@@ -37,6 +37,8 @@ enum kmemcheck_error_type {
 	ERROR_BUG,
 };
 
+#define SHADOW_COPY_SIZE (1 << CONFIG_KMEMCHECK_SHADOW_COPY_SHIFT)
+
 struct kmemcheck_error {
 	enum kmemcheck_error_type type;
 
@@ -54,6 +56,8 @@ struct kmemcheck_error {
 	struct pt_regs		regs;
 	struct stack_trace	trace;
 	unsigned long		trace_entries[32];
+
+	enum shadow shadow_copy[SHADOW_COPY_SIZE];
 };
 
 /*
@@ -101,6 +105,9 @@ error_next_rd(void)
 	return e;
 }
 
+static void *
+address_get_shadow(unsigned long address);
+
 /*
  * Save the context of an error.
  */
@@ -111,6 +118,7 @@ error_save(enum shadow state, unsigned long address, unsigned int size,
 	static unsigned long prev_ip;
 
 	struct kmemcheck_error *e;
+	enum shadow *shadow_copy;
 
 	/* Don't report several adjacent errors from the same EIP. */
 	if (regs->ip == prev_ip)
@@ -136,6 +144,12 @@ error_save(enum shadow state, unsigned long address, unsigned int size,
 	e->trace.max_entries = ARRAY_SIZE(e->trace_entries);
 	e->trace.skip = 1;
 	save_stack_trace(&e->trace);
+
+	/* Round address down to nearest 16 bytes */
+	shadow_copy = address_get_shadow(address & ~(SHADOW_COPY_SIZE - 1));
+	BUG_ON(!shadow_copy);
+
+	memcpy(e->shadow_copy, shadow_copy, SHADOW_COPY_SIZE);
 }
 
 /*
@@ -171,7 +185,15 @@ error_recall(void)
 		[SHADOW_FREED]		= "freed",
 	};
 
+	static const char short_desc[] = {
+		[SHADOW_UNALLOCATED]	= 'a',
+		[SHADOW_UNINITIALIZED]	= 'u',
+		[SHADOW_INITIALIZED]	= 'i',
+		[SHADOW_FREED]		= 'f',
+	};
+
 	struct kmemcheck_error *e;
+	unsigned int i;
 
 	e = error_next_rd();
 	if (!e)
@@ -181,7 +203,20 @@ error_recall(void)
 	case ERROR_INVALID_ACCESS:
 		printk(KERN_ERR  "kmemcheck: Caught %d-bit read "
 			"from %s memory (%p)\n",
-			e->size, desc[e->state], (void *) e->address);
+			e->size, e->state < ARRAY_SIZE(desc) ?
+				desc[e->state] : "(invalid shadow state)",
+			(void *) e->address);
+
+		printk(KERN_INFO);
+		for (i = 0; i < SHADOW_COPY_SIZE; ++i) {
+			if (e->shadow_copy[i] < ARRAY_SIZE(short_desc))
+				printk("%c", short_desc[e->shadow_copy[i]]);
+			else
+				printk("?");
+		}
+		printk("\n");
+		printk(KERN_INFO "%*c\n",
+			1 + (int) (e->address & (SHADOW_COPY_SIZE - 1)), '^');
 		break;
 	case ERROR_BUG:
 		printk(KERN_EMERG "kmemcheck: Fatal error\n");
@@ -716,14 +751,14 @@ kmemcheck_read(struct pt_regs *regs, unsigned long address, unsigned int size)
 	if (status == SHADOW_INITIALIZED)
 		return;
 
-	/* Don't warn about it again. */
-	set(shadow, size);
-
 	if (kmemcheck_enabled)
 		error_save(status, address, size, regs);
 
 	if (kmemcheck_enabled == 2)
 		kmemcheck_enabled = 0;
+
+	/* Don't warn about it again. */
+	set(shadow, size);
 }
 
 static void
