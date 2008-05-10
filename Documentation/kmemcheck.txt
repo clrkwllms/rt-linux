@@ -18,16 +18,16 @@ exception is raised. From here, we simply hide the page again and continue
 execution, this time with the single-stepping feature turned off.
 
 
-Changes to the memory allocator (SLUB)
-======================================
+Changes to the slab allocators
+==============================
 
 kmemcheck requires some assistance from the memory allocator in order to work.
 The memory allocator needs to
 
-1. Request twice as much memory as would normally be needed. The bottom half
-   of the memory is what the user actually sees and uses; the upper half
-   contains the so-called shadow memory, which stores the status of each byte
-   in the bottom half, e.g. initialized or uninitialized.
+1. Tell kmemcheck about newly allocated pages and pages that are about to
+   be freed. This allows kmemcheck to set up and tear down the shadow memory
+   for the pages in question. The shadow memory stores the status of each byte
+   in the allocation proper, e.g. whether it is initialized or uninitialized.
 2. Tell kmemcheck which parts of memory should be marked uninitialized. There
    are actually a few more states, such as "not yet allocated" and "recently
    freed".
@@ -39,6 +39,8 @@ If a slab cache is NOT set up using the SLAB_NOTRACK flag, callers can still
 request memory with the __GFP_NOTRACK flag. This does not prevent the page
 faults from occurring, however, but marks the object in question as being
 initialized so that no warnings will ever be produced for this object.
+
+Currently, the SLAB and SLUB allocators are supported by kmemcheck.
 
 
 Problems
