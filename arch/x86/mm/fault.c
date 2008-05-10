@@ -492,8 +492,7 @@ static int spurious_fault(unsigned long address,
  *
  * This assumes no large pages in there.
  */
-static int vmalloc_fault(struct pt_regs *regs, unsigned long address,
-	unsigned long error_code)
+static int vmalloc_fault(unsigned long address)
 {
 #ifdef CONFIG_X86_32
 	unsigned long pgd_paddr;
@@ -510,17 +509,10 @@ static int vmalloc_fault(struct pt_regs *regs, unsigned long address,
 	pmd_k = vmalloc_sync_one(__va(pgd_paddr), address);
 	if (!pmd_k)
 		return -1;
-	pte_k = pte_offset_kernel(pmd_k, address);
-	if (!pte_present(*pte_k)) {
-		if (!pte_hidden(*pte_k))
-			return -1;
 
-		if (error_code & 2)
-			kmemcheck_access(regs, address, KMEMCHECK_WRITE);
-		else
-			kmemcheck_access(regs, address, KMEMCHECK_READ);
-		kmemcheck_show(regs);
-	}
+	pte_k = pte_offset_kernel(pmd_k, address);
+	if (!pte_present(*pte_k))
+		return -1;
 	return 0;
 #else
 	pgd_t *pgd, *pgd_ref;
@@ -571,6 +563,29 @@ static int vmalloc_fault(struct pt_regs *regs, unsigned long address,
 		BUG();
 	return 0;
 #endif
+}
+
+static bool kmemcheck_fault(struct pt_regs *regs, unsigned long address,
+	unsigned long error_code)
+{
+	pte_t *pte;
+	unsigned int level;
+
+	pte = lookup_address(address, &level);
+	if (!pte)
+		return false;
+	if (level != PG_LEVEL_4K)
+		return false;
+	if (!pte_hidden(*pte))
+		return false;
+
+	if (error_code & 2)
+		kmemcheck_access(regs, address, KMEMCHECK_WRITE);
+	else
+		kmemcheck_access(regs, address, KMEMCHECK_READ);
+
+	kmemcheck_show(regs);
+	return true;
 }
 
 int show_unhandled_signals = 1;
@@ -638,7 +653,10 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (unlikely(address >= TASK_SIZE64)) {
 #endif
 		if (!(error_code & (PF_RSVD|PF_USER|PF_PROT)) &&
-		    vmalloc_fault(regs, address, error_code) >= 0)
+		    vmalloc_fault(address) >= 0)
+			return;
+
+		if (kmemcheck_fault(regs, address, error_code))
 			return;
 
 		/* Can handle a stale RO->RW TLB */
