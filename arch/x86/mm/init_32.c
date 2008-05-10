@@ -92,7 +92,7 @@ static pte_t * __init one_page_table_init(pmd_t *pmd)
 	if (!(pmd_val(*pmd) & _PAGE_PRESENT)) {
 		pte_t *page_table = NULL;
 
-#if defined(CONFIG_DEBUG_PAGEALLOC) || defined(CONFIG_KMEMCHECK)
+#ifdef CONFIG_DEBUG_PAGEALLOC
 		page_table = (pte_t *) alloc_bootmem_pages(PAGE_SIZE);
 #endif
 		if (!page_table) {

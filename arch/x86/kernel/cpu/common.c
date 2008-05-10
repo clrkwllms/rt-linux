@@ -628,13 +628,6 @@ void __init early_cpu_init(void)
 
 	early_cpu_detect();
 	validate_pat_support(&boot_cpu_data);
-
-#ifdef CONFIG_KMEMCHECK
-	/*
-	 * We need 4K granular PTEs for kmemcheck:
-	 */
-	setup_clear_cpu_cap(X86_FEATURE_PSE);
-#endif
 }
 
 /* Make sure %fs is initialized properly in idle threads */
