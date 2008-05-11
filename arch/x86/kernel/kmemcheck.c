@@ -254,13 +254,15 @@ param_kmemcheck(char *str)
 early_param("kmemcheck", param_kmemcheck);
 
 static pte_t *
-address_get_pte(unsigned int address)
+address_get_pte(unsigned long address)
 {
 	pte_t *pte;
 	unsigned int level;
 
 	pte = lookup_address(address, &level);
 	if (!pte)
+		return NULL;
+	if (level != PG_LEVEL_4K)
 		return NULL;
 	if (!pte_hidden(*pte))
 		return NULL;
