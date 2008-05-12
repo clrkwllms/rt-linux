@@ -1,0 +1,46 @@
+
+[ "$#" = 0 ] && {
+#  NR=`git-ls-files -u | wc -l`
+#  [ $NR != 3 ] && { echo "not a simple 3-way 1-file merge"; exit -1; }
+  SRC=`git-ls-files -u | cut -f2 | head -1`
+} || {
+  SRC=`git-ls-files -u | grep $1 | cut -f2 | head -1`
+}
+
+[ "$SRC" = "" -o ! -f "$SRC" ] && { echo "$1 has no conflicts!"; exit -1; }
+
+SRC_SED=`echo $SRC | sed 's/\//\\\\\//g'`
+
+SHA_1=`git-ls-files -u | grep $SRC | grep '^.* .* 1\>' | cut -d' ' -f2`
+SHA_2=`git-ls-files -u | grep $SRC | grep '^.* .* 2\>' | cut -d' ' -f2`
+SHA_3=`git-ls-files -u | grep $SRC | grep '^.* .* 3\>' | cut -d' ' -f2`
+
+mv -b $SRC $SRC.automerge             || { echo error1; exit -1; }
+
+git-diff $SHA_1 $SHA_2 | sed "s/$SHA_1/$SRC_SED/g" |
+   sed "s/$SHA_2/$SRC_SED/g" > $SRC.diff-v1 || { echo error2; exit -1; }
+
+git-diff $SHA_1 $SHA_3 | sed "s/$SHA_1/$SRC_SED/g" |
+   sed "s/$SHA_3/$SRC_SED/g" > $SRC.diff-v2 || { echo error2; exit -1; }
+
+git-cat-file -p $SHA_1 > $SRC         || { echo error4; exit -1; }
+
+ls -l $SRC.automerge $SRC $SRC.diff-v1 $SRC.diff-v2
+
+patch -p1 < $SRC.diff-v2 || { echo error5; exit -1; }
+patch -p1 < $SRC.diff-v1 || {
+    echo "reject file ..."
+    ls -l $SRC.rej
+    echo "trying auto-merge ..."
+    OK=$(rej -dry-run $SRC.rej 2>&1 | grep ', 0 conflicts remain')
+    [ "$OK" = "" ] && { echo "$OK"; exit -1; }
+    reja $SRC.rej
+}
+
+echo "adding $SRC to the commit"
+git-add $SRC
+git-commit -m "Manual merge of conflicts."
+
+echo "merge successful!"
+exit 0
+

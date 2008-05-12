@@ -1,0 +1,48 @@
+
+echo "checking branches ..."
+
+git-branch | grep '^*' | grep -q '^* master$' ||
+                            { echo "not on master branch!"; exit -1; }
+
+unset BRANCHES
+for N in $(find tip/ -name series); do
+
+  BRANCH=$(echo $N | sed 's/\/series//g' | sed 's/^tip\///g')
+  BRANCHES="$BRANCHES $BRANCH"
+done
+
+for BRANCH in $BRANCHES; do
+  git-branch -a | grep -q " $BRANCH$" &&
+                          { echo "$BRANCH already exists!"; exit -1;}
+done
+
+echo "branch check passed."
+
+echo "creating branches and applying series."
+
+git-checkout -b base master || { echo "base branch already exists!"; exit -1; }
+
+echo "importing:"
+for BRANCH in $BRANCHES; do
+  echo
+  git-checkout -b $BRANCH base
+  git-quiltimport --patches tip/$BRANCH ||
+                  {
+                    echo "failed quilt import in $BRANCH!"
+echo "type exit to prune the rest!"
+bash
+                    git-checkout master
+                    git-branch -D base
+                    for BRANCH in $BRANCHES; do
+                      git-branch -D $BRANCH 2>/dev/null >/dev/null
+                    done
+                    rm -rf .dotest
+
+                    exit -1
+                  }
+done
+echo
+git-checkout master
+echo "-tip import successful! Imported "$(git-branch | grep -vw master | wc -l)" branches"
+
+

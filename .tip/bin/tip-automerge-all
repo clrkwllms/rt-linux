@@ -1,0 +1,11 @@
+
+for N in $(git-branch | cut -c2- | grep -v tmp); do
+  echo $N
+  git-merge $N || {
+    echo merge conflict
+    exit -1
+    git-add $(git-ls-files -u | cut -f2 | sort | uniq)
+    git-commit -m "Manual merge." || exit -1;
+  }
+done
+

@@ -1,0 +1,23 @@
+
+[ -e tip/ ] && { echo "tip/ hierarchy already exists!"; exit -1; }
+for N in $(git-branch | grep -vE ' master$| base$| tmp'); do
+
+  ITEMS=$(git-rev-list --reverse base..$N)
+  mkdir -p tip/$N
+  echo $N
+
+  echo > tip/$N/series
+  for M in $ITEMS; do
+    git-show --pretty=email --no-merges $M > tip/$N/$M
+    # | tail -n +2 | sed 's/^Author: /From: /'
+
+    # pure merges will be zero-size patches:
+    [ -s tip/$N/$M ] && echo $M >> tip/$N/series
+
+  done
+
+#  # delete empty branches:
+#  [ -s $N/series ] || rm -rf $N
+
+done
+

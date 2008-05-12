@@ -1,0 +1,14 @@
+
+[ "$#" = "0" ] &&
+     { echo "usage: tip-remove-commit-from-series <sha1>"; exit -1; }
+
+[ -d tip/ ] || { echo "no tip/ hierarchy present here!"; exit -1; }
+
+SERIES=`grep -rl $1 tip/ | grep series`
+
+[ "$SERIES" = "" ] && { echo "commit $1 not present!"; exit -1; }
+
+for S in $SERIES; do
+  echo "fixing up $S ..."
+  sed -i "s/$1//g" $S
+done

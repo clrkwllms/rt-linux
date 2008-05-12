@@ -1,0 +1,7 @@
+
+for N in `git-branch -a | grep /devel`; do
+  M=$(echo $N | sed 's/\/devel//g')
+  echo $M
+  git-log $M/fixes..$M/devel | grep ^commit
+done 
+
