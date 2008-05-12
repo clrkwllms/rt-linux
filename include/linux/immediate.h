@@ -12,17 +12,6 @@
 
 #ifdef CONFIG_IMMEDIATE
 
-struct __imv {
-	unsigned long var;	/* Pointer to the identifier variable of the
-				 * immediate value
-				 */
-	unsigned long imv;	/*
-				 * Pointer to the memory location of the
-				 * immediate value within the instruction.
-				 */
-	unsigned char size;	/* Type size. */
-} __attribute__ ((packed));
-
 #include <asm/immediate.h>
 
 /**
