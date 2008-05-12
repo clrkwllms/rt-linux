@@ -403,7 +403,7 @@ config X86_TSC
 # generates cmov.
 config X86_CMOV
 	def_bool y
-	depends on (MK7 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || MVIAC3_2 || MVIAC7 || X86_64)
+	depends on !(MCYRIXIII || MGEODEGX1 || MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MK6 || M586MMX || M586TSC || M586 || M486 || M386 || X86_ELAN)
 
 config X86_MINIMUM_CPU_FAMILY
 	int
