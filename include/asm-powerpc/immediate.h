@@ -68,6 +68,8 @@ struct __imv {
 		value;							\
 	})
 
+#define imv_cond(name)	imv_read(name)
+
 extern int arch_imv_update(const struct __imv *imv, int early);
 
 #endif /* _ASM_POWERPC_IMMEDIATE_H */

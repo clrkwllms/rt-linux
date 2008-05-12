@@ -20,6 +20,7 @@ struct __imv {
 				 * Pointer to the memory location of the
 				 * immediate value within the instruction.
 				 */
+	int  jmp_off;		/* offset for jump target */
 	unsigned char size;	/* Type size. */
 	unsigned char insn_size;/* Instruction size. */
 } __attribute__ ((packed));
@@ -57,6 +58,7 @@ struct __imv {
 				".previous\n\t"				\
 				".section __imv,\"aw\",@progbits\n\t"	\
 				_ASM_PTR "%c1, (3f)-%c2\n\t"		\
+				".int 0\n\t"				\
 				".byte %c2, (2b-1b)\n\t"		\
 				".previous\n\t"				\
 				"mov $0,%0\n\t"				\
@@ -74,6 +76,7 @@ struct __imv {
 				".previous\n\t"				\
 				".section __imv,\"aw\",@progbits\n\t"	\
 				_ASM_PTR "%c1, (3f)-%c2\n\t"		\
+				".int 0\n\t"				\
 				".byte %c2, (2b-1b)\n\t"		\
 				".previous\n\t"				\
 				".org . + ((-.-(2b-1b)) & (%c2-1)), 0x90\n\t" \
@@ -95,6 +98,7 @@ struct __imv {
 				".previous\n\t"				\
 				".section __imv,\"aw\",@progbits\n\t"	\
 				_ASM_PTR "%c1, (3f)-%c2\n\t"		\
+				".int 0\n\t"				\
 				".byte %c2, (2b-1b)\n\t"		\
 				".previous\n\t"				\
 				".org . + ((-.-(2b-1b)) & (%c2-1)), 0x90\n\t" \
@@ -108,6 +112,34 @@ struct __imv {
 		value;							\
 	})
 
-extern int arch_imv_update(const struct __imv *imv, int early);
+/*
+ * Uses %al.
+ * size is 0.
+ * Use in if (unlikely(imv_cond(var)))
+ * Given a char as argument.
+ */
+#define imv_cond(name)							\
+	({								\
+		__typeof__(name##__imv) value;				\
+		BUILD_BUG_ON(sizeof(value) > 1);			\
+		asm (".section __discard,\"\",@progbits\n\t"		\
+			"1:\n\t"					\
+			"mov $0,%0\n\t"					\
+			"2:\n\t"					\
+			".previous\n\t"					\
+			".section __imv,\"aw\",@progbits\n\t"		\
+			_ASM_PTR "%c1, (3f)-1\n\t"			\
+			".int 0\n\t"					\
+			".byte %c2, (2b-1b)\n\t"			\
+			".previous\n\t"					\
+			"mov $0,%0\n\t"					\
+			"3:\n\t"					\
+			: "=a" (value)					\
+			: "i" (&name##__imv),				\
+			  "i" (0));					\
+		value;							\
+	})
+
+extern int arch_imv_update(struct __imv *imv, int early);
 
 #endif /* _ASM_X86_IMMEDIATE_H */

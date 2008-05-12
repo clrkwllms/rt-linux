@@ -43,10 +43,10 @@ static DEFINE_MUTEX(imv_mutex);
  *
  * Updates a range of immediates.
  */
-void imv_update_range(const struct __imv *begin,
-		const struct __imv *end)
+void imv_update_range(struct __imv *begin,
+		struct __imv *end)
 {
-	const struct __imv *iter;
+	struct __imv *iter;
 	int ret;
 	for (iter = begin; iter < end; iter++) {
 		mutex_lock(&imv_mutex);
