@@ -43,6 +43,7 @@
 #include <linux/seq_file.h>
 #include <linux/debugfs.h>
 #include <linux/kdebug.h>
+#include <linux/memory.h>
 
 #include <asm-generic/sections.h>
 #include <asm/cacheflush.h>
@@ -618,9 +619,10 @@ static int __kprobes __register_kprobe(struct kprobe *p,
 		goto out;
 	}
 
+	kernel_text_lock();
 	ret = arch_prepare_kprobe(p);
 	if (ret)
-		goto out;
+		goto out_unlock_text;
 
 	INIT_HLIST_NODE(&p->hlist);
 	hlist_add_head_rcu(&p->hlist,
@@ -628,7 +630,8 @@ static int __kprobes __register_kprobe(struct kprobe *p,
 
 	if (kprobe_enabled)
 		arch_arm_kprobe(p);
-
+out_unlock_text:
+	kernel_text_unlock();
 out:
 	mutex_unlock(&kprobe_mutex);
 
@@ -664,8 +667,11 @@ valid_p:
 		 * enabled - otherwise, the breakpoint would already have
 		 * been removed. We save on flushing icache.
 		 */
-		if (kprobe_enabled)
+		if (kprobe_enabled) {
+			kernel_text_lock();
 			arch_disarm_kprobe(p);
+			kernel_text_unlock();
+		}
 		hlist_del_rcu(&old_p->hlist);
 	} else {
 		if (p->break_handler)
@@ -862,7 +868,6 @@ static int __kprobes pre_handler_kretprobe(struct kprobe *p,
 		}
 
 		arch_prepare_kretprobe(ri, regs);
-
 		/* XXX(hch): why is there no hlist_move_head? */
 		hlist_del(&ri->uflist);
 		hlist_add_head(&ri->uflist, &ri->rp->used_instances);
@@ -1162,11 +1167,13 @@ static void __kprobes enable_all_kprobes(void)
 	if (kprobe_enabled)
 		goto already_enabled;
 
+	kernel_text_lock();
 	for (i = 0; i < KPROBE_TABLE_SIZE; i++) {
 		head = &kprobe_table[i];
 		hlist_for_each_entry_rcu(p, node, head, hlist)
 			arch_arm_kprobe(p);
 	}
+	kernel_text_unlock();
 
 	kprobe_enabled = true;
 	printk(KERN_INFO "Kprobes globally enabled\n");
@@ -1191,6 +1198,7 @@ static void __kprobes disable_all_kprobes(void)
 
 	kprobe_enabled = false;
 	printk(KERN_INFO "Kprobes globally disabled\n");
+	kernel_text_lock();
 	for (i = 0; i < KPROBE_TABLE_SIZE; i++) {
 		head = &kprobe_table[i];
 		hlist_for_each_entry_rcu(p, node, head, hlist) {
@@ -1198,6 +1206,7 @@ static void __kprobes disable_all_kprobes(void)
 				arch_disarm_kprobe(p);
 		}
 	}
+	kernel_text_unlock();
 
 	mutex_unlock(&kprobe_mutex);
 	/* Allow all currently running kprobes to complete */
