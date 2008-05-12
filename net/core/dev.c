@@ -119,6 +119,7 @@
 #include <linux/err.h>
 #include <linux/ctype.h>
 #include <linux/if_arp.h>
+#include <linux/marker.h>
 
 #include "net-sysfs.h"
 
@@ -1647,6 +1648,8 @@ int dev_queue_xmit(struct sk_buff *skb)
 	}
 
 gso:
+	trace_mark(net_dev_xmit, "skb %p protocol #2u%hu", skb, skb->protocol);
+
 	spin_lock_prefetch(&dev->queue_lock);
 
 	/* Disable soft irqs for various locks below. Also
@@ -2046,6 +2049,9 @@ int netif_receive_skb(struct sk_buff *skb)
 		return NET_RX_DROP;
 
 	__get_cpu_var(netdev_rx_stat).total++;
+
+	trace_mark(net_dev_receive, "skb %p protocol #2u%hu",
+		skb, skb->protocol);
 
 	skb_reset_network_header(skb);
 	skb_reset_transport_header(skb);
