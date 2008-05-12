@@ -30,6 +30,10 @@ MODULE_ALIAS("platform:pcspkr");
 #else
 #include <asm/8253pit.h>
 static DEFINE_SPINLOCK(i8253_lock);
+#define PIT_MODE		0x43
+#define PIT_CH0			0x40
+#define PIT_CH2			0x42
+#define outb_pit		outb_p
 #endif
 
 static int pcspkr_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
