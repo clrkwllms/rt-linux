@@ -1761,6 +1761,7 @@ static struct module *load_module(void __user *umod,
 	unsigned int unusedgplindex;
 	unsigned int unusedgplcrcindex;
 	unsigned int immediateindex;
+	unsigned int immediatecondendindex;
 	unsigned int markersindex;
 	unsigned int markersstringsindex;
 	struct module *mod;
@@ -1860,6 +1861,8 @@ static struct module *load_module(void __user *umod,
 	unwindex = find_sec(hdr, sechdrs, secstrings, ARCH_UNWIND_SECTION_NAME);
 #endif
 	immediateindex = find_sec(hdr, sechdrs, secstrings, "__imv");
+	immediatecondendindex = find_sec(hdr, sechdrs, secstrings,
+		"__imv_cond_end");
 
 	/* Don't keep modinfo and version sections. */
 	sechdrs[infoindex].sh_flags &= ~(unsigned long)SHF_ALLOC;
@@ -2023,6 +2026,11 @@ static struct module *load_module(void __user *umod,
 	mod->immediate = (void *)sechdrs[immediateindex].sh_addr;
 	mod->num_immediate =
 		sechdrs[immediateindex].sh_size / sizeof(*mod->immediate);
+	mod->immediate_cond_end =
+		(void *)sechdrs[immediatecondendindex].sh_addr;
+	mod->num_immediate_cond_end =
+		sechdrs[immediatecondendindex].sh_size
+			/ sizeof(*mod->immediate_cond_end);
 #endif
 
 	mod->unused_syms = (void *)sechdrs[unusedindex].sh_addr;
@@ -2691,4 +2699,19 @@ void module_imv_update(void)
 	mutex_unlock(&module_mutex);
 }
 EXPORT_SYMBOL_GPL(module_imv_update);
+
+/**
+ * is_imv_cond_end_module
+ *
+ * Check if the two given addresses are located in the immediate value condition
+ * end table. Addresses should be in the same object.
+ * The module mutex should be held.
+ */
+int is_imv_cond_end_module(unsigned long addr1, unsigned long addr2)
+{
+	struct module *mod = __module_text_address(addr1);
+	return _is_imv_cond_end(mod->immediate_cond_end,
+		mod->immediate_cond_end + mod->num_immediate_cond_end,
+		addr1, addr2);
+}
 #endif
