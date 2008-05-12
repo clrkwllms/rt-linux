@@ -8,8 +8,7 @@ config STDERR_CONSOLE
 	  console driver which dumps all printk messages to stderr.
 
 config STDIO_CONSOLE
-	bool
-	default y
+	def_bool y
 
 config SSL
 	bool "Virtual serial line"
@@ -68,8 +67,7 @@ config XTERM_CHAN
           It is safe to say 'Y' here.
 
 config NOCONFIG_CHAN
-	bool
-	default !(XTERM_CHAN && TTY_CHAN && PTY_CHAN && PORT_CHAN && NULL_CHAN)
+	def_bool !(XTERM_CHAN && TTY_CHAN && PTY_CHAN && PORT_CHAN && NULL_CHAN)
 
 config CON_ZERO_CHAN
 	string "Default main console channel initialization"
