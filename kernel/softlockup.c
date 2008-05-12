@@ -245,7 +245,7 @@ static int watchdog(void *__bind_cpu)
 	 */
 	while (!kthread_should_stop()) {
 		touch_softlockup_watchdog();
-		schedule();
+		schedule_timeout(softlockup_thresh/2);
 
 		if (kthread_should_stop())
 			break;
