@@ -37,7 +37,7 @@ unsigned long __read_mostly	tracing_thresh;
 
 static int tracing_disabled = 1;
 
-static long
+long
 ns2usecs(cycle_t nsec)
 {
 	nsec += 500;
@@ -95,18 +95,6 @@ unsigned long nsecs_to_usecs(unsigned long nsecs)
 {
 	return nsecs / 1000;
 }
-
-enum trace_type {
-	__TRACE_FIRST_TYPE = 0,
-
-	TRACE_FN,
-	TRACE_CTX,
-	TRACE_WAKE,
-	TRACE_STACK,
-	TRACE_SPECIAL,
-
-	__TRACE_LAST_TYPE
-};
 
 enum trace_flag_type {
 	TRACE_FLAG_IRQS_OFF		= 0x01,
@@ -190,7 +178,7 @@ void *head_page(struct trace_array_cpu *data)
 	return page_address(page);
 }
 
-static int
+int
 trace_seq_printf(struct trace_seq *s, const char *fmt, ...)
 {
 	int len = (PAGE_SIZE - 1) - s->len;
@@ -205,7 +193,7 @@ trace_seq_printf(struct trace_seq *s, const char *fmt, ...)
 	va_end(ap);
 
 	/* If we can't write it all, don't bother writing anything */
-	if (ret > len)
+	if (ret >= len)
 		return 0;
 
 	s->len += ret;
@@ -638,7 +626,7 @@ tracing_generic_entry_update(struct trace_entry *entry, unsigned long flags)
 	pc = preempt_count();
 
 	entry->preempt_count	= pc & 0xff;
-	entry->pid		= tsk->pid;
+	entry->pid		= (tsk) ? tsk->pid : 0;
 	entry->t		= ftrace_now(raw_smp_processor_id());
 	entry->flags = (irqs_disabled_flags(flags) ? TRACE_FLAG_IRQS_OFF : 0) |
 		((pc & HARDIRQ_MASK) ? TRACE_FLAG_HARDIRQ : 0) |
@@ -684,13 +672,6 @@ __trace_special(void *__tr, void *__data,
 	raw_local_irq_save(irq_flags);
 	__raw_spin_lock(&data->lock);
 	entry			= tracing_get_trace_entry(tr, data);
-	if (!entry) {
-		static unsigned limit;
-		if (limit++ < 12)
-			pr_err("%s: Dereferencing NULL, arrr!\n", __func__);
-		spin_unlock_irqrestore(&data->lock, irq_flags);
-		return;
-	}
 	tracing_generic_entry_update(entry, 0);
 	entry->type		= TRACE_SPECIAL;
 	entry->special.arg1	= arg1;
@@ -701,6 +682,40 @@ __trace_special(void *__tr, void *__data,
 
 	trace_wake_up();
 }
+
+#ifdef CONFIG_MMIOTRACE
+void __trace_mmiotrace_rw(struct trace_array *tr, struct trace_array_cpu *data,
+						struct mmiotrace_rw *rw)
+{
+	struct trace_entry *entry;
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&data->lock, irq_flags);
+	entry			= tracing_get_trace_entry(tr, data);
+	tracing_generic_entry_update(entry, 0);
+	entry->type		= TRACE_MMIO_RW;
+	entry->mmiorw		= *rw;
+	spin_unlock_irqrestore(&data->lock, irq_flags);
+
+	trace_wake_up();
+}
+
+void __trace_mmiotrace_map(struct trace_array *tr, struct trace_array_cpu *data,
+						struct mmiotrace_map *map)
+{
+	struct trace_entry *entry;
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&data->lock, irq_flags);
+	entry			= tracing_get_trace_entry(tr, data);
+	tracing_generic_entry_update(entry, 0);
+	entry->type		= TRACE_MMIO_MAP;
+	entry->mmiomap		= *map;
+	spin_unlock_irqrestore(&data->lock, irq_flags);
+
+	trace_wake_up();
+}
+#endif
 
 void __trace_stack(struct trace_array *tr,
 		   struct trace_array_cpu *data,
@@ -1548,6 +1563,9 @@ static int trace_empty(struct trace_iterator *iter)
 
 static int print_trace_line(struct trace_iterator *iter)
 {
+	if (iter->trace && iter->trace->print_line)
+		return iter->trace->print_line(iter);
+
 	if (trace_flags & TRACE_ITER_BIN)
 		return print_bin_fmt(iter);
 
@@ -2169,6 +2187,7 @@ static int tracing_open_pipe(struct inode *inode, struct file *filp)
 		return -ENOMEM;
 
 	iter->tr = &global_trace;
+	iter->trace = current_trace;
 
 	filp->private_data = iter;
 
