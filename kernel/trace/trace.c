@@ -92,9 +92,16 @@ void trace_wake_up(void)
 
 static int __init set_nr_entries(char *str)
 {
+	unsigned long nr_entries;
+	int ret;
+
 	if (!str)
 		return 0;
-	trace_nr_entries = simple_strtoul(str, &str, 0);
+	ret = strict_strtoul(str, 0, &nr_entries);
+	/* nr_entries can not be zero */
+	if (ret < 0 || nr_entries == 0)
+		return 0;
+	trace_nr_entries = nr_entries;
 	return 1;
 }
 __setup("trace_entries=", set_nr_entries);
@@ -2037,8 +2044,9 @@ tracing_ctrl_write(struct file *filp, const char __user *ubuf,
 		   size_t cnt, loff_t *ppos)
 {
 	struct trace_array *tr = filp->private_data;
-	long val;
 	char buf[64];
+	long val;
+	int ret;
 
 	if (cnt >= sizeof(buf))
 		return -EINVAL;
@@ -2048,7 +2056,9 @@ tracing_ctrl_write(struct file *filp, const char __user *ubuf,
 
 	buf[cnt] = 0;
 
-	val = simple_strtoul(buf, NULL, 10);
+	ret = strict_strtoul(buf, 10, &val);
+	if (ret < 0)
+		return ret;
 
 	val = !!val;
 
@@ -2152,8 +2162,9 @@ tracing_max_lat_write(struct file *filp, const char __user *ubuf,
 		      size_t cnt, loff_t *ppos)
 {
 	long *ptr = filp->private_data;
-	long val;
 	char buf[64];
+	long val;
+	int ret;
 
 	if (cnt >= sizeof(buf))
 		return -EINVAL;
@@ -2163,7 +2174,9 @@ tracing_max_lat_write(struct file *filp, const char __user *ubuf,
 
 	buf[cnt] = 0;
 
-	val = simple_strtoul(buf, NULL, 10);
+	ret = strict_strtoul(buf, 10, &val);
+	if (ret < 0)
+		return ret;
 
 	*ptr = val * 1000;
 
@@ -2418,6 +2431,7 @@ tracing_entries_write(struct file *filp, const char __user *ubuf,
 {
 	unsigned long val;
 	char buf[64];
+	int ret;
 
 	if (cnt >= sizeof(buf))
 		return -EINVAL;
@@ -2427,7 +2441,9 @@ tracing_entries_write(struct file *filp, const char __user *ubuf,
 
 	buf[cnt] = 0;
 
-	val = simple_strtoul(buf, NULL, 10);
+	ret = strict_strtoul(buf, 10, &val);
+	if (ret < 0)
+		return ret;
 
 	/* must have at least 1 entry */
 	if (!val)
