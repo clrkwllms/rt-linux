@@ -2336,6 +2336,35 @@ static int sched_balance_self(int cpu, int flag)
 
 #endif /* CONFIG_SMP */
 
+#ifdef CONFIG_CONTEXT_SWITCH_TRACER
+
+void ftrace_all_fair_tasks(void *__rq, void *__tr, void *__data)
+{
+	struct sched_entity *se;
+	struct task_struct *p;
+	struct rb_node *curr;
+	struct rq *rq = __rq;
+
+	curr = first_fair(&rq->cfs);
+	if (!curr)
+		return;
+
+	while (curr) {
+		se = rb_entry(curr, struct sched_entity, run_node);
+		if (!entity_is_task(se))
+			continue;
+
+		p = task_of(se);
+
+		__trace_special(__tr, __data,
+			      p->pid, p->se.vruntime, p->se.sum_exec_runtime);
+
+		curr = rb_next(curr);
+	}
+}
+
+#endif
+
 /***
  * try_to_wake_up - wake up a thread
  * @p: the to-be-woken-up thread
@@ -2410,7 +2439,7 @@ static int try_to_wake_up(struct task_struct *p, unsigned int state, int sync)
 
 out_activate:
 #endif /* CONFIG_SMP */
-	ftrace_wake_up_task(p, rq->curr);
+	ftrace_wake_up_task(rq, p, rq->curr);
 	schedstat_inc(p, se.nr_wakeups);
 	if (sync)
 		schedstat_inc(p, se.nr_wakeups_sync);
@@ -2555,7 +2584,7 @@ void wake_up_new_task(struct task_struct *p, unsigned long clone_flags)
 		p->sched_class->task_new(rq, p);
 		inc_nr_running(rq);
 	}
-	ftrace_wake_up_task(p, rq->curr);
+	ftrace_wake_up_task(rq, p, rq->curr);
 	check_preempt_curr(rq, p);
 #ifdef CONFIG_SMP
 	if (p->sched_class->task_wake_up)
@@ -2728,7 +2757,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	struct mm_struct *mm, *oldmm;
 
 	prepare_task_switch(rq, prev, next);
-	ftrace_ctx_switch(prev, next);
+	ftrace_ctx_switch(rq, prev, next);
 	mm = next->mm;
 	oldmm = prev->active_mm;
 	/*
