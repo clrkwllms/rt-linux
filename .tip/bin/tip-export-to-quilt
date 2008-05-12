@@ -1,6 +1,6 @@
 
 [ -e tip/ ] && { echo "tip/ hierarchy already exists!"; exit -1; }
-for N in $(git-branch | grep -vE ' master$| base$| tmp'); do
+for N in $(git-branch | cut -c2- | grep -vE ' master$| base$| tmp'); do
 
   ITEMS=$(git-rev-list --reverse base..$N)
   mkdir -p tip/$N
