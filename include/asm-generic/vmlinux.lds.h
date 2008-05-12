@@ -63,6 +63,10 @@
 		VMLINUX_SYMBOL(__start_rodata) = .;			\
 		*(.rodata) *(.rodata.*)					\
 		*(__vermagic)		/* Kernel version magic */	\
+		. = ALIGN(8);						\
+		VMLINUX_SYMBOL(__start___imv_cond_end) = .;		\
+		*(__imv_cond_end) /* Immediate condition end pointers */\
+		VMLINUX_SYMBOL(__stop___imv_cond_end) = .;		\
 		*(__markers_strings)	/* Markers: strings */		\
 	}								\
 									\

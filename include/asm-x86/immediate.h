@@ -20,8 +20,8 @@ struct __imv {
 				 * Pointer to the memory location of the
 				 * immediate value within the instruction.
 				 */
-	int  jmp_off;		/* offset for jump target */
-	unsigned char size;	/* Type size. */
+	unsigned char var_size;	/* Type size of variable. */
+	unsigned char size;	/* Type size of immediate value. */
 	unsigned char insn_size;/* Instruction size. */
 } __attribute__ ((packed));
 
@@ -58,8 +58,7 @@ struct __imv {
 				".previous\n\t"				\
 				".section __imv,\"aw\",@progbits\n\t"	\
 				_ASM_PTR "%c1, (3f)-%c2\n\t"		\
-				".int 0\n\t"				\
-				".byte %c2, (2b-1b)\n\t"		\
+				".byte %c2, %c2, (2b-1b)\n\t"		\
 				".previous\n\t"				\
 				"mov $0,%0\n\t"				\
 				"3:\n\t"				\
@@ -76,8 +75,7 @@ struct __imv {
 				".previous\n\t"				\
 				".section __imv,\"aw\",@progbits\n\t"	\
 				_ASM_PTR "%c1, (3f)-%c2\n\t"		\
-				".int 0\n\t"				\
-				".byte %c2, (2b-1b)\n\t"		\
+				".byte %c2, %c2, (2b-1b)\n\t"		\
 				".previous\n\t"				\
 				".org . + ((-.-(2b-1b)) & (%c2-1)), 0x90\n\t" \
 				"mov $0,%0\n\t"				\
@@ -98,8 +96,7 @@ struct __imv {
 				".previous\n\t"				\
 				".section __imv,\"aw\",@progbits\n\t"	\
 				_ASM_PTR "%c1, (3f)-%c2\n\t"		\
-				".int 0\n\t"				\
-				".byte %c2, (2b-1b)\n\t"		\
+				".byte %c2, %c2, (2b-1b)\n\t"		\
 				".previous\n\t"				\
 				".org . + ((-.-(2b-1b)) & (%c2-1)), 0x90\n\t" \
 				"mov $0xFEFEFEFE01010101,%0\n\t" 	\
@@ -113,32 +110,59 @@ struct __imv {
 	})
 
 /*
- * Uses %al.
- * size is 0.
- * Use in if (unlikely(imv_cond(var)))
+ * Uses %eax.
+ * immediate value size is declared as 0.
+ * Use in
+ * if (unlikely(imv_cond(var))) {
+ *   imv_cond_end();
+ *   ...
+ * } else {
+ *   imv_cond_end();
+ *   ...
+ * }
  * Given a char as argument.
+ * If the expected code pattern insuring correct liveliness of ZF and %eax isn't
+ * met, fallback on standard immediate value.
+ * patches the 5 bytes mov for a e9 XX XX XX XX (near jump)
+ * Note : Patching the the 4 bytes immediate value with 1 byte variable
+ * on fallback.
  */
 #define imv_cond(name)							\
 	({								\
-		__typeof__(name##__imv) value;				\
-		BUILD_BUG_ON(sizeof(value) > 1);			\
+		uint32_t value;						\
+		BUILD_BUG_ON(sizeof(__typeof__(name##__imv)) > 1);	\
 		asm (".section __discard,\"\",@progbits\n\t"		\
 			"1:\n\t"					\
 			"mov $0,%0\n\t"					\
 			"2:\n\t"					\
 			".previous\n\t"					\
 			".section __imv,\"aw\",@progbits\n\t"		\
-			_ASM_PTR "%c1, (3f)-1\n\t"			\
-			".int 0\n\t"					\
-			".byte %c2, (2b-1b)\n\t"			\
+			_ASM_PTR "%c1, (3f)-%c2\n\t"			\
+			".byte %c3, 0, (2b-1b)\n\t"			\
 			".previous\n\t"					\
 			"mov $0,%0\n\t"					\
 			"3:\n\t"					\
 			: "=a" (value)					\
 			: "i" (&name##__imv),				\
-			  "i" (0));					\
+			  "i" (sizeof(value)),				\
+			  "i" (sizeof(__typeof__(name##__imv))));	\
 		value;							\
 	})
+
+/*
+ * Make sure the %eax register and ZF are not live anymore at the current
+ * address, which is declared in the __imv_cond_end section.
+ * All asm statements clobbers the flags, but add "cc" clobber just to be sure.
+ * Clobbers %eax.
+ */
+#define imv_cond_end()							\
+	do {								\
+		asm (".section __imv_cond_end,\"a\",@progbits\n\t"	\
+				_ASM_PTR "1f\n\t"			\
+				".previous\n\t"				\
+				"1:\n\t"				\
+				: : : "eax", "cc");			\
+	} while (0)
 
 extern int arch_imv_update(struct __imv *imv, int early);
 

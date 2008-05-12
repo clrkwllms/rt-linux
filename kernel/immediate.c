@@ -29,6 +29,8 @@ static int imv_early_boot_complete;
 
 extern struct __imv __start___imv[];
 extern struct __imv __stop___imv[];
+extern unsigned long __start___imv_cond_end[];
+extern unsigned long __stop___imv_cond_end[];
 
 /*
  * imv_mutex nests inside module_mutex. imv_mutex protects builtin
@@ -101,6 +103,42 @@ void imv_unref_core_init(void)
 {
 	imv_unref(__start___imv, __stop___imv, __init_begin,
 		(unsigned long)__init_end - (unsigned long)__init_begin);
+}
+
+int _is_imv_cond_end(unsigned long *begin, unsigned long *end,
+		unsigned long addr1, unsigned long addr2)
+{
+	unsigned long *iter;
+	int found = 0;
+
+	for (iter = begin; iter < end; iter++) {
+		if (*iter == addr1)	/* deals with addr1 == addr2 */
+			found++;
+		if (*iter == addr2)
+			found++;
+		if (found == 2)
+			return 1;
+	}
+	return 0;
+}
+
+/**
+ * is_imv_cond_end
+ *
+ * Check if the two given addresses are located in the immediate value condition
+ * end table. Addresses should be in the same object.
+ * The module mutex should be held when calling this function for non-core
+ * addresses.
+ */
+int is_imv_cond_end(unsigned long addr1, unsigned long addr2)
+{
+	if (core_kernel_text(addr1)) {
+		return _is_imv_cond_end(__start___imv_cond_end,
+			__stop___imv_cond_end, addr1, addr2);
+	} else {
+		return is_imv_cond_end_module(addr1, addr2);
+	}
+	return 0;
 }
 
 void __init imv_init_complete(void)
