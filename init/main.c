@@ -804,6 +804,7 @@ static void run_init_process(char *init_filename)
  */
 static int noinline init_post(void)
 {
+	imv_unref_core_init();
 	free_initmem();
 	unlock_kernel();
 	mark_rodata_ro();

@@ -42,10 +42,10 @@ The immediate mechanism supports inserting multiple instances of the same
 immediate. Immediate values can be put in inline functions, inlined static
 functions, and unrolled loops.
 
-If you have to read the immediate values from a function declared as __init or
-__exit, you should explicitly use _imv_read(), which will fall back on a
-global variable read. Failing to do so will leave a reference to the __init
-section after it is freed (it would generate a modpost warning).
+If you have to read the immediate values from a function declared as __exit, you
+should explicitly use _imv_read(), which will fall back on a global variable
+read. Failing to do so will leave a reference to the __exit section in kernel
+without module unload support. imv_read() in the __init section is supported.
 
 You can choose to set an initial static value to the immediate by using, for
 instance:

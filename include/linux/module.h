@@ -340,7 +340,7 @@ struct module
 	   keeping pointers to this stuff */
 	char *args;
 #ifdef CONFIG_IMMEDIATE
-	const struct __imv *immediate;
+	struct __imv *immediate;
 	unsigned int num_immediate;
 #endif
 #ifdef CONFIG_MARKERS

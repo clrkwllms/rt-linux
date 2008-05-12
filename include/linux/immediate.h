@@ -46,6 +46,9 @@ struct __imv {
 extern void core_imv_update(void);
 extern void imv_update_range(const struct __imv *begin,
 	const struct __imv *end);
+extern void imv_unref_core_init(void);
+extern void imv_unref(struct __imv *begin, struct __imv *end, void *start,
+		unsigned long size);
 
 #else
 
@@ -73,6 +76,7 @@ extern void imv_update_range(const struct __imv *begin,
 
 static inline void core_imv_update(void) { }
 static inline void module_imv_update(void) { }
+static inline void imv_unref_core_init(void) { }
 
 #endif
 
