@@ -49,3 +49,7 @@ do
 	fi
     }
 done
+
+# switch back to master again
+git-checkout master
+
