@@ -95,6 +95,8 @@
 		VMLINUX_SYMBOL(__end_rio_route_ops) = .;		\
 	}								\
 									\
+	TRACEDATA							\
+									\
 	/* Kernel symbol table: Normal symbols */			\
 	__ksymtab         : AT(ADDR(__ksymtab) - LOAD_OFFSET) {		\
 		VMLINUX_SYMBOL(__start___ksymtab) = .;			\
@@ -322,6 +324,18 @@
 	}
 #else
 #define BUG_TABLE
+#endif
+
+#ifdef CONFIG_PM_TRACE
+#define TRACEDATA							\
+	. = ALIGN(4);							\
+	.tracedata : AT(ADDR(.tracedata) - LOAD_OFFSET) {		\
+	  	__tracedata_start = .;					\
+		*(.tracedata)						\
+	  	__tracedata_end = .;					\
+	}
+#else
+#define TRACEDATA
 #endif
 
 #define NOTES								\

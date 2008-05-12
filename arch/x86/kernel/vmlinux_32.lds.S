@@ -58,13 +58,6 @@ SECTIONS
   	__stop___ex_table = .;
   } :text = 0x9090
 
-  . = ALIGN(4);
-  .tracedata : AT(ADDR(.tracedata) - LOAD_OFFSET) {
-  	__tracedata_start = .;
-	*(.tracedata)
-  	__tracedata_end = .;
-  }
-
   RODATA
 
   /* writeable */
