@@ -1,0 +1,30 @@
+# -*-Shell-script-*-
+#
+# Tip script library
+#
+
+get_current_branch() {
+    git-branch | grep "*" | sed "s/\* //"
+}
+
+get_auto_branches() {
+    git-checkout tip 2>/dev/null
+    ls  .tip/auto-branches/ | grep -v "~"
+    git-checkout $1 2>/dev/null
+}
+
+check_master() {
+    local CB=`get_current_branch`
+    if [ $CB != "master" ]
+    then
+	echo "Check out master branch first"
+	exit 1;
+    fi
+}
+
+abort_merge() {
+    echo "merge aborted manually!";
+    git-reset --hard;
+    git-checkout master; 
+    exit -1;
+}
