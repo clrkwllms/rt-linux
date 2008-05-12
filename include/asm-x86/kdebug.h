@@ -3,6 +3,9 @@
 
 #include <linux/notifier.h>
 
+#include <linux/ptrace.h>
+#include <asm/system.h>
+
 struct pt_regs;
 
 /* Grossly misnamed. */
@@ -43,5 +46,14 @@ struct pf_handler {
 
 extern void register_page_fault_handler(struct pf_handler *new_pfh);
 extern void unregister_page_fault_handler(struct pf_handler *old_pfh);
+
+/* trap3/1 are intr gates for kprobes.  So, restore the status of IF,
+ * if necessary, before executing the original int3/1 (trap) handler.
+ */
+static inline void restore_interrupts(struct pt_regs *regs)
+{
+	if (regs->flags & X86_EFLAGS_IF)
+		local_irq_enable();
+}
 
 #endif
