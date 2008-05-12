@@ -2244,6 +2244,8 @@ tracing_read_pipe(struct file *filp, char __user *ubuf,
 {
 	struct trace_iterator *iter = filp->private_data;
 	struct trace_array_cpu *data;
+	struct trace_array *tr = iter->tr;
+	struct tracer *tracer = iter->trace;
 	static cpumask_t mask;
 	static int start;
 	unsigned long flags;
@@ -2316,7 +2318,8 @@ tracing_read_pipe(struct file *filp, char __user *ubuf,
 		cnt = PAGE_SIZE - 1;
 
 	memset(iter, 0, sizeof(*iter));
-	iter->tr = &global_trace;
+	iter->tr = tr;
+	iter->trace = tracer;
 	iter->pos = -1;
 
 	/*
