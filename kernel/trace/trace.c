@@ -684,6 +684,13 @@ __trace_special(void *__tr, void *__data,
 	raw_local_irq_save(irq_flags);
 	__raw_spin_lock(&data->lock);
 	entry			= tracing_get_trace_entry(tr, data);
+	if (!entry) {
+		static unsigned limit;
+		if (limit++ < 12)
+			pr_err("%s: Dereferencing NULL, arrr!\n", __func__);
+		spin_unlock_irqrestore(&data->lock, irq_flags);
+		return;
+	}
 	tracing_generic_entry_update(entry, 0);
 	entry->type		= TRACE_SPECIAL;
 	entry->special.arg1	= arg1;
