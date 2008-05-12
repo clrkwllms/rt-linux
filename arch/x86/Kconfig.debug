@@ -240,9 +240,13 @@ config IO_DELAY_UDELAY
 
 config IO_DELAY_NONE
 	bool "no port-IO delay"
+	depends on BROKEN && KERNEL_DEBUG
 	help
 	  No port-IO delay. Will break on old boxes that require port-IO
-	  delay for certain operations. Should work on most new machines.
+	  delay for certain operations. Should work on most new machines
+	  but not on all. There's no good way to determine whether this
+	  will break anything so only enable it if you know what you are
+	  doing.
 
 endchoice
 
