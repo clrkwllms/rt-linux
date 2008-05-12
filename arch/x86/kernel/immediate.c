@@ -80,13 +80,25 @@
 #include <asm/cacheflush.h>
 
 #define BREAKPOINT_INSTRUCTION  0xcc
+#define JMP_REL8		0xeb
+#define JMP_REL32		0xe9
+#define INSN_NOP1		0x90
+#define INSN_NOP2		0x89, 0xf6
 #define BREAKPOINT_INS_LEN	1
 #define NR_NOPS			10
+
+/*#define DEBUG_IMMEDIATE 1*/
+
+#ifdef DEBUG_IMMEDIATE
+#define printk_dbg printk
+#else
+#define printk_dbg(fmt , a...)
+#endif
 
 static unsigned long target_after_int3;	/* EIP of the target after the int3 */
 static unsigned long bypass_eip;	/* EIP of the bypass. */
 static unsigned long bypass_after_int3;	/* EIP after the end-of-bypass int3 */
-static unsigned long after_imv;	/*
+static unsigned long after_imv;		/*
 					 * EIP where to resume after the
 					 * single-stepping.
 					 */
@@ -142,6 +154,25 @@ static int imv_notifier(struct notifier_block *nb,
 
 	if (die_val == DIE_INT3) {
 		if (args->regs->ip == target_after_int3) {
+			/* deal with non-relocatable jmp instructions */
+			switch (*(uint8_t *)bypass_eip) {
+			case JMP_REL8: /* eb cb       jmp rel8 */
+				args->regs->ip +=
+					*(signed char *)(bypass_eip + 1) + 1;
+				return NOTIFY_STOP;
+			case JMP_REL32: /* e9 cw    jmp rel16 (valid on ia32) */
+					/* e9 cd    jmp rel32 */
+				args->regs->ip +=
+					*(int *)(bypass_eip + 1) + 4;
+				return NOTIFY_STOP;
+			case INSN_NOP1:
+				/* deal with insertion of nop + jmp_rel32 */
+				if (*((uint8_t *)bypass_eip + 1) == JMP_REL32) {
+					args->regs->ip +=
+						*(int *)(bypass_eip + 2) + 5;
+					return NOTIFY_STOP;
+				}
+			}
 			preempt_disable();
 			args->regs->ip = bypass_eip;
 			return NOTIFY_STOP;
@@ -159,71 +190,107 @@ static struct notifier_block imv_notify = {
 	.priority = 0x7fffffff,	/* we need to be notified first */
 };
 
-/**
- * arch_imv_update - update one immediate value
- * @imv: pointer of type const struct __imv to update
- * @early: early boot (1) or normal (0)
- *
- * Update one immediate value. Must be called with imv_mutex held.
+/*
+ * returns -1 if not found
+ * return 0 if found.
  */
-__kprobes int arch_imv_update(const struct __imv *imv, int early)
+static inline int detect_mov_test_jne(uint8_t *addr, uint8_t **opcode,
+		uint8_t **jmp_offset, int *offset_len)
 {
-	int ret;
-	unsigned char opcode_size = imv->insn_size - imv->size;
-	unsigned long insn = imv->imv - opcode_size;
-	unsigned long len;
+	printk_dbg(KERN_DEBUG "Trying at %p %hx %hx %hx %hx %hx %hx\n",
+		addr, addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+	/* b0 cb    movb cb,%al */
+	if (addr[0] != 0xb0)
+		return -1;
+	/* 84 c0    test %al,%al */
+	if (addr[2] != 0x84 || addr[3] != 0xc0)
+		return -1;
+	printk_dbg(KERN_DEBUG "Found test %%al,%%al at %p\n", addr + 2);
+	switch (addr[4]) {
+	case 0x75: /* 75 cb       jne rel8 */
+		printk_dbg(KERN_DEBUG "Found jne rel8 at %p\n", addr + 4);
+		*opcode = addr + 4;
+		*jmp_offset = addr + 5;
+		*offset_len = 1;
+		return 0;
+	case 0x0f:
+		switch (addr[5]) {
+		case 0x85:	 /* 0F 85 cw    jne rel16 (valid on ia32) */
+				 /* 0F 85 cd    jne rel32 */
+			printk_dbg(KERN_DEBUG "Found jne rel16/32 at %p\n",
+				addr + 5);
+			*opcode = addr + 4;
+			*jmp_offset = addr + 6;
+			*offset_len = 4;
+			return 0;
+		default:
+			return -1;
+		}
+		break;
+	default: return -1;
+	}
+}
+
+/*
+ * returns -1 if not found
+ * return 0 if found.
+ */
+static inline int detect_mov_test_je(uint8_t *addr, uint8_t **opcode,
+		uint8_t **jmp_offset, int *offset_len)
+{
+	/* b0 cb    movb cb,%al */
+	if (addr[0] != 0xb0)
+		return -1;
+	/* 84 c0    test %al,%al */
+	if (addr[2] != 0x84 || addr[3] != 0xc0)
+		return -1;
+	printk_dbg(KERN_DEBUG "Found test %%al,%%al at %p\n", addr + 2);
+	switch (addr[4]) {
+	case 0x74: /* 74 cb       je rel8 */
+		printk_dbg(KERN_DEBUG "Found je rel8 at %p\n", addr + 4);
+		*opcode = addr + 4;
+		*jmp_offset = addr + 5;
+		*offset_len = 1;
+		return 0;
+	case 0x0f:
+		switch (addr[5]) {
+		case 0x84:	 /* 0F 84 cw    je rel16 (valid on ia32) */
+				 /* 0F 84 cd    je rel32 */
+			printk_dbg(KERN_DEBUG "Found je rel16/32 at %p\n",
+				addr + 5);
+			*opcode = addr + 4;
+			*jmp_offset = addr + 6;
+			*offset_len = 4;
+			return 0;
+		default:
+			return -1;
+		}
+		break;
+	default: return -1;
+	}
+}
+
+static int static_early;
+
+/*
+ * Marked noinline because we prefer to have only one _imv_bypass. Not that it
+ * is required, but there is no need to edit two bypasses.
+ */
+static noinline int replace_instruction_safe(uint8_t *addr, uint8_t *newcode,
+		int size)
+{
 	char *vaddr;
 	struct page *pages[1];
+	int len;
+	int ret;
 
-#ifdef CONFIG_KPROBES
-	/*
-	 * Fail if a kprobe has been set on this instruction.
-	 * (TODO: we could eventually do better and modify all the (possibly
-	 * nested) kprobes for this site if kprobes had an API for this.
-	 */
-	if (unlikely(!early
-			&& *(unsigned char *)insn == BREAKPOINT_INSTRUCTION)) {
-		printk(KERN_WARNING "Immediate value in conflict with kprobe. "
-				    "Variable at %p, "
-				    "instruction at %p, size %hu\n",
-				    (void *)imv->imv,
-				    (void *)imv->var, imv->size);
-		return -EBUSY;
-	}
-#endif
+	/* bypass is 10 bytes long for x86_64 long */
+	WARN_ON(size > 10);
 
-	/*
-	 * If the variable and the instruction have the same value, there is
-	 * nothing to do.
-	 */
-	switch (imv->size) {
-	case 1:	if (*(uint8_t *)imv->imv
-				== *(uint8_t *)imv->var)
-			return 0;
-		break;
-	case 2:	if (*(uint16_t *)imv->imv
-				== *(uint16_t *)imv->var)
-			return 0;
-		break;
-	case 4:	if (*(uint32_t *)imv->imv
-				== *(uint32_t *)imv->var)
-			return 0;
-		break;
-#ifdef CONFIG_X86_64
-	case 8:	if (*(uint64_t *)imv->imv
-				== *(uint64_t *)imv->var)
-			return 0;
-		break;
-#endif
-	default:return -EINVAL;
-	}
+	_imv_bypass(&bypass_eip, &bypass_after_int3);
 
-	if (!early) {
-		/* bypass is 10 bytes long for x86_64 long */
-		WARN_ON(imv->insn_size > 10);
-		_imv_bypass(&bypass_eip, &bypass_after_int3);
-
-		after_imv = imv->imv + imv->size;
+	if (!static_early) {
+		after_imv = (unsigned long)addr + size;
 
 		/*
 		 * Using the _early variants because nobody is executing the
@@ -238,22 +305,23 @@ __kprobes int arch_imv_update(const struct __imv *imv, int early)
 		vaddr = vmap(pages, 1, VM_MAP, PAGE_KERNEL);
 		BUG_ON(!vaddr);
 		text_poke_early(&vaddr[bypass_eip & ~PAGE_MASK],
-			(void *)insn, imv->insn_size);
+			(void *)addr, size);
 		/*
 		 * Fill the rest with nops.
 		 */
-		len = NR_NOPS - imv->insn_size;
+		len = NR_NOPS - size;
 		add_nops((void *)
-			&vaddr[(bypass_eip & ~PAGE_MASK) + imv->insn_size],
+			&vaddr[(bypass_eip & ~PAGE_MASK) + size],
 			len);
 		vunmap(vaddr);
 
-		target_after_int3 = insn + BREAKPOINT_INS_LEN;
+		target_after_int3 = (unsigned long)addr + BREAKPOINT_INS_LEN;
 		/* register_die_notifier has memory barriers */
 		register_die_notifier(&imv_notify);
-		/* The breakpoint will single-step the bypass */
-		text_poke((void *)insn,
-			((unsigned char[]){BREAKPOINT_INSTRUCTION}), 1);
+		/* The breakpoint will execute the bypass */
+		text_poke((void *)addr,
+			((unsigned char[]){BREAKPOINT_INSTRUCTION}),
+			BREAKPOINT_INS_LEN);
 		/*
 		 * Make sure the breakpoint is set before we continue (visible
 		 * to other CPUs and interrupts).
@@ -265,14 +333,18 @@ __kprobes int arch_imv_update(const struct __imv *imv, int early)
 		ret = on_each_cpu(imv_synchronize_core, NULL, 1, 1);
 		BUG_ON(ret != 0);
 
-		text_poke((void *)(insn + opcode_size), (void *)imv->var,
-				imv->size);
+		text_poke((void *)(addr + BREAKPOINT_INS_LEN),
+			&newcode[BREAKPOINT_INS_LEN],
+			size - BREAKPOINT_INS_LEN);
 		/*
 		 * Make sure the value can be seen from other CPUs and
 		 * interrupts.
 		 */
 		wmb();
-		text_poke((void *)insn, (unsigned char *)bypass_eip, 1);
+#ifdef DEBUG_IMMEDIATE
+		mdelay(10);	/* lets the breakpoint for a while */
+#endif
+		text_poke(addr, newcode, BREAKPOINT_INS_LEN);
 		/*
 		 * Wait for all int3 handlers to end (interrupts are disabled in
 		 * int3). This CPU is clearly not in a int3 handler, because
@@ -285,7 +357,203 @@ __kprobes int arch_imv_update(const struct __imv *imv, int early)
 		unregister_die_notifier(&imv_notify);
 		/* unregister_die_notifier has memory barriers */
 	} else
-		text_poke_early((void *)imv->imv, (void *)imv->var,
-			imv->size);
+		text_poke_early(addr, newcode, size);
+	return 0;
+}
+
+static int patch_jump_target(struct __imv *imv)
+{
+	uint8_t *opcode, *jmp_offset;
+	int offset_len;
+	int mov_test_j_found = 0;
+
+	if (!detect_mov_test_jne((uint8_t *)imv->imv - 1,
+			&opcode, &jmp_offset, &offset_len)) {
+		imv->insn_size = 1;	/* positive logic */
+		mov_test_j_found = 1;
+	} else if (!detect_mov_test_je((uint8_t *)imv->imv - 1,
+			&opcode, &jmp_offset, &offset_len)) {
+		imv->insn_size = 0;	/* negative logic */
+		mov_test_j_found = 1;
+	}
+
+	if (mov_test_j_found) {
+		int logicvar = imv->insn_size ? imv->var : !imv->var;
+		int newoff;
+
+		if (offset_len == 1) {
+			imv->jmp_off = *(signed char *)jmp_offset;
+			/* replace with JMP_REL8 opcode. */
+			replace_instruction_safe(opcode,
+				((unsigned char[]){ JMP_REL8,
+				(logicvar ? (signed char)imv->jmp_off : 0) }),
+				2);
+		} else {
+			/* replace with nop and JMP_REL16/32 opcode.
+			 * It's ok to shrink an instruction, never ok to
+			 * grow it afterward. */
+			imv->jmp_off = *(int *)jmp_offset;
+			newoff = logicvar ? (int)imv->jmp_off : 0;
+			replace_instruction_safe(opcode,
+				((unsigned char[]){ INSN_NOP1, JMP_REL32,
+				((unsigned char *)&newoff)[0],
+				((unsigned char *)&newoff)[1],
+				((unsigned char *)&newoff)[2],
+				((unsigned char *)&newoff)[3] }),
+				6);
+		}
+		/* now we can get rid of the movb */
+		replace_instruction_safe((uint8_t *)imv->imv - 1,
+			((unsigned char[]){ INSN_NOP2 }),
+			2);
+		/* now we can get rid of the testb */
+		replace_instruction_safe((uint8_t *)imv->imv + 1,
+			((unsigned char[]){ INSN_NOP2 }),
+			2);
+		/* remember opcode + 1 to enable the JMP_REL patching */
+		if (offset_len == 1)
+			imv->imv = (unsigned long)opcode + 1;
+		else
+			imv->imv = (unsigned long)opcode + 2;	/* skip nop */
+		return 0;
+
+	}
+
+	if (*((uint8_t *)imv->imv - 1) == JMP_REL8) {
+		int logicvar = imv->insn_size ? imv->var : !imv->var;
+
+		printk_dbg(KERN_DEBUG "Found JMP_REL8 at %p\n",
+			((uint8_t *)imv->imv - 1));
+		/* Speed up by skipping if not changed */
+		if (logicvar) {
+			if (*(int8_t *)imv->imv == (int8_t)imv->jmp_off)
+				return 0;
+		} else {
+			if (*(int8_t *)imv->imv == 0)
+				return 0;
+		}
+
+		replace_instruction_safe((uint8_t *)imv->imv - 1,
+			((unsigned char[]){ JMP_REL8,
+			(logicvar ? (signed char)imv->jmp_off : 0) }),
+			2);
+		return 0;
+	}
+
+	if (*((uint8_t *)imv->imv - 1) == JMP_REL32) {
+		int logicvar = imv->insn_size ? imv->var : !imv->var;
+		int newoff = logicvar ? (int)imv->jmp_off : 0;
+
+		printk_dbg(KERN_DEBUG "Found JMP_REL32 at %p, update with %x\n",
+			((uint8_t *)imv->imv - 1), newoff);
+		/* Speed up by skipping if not changed */
+		if (logicvar) {
+			if (*(int *)imv->imv == (int)imv->jmp_off)
+				return 0;
+		} else {
+			if (*(int *)imv->imv == 0)
+				return 0;
+		}
+
+		replace_instruction_safe((uint8_t *)imv->imv - 1,
+			((unsigned char[]){ JMP_REL32,
+			((unsigned char *)&newoff)[0],
+			((unsigned char *)&newoff)[1],
+			((unsigned char *)&newoff)[2],
+			((unsigned char *)&newoff)[3] }),
+			5);
+		return 0;
+	}
+
+	/* Nothing known found. */
+	return -1;
+}
+
+/**
+ * arch_imv_update - update one immediate value
+ * @imv: pointer of type const struct __imv to update
+ * @early: early boot (1) or normal (0)
+ *
+ * Update one immediate value. Must be called with imv_mutex held.
+ */
+__kprobes int arch_imv_update(struct __imv *imv, int early)
+{
+	int ret;
+	uint8_t buf[10];
+	unsigned long insn, opcode_size;
+
+	static_early = early;
+
+	/*
+	 * If imv_cond is encountered, try to patch it with
+	 * patch_jump_target. Continue with normal immediate values if the area
+	 * surrounding the instruction is not as expected.
+	 */
+	if (imv->size == 0) {
+		ret = patch_jump_target(imv);
+		if (ret) {
+#ifdef DEBUG_IMMEDIATE
+			static int nr_fail;
+			printk(KERN_DEBUG
+				"Jump target fallback at %lX, nr fail %d\n",
+				imv->imv, ++nr_fail);
+#endif
+			imv->size = 1;
+		} else {
+#ifdef DEBUG_IMMEDIATE
+			static int nr_success;
+			printk(KERN_DEBUG "Jump target at %lX, nr success %d\n",
+				imv->imv, ++nr_success);
+#endif
+			return 0;
+		}
+	}
+
+	opcode_size = imv->insn_size - imv->size;
+	insn = imv->imv - opcode_size;
+
+#ifdef CONFIG_KPROBES
+	/*
+	 * Fail if a kprobe has been set on this instruction.
+	 * (TODO: we could eventually do better and modify all the (possibly
+	 * nested) kprobes for this site if kprobes had an API for this.
+	 */
+	if (unlikely(!early
+			&& *(unsigned char *)insn == BREAKPOINT_INSTRUCTION)) {
+		printk(KERN_WARNING "Immediate value in conflict with kprobe. "
+				    "Variable at %p, "
+				    "instruction at %p, size %hu\n",
+				    (void *)imv->var,
+				    (void *)imv->imv, imv->size);
+		return -EBUSY;
+	}
+#endif
+
+	/*
+	 * If the variable and the instruction have the same value, there is
+	 * nothing to do.
+	 */
+	switch (imv->size) {
+	case 1:	if (*(uint8_t *)imv->imv == *(uint8_t *)imv->var)
+			return 0;
+		break;
+	case 2:	if (*(uint16_t *)imv->imv == *(uint16_t *)imv->var)
+			return 0;
+		break;
+	case 4:	if (*(uint32_t *)imv->imv == *(uint32_t *)imv->var)
+			return 0;
+		break;
+#ifdef CONFIG_X86_64
+	case 8:	if (*(uint64_t *)imv->imv == *(uint64_t *)imv->var)
+			return 0;
+		break;
+#endif
+	default:return -EINVAL;
+	}
+
+	memcpy(buf, (uint8_t *)insn, opcode_size);
+	memcpy(&buf[opcode_size], (void *)imv->var, imv->size);
+	replace_instruction_safe((uint8_t *)insn, buf, imv->insn_size);
+
 	return 0;
 }
