@@ -2253,6 +2253,10 @@ sys_init_module(void __user *umod,
 	/* Drop initial reference. */
 	module_put(mod);
 	unwind_remove_table(mod->unwind_info, 1);
+#ifdef CONFIG_IMMEDIATE
+	imv_unref(mod->immediate, mod->immediate + mod->num_immediate,
+		mod->module_init, mod->init_size);
+#endif
 	module_free(mod, mod->module_init);
 	mod->module_init = NULL;
 	mod->init_size = 0;

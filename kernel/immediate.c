@@ -22,6 +22,7 @@
 #include <linux/cpu.h>
 #include <linux/stop_machine.h>
 
+#include <asm/sections.h>
 #include <asm/cacheflush.h>
 
 /*
@@ -30,8 +31,8 @@
 static int imv_early_boot_complete;
 static int wrote_text;
 
-extern const struct __imv __start___imv[];
-extern const struct __imv __stop___imv[];
+extern struct __imv __start___imv[];
+extern struct __imv __stop___imv[];
 
 static int stop_machine_imv_update(void *imv_ptr)
 {
@@ -118,6 +119,8 @@ void imv_update_range(const struct __imv *begin,
 	int ret;
 	for (iter = begin; iter < end; iter++) {
 		mutex_lock(&imv_mutex);
+		if (!iter->imv)	/* Skip removed __init immediate values */
+			goto skip;
 		ret = apply_imv_update(iter);
 		if (imv_early_boot_complete && ret)
 			printk(KERN_WARNING
@@ -126,6 +129,7 @@ void imv_update_range(const struct __imv *begin,
 				"instruction at %p, size %hu\n",
 				(void *)iter->imv,
 				(void *)iter->var, iter->size);
+skip:
 		mutex_unlock(&imv_mutex);
 	}
 }
@@ -142,6 +146,29 @@ void core_imv_update(void)
 	imv_update_range(__start___imv, __stop___imv);
 }
 EXPORT_SYMBOL_GPL(core_imv_update);
+
+/**
+ * imv_unref
+ *
+ * Deactivate any immediate value reference pointing into the code region in the
+ * range start to start + size.
+ */
+void imv_unref(struct __imv *begin, struct __imv *end, void *start,
+		unsigned long size)
+{
+	struct __imv *iter;
+
+	for (iter = begin; iter < end; iter++)
+		if (iter->imv >= (unsigned long)start
+			&& iter->imv < (unsigned long)start + size)
+			iter->imv = 0UL;
+}
+
+void imv_unref_core_init(void)
+{
+	imv_unref(__start___imv, __stop___imv, __init_begin,
+		(unsigned long)__init_end - (unsigned long)__init_begin);
+}
 
 void __init imv_init_complete(void)
 {

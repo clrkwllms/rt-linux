@@ -33,7 +33,7 @@
 		BUILD_BUG_ON(sizeof(value) > 8);			\
 		switch (sizeof(value)) {				\
 		case 1:							\
-			asm(".section __imv,\"a\",@progbits\n\t"	\
+			asm(".section __imv,\"aw\",@progbits\n\t"	\
 				_ASM_PTR "%c1, (3f)-%c2\n\t"		\
 				".byte %c2\n\t"				\
 				".previous\n\t"				\
@@ -45,7 +45,7 @@
 			break;						\
 		case 2:							\
 		case 4:							\
-			asm(".section __imv,\"a\",@progbits\n\t"	\
+			asm(".section __imv,\"aw\",@progbits\n\t"	\
 				_ASM_PTR "%c1, (3f)-%c2\n\t"		\
 				".byte %c2\n\t"				\
 				".previous\n\t"				\
@@ -60,7 +60,7 @@
 				value = name##__imv;			\
 				break;					\
 			}						\
-			asm(".section __imv,\"a\",@progbits\n\t"	\
+			asm(".section __imv,\"aw\",@progbits\n\t"	\
 				_ASM_PTR "%c1, (3f)-%c2\n\t"		\
 				".byte %c2\n\t"				\
 				".previous\n\t"				\
