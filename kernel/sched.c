@@ -841,14 +841,14 @@ static inline u64 global_rt_runtime(void)
  * For kernel-internal use: high-speed (but slightly incorrect) per-cpu
  * clock constructed from sched_clock():
  */
-unsigned long long cpu_clock(int cpu)
+unsigned long long notrace cpu_clock(int cpu)
 {
 	unsigned long flags;
 	u64 now;
 
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	now = sched_clock_cpu(cpu);
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 
 	return now;
 }

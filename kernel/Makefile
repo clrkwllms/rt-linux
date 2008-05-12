@@ -14,7 +14,7 @@ obj-y     = sched.o fork.o exec_domain.o panic.o printk.o profile.o \
 ifdef CONFIG_FTRACE
 # Do not profile debug utilities
 ORIG_CFLAGS := $(KBUILD_CFLAGS)
-KBUILD_CFLAGS = $(if $(filter-out lockdep% %debug,$(basename $(notdir $@))), \
+KBUILD_CFLAGS = $(if $(filter-out lockdep% %debug sched_clock,$(basename $(notdir $@))), \
 	$(ORIG_CFLAGS), \
 	$(subst -pg,,$(ORIG_CFLAGS)))
 endif
