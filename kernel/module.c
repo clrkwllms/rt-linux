@@ -33,6 +33,7 @@
 #include <linux/cpu.h>
 #include <linux/moduleparam.h>
 #include <linux/errno.h>
+#include <linux/immediate.h>
 #include <linux/err.h>
 #include <linux/vermagic.h>
 #include <linux/notifier.h>
@@ -1759,6 +1760,7 @@ static struct module *load_module(void __user *umod,
 	unsigned int unusedcrcindex;
 	unsigned int unusedgplindex;
 	unsigned int unusedgplcrcindex;
+	unsigned int immediateindex;
 	unsigned int markersindex;
 	unsigned int markersstringsindex;
 	struct module *mod;
@@ -1857,6 +1859,7 @@ static struct module *load_module(void __user *umod,
 #ifdef ARCH_UNWIND_SECTION_NAME
 	unwindex = find_sec(hdr, sechdrs, secstrings, ARCH_UNWIND_SECTION_NAME);
 #endif
+	immediateindex = find_sec(hdr, sechdrs, secstrings, "__imv");
 
 	/* Don't keep modinfo and version sections. */
 	sechdrs[infoindex].sh_flags &= ~(unsigned long)SHF_ALLOC;
@@ -2016,6 +2019,11 @@ static struct module *load_module(void __user *umod,
 	mod->gpl_future_syms = (void *)sechdrs[gplfutureindex].sh_addr;
 	if (gplfuturecrcindex)
 		mod->gpl_future_crcs = (void *)sechdrs[gplfuturecrcindex].sh_addr;
+#ifdef CONFIG_IMMEDIATE
+	mod->immediate = (void *)sechdrs[immediateindex].sh_addr;
+	mod->num_immediate =
+		sechdrs[immediateindex].sh_size / sizeof(*mod->immediate);
+#endif
 
 	mod->unused_syms = (void *)sechdrs[unusedindex].sh_addr;
 	if (unusedcrcindex)
@@ -2085,11 +2093,16 @@ static struct module *load_module(void __user *umod,
 
 	add_kallsyms(mod, sechdrs, symindex, strindex, secstrings);
 
+	if (!(mod->taints & TAINT_FORCED_MODULE)) {
 #ifdef CONFIG_MARKERS
-	if (!mod->taints)
 		marker_update_probe_range(mod->markers,
 			mod->markers + mod->num_markers);
 #endif
+#ifdef CONFIG_IMMEDIATE
+		imv_update_range(mod->immediate,
+			mod->immediate + mod->num_immediate);
+#endif
+}
 	err = module_finalize(hdr, sechdrs, mod);
 	if (err < 0)
 		goto cleanup;
@@ -2638,4 +2651,39 @@ void module_update_markers(void)
 				mod->markers + mod->num_markers);
 	mutex_unlock(&module_mutex);
 }
+#endif
+
+#ifdef CONFIG_IMMEDIATE
+/**
+ * _module_imv_update - update all immediate values in the kernel
+ *
+ * Iterate on the kernel core and modules to update the immediate values.
+ * Module_mutex must be held be the caller.
+ */
+void _module_imv_update(void)
+{
+	struct module *mod;
+
+	list_for_each_entry(mod, &modules, list) {
+		if (mod->taints)
+			continue;
+		imv_update_range(mod->immediate,
+			mod->immediate + mod->num_immediate);
+	}
+}
+EXPORT_SYMBOL_GPL(_module_imv_update);
+
+/**
+ * module_imv_update - update all immediate values in the kernel
+ *
+ * Iterate on the kernel core and modules to update the immediate values.
+ * Takes module_mutex.
+ */
+void module_imv_update(void)
+{
+	mutex_lock(&module_mutex);
+	_module_imv_update();
+	mutex_unlock(&module_mutex);
+}
+EXPORT_SYMBOL_GPL(module_imv_update);
 #endif
