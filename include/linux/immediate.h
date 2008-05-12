@@ -33,8 +33,7 @@
  * Internal update functions.
  */
 extern void core_imv_update(void);
-extern void imv_update_range(const struct __imv *begin,
-	const struct __imv *end);
+extern void imv_update_range(struct __imv *begin, struct __imv *end);
 extern void imv_unref_core_init(void);
 extern void imv_unref(struct __imv *begin, struct __imv *end, void *start,
 		unsigned long size);
@@ -52,6 +51,14 @@ extern void imv_unref(struct __imv *begin, struct __imv *end, void *start,
  * Reads the value of @name.
  */
 #define imv_read(name)			_imv_read(name)
+
+/**
+ * imv_cond - read immediate variable use as condition for if()
+ * @name: immediate value name
+ *
+ * Reads the value of @name.
+ */
+#define imv_cond(name)			_imv_read(name)
 
 /**
  * imv_set - set immediate variable (with locking)
