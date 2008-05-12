@@ -76,7 +76,7 @@ struct marker {
 		{ __mark_empty_function, NULL}, NULL };			\
 		__mark_check_format(format, ## args);			\
 		if (!generic) {						\
-			if (unlikely(imv_read(__mark_##name.state)))	\
+			if (unlikely(imv_cond(__mark_##name.state)))	\
 				(*__mark_##name.call)			\
 					(&__mark_##name, call_private,	\
 					## args);			\
