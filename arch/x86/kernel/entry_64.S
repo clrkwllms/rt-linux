@@ -1073,13 +1073,13 @@ ENTRY(device_not_available)
 END(device_not_available)
 
 	/* runs on exception stack */
-KPROBE_ENTRY(debug)
+KPROBE_ENTRY(x86_debug)
  	INTR_FRAME
 	pushq $0
 	CFI_ADJUST_CFA_OFFSET 8		
 	paranoidentry do_debug, DEBUG_STACK
 	paranoidexit
-KPROBE_END(debug)
+KPROBE_END(x86_debug)
 
 	/* runs on exception stack */	
 KPROBE_ENTRY(nmi)
