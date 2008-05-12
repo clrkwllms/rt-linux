@@ -84,7 +84,7 @@ extern int sysctl_stat_interval;
 extern int latencytop_enabled;
 
 /* Constants used for minimum and  maximum */
-#ifdef CONFIG_HIGHMEM
+#if defined(CONFIG_HIGHMEM) || defined(CONFIG_DETECT_SOFTLOCKUP)
 static int one = 1;
 #endif
 
