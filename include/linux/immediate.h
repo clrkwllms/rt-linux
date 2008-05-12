@@ -37,6 +37,9 @@ extern void imv_update_range(struct __imv *begin, struct __imv *end);
 extern void imv_unref_core_init(void);
 extern void imv_unref(struct __imv *begin, struct __imv *end, void *start,
 		unsigned long size);
+extern int _is_imv_cond_end(unsigned long *begin, unsigned long *end,
+		unsigned long addr1, unsigned long addr2);
+extern int is_imv_cond_end(unsigned long addr1, unsigned long addr2);
 
 #else
 
@@ -59,6 +62,7 @@ extern void imv_unref(struct __imv *begin, struct __imv *end, void *start,
  * Reads the value of @name.
  */
 #define imv_cond(name)			_imv_read(name)
+#define imv_cond_end()
 
 /**
  * imv_set - set immediate variable (with locking)

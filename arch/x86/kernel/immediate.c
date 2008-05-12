@@ -80,10 +80,7 @@
 #include <asm/cacheflush.h>
 
 #define BREAKPOINT_INSTRUCTION  0xcc
-#define JMP_REL8		0xeb
 #define JMP_REL32		0xe9
-#define INSN_NOP1		0x90
-#define INSN_NOP2		0x89, 0xf6
 #define BREAKPOINT_INS_LEN	1
 #define NR_NOPS			10
 
@@ -156,22 +153,14 @@ static int imv_notifier(struct notifier_block *nb,
 		if (args->regs->ip == target_after_int3) {
 			/* deal with non-relocatable jmp instructions */
 			switch (*(uint8_t *)bypass_eip) {
-			case JMP_REL8: /* eb cb       jmp rel8 */
-				args->regs->ip +=
-					*(signed char *)(bypass_eip + 1) + 1;
-				return NOTIFY_STOP;
 			case JMP_REL32: /* e9 cw    jmp rel16 (valid on ia32) */
 					/* e9 cd    jmp rel32 */
+					/* Skip the 4 bytes (jump offset)
+					 * following the breakpoint. */
 				args->regs->ip +=
 					*(int *)(bypass_eip + 1) + 4;
+				/* The bypass won't be executed. */
 				return NOTIFY_STOP;
-			case INSN_NOP1:
-				/* deal with insertion of nop + jmp_rel32 */
-				if (*((uint8_t *)bypass_eip + 1) == JMP_REL32) {
-					args->regs->ip +=
-						*(int *)(bypass_eip + 2) + 5;
-					return NOTIFY_STOP;
-				}
 			}
 			preempt_disable();
 			args->regs->ip = bypass_eip;
@@ -197,38 +186,62 @@ static struct notifier_block imv_notify = {
 static inline int detect_mov_test_jne(uint8_t *addr, uint8_t **opcode,
 		uint8_t **jmp_offset, int *offset_len)
 {
+	uint8_t *addr1, *addr2;
+
 	printk_dbg(KERN_DEBUG "Trying at %p %hx %hx %hx %hx %hx %hx\n",
 		addr, addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
-	/* b0 cb    movb cb,%al */
-	if (addr[0] != 0xb0)
+	/*
+	 * b8 imm32        mov  imm32,%eax or
+	 * c9 XX XX XX XX  jmp  rel32 (patched instruction)
+	 */
+	if (addr[0] != 0xb8 && addr[0] != JMP_REL32)
 		return -1;
-	/* 84 c0    test %al,%al */
-	if (addr[2] != 0x84 || addr[3] != 0xc0)
+	/* 85 c0    test %eax,%eax */
+	if (addr[5] != 0x85 || addr[6] != 0xc0)
 		return -1;
-	printk_dbg(KERN_DEBUG "Found test %%al,%%al at %p\n", addr + 2);
-	switch (addr[4]) {
+	printk_dbg(KERN_DEBUG "Found test %%eax,%%eax at %p\n", addr + 5);
+	switch (addr[7]) {
 	case 0x75: /* 75 cb       jne rel8 */
-		printk_dbg(KERN_DEBUG "Found jne rel8 at %p\n", addr + 4);
-		*opcode = addr + 4;
-		*jmp_offset = addr + 5;
+		printk_dbg(KERN_DEBUG "Found jne rel8 at %p\n", addr + 7);
+		*opcode = addr + 7;
+		*jmp_offset = addr + 8;
 		*offset_len = 1;
-		return 0;
+		/* addr1 is the address following the branch instruction */
+		addr1 = addr + 9;
+		/* addr2 is the branch target */
+		addr2 = addr1 + addr[8];
+		break;
 	case 0x0f:
-		switch (addr[5]) {
+		switch (addr[8]) {
 		case 0x85:	 /* 0F 85 cw    jne rel16 (valid on ia32) */
 				 /* 0F 85 cd    jne rel32 */
 			printk_dbg(KERN_DEBUG "Found jne rel16/32 at %p\n",
-				addr + 5);
-			*opcode = addr + 4;
-			*jmp_offset = addr + 6;
+				addr + 8);
+			*opcode = addr + 7;
+			*jmp_offset = addr + 9;
 			*offset_len = 4;
-			return 0;
+			/*
+			 * addr1 is the address following the branch
+			 * instruction
+			 */
+			addr1 = addr + 13;
+			/* addr2 is the branch target */
+			addr2 = addr1 + *(uint32_t *)(addr + 9);
+			break;
 		default:
 			return -1;
 		}
 		break;
 	default: return -1;
 	}
+	/*
+	 * Now check that the pattern was squeezed between the mov instruction
+	 * end the two epilogues (branch taken and not taken), which ensure
+	 * %eax and ZF liveliness is limited to our instructions.
+	 */
+	if (!is_imv_cond_end((unsigned long)addr1, (unsigned long)addr2))
+		return -1;
+	return 0;
 }
 
 /*
@@ -238,36 +251,60 @@ static inline int detect_mov_test_jne(uint8_t *addr, uint8_t **opcode,
 static inline int detect_mov_test_je(uint8_t *addr, uint8_t **opcode,
 		uint8_t **jmp_offset, int *offset_len)
 {
-	/* b0 cb    movb cb,%al */
-	if (addr[0] != 0xb0)
+	uint8_t *addr1, *addr2;
+
+	/*
+	 * b8 imm32        mov  imm32,%eax or
+	 * c9 XX XX XX XX  jmp  rel32 (patched instruction)
+	 */
+	if (addr[0] != 0xb8 && addr[0] != JMP_REL32)
 		return -1;
-	/* 84 c0    test %al,%al */
-	if (addr[2] != 0x84 || addr[3] != 0xc0)
+	/* 85 c0    test %eax,%eax */
+	if (addr[5] != 0x85 || addr[6] != 0xc0)
 		return -1;
-	printk_dbg(KERN_DEBUG "Found test %%al,%%al at %p\n", addr + 2);
-	switch (addr[4]) {
+	printk_dbg(KERN_DEBUG "Found test %%eax,%%eax at %p\n", addr + 5);
+	switch (addr[7]) {
 	case 0x74: /* 74 cb       je rel8 */
-		printk_dbg(KERN_DEBUG "Found je rel8 at %p\n", addr + 4);
-		*opcode = addr + 4;
-		*jmp_offset = addr + 5;
+		printk_dbg(KERN_DEBUG "Found je rel8 at %p\n", addr + 7);
+		*opcode = addr + 7;
+		*jmp_offset = addr + 8;
 		*offset_len = 1;
-		return 0;
+		/* addr1 is the address following the branch instruction */
+		addr1 = addr + 9;
+		/* addr2 is the branch target */
+		addr2 = addr1 + addr[8];
+		break;
 	case 0x0f:
-		switch (addr[5]) {
+		switch (addr[8]) {
 		case 0x84:	 /* 0F 84 cw    je rel16 (valid on ia32) */
 				 /* 0F 84 cd    je rel32 */
 			printk_dbg(KERN_DEBUG "Found je rel16/32 at %p\n",
-				addr + 5);
-			*opcode = addr + 4;
-			*jmp_offset = addr + 6;
+				addr + 8);
+			*opcode = addr + 7;
+			*jmp_offset = addr + 9;
 			*offset_len = 4;
-			return 0;
+			/*
+			 * addr1 is the address following the branch
+			 * instruction
+			 */
+			addr1 = addr + 13;
+			/* addr2 is the branch target */
+			addr2 = addr1 + *(uint32_t *)(addr + 9);
+			break;
 		default:
 			return -1;
 		}
 		break;
 	default: return -1;
 	}
+	/*
+	 * Now check that the pattern was squeezed between the mov instruction
+	 * end the two epilogues (branch taken and not taken), which ensure
+	 * %eax and ZF liveliness is limited to our instructions.
+	 */
+	if (!is_imv_cond_end((unsigned long)addr1, (unsigned long)addr2))
+		return -1;
+	return 0;
 }
 
 static int static_early;
@@ -366,95 +403,42 @@ static int patch_jump_target(struct __imv *imv)
 	uint8_t *opcode, *jmp_offset;
 	int offset_len;
 	int mov_test_j_found = 0;
+	unsigned long logicvar;
 
 	if (!detect_mov_test_jne((uint8_t *)imv->imv - 1,
 			&opcode, &jmp_offset, &offset_len)) {
-		imv->insn_size = 1;	/* positive logic */
+		logicvar = imv->var;	/* positive logic */
 		mov_test_j_found = 1;
 	} else if (!detect_mov_test_je((uint8_t *)imv->imv - 1,
 			&opcode, &jmp_offset, &offset_len)) {
-		imv->insn_size = 0;	/* negative logic */
+		logicvar = !imv->var;	/* negative logic */
 		mov_test_j_found = 1;
 	}
 
 	if (mov_test_j_found) {
-		int logicvar = imv->insn_size ? imv->var : !imv->var;
 		int newoff;
 
 		if (offset_len == 1) {
-			imv->jmp_off = *(signed char *)jmp_offset;
-			/* replace with JMP_REL8 opcode. */
-			replace_instruction_safe(opcode,
-				((unsigned char[]){ JMP_REL8,
-				(logicvar ? (signed char)imv->jmp_off : 0) }),
-				2);
+			if (logicvar)
+				newoff = *(signed char *)jmp_offset;
+			else
+				newoff = 0;
+			newoff += 4; /* jump over test, branch */
 		} else {
-			/* replace with nop and JMP_REL16/32 opcode.
-			 * It's ok to shrink an instruction, never ok to
-			 * grow it afterward. */
-			imv->jmp_off = *(int *)jmp_offset;
-			newoff = logicvar ? (int)imv->jmp_off : 0;
-			replace_instruction_safe(opcode,
-				((unsigned char[]){ INSN_NOP1, JMP_REL32,
-				((unsigned char *)&newoff)[0],
-				((unsigned char *)&newoff)[1],
-				((unsigned char *)&newoff)[2],
-				((unsigned char *)&newoff)[3] }),
-				6);
+			if (logicvar)
+				newoff = *(int *)jmp_offset;
+			else
+				newoff = 0;
+			newoff += 8; /*
+				      * jump over test (2 bytes)
+				      * and branch (6 bytes).
+				      */
 		}
-		/* now we can get rid of the movb */
-		replace_instruction_safe((uint8_t *)imv->imv - 1,
-			((unsigned char[]){ INSN_NOP2 }),
-			2);
-		/* now we can get rid of the testb */
-		replace_instruction_safe((uint8_t *)imv->imv + 1,
-			((unsigned char[]){ INSN_NOP2 }),
-			2);
-		/* remember opcode + 1 to enable the JMP_REL patching */
-		if (offset_len == 1)
-			imv->imv = (unsigned long)opcode + 1;
-		else
-			imv->imv = (unsigned long)opcode + 2;	/* skip nop */
-		return 0;
-
-	}
-
-	if (*((uint8_t *)imv->imv - 1) == JMP_REL8) {
-		int logicvar = imv->insn_size ? imv->var : !imv->var;
-
-		printk_dbg(KERN_DEBUG "Found JMP_REL8 at %p\n",
-			((uint8_t *)imv->imv - 1));
 		/* Speed up by skipping if not changed */
-		if (logicvar) {
-			if (*(int8_t *)imv->imv == (int8_t)imv->jmp_off)
-				return 0;
-		} else {
-			if (*(int8_t *)imv->imv == 0)
-				return 0;
-		}
-
-		replace_instruction_safe((uint8_t *)imv->imv - 1,
-			((unsigned char[]){ JMP_REL8,
-			(logicvar ? (signed char)imv->jmp_off : 0) }),
-			2);
-		return 0;
-	}
-
-	if (*((uint8_t *)imv->imv - 1) == JMP_REL32) {
-		int logicvar = imv->insn_size ? imv->var : !imv->var;
-		int newoff = logicvar ? (int)imv->jmp_off : 0;
-
-		printk_dbg(KERN_DEBUG "Found JMP_REL32 at %p, update with %x\n",
-			((uint8_t *)imv->imv - 1), newoff);
-		/* Speed up by skipping if not changed */
-		if (logicvar) {
-			if (*(int *)imv->imv == (int)imv->jmp_off)
-				return 0;
-		} else {
-			if (*(int *)imv->imv == 0)
-				return 0;
-		}
-
+		if (*(uint8_t *)(imv->imv - 1) == JMP_REL32 &&
+				*(int *)imv->imv == newoff)
+			return 0;
+		/* replace with a 5 bytes jump */
 		replace_instruction_safe((uint8_t *)imv->imv - 1,
 			((unsigned char[]){ JMP_REL32,
 			((unsigned char *)&newoff)[0],
@@ -464,7 +448,6 @@ static int patch_jump_target(struct __imv *imv)
 			5);
 		return 0;
 	}
-
 	/* Nothing known found. */
 	return -1;
 }
@@ -498,7 +481,7 @@ __kprobes int arch_imv_update(struct __imv *imv, int early)
 				"Jump target fallback at %lX, nr fail %d\n",
 				imv->imv, ++nr_fail);
 #endif
-			imv->size = 1;
+			imv->size = 4;
 		} else {
 #ifdef DEBUG_IMMEDIATE
 			static int nr_success;
@@ -533,7 +516,8 @@ __kprobes int arch_imv_update(struct __imv *imv, int early)
 	 * If the variable and the instruction have the same value, there is
 	 * nothing to do.
 	 */
-	switch (imv->size) {
+	BUG_ON(imv->var_size > imv->size);
+	switch (imv->var_size) {
 	case 1:	if (*(uint8_t *)imv->imv == *(uint8_t *)imv->var)
 			return 0;
 		break;
@@ -552,7 +536,9 @@ __kprobes int arch_imv_update(struct __imv *imv, int early)
 	}
 
 	memcpy(buf, (uint8_t *)insn, opcode_size);
-	memcpy(&buf[opcode_size], (void *)imv->var, imv->size);
+	memcpy(&buf[opcode_size], (void *)imv->var, imv->var_size);
+	/* pad MSBs with 0 */
+	memset(&buf[opcode_size + imv->var_size], 0, imv->size - imv->var_size);
 	replace_instruction_safe((uint8_t *)insn, buf, imv->insn_size);
 
 	return 0;

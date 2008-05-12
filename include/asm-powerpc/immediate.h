@@ -69,6 +69,7 @@ struct __imv {
 	})
 
 #define imv_cond(name)	imv_read(name)
+#define imv_cond_end()
 
 extern int arch_imv_update(const struct __imv *imv, int early);
 
