@@ -71,7 +71,6 @@
 #include <linux/debugfs.h>
 #include <linux/ctype.h>
 #include <linux/ftrace.h>
-#include <linux/marker.h>
 
 #include <asm/tlb.h>
 #include <asm/irq_regs.h>
@@ -640,6 +639,8 @@ static inline void update_rq_clock(struct rq *rq)
 {
 	rq->clock = sched_clock_cpu(cpu_of(rq));
 }
+
+#include "sched_trace.h"
 
 /*
  * Tunables that become constants when CONFIG_SCHED_DEBUG is off:
@@ -2106,8 +2107,7 @@ void wait_task_inactive(struct task_struct *p)
 		 * just go back and repeat.
 		 */
 		rq = task_rq_lock(p, &flags);
-		trace_mark(kernel_sched_wait_task, "pid %d state %ld",
-			p->pid, p->state);
+		trace_kernel_sched_wait(p);
 		running = task_running(rq, p);
 		on_rq = p->se.on_rq;
 		task_rq_unlock(rq, &flags);
@@ -2451,9 +2451,7 @@ out_activate:
 	success = 1;
 
 out_running:
-	trace_mark(kernel_sched_wakeup,
-		"pid %d state %ld ## rq %p task %p rq->curr %p",
-		p->pid, p->state, rq, p, rq->curr);
+	trace_kernel_sched_wakeup(rq, p);
 	check_preempt_curr(rq, p);
 
 	p->state = TASK_RUNNING;
@@ -2584,9 +2582,7 @@ void wake_up_new_task(struct task_struct *p, unsigned long clone_flags)
 		p->sched_class->task_new(rq, p);
 		inc_nr_running(rq);
 	}
-	trace_mark(kernel_sched_wakeup_new,
-		"pid %d state %ld ## rq %p task %p rq->curr %p",
-		p->pid, p->state, rq, p, rq->curr);
+	trace_kernel_sched_wakeup_new(rq, p);
 	check_preempt_curr(rq, p);
 #ifdef CONFIG_SMP
 	if (p->sched_class->task_wake_up)
@@ -2759,11 +2755,8 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	struct mm_struct *mm, *oldmm;
 
 	prepare_task_switch(rq, prev, next);
-	trace_mark(kernel_sched_schedule,
-		"prev_pid %d next_pid %d prev_state %ld "
-		"## rq %p prev %p next %p",
-		prev->pid, next->pid, prev->state,
-		rq, prev, next);
+
+	trace_kernel_sched_switch(rq, prev, next);
 	mm = next->mm;
 	oldmm = prev->active_mm;
 	/*
@@ -2996,8 +2989,7 @@ static void sched_migrate_task(struct task_struct *p, int dest_cpu)
 	    || unlikely(cpu_is_offline(dest_cpu)))
 		goto out;
 
-	trace_mark(kernel_sched_migrate_task, "pid %d state %ld dest_cpu %d",
-		p->pid, p->state, dest_cpu);
+	trace_kernel_sched_migrate_task(p, cpu_of(rq), dest_cpu);
 	/* force the process onto the specified CPU */
 	if (migrate_task(p, dest_cpu, &req)) {
 		/* Need to wait for migration thread (might exit: take ref). */
