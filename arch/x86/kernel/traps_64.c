@@ -53,6 +53,7 @@
 #include <asm/proto.h>
 #include <asm/nmi.h>
 #include <asm/stacktrace.h>
+#include <asm/kmemcheck.h>
 
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
@@ -899,6 +900,9 @@ asmlinkage __kprobes struct pt_regs *sync_regs(struct pt_regs *eregs)
 	return regs;
 }
 
+extern void ia32_sysenter_target(void);
+extern void x86_debug(void);
+
 /* runs on IST stack. */
 asmlinkage void __kprobes do_debug(struct pt_regs * regs,
 				   unsigned long error_code)
@@ -910,6 +914,19 @@ asmlinkage void __kprobes do_debug(struct pt_regs * regs,
 	trace_hardirqs_fixup();
 
 	get_debugreg(condition, 6);
+
+#ifdef CONFIG_KMEMCHECK
+	/* Catch kmemcheck conditions first of all! */
+	if (condition & DR_STEP) {
+		if (!(regs->flags & X86_VM_MASK) && !user_mode(regs) &&
+			((void *)regs->ip != system_call) &&
+			((void *)regs->ip != x86_debug) &&
+			((void *)regs->ip != ia32_sysenter_target)) {
+			kmemcheck_hide(regs);
+			return;
+		}
+	}
+#endif
 
 	/*
 	 * The processor cleared BTF, so don't mark that we need it set.
@@ -1150,7 +1167,7 @@ EXPORT_SYMBOL_GPL(math_state_restore);
 void __init trap_init(void)
 {
 	set_intr_gate(0,&divide_error);
-	set_intr_gate_ist(1,&debug,DEBUG_STACK);
+	set_intr_gate_ist(1,&x86_debug,DEBUG_STACK);
 	set_intr_gate_ist(2,&nmi,NMI_STACK);
  	set_system_gate_ist(3,&int3,DEBUG_STACK); /* int3 can be called from all */
 	set_system_gate(4,&overflow);	/* int4 can be called from all */

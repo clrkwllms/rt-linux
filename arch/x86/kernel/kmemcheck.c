@@ -442,7 +442,9 @@ kmemcheck_show_pages(struct page *p, unsigned int n)
 		address = (unsigned long) page_address(&p[i]);
 		pte = lookup_address(address, &level);
 		BUG_ON(!pte);
-		BUG_ON(level != PG_LEVEL_4K);
+
+		if (level != PG_LEVEL_4K)
+			continue;
 
 		set_pte(pte, __pte(pte_val(*pte) | _PAGE_PRESENT));
 		set_pte(pte, __pte(pte_val(*pte) & ~_PAGE_HIDDEN));
@@ -470,7 +472,8 @@ kmemcheck_hide_pages(struct page *p, unsigned int n)
 		address = (unsigned long) page_address(&p[i]);
 		pte = lookup_address(address, &level);
 		BUG_ON(!pte);
-		BUG_ON(level != PG_LEVEL_4K);
+		if (level != PG_LEVEL_4K)
+			continue;
 
 		set_pte(pte, __pte(pte_val(*pte) & ~_PAGE_PRESENT));
 		set_pte(pte, __pte(pte_val(*pte) | _PAGE_HIDDEN));
