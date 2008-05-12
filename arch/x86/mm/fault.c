@@ -607,14 +607,14 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	/* get the address */
 	address = read_cr2();
 
-	si_code = SEGV_MAPERR;
-
 	/*
 	 * Detect and handle instructions that would cause a page fault for
 	 * both a tracked kernel page and a userspace page.
 	 */
-	if(kmemcheck_active(regs))
+	if (kmemcheck_active(regs))
 		kmemcheck_hide(regs);
+
+	si_code = SEGV_MAPERR;
 
 	if (notify_page_fault(regs))
 		return;
