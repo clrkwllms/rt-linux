@@ -90,6 +90,8 @@ scx200-y			+= scx200_32.o
 
 obj-$(CONFIG_OLPC)		+= olpc.o
 
+obj-$(CONFIG_KMEMCHECK)		+= kmemcheck.o
+
 ###
 # 64 bit specific files
 ifeq ($(CONFIG_X86_64),y)
