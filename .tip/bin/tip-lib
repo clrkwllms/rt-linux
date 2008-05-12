@@ -15,7 +15,7 @@ get_auto_branches() {
 
 check_master() {
     local CB=`get_current_branch`
-    if [ $CB != "master" ]
+    if [ "$CB" != "master" ]
     then
 	echo "Check out master branch first"
 	exit 1;
