@@ -287,6 +287,17 @@ config KMEMCHECK_ONESHOT_BY_DEFAULT
 
 endchoice
 
+config KMEMCHECK_QUEUE_SIZE
+	int "kmemcheck: error queue size"
+	depends on KMEMCHECK
+	default 64
+	help
+	  Select the maximum number of errors to store in the queue. This
+	  queue will be emptied once every second, so this is effectively a
+	  limit on how many reports to print in one go. Note however, that
+	  if the number of errors occuring between two bursts is larger than
+	  this number, the extra error reports will get lost.
+
 config KMEMCHECK_PARTIAL_OK
 	bool "kmemcheck: allow partially uninitialized memory"
 	depends on KMEMCHECK
