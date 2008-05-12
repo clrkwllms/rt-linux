@@ -521,6 +521,15 @@ static void enqueue_task_rt(struct rq *rq, struct task_struct *p, int wakeup)
 	for_each_sched_rt_entity(rt_se)
 		enqueue_rt_entity(rt_se);
 
+#ifdef CONFIG_SMP
+	/*
+	 * Clear the "pushed" state since we have changed the run-queue and
+	 * may need to migrate some of these tasks (see push_rt_tasks() for
+	 * details)
+	 */
+	rq->rt.pushed = 0;
+#endif
+
 	inc_cpu_load(rq, p->se.load.weight);
 }
 
@@ -966,7 +975,7 @@ static int push_rt_task(struct rq *rq)
 	int ret = 0;
 	int paranoid = RT_MAX_TRIES;
 
-	if (!rq->rt.overloaded)
+	if (!rq->rt.overloaded || rq->rt.pushed)
 		return 0;
 
 	next_task = pick_next_highest_task_rt(rq, -1);
@@ -1026,6 +1035,15 @@ out:
 }
 
 /*
+ * push_rt_tasks()
+ *
+ * Push as many tasks away as possible.  We only need to try once whenever
+ * one or more new tasks are added to our runqueue.  After an inital attempt,
+ * further changes in remote runqueue state will be accounted for with pull
+ * operations.  Therefore, we mark the run-queue as "pushed" here, and clear it
+ * during enqueue.  This primarily helps SCHED_RR tasks which will tend to
+ * have a higher context-switch to enqueue ratio.
+ *
  * TODO: Currently we just use the second highest prio task on
  *       the queue, and stop when it can't migrate (or there's
  *       no more RT tasks).  There may be a case where a lower
@@ -1040,6 +1058,8 @@ static void push_rt_tasks(struct rq *rq)
 	/* push_rt_task will return true if it moved an RT */
 	while (push_rt_task(rq))
 		;
+
+	rq->rt.pushed = 1;
 }
 
 static int pull_rt_task(struct rq *this_rq)
@@ -1144,7 +1164,7 @@ static void post_schedule_rt(struct rq *rq)
 	 * the lock was owned by prev, we need to release it
 	 * first via finish_lock_switch and then reaquire it here.
 	 */
-	if (unlikely(rq->rt.overloaded)) {
+	if (unlikely(rq->rt.overloaded && !rq->rt.pushed)) {
 		spin_lock_irq(&rq->lock);
 		push_rt_tasks(rq);
 		spin_unlock_irq(&rq->lock);
