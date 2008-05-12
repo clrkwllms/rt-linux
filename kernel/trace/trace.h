@@ -160,6 +160,7 @@ struct tracer {
 struct trace_seq {
 	unsigned char		buffer[PAGE_SIZE];
 	unsigned int		len;
+	unsigned int		readpos;
 };
 
 /*
@@ -321,6 +322,8 @@ extern int trace_selftest_startup_sysprof(struct tracer *trace,
 
 extern void *head_page(struct trace_array_cpu *data);
 extern int trace_seq_printf(struct trace_seq *s, const char *fmt, ...);
+extern ssize_t trace_seq_to_user(struct trace_seq *s, char __user *ubuf,
+				 size_t cnt);
 extern long ns2usecs(cycle_t nsec);
 
 extern unsigned long trace_flags;
