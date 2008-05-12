@@ -735,9 +735,9 @@ static int irqbits;
 	| (1 << SIGUSR1) | (1 << SIGUSR2) | (1 << SIGIO)  | (1 << SIGURG) \
 	| (1 << SIGUNUSED))
 
-static irqreturn_t irq_handler(int intno, void *dev_id)
+static irqreturn_t irq_handler(int dummy, void *dev_id)
 {
-	int irq_bit;
+	int irq_bit, intno = (int)(unsigned long) dev_id;
 	unsigned long flags;
 
 	spin_lock_irqsave(&irqbits_lock, flags);
@@ -818,7 +818,8 @@ static int do_vm86_irq_handling(int subfunction, int irqnumber)
 			if (!((1 << sig) & ALLOWED_SIGS)) return -EPERM;
 			if (invalid_vm86_irq(irq)) return -EPERM;
 			if (vm86_irqs[irq].tsk) return -EPERM;
-			ret = request_irq(irq, &irq_handler, 0, VM86_IRQNAME, NULL);
+			ret = request_irq(irq, irq_handler, 0, VM86_IRQNAME,
+					  (void *)(unsigned long) irq);
 			if (ret) return ret;
 			vm86_irqs[irq].sig = sig;
 			vm86_irqs[irq].tsk = current;
