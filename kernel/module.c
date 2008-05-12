@@ -2096,6 +2096,7 @@ static struct module *load_module(void __user *umod,
 			mod->markers + mod->num_markers);
 #endif
 #ifdef CONFIG_IMMEDIATE
+		/* Immediate values must be updated after markers */
 		imv_update_range(mod->immediate,
 			mod->immediate + mod->num_immediate);
 #endif
