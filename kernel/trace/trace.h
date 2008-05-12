@@ -102,6 +102,7 @@ struct trace_array_cpu {
 	void			*trace_head; /* producer */
 	void			*trace_tail; /* consumer */
 	unsigned long		trace_idx;
+	unsigned long		overrun;
 	unsigned long		saved_latency;
 	unsigned long		critical_start;
 	unsigned long		critical_end;
@@ -162,10 +163,13 @@ struct trace_seq {
  * results to users and which routines might sleep, etc:
  */
 struct trace_iterator {
-	struct trace_seq	seq;
 	struct trace_array	*tr;
 	struct tracer		*trace;
+	long			last_overrun[NR_CPUS];
+	long			overrun[NR_CPUS];
 
+	/* The below is zeroed out in pipe_read */
+	struct trace_seq	seq;
 	struct trace_entry	*ent;
 	int			cpu;
 
