@@ -28,6 +28,7 @@
 #include <linux/spinlock.h>
 #include <linux/ktime.h>
 #include <linux/module.h>
+#include <linux/hardirq.h>
 
 
 #ifdef CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
@@ -135,6 +136,13 @@ u64 sched_clock_cpu(int cpu)
 {
 	struct sched_clock_data *scd = cpu_sdc(cpu);
 	u64 now, clock;
+
+	/*
+	 * Normally this is not called in NMI context - but if it is,
+	 * trying to do any locking here is totally lethal.
+	 */
+	if (unlikely(in_nmi()))
+		return scd->clock;
 
 	WARN_ON_ONCE(!irqs_disabled());
 	now = sched_clock();
