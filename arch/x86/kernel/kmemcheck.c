@@ -61,10 +61,11 @@ struct kmemcheck_error {
  * from the kmemcheck traps, since this may call the console drivers and
  * result in a recursive fault.
  */
-static struct kmemcheck_error error_fifo[32];
+static struct kmemcheck_error error_fifo[CONFIG_KMEMCHECK_QUEUE_SIZE];
 static unsigned int error_count;
 static unsigned int error_rd;
 static unsigned int error_wr;
+static unsigned int error_missed_count;
 
 static struct timer_list kmemcheck_timer;
 
@@ -73,8 +74,10 @@ error_next_wr(void)
 {
 	struct kmemcheck_error *e;
 
-	if (error_count == ARRAY_SIZE(error_fifo))
+	if (error_count == ARRAY_SIZE(error_fifo)) {
+		++error_missed_count;
 		return NULL;
+	}
 
 	e = &error_fifo[error_wr];
 	if (++error_wr == ARRAY_SIZE(error_fifo))
@@ -194,6 +197,13 @@ do_wakeup(unsigned long data)
 {
 	while (error_count > 0)
 		error_recall();
+
+	if (error_missed_count > 0) {
+		printk(KERN_WARNING "kmemcheck: Lost %d error reports because "
+			"the queue was too small\n", error_missed_count);
+		error_missed_count = 0;
+	}
+
 	mod_timer(&kmemcheck_timer, kmemcheck_timer.expires + HZ);
 }
 
