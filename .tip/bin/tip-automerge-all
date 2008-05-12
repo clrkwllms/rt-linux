@@ -1,11 +1,40 @@
 
-for N in $(git-branch | cut -c2- | grep -v tmp); do
+[ "$#" = "0" ] && {
+  echo "available auto-branches:"
+  ls .tip/auto-branches/
+  exit -1;
+}
+
+BRANCH=$1
+BFILE=.tip/auto-branches/$BRANCH
+
+[ -f $BFILE ] || {
+  echo "no such auto-branch: $BRANCH"
+  exit -1
+}
+
+#cat $BFILE
+
+BRANCHES=$(cat $BFILE | grep -v ^#)
+
+echo "integrating the following branches: $BRANCHES"
+
+git-checkout -b $BRANCH master || { exit -1; }
+
+for N in $BRANCHES; do
   echo $N
   git-merge $N || {
-    echo merge conflict
-    exit -1
+    echo merge conflict - run tip-mergetool
+    echo
+    echo running subshell - type "exit" when resolved
+    bash || { echo "merge aborted manually!"; git-checkout master; exit -1; }
+
     git-add $(git-ls-files -u | cut -f2 | sort | uniq)
     git-commit -m "Manual merge." || exit -1;
   }
 done
+
+git-checkout master
+
+echo "created integration branch $BRANCH successfully!"
 
