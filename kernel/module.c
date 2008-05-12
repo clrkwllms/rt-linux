@@ -2710,6 +2710,10 @@ EXPORT_SYMBOL_GPL(module_imv_update);
 int is_imv_cond_end_module(unsigned long addr1, unsigned long addr2)
 {
 	struct module *mod = __module_text_address(addr1);
+
+	if (!mod)
+		return 0;
+
 	return _is_imv_cond_end(mod->immediate_cond_end,
 		mod->immediate_cond_end + mod->num_immediate_cond_end,
 		addr1, addr2);
