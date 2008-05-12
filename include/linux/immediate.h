@@ -71,7 +71,6 @@ extern void imv_unref(struct __imv *begin, struct __imv *end, void *start,
 #define imv_set(name, i)		(name##__imv = (i))
 
 static inline void core_imv_update(void) { }
-static inline void module_imv_update(void) { }
 static inline void imv_unref_core_init(void) { }
 
 #endif
