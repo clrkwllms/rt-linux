@@ -3,9 +3,9 @@ git-branch | grep '^*' | grep -q '^* master$' ||
                             { echo "not on master branch!"; exit -1; }
 
 echo "DESTROYING the whole -tip Git tree!!! Ctrl-C if unsure."
-echo "sleeping 3 seconds"
-sleep 3
+echo "sleeping 30 seconds"
+sleep 30
 
-for N in `git-branch | grep -vw master`; do 
+for N in `git-branch | grep -vw master | grep -v for-linus`; do 
   git-branch -D $N || { exit "hm?"; exit -1; }
 done
