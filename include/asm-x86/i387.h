@@ -47,19 +47,7 @@ static inline void tolerant_fwait(void)
 
 static inline int restore_fpu_checking(struct i387_fxsave_struct *fx)
 {
-	int err = -1;
-
-	if (!used_math()) {
-		local_irq_enable();
-		/*
-		 * does a slab alloc which can sleep
-		 */
-		if (init_fpu(current))
-			return err;
-		local_irq_disable();
-	}
-
-	clts();			/* Allow maths ops (or we recurse) */
+	int err;
 
 	asm volatile("1:  rex64/fxrstor (%[fx])\n\t"
 		     "2:\n"
