@@ -11,7 +11,9 @@
 #include <linux/slab.h>
 #include <linux/kmod.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <linux/module.h>
+
 #include <asm/uaccess.h>
 
 /*
@@ -219,6 +221,14 @@ struct file_system_type *get_fs_type(const char *name)
 	struct file_system_type *fs;
 	const char *dot = strchr(name, '.');
 	unsigned len = dot ? dot - name : strlen(name);
+	int bkl = kernel_locked();
+
+	/*
+	 * We request a module that might trigger user-space
+	 * tasks. So explicitly drop the BKL here:
+	 */
+	if (bkl)
+		unlock_kernel();
 
 	read_lock(&file_systems_lock);
 	fs = *(find_filesystem(name, len));
@@ -237,6 +247,8 @@ struct file_system_type *get_fs_type(const char *name)
 		put_filesystem(fs);
 		fs = NULL;
 	}
+	if (bkl)
+		lock_kernel();
 	return fs;
 }
 
