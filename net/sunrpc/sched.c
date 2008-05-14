@@ -224,9 +224,15 @@ EXPORT_SYMBOL_GPL(rpc_destroy_wait_queue);
 
 static int rpc_wait_bit_killable(void *word)
 {
+	int bkl = kernel_locked();
+
 	if (fatal_signal_pending(current))
 		return -ERESTARTSYS;
+	if (bkl)
+		unlock_kernel();
 	schedule();
+	if (bkl)
+		lock_kernel();
 	return 0;
 }
 
