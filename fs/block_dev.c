@@ -1083,8 +1083,8 @@ static int __blkdev_put(struct block_device *bdev, int for_part)
 	struct gendisk *disk = bdev->bd_disk;
 	struct block_device *victim = NULL;
 
-	mutex_lock_nested(&bdev->bd_mutex, for_part);
 	lock_kernel();
+	mutex_lock_nested(&bdev->bd_mutex, for_part);
 	if (for_part)
 		bdev->bd_part_count--;
 
@@ -1112,8 +1112,8 @@ static int __blkdev_put(struct block_device *bdev, int for_part)
 			victim = bdev->bd_contains;
 		bdev->bd_contains = NULL;
 	}
-	unlock_kernel();
 	mutex_unlock(&bdev->bd_mutex);
+	unlock_kernel();
 	bdput(bdev);
 	if (victim)
 		__blkdev_put(victim, 1);
