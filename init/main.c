@@ -461,7 +461,6 @@ static void noinline __init_refok rest_init(void)
 	numa_default_policy();
 	pid = kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES);
 	kthreadd_task = find_task_by_pid_ns(pid, &init_pid_ns);
-	unlock_kernel();
 
 	/*
 	 * The boot idle thread must execute schedule()
@@ -677,6 +676,7 @@ asmlinkage void __init start_kernel(void)
 	delayacct_init();
 
 	check_bugs();
+	unlock_kernel();
 
 	acpi_early_init(); /* before LAPIC and SMP init */
 
@@ -795,7 +795,6 @@ static void run_init_process(char *init_filename)
 static int noinline init_post(void)
 {
 	free_initmem();
-	unlock_kernel();
 	mark_rodata_ro();
 	system_state = SYSTEM_RUNNING;
 	numa_default_policy();
@@ -835,7 +834,6 @@ static int noinline init_post(void)
 
 static int __init kernel_init(void * unused)
 {
-	lock_kernel();
 	/*
 	 * init can run on any cpu.
 	 */
