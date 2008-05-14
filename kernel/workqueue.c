@@ -392,13 +392,26 @@ static int flush_cpu_workqueue(struct cpu_workqueue_struct *cwq)
 void flush_workqueue(struct workqueue_struct *wq)
 {
 	const cpumask_t *cpu_map = wq_cpu_map(wq);
+	int bkl = kernel_locked();
 	int cpu;
 
 	might_sleep();
+	if (bkl) {
+		if (debug_locks) {
+			WARN_ON_ONCE(1);
+			debug_show_held_locks(current);
+			debug_locks_off();
+		}
+		unlock_kernel();
+	}
+
 	lock_acquire(&wq->lockdep_map, 0, 0, 0, 2, _THIS_IP_);
 	lock_release(&wq->lockdep_map, 1, _THIS_IP_);
 	for_each_cpu_mask(cpu, *cpu_map)
 		flush_cpu_workqueue(per_cpu_ptr(wq->cpu_wq, cpu));
+
+	if (bkl)
+		lock_kernel();
 }
 EXPORT_SYMBOL_GPL(flush_workqueue);
 
