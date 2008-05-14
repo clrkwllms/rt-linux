@@ -1,66 +1,32 @@
 /*
- * lib/kernel_lock.c
+ * This is the Big Kernel Lock - the traditional lock that we
+ * inherited from the uniprocessor Linux kernel a decade ago.
  *
- * This is the traditional BKL - big kernel lock. Largely
- * relegated to obsolescence, but used by various less
+ * Largely relegated to obsolescence, but used by various less
  * important (or lazy) subsystems.
- */
-#include <linux/smp_lock.h>
-#include <linux/module.h>
-#include <linux/kallsyms.h>
-#include <linux/semaphore.h>
-
-/*
- * The 'big kernel semaphore'
- *
- * This mutex is taken and released recursively by lock_kernel()
- * and unlock_kernel().  It is transparently dropped and reacquired
- * over schedule().  It is used to protect legacy code that hasn't
- * been migrated to a proper locking design yet.
- *
- * Note: code locked by this semaphore will only be serialized against
- * other code using the same locking facility. The code guarantees that
- * the task remains on the same CPU.
  *
  * Don't use in new code.
+ *
+ * It now has plain mutex semantics (i.e. no auto-drop on
+ * schedule() anymore), combined with a very simple self-recursion
+ * layer that allows the traditional nested use:
+ *
+ *   lock_kernel();
+ *     lock_kernel();
+ *     unlock_kernel();
+ *   unlock_kernel();
+ *
+ * Please migrate all BKL using code to a plain mutex.
  */
-static DECLARE_MUTEX(kernel_sem);
+#include <linux/smp_lock.h>
+#include <linux/kallsyms.h>
+#include <linux/module.h>
+#include <linux/mutex.h>
+
+static DEFINE_MUTEX(kernel_mutex);
 
 /*
- * Re-acquire the kernel semaphore.
- *
- * This function is called with preemption off.
- *
- * We are executing in schedule() so the code must be extremely careful
- * about recursion, both due to the down() and due to the enabling of
- * preemption. schedule() will re-check the preemption flag after
- * reacquiring the semaphore.
- */
-int __lockfunc __reacquire_kernel_lock(void)
-{
-	struct task_struct *task = current;
-	int saved_lock_depth = task->lock_depth;
-
-	BUG_ON(saved_lock_depth < 0);
-
-	task->lock_depth = -1;
-	preempt_enable_no_resched();
-
-	down(&kernel_sem);
-
-	preempt_disable();
-	task->lock_depth = saved_lock_depth;
-
-	return 0;
-}
-
-void __lockfunc __release_kernel_lock(void)
-{
-	up(&kernel_sem);
-}
-
-/*
- * Getting the big kernel semaphore.
+ * Get the big kernel lock:
  */
 void __lockfunc lock_kernel(void)
 {
@@ -71,7 +37,7 @@ void __lockfunc lock_kernel(void)
 		/*
 		 * No recursion worries - we set up lock_depth _after_
 		 */
-		down(&kernel_sem);
+		mutex_lock(&kernel_mutex);
 
 	task->lock_depth = depth;
 }
@@ -80,10 +46,11 @@ void __lockfunc unlock_kernel(void)
 {
 	struct task_struct *task = current;
 
-	BUG_ON(task->lock_depth < 0);
+	if (WARN_ON_ONCE(task->lock_depth < 0))
+		return;
 
 	if (likely(--task->lock_depth < 0))
-		up(&kernel_sem);
+		mutex_unlock(&kernel_mutex);
 }
 
 EXPORT_SYMBOL(lock_kernel);

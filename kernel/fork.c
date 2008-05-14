@@ -54,6 +54,7 @@
 #include <linux/tty.h>
 #include <linux/proc_fs.h>
 #include <linux/blkdev.h>
+#include <linux/smp_lock.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -1009,6 +1010,9 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	int retval;
 	struct task_struct *p;
 	int cgroup_callbacks_done = 0;
+
+	if (system_state == SYSTEM_RUNNING && kernel_locked())
+		debug_check_no_locks_held(current);
 
 	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
 		return ERR_PTR(-EINVAL);

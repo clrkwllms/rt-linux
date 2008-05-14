@@ -4494,9 +4494,6 @@ need_resched:
 	prev = rq->curr;
 	switch_count = &prev->nivcsw;
 
-	release_kernel_lock(prev);
-need_resched_nonpreemptible:
-
 	schedule_debug(prev);
 
 	hrtick_clear(rq);
@@ -4549,9 +4546,6 @@ need_resched_nonpreemptible:
 
 	hrtick_set(rq);
 
-	if (unlikely(reacquire_kernel_lock(current) < 0))
-		goto need_resched_nonpreemptible;
-
 	preempt_enable_no_resched();
 	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
 		goto need_resched;
@@ -4567,8 +4561,6 @@ EXPORT_SYMBOL(schedule);
 asmlinkage void __sched preempt_schedule(void)
 {
 	struct thread_info *ti = current_thread_info();
-	struct task_struct *task = current;
-	int saved_lock_depth;
 
 	/*
 	 * If there is a non-zero preempt_count or interrupts are disabled,
@@ -4579,16 +4571,7 @@ asmlinkage void __sched preempt_schedule(void)
 
 	do {
 		add_preempt_count(PREEMPT_ACTIVE);
-
-		/*
-		 * We keep the big kernel semaphore locked, but we
-		 * clear ->lock_depth so that schedule() doesnt
-		 * auto-release the semaphore:
-		 */
-		saved_lock_depth = task->lock_depth;
-		task->lock_depth = -1;
 		schedule();
-		task->lock_depth = saved_lock_depth;
 		sub_preempt_count(PREEMPT_ACTIVE);
 
 		/*
@@ -4609,26 +4592,15 @@ EXPORT_SYMBOL(preempt_schedule);
 asmlinkage void __sched preempt_schedule_irq(void)
 {
 	struct thread_info *ti = current_thread_info();
-	struct task_struct *task = current;
-	int saved_lock_depth;
 
 	/* Catch callers which need to be fixed */
 	BUG_ON(ti->preempt_count || !irqs_disabled());
 
 	do {
 		add_preempt_count(PREEMPT_ACTIVE);
-
-		/*
-		 * We keep the big kernel semaphore locked, but we
-		 * clear ->lock_depth so that schedule() doesnt
-		 * auto-release the semaphore:
-		 */
-		saved_lock_depth = task->lock_depth;
-		task->lock_depth = -1;
 		local_irq_enable();
 		schedule();
 		local_irq_disable();
-		task->lock_depth = saved_lock_depth;
 		sub_preempt_count(PREEMPT_ACTIVE);
 
 		/*
@@ -5535,11 +5507,6 @@ static void __cond_resched(void)
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
 	__might_sleep(__FILE__, __LINE__);
 #endif
-	/*
-	 * The BKS might be reacquired before we have dropped
-	 * PREEMPT_ACTIVE, which could trigger a second
-	 * cond_resched() call.
-	 */
 	do {
 		add_preempt_count(PREEMPT_ACTIVE);
 		schedule();
