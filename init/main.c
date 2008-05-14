@@ -554,7 +554,6 @@ asmlinkage void __init start_kernel(void)
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
  */
-	lock_kernel();
 	tick_init();
 	boot_cpu_init();
 	page_address_init();
@@ -625,6 +624,8 @@ asmlinkage void __init start_kernel(void)
 	 * too:
 	 */
 	locking_selftest();
+
+	lock_kernel();
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start && !initrd_below_start_ok &&
