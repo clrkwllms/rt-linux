@@ -36,6 +36,7 @@
 #include <linux/module.h>
 
 #include <linux/fs.h>
+#include <linux/smp_lock.h>
 #include <linux/errno.h>
 #include <linux/miscdevice.h>
 #include <linux/kernel.h>
@@ -128,8 +129,15 @@ static int misc_open(struct inode * inode, struct file * file)
 	}
 		
 	if (!new_fops) {
+		int bkl = kernel_locked();
+
 		mutex_unlock(&misc_mtx);
+		if (bkl)
+			unlock_kernel();
 		request_module("char-major-%d-%d", MISC_MAJOR, minor);
+		if (bkl)
+			lock_kernel();
+
 		mutex_lock(&misc_mtx);
 
 		list_for_each_entry(c, &misc_list, list) {
