@@ -668,6 +668,7 @@ asmlinkage void __init start_kernel(void)
 	signals_init();
 	/* rootfs populating might need page-writeback */
 	page_writeback_init();
+	unlock_kernel();
 #ifdef CONFIG_PROC_FS
 	proc_root_init();
 #endif
@@ -677,7 +678,6 @@ asmlinkage void __init start_kernel(void)
 	delayacct_init();
 
 	check_bugs();
-	unlock_kernel();
 
 	acpi_early_init(); /* before LAPIC and SMP init */
 
