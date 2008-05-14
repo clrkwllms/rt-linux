@@ -53,6 +53,17 @@ void __lockfunc unlock_kernel(void)
 		mutex_unlock(&kernel_mutex);
 }
 
+void debug_print_bkl(void)
+{
+#ifdef CONFIG_DEBUG_MUTEXES
+	if (mutex_is_locked(&kernel_mutex)) {
+		printk(KERN_EMERG "BUG: **** BKL held by: %d:%s\n",
+			kernel_mutex.owner->task->pid,
+			kernel_mutex.owner->task->comm);
+	}
+#endif
+}
+
 EXPORT_SYMBOL(lock_kernel);
 EXPORT_SYMBOL(unlock_kernel);
 

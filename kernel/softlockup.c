@@ -15,6 +15,7 @@
 #include <linux/kthread.h>
 #include <linux/notifier.h>
 #include <linux/module.h>
+#include <linux/smp_lock.h>
 
 #include <asm/irq_regs.h>
 
@@ -169,6 +170,8 @@ static void check_hung_task(struct task_struct *t, unsigned long now)
 			" disables this message.\n");
 	sched_show_task(t);
 	__debug_show_held_locks(t);
+
+	debug_print_bkl();
 
 	t->last_switch_timestamp = now;
 	touch_nmi_watchdog();

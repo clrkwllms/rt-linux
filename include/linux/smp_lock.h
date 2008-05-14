@@ -11,9 +11,13 @@ static inline int kernel_locked(void)
 {
 	return current->lock_depth >= 0;
 }
+
+extern void debug_print_bkl(void);
+
 #else
 static inline lock_kernel(void)			__acquires(kernel_lock) { }
 static inline void unlock_kernel(void)		__releases(kernel_lock) { }
 static inline int kernel_locked(void)		{ return 1; }
+static inline void debug_print_bkl(void)	{ }
 #endif
 #endif
