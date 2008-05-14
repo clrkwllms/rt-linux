@@ -2590,9 +2590,19 @@ static void release_dev(struct file *filp)
 
 	/*
 	 * Wait for ->hangup_work and ->buf.work handlers to terminate
+	 *
+	 * It's safe to drop/reacquire the BKL here as
+	 * flush_scheduled_work() can sleep anyway:
 	 */
+	{
+		int bkl = kernel_locked();
 
-	flush_scheduled_work();
+		if (bkl)
+			unlock_kernel();
+		flush_scheduled_work();
+		if (bkl)
+			lock_kernel();
+	}
 
 	/*
 	 * Wait for any short term users (we know they are just driver
