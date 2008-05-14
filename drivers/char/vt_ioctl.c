@@ -1174,7 +1174,11 @@ static DECLARE_WAIT_QUEUE_HEAD(vt_activate_queue);
 int vt_waitactive(int vt)
 {
 	int retval;
+	int bkl = kernel_locked();
 	DECLARE_WAITQUEUE(wait, current);
+
+	if (bkl)
+		unlock_kernel();
 
 	add_wait_queue(&vt_activate_queue, &wait);
 	for (;;) {
@@ -1201,6 +1205,10 @@ int vt_waitactive(int vt)
 	}
 	remove_wait_queue(&vt_activate_queue, &wait);
 	__set_current_state(TASK_RUNNING);
+
+	if (bkl)
+		lock_kernel();
+
 	return retval;
 }
 
