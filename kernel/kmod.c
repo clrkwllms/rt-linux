@@ -36,6 +36,8 @@
 #include <linux/resource.h>
 #include <linux/notifier.h>
 #include <linux/suspend.h>
+#include <linux/smp_lock.h>
+
 #include <asm/uaccess.h>
 
 extern int max_threads;
@@ -77,6 +79,7 @@ int request_module(const char *fmt, ...)
 	static atomic_t kmod_concurrent = ATOMIC_INIT(0);
 #define MAX_KMOD_CONCURRENT 50	/* Completely arbitrary value - KAO */
 	static int kmod_loop_msg;
+	int bkl = kernel_locked();
 
 	va_start(args, fmt);
 	ret = vsnprintf(module_name, MODULE_NAME_LEN, fmt, args);
@@ -108,8 +111,27 @@ int request_module(const char *fmt, ...)
 		return -ENOMEM;
 	}
 
+	/*
+	 * usermodehelper blocks waiting for modprobe. We cannot
+	 * do that with the BKL held. Also emit a (one time)
+	 * warning about callsites that do this:
+	 */
+	if (bkl) {
+		if (debug_locks) {
+			WARN_ON_ONCE(1);
+			debug_show_held_locks(current);
+			debug_locks_off();
+		}
+		unlock_kernel();
+	}
+
 	ret = call_usermodehelper(modprobe_path, argv, envp, 1);
+
 	atomic_dec(&kmod_concurrent);
+
+	if (bkl)
+		lock_kernel();
+
 	return ret;
 }
 EXPORT_SYMBOL(request_module);
