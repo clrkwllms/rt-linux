@@ -106,6 +106,9 @@ PHONY += systbl_chk
 systbl_chk: $(src)/systbl_chk.sh $(obj)/systbl_chk.i
 	$(call cmd,systbl_chk)
 
+
+ifeq ($(CONFIG_PPC_MERGE),y)
+
 $(obj)/built-in.o:		prom_init_check
 
 quiet_cmd_prom_init_check = CALL    $<
@@ -114,5 +117,8 @@ quiet_cmd_prom_init_check = CALL    $<
 PHONY += prom_init_check
 prom_init_check: $(src)/prom_init_check.sh $(obj)/prom_init.o
 	$(call cmd,prom_init_check)
+
+endif
+
 
 clean-files := vmlinux.lds
