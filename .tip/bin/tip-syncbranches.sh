@@ -36,6 +36,9 @@ do
 
     echo "Updating $B"
     git-checkout $B
+    # check whether there's anything to pull from the origin:
+    echo "Pulling from origin"
+    git-pull
     git-merge linus  || {
 
 	echo Merging $B failed
