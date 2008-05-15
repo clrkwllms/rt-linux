@@ -8,10 +8,9 @@ CPPFLAGS_vmlinux.lds += -U$(UTS_MACHINE)
 
 ifdef CONFIG_FTRACE
 # Do not profile debug utilities
-ORIG_CFLAGS := $(KBUILD_CFLAGS)
-KBUILD_CFLAGS = $(if $(filter-out tsc_64 tsc_32 rtc,$(basename $(notdir $@))), \
-	$(ORIG_CFLAGS), \
-	$(subst -pg,,$(ORIG_CFLAGS)))
+CFLAGS_REMOVE_tsc_64.o = -pg
+CFLAGS_REMOVE_tsc_32.o = -pg
+CFLAGS_REMOVE_rtc.o = -pg
 endif
 
 #
