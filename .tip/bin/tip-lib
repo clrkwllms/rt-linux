@@ -20,6 +20,7 @@ check_master() {
 	echo "Check out master branch first"
 	exit 1;
     fi
+    quilt top 2>/dev/null && { echo "quilt patches still applied!"; exit -1; }
 }
 
 abort_merge() {

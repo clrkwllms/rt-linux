@@ -1,0 +1,15 @@
+
+tip-integrate auto-sched-next		|| { echo error1; exit -1; }
+tip-integrate auto-x86-next		|| { echo error2; exit -1; }
+tip-integrate auto-latest		|| { echo error3; exit -1; }
+
+tip-checkout auto-latest		|| { echo error4; exit -1; }
+D=`date | sed 's/[ :]/_/g'`
+
+# save the previous master head:
+git-tag -m "auto-latest update: $D" tip-auto-history-$D master ||
+					   { echo error5; exit -1; }
+
+git-branch -D master			|| { echo error6; exit -1; }
+git-checkout -b master auto-latest	|| { echo error7; exit -1; }
+
