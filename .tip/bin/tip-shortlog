@@ -1,0 +1,3 @@
+
+git-shortlog base.. --no-merges
+

@@ -1,0 +1,11 @@
+
+while :; do
+  echo "next patch to process: "`qn`
+  read -p "apply it?"
+  git-am `qn`
+  read -p "remove from series file?"
+  q-remove-next-patch-from-series
+  echo "done!"
+  echo
+done
+
