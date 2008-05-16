@@ -53,3 +53,4 @@ done
 # switch back to master again
 git-checkout master
 
+echo "integration of $1 done."
