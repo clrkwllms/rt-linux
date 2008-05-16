@@ -132,6 +132,52 @@ static inline int suspend_test(int level) { return 0; }
 
 #ifdef CONFIG_SUSPEND
 
+#ifdef CONFIG_PM_TEST_SUSPEND
+
+/*
+ * We test the system suspend code by setting an RTC wakealarm a short
+ * time in the future, then suspending.  Suspending the devices won't
+ * normally take long ... some systems only need a few milliseconds.
+ *
+ * The time it takes is system-specific though, so when we test this
+ * during system bootup we allow a LOT of time.
+ */
+#define TEST_SUSPEND_SECONDS	5
+
+static unsigned long suspend_test_start_time;
+
+static void suspend_test_start(void)
+{
+	/* FIXME Use better timebase than "jiffies", ideally a clocksource.
+	 * What we want is a hardware counter that will work correctly even
+	 * during the irqs-are-off stages of the suspend/resume cycle...
+	 */
+	suspend_test_start_time = jiffies;
+}
+
+static void suspend_test_finish(const char *label)
+{
+	long nj = jiffies - suspend_test_start_time;
+	unsigned msec;
+
+	msec = jiffies_to_msecs((nj >= 0) ? nj : -nj);
+	pr_info("PM: %s took %d.%03d seconds\n", label,
+			msec / 1000, msec % 1000);
+	WARN_ON_ONCE(msec > ((TEST_SUSPEND_SECONDS+5) * 1000));
+}
+
+#else
+
+static void suspend_test_start(void)
+{
+}
+
+static void suspend_test_finish(const char *label)
+{
+}
+
+#endif
+
 /* This is just an arbitrary number */
 #define FREE_PAGE_NUMBER (100)
 
@@ -264,11 +310,14 @@ int suspend_devices_and_enter(suspend_state_t state)
 			goto Close;
 	}
 	suspend_console();
+
+	suspend_test_start();
 	error = device_suspend(PMSG_SUSPEND);
 	if (error) {
 		printk(KERN_ERR "PM: Some devices failed to suspend\n");
 		goto Resume_console;
 	}
+	suspend_test_finish("suspend devices");
 
 	if (suspend_test(TEST_DEVICES))
 		goto Resume_devices;
@@ -291,7 +340,9 @@ int suspend_devices_and_enter(suspend_state_t state)
 	if (suspend_ops->finish)
 		suspend_ops->finish();
  Resume_devices:
+	suspend_test_start();
 	device_resume();
+	suspend_test_finish("resume devices");
  Resume_console:
 	resume_console();
  Close:
@@ -515,3 +566,115 @@ static int __init pm_init(void)
 }
 
 core_initcall(pm_init);
+
+
+#ifdef CONFIG_PM_TEST_SUSPEND
+
+#include <linux/rtc.h>
+
+/*
+ * To test system suspend, we need a hands-off mechanism to resume the
+ * system.  RTCs with wakeup alarms are the the most common mechanism
+ * that's self-contained.
+ */
+
+static void __init test_wakealarm(struct rtc_device *rtc, suspend_state_t state)
+{
+	static char	err_readtime [] __initdata =
+		KERN_ERR "PM: can't read %s time, err %d\n";
+	static char	err_wakealarm [] __initdata =
+		KERN_ERR "PM: can't set %s wakealarm, err %d\n";
+	static char	err_suspend [] __initdata =
+		KERN_ERR "PM: suspend test failed, error %d\n";
+	static char	info_test [] __initdata =
+		KERN_INFO "PM: test RTC wakeup from '%s' suspend\n";
+
+	unsigned long		now;
+	struct rtc_wkalrm	alm;
+	int			status;
+
+	/* this may fail if the RTC hasn't been initialized */
+	status = rtc_read_time(rtc, &alm.time);
+	if (status < 0) {
+		printk(err_readtime, rtc->dev.bus_id, status);
+		return;
+	}
+	rtc_tm_to_time(&alm.time, &now);
+
+	memset(&alm, 0, sizeof alm);
+	rtc_time_to_tm(now + TEST_SUSPEND_SECONDS, &alm.time);
+	alm.enabled = true;
+
+	status = rtc_set_alarm(rtc, &alm);
+	if (status < 0) {
+		printk(err_wakealarm, rtc->dev.bus_id, status);
+		return;
+	}
+
+	if (state == PM_SUSPEND_MEM) {
+		printk(info_test, pm_states[state]);
+		status = pm_suspend(state);
+		if (status == -ENODEV)
+			state = PM_SUSPEND_STANDBY;
+	}
+	if (state == PM_SUSPEND_STANDBY) {
+		printk(info_test, pm_states[state]);
+		status = pm_suspend(state);
+	}
+	if (status < 0)
+		printk(err_suspend, status);
+}
+
+static int __init has_wakealarm(struct device *dev, void *name_ptr)
+{
+	struct rtc_device *candidate = to_rtc_device(dev);
+
+	if (!candidate->ops->set_alarm)
+		return 0;
+	if (!device_may_wakeup(candidate->dev.parent))
+		return 0;
+
+	*(char **)name_ptr = dev->bus_id;
+	return 1;
+}
+
+/*
+ * We normally test Suspend-to-RAM, with standby as a backup when
+ * the system doesn't support that state.  But we also need to be
+ * able to disable the powerup test, and tell it to ignore STR since
+ * the RTC may not work then.
+ */
+static suspend_state_t test_state __initdata = PM_SUSPEND_MEM;
+
+static int __init setup_test_suspend(char *value)
+{
+	/* FIXME accept "standby", etc */
+	test_state = PM_SUSPEND_ON;
+	return 0;
+}
+__setup("test_suspend", setup_test_suspend);
+
+static int __init test_suspend(void)
+{
+	static char	warn_no_rtc[] __initdata =
+		KERN_WARNING "PM: no wakealarm-capable RTC driver is ready\n";
+
+	char			*pony = NULL;
+	struct rtc_device	*rtc = NULL;
+
+	class_find_device(rtc_class, &pony, has_wakealarm);
+	if (pony)
+		rtc = rtc_class_open(pony);
+
+	if (rtc) {
+		if (test_state != PM_SUSPEND_ON)
+			test_wakealarm(rtc, test_state);
+		rtc_class_close(rtc);
+	} else
+		printk(warn_no_rtc);
+
+	return 0;
+}
+late_initcall(test_suspend);
+
+#endif /* CONFIG_PM_TEST_SUSPEND */
