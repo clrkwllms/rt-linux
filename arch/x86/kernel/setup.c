@@ -12,7 +12,7 @@
 #include <asm/mpspec.h>
 #include <asm/apicdef.h>
 
-#ifdef CONFIG_X86_MPPARSE
+#ifdef CONFIG_X86_LOCAL_APIC
 unsigned int num_processors;
 unsigned disabled_cpus __cpuinitdata;
 
