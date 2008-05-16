@@ -63,7 +63,7 @@ struct __imv {
 				"mov $0,%0\n\t"				\
 				"3:\n\t"				\
 				: "=q" (value)				\
-				: "i" (&name##__imv),			\
+				: "g" (&name##__imv),			\
 				  "i" (sizeof(value)));			\
 			break;						\
 		case 2:							\
@@ -81,7 +81,7 @@ struct __imv {
 				"mov $0,%0\n\t"				\
 				"3:\n\t"				\
 				: "=r" (value)				\
-				: "i" (&name##__imv),			\
+				: "g" (&name##__imv),			\
 				  "i" (sizeof(value)));			\
 			break;						\
 		case 8:							\
@@ -102,7 +102,7 @@ struct __imv {
 				"mov $0xFEFEFEFE01010101,%0\n\t" 	\
 				"3:\n\t"				\
 				: "=r" (value)				\
-				: "i" (&name##__imv),			\
+				: "g" (&name##__imv),			\
 				  "i" (sizeof(value)));			\
 			break;						\
 		};							\
@@ -143,7 +143,7 @@ struct __imv {
 			"mov $0,%0\n\t"					\
 			"3:\n\t"					\
 			: "=a" (value)					\
-			: "i" (&name##__imv),				\
+			: "g" (&name##__imv),				\
 			  "i" (sizeof(value)),				\
 			  "i" (sizeof(__typeof__(name##__imv))));	\
 		value;							\
