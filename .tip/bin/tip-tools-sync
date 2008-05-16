@@ -2,7 +2,7 @@
 git-checkout tip || { echo error1; exit -1; }
 git-pull
 
-cp -a .tip/bin/* ~/bin/tip/
+cp -au .tip/bin/* ~/bin/tip/
 
 git-checkout master || { echo error2; exit -1; }
 
