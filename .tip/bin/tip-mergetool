@@ -34,7 +34,7 @@ patch -p1 < $SRC.diff-v1 || {
     echo "trying auto-merge ..."
     OK=$(rej -dry-run $SRC.rej 2>&1 | grep ', 0 conflicts remain')
     [ "$OK" = "" ] && { echo "$OK"; exit -1; }
-    reja $SRC.rej
+    rej -a $SRC.rej
 }
 
 echo "adding $SRC to the commit"
