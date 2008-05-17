@@ -32,3 +32,12 @@ abort_merge() {
     git-checkout master; 
     exit -1;
 }
+
+get_date_for_tag() {
+    date -u +"%Y-%m-%d-%H-%M-%S"
+}
+
+get_topic_reference() {
+    local TR=`echo $1 | sed "s@/@-@"`
+    git-tag | grep tip-$TR | sort | tail -n1
+}
