@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Get the latest version of -tip from kernel.org
+#
+
+. ~/bin/tip/tip-lib
+
+check_master
+
+git-pull || exit 1;
