@@ -107,6 +107,7 @@ config PPC
 	default y
 	select HAVE_IDE
 	select HAVE_IMMEDIATE
+	select HAVE_DYNAMIC_FTRACE
 	select HAVE_FTRACE
 	select HAVE_KPROBES
 	select HAVE_KRETPROBES
