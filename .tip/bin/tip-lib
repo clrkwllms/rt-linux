@@ -8,9 +8,8 @@ get_current_branch() {
 }
 
 get_auto_branches() {
-    git-checkout tip 2>/dev/null
-    ls  .tip/auto-branches/ | grep -v "~"
-    git-checkout $1 2>/dev/null
+
+    git-ls-tree  tip -- .tip/auto-branches/ | sed "s@.*tip/auto-branches/@@"
 }
 
 check_master() {
