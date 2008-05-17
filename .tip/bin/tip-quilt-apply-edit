@@ -1,4 +1,6 @@
 
+git-checkout .
+
 while :; do
   echo "next patch to process: "`qn`
   read -p "apply it?"
