@@ -12,7 +12,7 @@ git-checkout linus
 git-pull || exit 1;
 git-checkout master
 
-AB=`get_auto_branches master`
+AB=`get_auto_branches`
 BS=`git branch | sed "s/\* //"`
 
 for B in $BS

@@ -6,5 +6,5 @@
 
 . ~/bin/tip/tip-lib
 
-get_auto_branches master
+get_auto_branches
 

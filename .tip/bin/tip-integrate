@@ -14,7 +14,7 @@ if [ ! -f  .tip/auto-branches/$BRANCH ]
 then
     echo "usage: tip-integrate integration-branch"
     echo "available integration branches:"
-    BS=`get_auto_branches master`
+    BS=`get_auto_branches`
     for B in $BS; do echo "    $B"; done
     exit 1;
 fi
