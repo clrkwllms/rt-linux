@@ -4,12 +4,16 @@
 #
 
 get_current_branch() {
-    git-branch | grep "*" | sed "s/\* //"
+    git-branch | grep "*" | cut -c3-
 }
 
 get_auto_branches() {
 
     git-ls-tree  tip -- .tip/auto-branches/ | sed "s@.*tip/auto-branches/@@"
+}
+
+get_topic_branches() {
+    git-branch | grep -vE 'linus|tmp|auto-' | cut -c3-
 }
 
 check_master() {

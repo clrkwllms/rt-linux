@@ -1,0 +1,10 @@
+#!/bin/bash
+
+#
+# Show all auto-generated -tip branches
+#
+
+. ~/bin/tip/tip-lib
+
+get_auto_branches master
+
