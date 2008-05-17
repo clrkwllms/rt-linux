@@ -1,5 +1,5 @@
 
-git-checkout .
+git-checkout . || { echo error; exit -1; }
 
 while :; do
   echo "next patch to process: "`qn`
