@@ -11,6 +11,8 @@ check_master
 git-checkout linus
 git-pull || exit 1;
 git-checkout master
+echo "Pulling from origin"
+git-pull || exit 1;
 
 AB=`get_auto_branches`
 BS=`git branch | sed "s/\* //"`
@@ -37,8 +39,7 @@ do
     echo "Updating $B"
     git-checkout $B
     # check whether there's anything to pull from the origin:
-    echo "Pulling from origin"
-    #git-pull
+    git-merge origin/$B
 
     # Get the files which have been changed by that topic branch since
     # the last merge of linus tree
