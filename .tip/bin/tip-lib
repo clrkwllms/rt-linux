@@ -13,7 +13,7 @@ get_auto_branches() {
 }
 
 get_topic_branches() {
-    git-branch | grep -vE 'linus|tmp|auto-' | cut -c3-
+    git-branch | grep -vE 'master|linus|tmp|auto-' | cut -c3-
 }
 
 check_master() {

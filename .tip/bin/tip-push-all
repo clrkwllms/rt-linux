@@ -13,5 +13,5 @@ echo "pushing: "$TOPIC_BRANCHES
 git-push origin $TOPIC_BRANCHES || { echo error; exit 1; }
 
 echo "force-pushing: "$AUTO_BRANCHES
-git-push -f origin $AUTO_BRANCHES || { echo error; exit 1; }
+git-push -f origin master $AUTO_BRANCHES || { echo error; exit 1; }
 
