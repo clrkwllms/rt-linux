@@ -51,6 +51,61 @@ static inline void native_halt(void)
 
 #endif
 
+#ifdef CONFIG_X86_64
+/*
+ * Only returns from a trap or exception to a NMI context (intra-privilege
+ * level near return) to the same SS and CS segments. Should be used
+ * upon trap or exception return when nested over a NMI context so no iret is
+ * issued. It takes care of modifying the eflags, rsp and returning to the
+ * previous function.
+ *
+ * The stack, at that point, looks like :
+ *
+ * 0(rsp)  RIP
+ * 8(rsp)  CS
+ * 16(rsp) EFLAGS
+ * 24(rsp) RSP
+ * 32(rsp) SS
+ *
+ * Upon execution :
+ * Copy EIP to the top of the return stack
+ * Update top of return stack address
+ * Pop eflags into the eflags register
+ * Make the return stack current
+ * Near return (popping the return address from the return stack)
+ */
+#define NATIVE_INTERRUPT_RETURN_NMI_SAFE	pushq %rax;		\
+						movq %rsp, %rax;	\
+						movq 24+8(%rax), %rsp;	\
+						pushq 0+8(%rax);	\
+						pushq 16+8(%rax);	\
+						movq (%rax), %rax;	\
+						popfq;			\
+						ret
+#else
+/*
+ * Protected mode only, no V8086. Implies that protected mode must
+ * be entered before NMIs or MCEs are enabled. Only returns from a trap or
+ * exception to a NMI context (intra-privilege level far return). Should be used
+ * upon trap or exception return when nested over a NMI context so no iret is
+ * issued.
+ *
+ * The stack, at that point, looks like :
+ *
+ * 0(esp) EIP
+ * 4(esp) CS
+ * 8(esp) EFLAGS
+ *
+ * Upon execution :
+ * Copy the stack eflags to top of stack
+ * Pop eflags into the eflags register
+ * Far return: pop EIP and CS into their register, and additionally pop EFLAGS.
+ */
+#define NATIVE_INTERRUPT_RETURN_NMI_SAFE	pushl 8(%esp);	\
+						popfl;		\
+						lret $4
+#endif
+
 #ifdef CONFIG_PARAVIRT
 #include <asm/paravirt.h>
 #else
@@ -109,6 +164,7 @@ static inline unsigned long __raw_local_irq_save(void)
 
 #define ENABLE_INTERRUPTS(x)	sti
 #define DISABLE_INTERRUPTS(x)	cli
+#define INTERRUPT_RETURN_NMI_SAFE	NATIVE_INTERRUPT_RETURN_NMI_SAFE
 
 #ifdef CONFIG_X86_64
 #define INTERRUPT_RETURN	iretq
@@ -179,8 +235,6 @@ static inline void trace_hardirqs_fixup(void)
  * have a reliable stack. x86_64 only.
  */
 #define SWAPGS_UNSAFE_STACK	swapgs
-#define ARCH_TRACE_IRQS_ON		call trace_hardirqs_on_thunk
-#define ARCH_TRACE_IRQS_OFF		call trace_hardirqs_off_thunk
 #define ARCH_LOCKDEP_SYS_EXIT		call lockdep_sys_exit_thunk
 #define ARCH_LOCKDEP_SYS_EXIT_IRQ	\
 	TRACE_IRQS_ON; \
@@ -192,24 +246,6 @@ static inline void trace_hardirqs_fixup(void)
 	TRACE_IRQS_OFF;
 
 #else
-#define ARCH_TRACE_IRQS_ON			\
-	pushl %eax;				\
-	pushl %ecx;				\
-	pushl %edx;				\
-	call trace_hardirqs_on;			\
-	popl %edx;				\
-	popl %ecx;				\
-	popl %eax;
-
-#define ARCH_TRACE_IRQS_OFF			\
-	pushl %eax;				\
-	pushl %ecx;				\
-	pushl %edx;				\
-	call trace_hardirqs_off;		\
-	popl %edx;				\
-	popl %ecx;				\
-	popl %eax;
-
 #define ARCH_LOCKDEP_SYS_EXIT			\
 	pushl %eax;				\
 	pushl %ecx;				\
@@ -223,8 +259,8 @@ static inline void trace_hardirqs_fixup(void)
 #endif
 
 #ifdef CONFIG_TRACE_IRQFLAGS
-#  define TRACE_IRQS_ON		ARCH_TRACE_IRQS_ON
-#  define TRACE_IRQS_OFF	ARCH_TRACE_IRQS_OFF
+#  define TRACE_IRQS_ON		call trace_hardirqs_on_thunk;
+#  define TRACE_IRQS_OFF	call trace_hardirqs_off_thunk;
 #else
 #  define TRACE_IRQS_ON
 #  define TRACE_IRQS_OFF
