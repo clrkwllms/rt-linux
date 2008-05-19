@@ -738,3 +738,31 @@ u64 __init find_e820_area_size(u64 start, u64 *sizep, u64 align)
 	return -1UL;
 
 }
+
+/*
+ * pre allocated 4k and reserved it in e820
+ */
+u64 __init early_reserve_e820(u64 sizet, u64 align)
+{
+	u64 start = 0, size = 0;
+	u64 addr;
+
+#ifdef CONFIG_X86_TRAMPOLINE
+	start = TRAMPOLINE_BASE;
+#endif
+	while (size < sizet)
+		start = find_e820_area_size(start, &size, align);
+
+	if (size < sizet)
+		return 0;
+
+	addr = start + size - sizet;
+
+	update_memory_range(addr, sizet, E820_RAM, E820_RESERVED);
+
+	printk(KERN_INFO "update e820 for early_reserve_e820\n");
+	update_e820();
+
+	return addr;
+}
+
