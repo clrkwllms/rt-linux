@@ -14,6 +14,7 @@
 #include <linux/mempolicy.h>
 #include <linux/cpuset.h>
 #include <linux/mutex.h>
+#include <linux/marker.h>
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -141,6 +142,7 @@ static void free_huge_page(struct page *page)
 	int nid = page_to_nid(page);
 	struct address_space *mapping;
 
+	trace_mark(mm_huge_page_free, "pfn %lu", page_to_pfn(page));
 	mapping = (struct address_space *) page_private(page);
 	set_page_private(page, 0);
 	BUG_ON(page_count(page));
@@ -509,6 +511,7 @@ static struct page *alloc_huge_page(struct vm_area_struct *vma,
 	if (!IS_ERR(page)) {
 		set_page_refcounted(page);
 		set_page_private(page, (unsigned long) mapping);
+		trace_mark(mm_huge_page_alloc, "pfn %lu", page_to_pfn(page));
 	}
 	return page;
 }
