@@ -31,4 +31,5 @@ date				>> ~/tip-master.log
 cat .git/refs/heads/master	>> ~/tip-master.log
 echo				>> ~/tip-master.log
 
-exit 0
+echo "integration done - new tag: tip-auto-history-$D"
+
