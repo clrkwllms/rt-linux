@@ -38,8 +38,9 @@ cflags-$(CONFIG_MCORE2)		+= -march=i686 $(call tune,core2)
 # AMD Elan support
 cflags-$(CONFIG_X86_ELAN)	+= -march=i486
 
-# Geode GX1 support
+# Geode GX1 and GX/LX support
 cflags-$(CONFIG_MGEODEGX1)	+= -march=pentium-mmx
+cflags-$(CONFIG_MGEODE_LX)	+= -march=i686 $(call tune,pentium-mmx)
 
 # add at the end to overwrite eventual tuning options from earlier
 # cpu entries
