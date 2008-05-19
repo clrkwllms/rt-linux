@@ -19,6 +19,7 @@
 #include <linux/mm.h>
 #include <linux/suspend.h>
 #include <linux/pfn.h>
+#include <linux/pci.h>
 
 #include <asm/pgtable.h>
 #include <asm/page.h>
@@ -305,21 +306,21 @@ unsigned long __init find_e820_area_size(unsigned long start,
  */
 unsigned long __init e820_end_of_ram(void)
 {
-	unsigned long end_pfn;
+	unsigned long last_pfn;
 
-	end_pfn = find_max_pfn_with_active_regions();
+	last_pfn = find_max_pfn_with_active_regions();
 
-	if (end_pfn > max_pfn_mapped)
-		max_pfn_mapped = end_pfn;
+	if (last_pfn > max_pfn_mapped)
+		max_pfn_mapped = last_pfn;
 	if (max_pfn_mapped > MAXMEM>>PAGE_SHIFT)
 		max_pfn_mapped = MAXMEM>>PAGE_SHIFT;
-	if (end_pfn > end_user_pfn)
-		end_pfn = end_user_pfn;
-	if (end_pfn > max_pfn_mapped)
-		end_pfn = max_pfn_mapped;
+	if (last_pfn > end_user_pfn)
+		last_pfn = end_user_pfn;
+	if (last_pfn > max_pfn_mapped)
+		last_pfn = max_pfn_mapped;
 
 	printk(KERN_INFO "max_pfn_mapped = %lu\n", max_pfn_mapped);
-	return end_pfn;
+	return last_pfn;
 }
 
 /*
@@ -378,12 +379,12 @@ void __init e820_mark_nosave_regions(void)
 }
 
 /*
- * Finds an active region in the address range from start_pfn to end_pfn and
+ * Finds an active region in the address range from start_pfn to last_pfn and
  * returns its range in ei_startpfn and ei_endpfn for the e820 entry.
  */
 static int __init e820_find_active_region(const struct e820entry *ei,
 					  unsigned long start_pfn,
-					  unsigned long end_pfn,
+					  unsigned long last_pfn,
 					  unsigned long *ei_startpfn,
 					  unsigned long *ei_endpfn)
 {
@@ -400,14 +401,14 @@ static int __init e820_find_active_region(const struct e820entry *ei,
 
 	/* Skip if map is outside the node */
 	if (ei->type != E820_RAM || *ei_endpfn <= start_pfn ||
-				    *ei_startpfn >= end_pfn)
+				    *ei_startpfn >= last_pfn)
 		return 0;
 
 	/* Check for overlaps */
 	if (*ei_startpfn < start_pfn)
 		*ei_startpfn = start_pfn;
-	if (*ei_endpfn > end_pfn)
-		*ei_endpfn = end_pfn;
+	if (*ei_endpfn > last_pfn)
+		*ei_endpfn = last_pfn;
 
 	/* Obey end_user_pfn to save on memmap */
 	if (*ei_startpfn >= end_user_pfn)
@@ -421,7 +422,7 @@ static int __init e820_find_active_region(const struct e820entry *ei,
 /* Walk the e820 map and register active regions within a node */
 void __init
 e820_register_active_regions(int nid, unsigned long start_pfn,
-							unsigned long end_pfn)
+							unsigned long last_pfn)
 {
 	unsigned long ei_startpfn;
 	unsigned long ei_endpfn;
@@ -429,7 +430,7 @@ e820_register_active_regions(int nid, unsigned long start_pfn,
 
 	for (i = 0; i < e820.nr_map; i++)
 		if (e820_find_active_region(&e820.map[i],
-					    start_pfn, end_pfn,
+					    start_pfn, last_pfn,
 					    &ei_startpfn, &ei_endpfn))
 			add_active_range(nid, ei_startpfn, ei_endpfn);
 }
@@ -460,13 +461,13 @@ void __init add_memory_region(unsigned long start, unsigned long size, int type)
 unsigned long __init e820_hole_size(unsigned long start, unsigned long end)
 {
 	unsigned long start_pfn = start >> PAGE_SHIFT;
-	unsigned long end_pfn = end >> PAGE_SHIFT;
+	unsigned long last_pfn = end >> PAGE_SHIFT;
 	unsigned long ei_startpfn, ei_endpfn, ram = 0;
 	int i;
 
 	for (i = 0; i < e820.nr_map; i++) {
 		if (e820_find_active_region(&e820.map[i],
-					    start_pfn, end_pfn,
+					    start_pfn, last_pfn,
 					    &ei_startpfn, &ei_endpfn))
 			ram += ei_endpfn - ei_startpfn;
 	}
