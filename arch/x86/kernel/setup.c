@@ -12,9 +12,10 @@
 #include <asm/mpspec.h>
 #include <asm/apicdef.h>
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#ifdef CONFIG_X86_MPPARSE
 unsigned int num_processors;
 unsigned disabled_cpus __cpuinitdata;
+
 /* Processor that is doing the boot up */
 unsigned int boot_cpu_physical_apicid = -1U;
 EXPORT_SYMBOL(boot_cpu_physical_apicid);
@@ -47,7 +48,7 @@ static void __init setup_node_to_cpumask_map(void);
 static inline void setup_node_to_cpumask_map(void) { }
 #endif
 
-#if defined(CONFIG_HAVE_SETUP_PER_CPU_AREA) && defined(CONFIG_X86_SMP)
+#ifdef CONFIG_HAVE_SETUP_PER_CPU_AREA
 /*
  * Copy data used in early init routines from the initial arrays to the
  * per cpu data areas.  These arrays then become expendable and the
