@@ -6,6 +6,9 @@ tip-integrate auto-latest		|| { echo error3; exit -1; }
 tip-checkout auto-latest		|| { echo error4; exit -1; }
 D=`date | sed 's/[ :]/_/g'`
 
+cat .git/refs/heads/auto-latest > .git/refs/heads/master ||
+					   { echo error6; exit -1; }
+
 tip-checkout master
 
 # save the new master head:
@@ -18,7 +21,4 @@ git-tag -m "auto-latest update: $D" tip-auto-history-$D master ||
 date				>> ~/tip-master.log
 cat .git/refs/heads/master	>> ~/tip-master.log
 echo				>> ~/tip-master.log
-
-cat .git/refs/heads/auto-latest > .git/refs/heads/master ||
-					   { echo error6; exit -1; }
 
