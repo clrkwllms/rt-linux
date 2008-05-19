@@ -25,7 +25,22 @@ static DEFINE_PER_CPU(unsigned long, print_timestamp);
 static DEFINE_PER_CPU(struct task_struct *, watchdog_task);
 
 static int __read_mostly did_panic;
-unsigned long __read_mostly softlockup_thresh = 60;
+int __read_mostly softlockup_thresh = 60;
+
+/*
+ * Should we panic (and reboot, if panic_timeout= is set) when a
+ * soft-lockup occurs:
+ */
+unsigned int __read_mostly softlockup_panic =
+				CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE;
+
+static int __init softlockup_panic_setup(char *str)
+{
+	softlockup_panic = simple_strtoul(str, NULL, 0);
+
+	return 1;
+}
+__setup("softlockup_panic=", softlockup_panic_setup);
 
 static int
 softlock_panic(struct notifier_block *this, unsigned long event, void *ptr)
@@ -79,6 +94,14 @@ void softlockup_tick(void)
 	struct pt_regs *regs = get_irq_regs();
 	unsigned long now;
 
+	/* Is detection switched off? */
+	if (!per_cpu(watchdog_task, this_cpu) || softlockup_thresh <= 0) {
+		/* Be sure we don't false trigger if switched back on */
+		if (touch_timestamp)
+			per_cpu(touch_timestamp, this_cpu) = 0;
+		return;
+	}
+
 	if (touch_timestamp == 0) {
 		touch_softlockup_watchdog();
 		return;
@@ -89,7 +112,7 @@ void softlockup_tick(void)
 	/* report at most once a second */
 	if ((print_timestamp >= touch_timestamp &&
 			print_timestamp < (touch_timestamp + 1)) ||
-			did_panic || !per_cpu(watchdog_task, this_cpu)) {
+			did_panic) {
 		return;
 	}
 
@@ -120,6 +143,9 @@ void softlockup_tick(void)
 	else
 		dump_stack();
 	spin_unlock(&print_lock);
+
+	if (softlockup_panic)
+		panic("softlockup: hung tasks");
 }
 
 /*
@@ -130,9 +156,9 @@ unsigned long __read_mostly sysctl_hung_task_check_count = 1024;
 /*
  * Zero means infinite timeout - no checking done:
  */
-unsigned long __read_mostly sysctl_hung_task_timeout_secs = 120;
+unsigned long __read_mostly sysctl_hung_task_timeout_secs = 240;
 
-unsigned long __read_mostly sysctl_hung_task_warnings = 10;
+unsigned long __read_mostly sysctl_hung_task_warnings = 1;
 
 /*
  * Only do the hung-tasks check on one CPU:
@@ -172,6 +198,9 @@ static void check_hung_task(struct task_struct *t, unsigned long now)
 
 	t->last_switch_timestamp = now;
 	touch_nmi_watchdog();
+
+	if (softlockup_panic)
+		panic("softlockup: blocked tasks");
 }
 
 /*
@@ -224,7 +253,7 @@ static int watchdog(void *__bind_cpu)
 	 */
 	while (!kthread_should_stop()) {
 		touch_softlockup_watchdog();
-		schedule();
+		schedule_timeout(softlockup_thresh/2);
 
 		if (kthread_should_stop())
 			break;
