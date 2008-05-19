@@ -714,8 +714,8 @@ static struct pci_driver agp_amd64_pci_driver = {
 	.probe		= agp_amd64_probe,
 	.remove		= agp_amd64_remove,
 #ifdef CONFIG_PM
-	.suspend	= agp_amd64_suspend,
-	.resume		= agp_amd64_resume,
+	.suspend_late	= agp_amd64_suspend,
+	.resume_early	= agp_amd64_resume,
 #endif
 };
 
