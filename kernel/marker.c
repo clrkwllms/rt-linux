@@ -24,6 +24,7 @@
 #include <linux/marker.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/immediate.h>
 
 extern struct marker __start___markers[];
 extern struct marker __stop___markers[];
@@ -55,8 +56,8 @@ static DEFINE_MUTEX(markers_mutex);
 struct marker_entry {
 	struct hlist_node hlist;
 	char *format;
-	void (*call)(const struct marker *mdata,	/* Probe wrapper */
-		void *call_private, const char *fmt, ...);
+			/* Probe wrapper */
+	void (*call)(const struct marker *mdata, void *call_private, ...);
 	struct marker_probe_closure single;
 	struct marker_probe_closure *multi;
 	int refcount;	/* Number of times armed. 0 if disarmed. */
@@ -91,15 +92,13 @@ EXPORT_SYMBOL_GPL(__mark_empty_function);
  * marker_probe_cb Callback that prepares the variable argument list for probes.
  * @mdata: pointer of type struct marker
  * @call_private: caller site private data
- * @fmt: format string
  * @...:  Variable argument list.
  *
  * Since we do not use "typical" pointer based RCU in the 1 argument case, we
  * need to put a full smp_rmb() in this branch. This is why we do not use
  * rcu_dereference() for the pointer read.
  */
-void marker_probe_cb(const struct marker *mdata, void *call_private,
-	const char *fmt, ...)
+void marker_probe_cb(const struct marker *mdata, void *call_private, ...)
 {
 	va_list args;
 	char ptype;
@@ -120,8 +119,9 @@ void marker_probe_cb(const struct marker *mdata, void *call_private,
 		/* Must read the ptr before private data. They are not data
 		 * dependant, so we put an explicit smp_rmb() here. */
 		smp_rmb();
-		va_start(args, fmt);
-		func(mdata->single.probe_private, call_private, fmt, &args);
+		va_start(args, call_private);
+		func(mdata->single.probe_private, call_private, mdata->format,
+			&args);
 		va_end(args);
 	} else {
 		struct marker_probe_closure *multi;
@@ -136,9 +136,9 @@ void marker_probe_cb(const struct marker *mdata, void *call_private,
 		smp_read_barrier_depends();
 		multi = mdata->multi;
 		for (i = 0; multi[i].func; i++) {
-			va_start(args, fmt);
-			multi[i].func(multi[i].probe_private, call_private, fmt,
-				&args);
+			va_start(args, call_private);
+			multi[i].func(multi[i].probe_private, call_private,
+				mdata->format, &args);
 			va_end(args);
 		}
 	}
@@ -150,13 +150,11 @@ EXPORT_SYMBOL_GPL(marker_probe_cb);
  * marker_probe_cb Callback that does not prepare the variable argument list.
  * @mdata: pointer of type struct marker
  * @call_private: caller site private data
- * @fmt: format string
  * @...:  Variable argument list.
  *
  * Should be connected to markers "MARK_NOARGS".
  */
-void marker_probe_cb_noarg(const struct marker *mdata,
-	void *call_private, const char *fmt, ...)
+void marker_probe_cb_noarg(const struct marker *mdata, void *call_private, ...)
 {
 	va_list args;	/* not initialized */
 	char ptype;
@@ -172,7 +170,8 @@ void marker_probe_cb_noarg(const struct marker *mdata,
 		/* Must read the ptr before private data. They are not data
 		 * dependant, so we put an explicit smp_rmb() here. */
 		smp_rmb();
-		func(mdata->single.probe_private, call_private, fmt, &args);
+		func(mdata->single.probe_private, call_private, mdata->format,
+			&args);
 	} else {
 		struct marker_probe_closure *multi;
 		int i;
@@ -186,8 +185,8 @@ void marker_probe_cb_noarg(const struct marker *mdata,
 		smp_read_barrier_depends();
 		multi = mdata->multi;
 		for (i = 0; multi[i].func; i++)
-			multi[i].func(multi[i].probe_private, call_private, fmt,
-				&args);
+			multi[i].func(multi[i].probe_private, call_private,
+				mdata->format, &args);
 	}
 	preempt_enable();
 }
@@ -545,7 +544,7 @@ static int set_marker(struct marker_entry **entry, struct marker *elem,
 	 */
 	smp_wmb();
 	elem->ptype = (*entry)->ptype;
-	elem->state = active;
+	elem->state__imv = active;
 
 	return 0;
 }
@@ -559,7 +558,7 @@ static int set_marker(struct marker_entry **entry, struct marker *elem,
 static void disable_marker(struct marker *elem)
 {
 	/* leave "call" as is. It is known statically. */
-	elem->state = 0;
+	elem->state__imv = 0;
 	elem->single.func = __mark_empty_function;
 	/* Update the function before setting the ptype */
 	smp_wmb();
@@ -623,6 +622,9 @@ static void marker_update_probes(void)
 	marker_update_probe_range(__start___markers, __stop___markers);
 	/* Markers in modules. */
 	module_update_markers();
+	/* Update immediate values */
+	core_imv_update();
+	module_imv_update();
 }
 
 /**
