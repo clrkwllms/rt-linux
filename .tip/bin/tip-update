@@ -10,7 +10,7 @@ check_master
 git-pull || exit 1;
 
 # create missing local branches
-tip-create-local-branches
+tip-create-local-branches.sh
 
 AB=`get_auto_branches`
 BS=`git branch | sed "s/\* //"`
@@ -42,8 +42,8 @@ do
     fi
 
     echo "Updating $B"
-    git-checkout $B
-    git-merge origin/$B
+    git-checkout $B || exit 1;
+    git-merge origin/$B || exit 1;
 done
 
 # switch back to master again

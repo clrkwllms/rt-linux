@@ -36,6 +36,11 @@ do
 	continue;
     fi
 
+    if [ "$B" = "linus" ]
+    then
+	continue
+    fi
+
     echo "Updating $B"
     git-checkout $B
     # check whether there's anything to pull from the origin:
