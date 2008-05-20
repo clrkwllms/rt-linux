@@ -1,2 +1,2 @@
 
-git-log base..$@
+git-log linus..$@

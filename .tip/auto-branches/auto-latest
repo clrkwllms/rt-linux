@@ -6,5 +6,6 @@ kmemcheck
 out-of-tree
 scratch
 stackprotector
+safe-poison-pointers
 
 x86/pebs

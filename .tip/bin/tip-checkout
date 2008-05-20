@@ -1,6 +1,6 @@
 
 quilt top 2>/dev/null && { echo "quilt patches still applied!"; exit -1; }
 
-git-checkout $@
-git-checkout .
+git-checkout $@ || { echo "failed to switch to target branch!"; exit -1; }
+git-checkout . || { echo "failed to check out target branch!"; exit -1; }
 

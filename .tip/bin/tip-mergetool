@@ -39,7 +39,7 @@ patch -p1 < $SRC.diff-v1 || {
 
 echo "adding $SRC to the commit"
 git-add $SRC
-git-commit -m "Manual merge of conflicts."
+echo 'if happy with the result, do: git-commit -m "Manual merge of conflicts."'
 
 echo "merge successful!"
 exit 0

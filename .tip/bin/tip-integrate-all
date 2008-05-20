@@ -1,12 +1,26 @@
 
+PREV_AUTO_LATEST=$(cat .git/refs/heads/auto-latest)
+
 tip-integrate auto-sched-next		|| { echo error1; exit -1; }
 tip-integrate auto-x86-next		|| { echo error2; exit -1; }
 tip-integrate auto-latest		|| { echo error3; exit -1; }
 
-tip-checkout auto-latest		|| { echo error4; exit -1; }
+tip-checkout master			|| { echo error4; exit -1; }
+#
+# Ok, we have a new auto-integration result, now carry over
+# our local fixups (which are in 'master') into a new master:
+#
+git-rebase -i -v -m --onto auto-latest $PREV_AUTO_LATEST || {
+  echo "rebase failed - restoring auto-latest."
+  echo $PREV_AUTO_LATEST > .git/refs/heads/auto-latest
+  exit -1;
+}
+
 D=`date | sed 's/[ :]/_/g'`
 
-# save the previous master head:
+#tip-checkout master
+
+# save the new master head:
 git-tag -m "auto-latest update: $D" tip-auto-history-$D master ||
 					   { echo error5; exit -1; }
 
@@ -17,8 +31,5 @@ date				>> ~/tip-master.log
 cat .git/refs/heads/master	>> ~/tip-master.log
 echo				>> ~/tip-master.log
 
-cat .git/refs/heads/auto-latest > .git/refs/heads/master ||
-					   { echo error6; exit -1; }
-
-tip-checkout master
+echo "integration done - new tag: tip-auto-history-$D"
 

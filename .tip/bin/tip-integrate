@@ -22,8 +22,8 @@ fi
 # Read the branch list
 git-checkout tip
 MB=`cat .tip/auto-branches/$BRANCH | grep -v "^[# \n]"`
-# switch back to master
-git-checkout master
+# switch back to linus
+git-checkout linus
 # Blow away the existing integration branch and create a new one
 git-branch -f $BRANCH
 # Build the new integration branch

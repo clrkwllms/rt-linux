@@ -2,6 +2,8 @@
 # Integration rule for x86-upstream-devel
 #
 x86/urgent
+x86/numa-fixes
+
 x86/build
 x86/cleanups
 x86/cpa
@@ -21,4 +23,6 @@ x86/pat
 x86/ptemask
 x86/threadinfo
 x86/timers
+x86/apic
+
 
