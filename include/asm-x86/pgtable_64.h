@@ -169,6 +169,12 @@ static inline unsigned long pmd_bad(pmd_t pmd)
 #define pte_none(x)	(!pte_val((x)))
 #define pte_present(x)	(pte_val((x)) & (_PAGE_PRESENT | _PAGE_PROTNONE))
 
+#ifdef CONFIG_KMEMCHECK
+#define pte_hidden(x)	(pte_val((x)) & (_PAGE_HIDDEN))
+#else
+#define pte_hidden(x)	0
+#endif
+
 #define pages_to_mb(x)	((x) >> (20 - PAGE_SHIFT))   /* FIXME: is this right? */
 #define pte_page(x)	pfn_to_page(pte_pfn((x)))
 #define pte_pfn(x)	((pte_val((x)) & __PHYSICAL_MASK) >> PAGE_SHIFT)
