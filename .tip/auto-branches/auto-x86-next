@@ -2,6 +2,8 @@
 # Integration rule for x86-upstream-devel
 #
 x86/urgent
+x86/numa-fixes
+
 x86/build
 x86/cleanups
 x86/cpa
