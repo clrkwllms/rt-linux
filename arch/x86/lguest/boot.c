@@ -958,6 +958,7 @@ __init void lguest_init(void)
 	pv_cpu_ops.cpuid = lguest_cpuid;
 	pv_cpu_ops.load_idt = lguest_load_idt;
 	pv_cpu_ops.iret = lguest_iret;
+	pv_cpu_ops.nmi_return = lguest_iret;
 	pv_cpu_ops.load_sp0 = lguest_load_sp0;
 	pv_cpu_ops.load_tr_desc = lguest_load_tr_desc;
 	pv_cpu_ops.set_ldt = lguest_set_ldt;
