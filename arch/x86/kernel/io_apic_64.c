@@ -911,8 +911,7 @@ static void __init setup_IO_APIC_irqs(void)
 }
 
 /*
- * Set up the 8259A-master output pin as broadcast to all
- * CPUs.
+ * Set up the 8259A-master output pin to point to CPU 0.
  */
 static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, int vector)
 {
