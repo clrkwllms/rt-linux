@@ -21,6 +21,8 @@
 #include <linux/cpumask.h>
 #include <linux/kdebug.h>
 
+#include <asm/apic.h>
+#include <asm/i8259.h>
 #include <asm/smp.h>
 #include <asm/nmi.h>
 #include <asm/proto.h>
@@ -79,7 +81,7 @@ static __init void nmi_cpu_busy(void *data)
 
 int __init check_nmi_watchdog(void)
 {
-	int *prev_nmi_count;
+	unsigned int *prev_nmi_count;
 	int cpu;
 
 	if ((nmi_watchdog == NMI_NONE) || (nmi_watchdog == NMI_DISABLED))
@@ -90,7 +92,7 @@ int __init check_nmi_watchdog(void)
 
 	prev_nmi_count = kmalloc(NR_CPUS * sizeof(int), GFP_KERNEL);
 	if (!prev_nmi_count)
-		return -1;
+		goto error;
 
 	printk(KERN_INFO "Testing NMI watchdog ... ");
 
@@ -121,7 +123,7 @@ int __init check_nmi_watchdog(void)
 	if (!atomic_read(&nmi_active)) {
 		kfree(prev_nmi_count);
 		atomic_set(&nmi_active, -1);
-		return -1;
+		goto error;
 	}
 	printk("OK.\n");
 
@@ -132,6 +134,11 @@ int __init check_nmi_watchdog(void)
 
 	kfree(prev_nmi_count);
 	return 0;
+error:
+	if (nmi_watchdog == NMI_IO_APIC && !timer_through_8259)
+		disable_8259A_irq(0);
+
+	return -1;
 }
 
 static int __init setup_nmi_watchdog(char *str)
@@ -316,7 +323,7 @@ EXPORT_SYMBOL(touch_nmi_watchdog);
 notrace __kprobes int
 nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 {
-	int sum;
+	unsigned int sum;
 	int touched = 0;
 	int cpu = smp_processor_id();
 	int rc = 0;

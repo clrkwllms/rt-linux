@@ -36,7 +36,7 @@ extern void generic_apic_probe(void);
 #ifdef CONFIG_X86_LOCAL_APIC
 
 extern int apic_verbosity;
-extern int timer_over_8254;
+extern int timer_through_8259;
 extern int local_apic_timer_c2_ok;
 extern int local_apic_timer_disabled;
 
