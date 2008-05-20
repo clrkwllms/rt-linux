@@ -15,6 +15,7 @@
 #include <linux/stringify.h>
 #include <linux/kobject.h>
 #include <linux/moduleparam.h>
+#include <linux/immediate.h>
 #include <linux/marker.h>
 #include <asm/local.h>
 
@@ -338,6 +339,12 @@ struct module
 	/* The command line arguments (may be mangled).  People like
 	   keeping pointers to this stuff */
 	char *args;
+#ifdef CONFIG_IMMEDIATE
+	struct __imv *immediate;
+	unsigned int num_immediate;
+	unsigned long *immediate_cond_end;
+	unsigned int num_immediate_cond_end;
+#endif
 #ifdef CONFIG_MARKERS
 	struct marker *markers;
 	unsigned int num_markers;
@@ -555,6 +562,24 @@ static inline void module_update_markers(void)
 }
 
 #endif /* CONFIG_MODULES */
+
+#if defined(CONFIG_MODULES) && defined(CONFIG_IMMEDIATE)
+extern void _module_imv_update(void);
+extern void module_imv_update(void);
+extern int is_imv_cond_end_module(unsigned long addr1, unsigned long addr2);
+#else
+static inline void _module_imv_update(void)
+{
+}
+static inline void module_imv_update(void)
+{
+}
+static inline int is_imv_cond_end_module(unsigned long addr1,
+		unsigned long addr2)
+{
+	return 0;
+}
+#endif
 
 struct device_driver;
 #ifdef CONFIG_SYSFS
