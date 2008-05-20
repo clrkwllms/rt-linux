@@ -20,7 +20,7 @@ x86/numa
 # PEBS disabled - needs ack from Roland
 #x86/pebs
 x86/pat
-x86/ptemask
+# x86/ptemask - upstream now
 x86/threadinfo
 x86/timers
 x86/apic
