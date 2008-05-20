@@ -30,12 +30,17 @@ MODULE_ALIAS("platform:pcspkr");
 #else
 #include <asm/8253pit.h>
 static DEFINE_SPINLOCK(i8253_lock);
+#define PIT_MODE		0x43
+#define PIT_CH0			0x40
+#define PIT_CH2			0x42
+#define outb_pit		outb_p
 #endif
 
 static int pcspkr_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
 	unsigned int count = 0;
 	unsigned long flags;
+	unsigned char val;
 
 	if (type != EV_SND)
 		return -1;
@@ -51,17 +56,18 @@ static int pcspkr_event(struct input_dev *dev, unsigned int type, unsigned int c
 
 	spin_lock_irqsave(&i8253_lock, flags);
 
+	val = inb(0x61);
 	if (count) {
 		/* enable counter 2 */
-		outb_p(inb_p(0x61) | 3, 0x61);
+		outb(val | 3, 0x61);
 		/* set command for counter 2, 2 byte write */
-		outb_p(0xB6, 0x43);
+		outb_pit(0xB6, PIT_MODE);
 		/* select desired HZ */
-		outb_p(count & 0xff, 0x42);
-		outb((count >> 8) & 0xff, 0x42);
+		outb_pit(count & 0xff, PIT_CH2);
+		outb((count >> 8) & 0xff, PIT_CH2);
 	} else {
 		/* disable counter 2 */
-		outb(inb_p(0x61) & 0xFC, 0x61);
+		outb(val & 0xFC, 0x61);
 	}
 
 	spin_unlock_irqrestore(&i8253_lock, flags);
