@@ -369,7 +369,14 @@ enum {
 	PG_LEVEL_4K,
 	PG_LEVEL_2M,
 	PG_LEVEL_1G,
+	PG_LEVEL_NUM
 };
+
+#ifdef CONFIG_PROC_FS
+extern void update_page_count(int level, unsigned long pages);
+#else
+static inline void update_page_count(int level, unsigned long pages) { }
+#endif
 
 /*
  * Helper function that returns the kernel pagetable entry controlling
