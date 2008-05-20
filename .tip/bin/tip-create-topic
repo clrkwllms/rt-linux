@@ -1,0 +1,26 @@
+#!/bin/sh
+
+. ~/bin/tip/tip-lib
+
+check_master
+
+if [ -z "$1" ]
+then
+    echo "tip-create-topic branchname"
+fi
+
+# create a new branch from linus
+git-branch $1 linus
+
+# push it out
+git checkout $1
+tip-push-current
+
+git checkout master
+
+# remove it
+git branch -D $1
+
+# pull it from remote and create the local branch again
+git pull
+tip-create-local-branches.sh
