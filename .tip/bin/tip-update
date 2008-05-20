@@ -9,6 +9,9 @@ check_master
 
 git-pull || exit 1;
 
+# create missing local branches
+tip-create-local-branches
+
 AB=`get_auto_branches`
 BS=`git branch | sed "s/\* //"`
 
