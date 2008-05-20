@@ -1,5 +1,5 @@
 
-qc 2>/dev/null && { echo "quilt patches still applied!"; exit -1; }
+quilt top 2>/dev/null && { echo "quilt patches still applied!"; exit -1; }
 
 git-checkout $@
 git-checkout .
