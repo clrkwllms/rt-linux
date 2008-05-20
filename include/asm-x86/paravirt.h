@@ -141,9 +141,10 @@ struct pv_cpu_ops {
 	u64 (*read_pmc)(int counter);
 	unsigned long long (*read_tscp)(unsigned int *aux);
 
-	/* These two are jmp to, not actually called. */
+	/* These three are jmp to, not actually called. */
 	void (*irq_enable_syscall_ret)(void);
 	void (*iret)(void);
+	void (*nmi_return)(void);
 
 	void (*swapgs)(void);
 
@@ -1384,6 +1385,10 @@ static inline unsigned long __raw_local_irq_save(void)
 #define INTERRUPT_RETURN						\
 	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_iret), CLBR_NONE,	\
 		  jmp *%cs:pv_cpu_ops+PV_CPU_iret)
+
+#define INTERRUPT_RETURN_NMI_SAFE					\
+	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_nmi_return), CLBR_NONE,	\
+		  jmp *%cs:pv_cpu_ops+PV_CPU_nmi_return)
 
 #define DISABLE_INTERRUPTS(clobbers)					\
 	PARA_SITE(PARA_PATCH(pv_irq_ops, PV_IRQ_irq_disable), clobbers, \
