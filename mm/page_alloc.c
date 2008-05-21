@@ -46,6 +46,7 @@
 #include <linux/page-isolation.h>
 #include <linux/memcontrol.h>
 #include <linux/debugobjects.h>
+#include <linux/marker.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -528,6 +529,9 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	int i;
 	int reserved = 0;
 
+	trace_mark(mm_page_free, "order %u pfn %lu",
+		order, page_to_pfn(page));
+
 	for (i = 0 ; i < (1 << order) ; ++i)
 		reserved += free_pages_check(page + i);
 	if (reserved)
@@ -993,6 +997,8 @@ static void free_hot_cold_page(struct page *page, int cold)
 	struct zone *zone = page_zone(page);
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
+
+	trace_mark(mm_page_free, "order %u pfn %lu", 0, page_to_pfn(page));
 
 	if (PageAnon(page))
 		page->mapping = NULL;
@@ -1655,6 +1661,9 @@ nopage:
 		show_mem();
 	}
 got_pg:
+	if (page)
+		trace_mark(mm_page_alloc, "order %u pfn %lu", order,
+			   page_to_pfn(page));
 	return page;
 }
 
