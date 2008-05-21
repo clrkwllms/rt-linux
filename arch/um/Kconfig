@@ -5,16 +5,13 @@ config DEFCONFIG_LIST
 
 # UML uses the generic IRQ subsystem
 config GENERIC_HARDIRQS
-	bool
-	default y
+	def_bool y
 
 config UML
-	bool
-	default y
+	def_bool y
 
 config MMU
-	bool
-	default y
+	def_bool y
 
 config NO_IOMEM
 	def_bool y
@@ -22,51 +19,43 @@ config NO_IOMEM
 mainmenu "Linux/Usermode Kernel Configuration"
 
 config ISA
-	bool
+	def_bool n
 
 config SBUS
-	bool
+	def_bool n
 
 config PCI
-	bool
+	def_bool n
 
 config PCMCIA
-	bool
+	def_bool n
 
 # Yet to do!
 config TRACE_IRQFLAGS_SUPPORT
-	bool
-	default n
+	def_bool n
 
 config LOCKDEP_SUPPORT
-	bool
-	default y
+	def_bool y
 
 config STACKTRACE_SUPPORT
-	bool
-	default n
+	def_bool n
 
 config GENERIC_CALIBRATE_DELAY
-	bool
-	default y
+	def_bool y
 
 config GENERIC_BUG
-	bool
-	default y
+	def_bool y
 	depends on BUG
 
 config GENERIC_TIME
-	bool
-	default y
+	def_bool y
 
 config GENERIC_CLOCKEVENTS
-	bool
-	default y
+	def_bool y
 
 # Used in kernel/irq/manage.c and include/linux/irq.h
 config IRQ_RELEASE_METHOD
-	bool
-	default y
+	def_bool y
 
 config HZ
 	int
@@ -90,13 +79,11 @@ source "mm/Kconfig"
 source "kernel/time/Kconfig"
 
 config LD_SCRIPT_STATIC
-	bool
-	default y
+	def_bool y
 	depends on STATIC_LINK
 
 config LD_SCRIPT_DYN
-	bool
-	default y
+	def_bool y
 	depends on !LD_SCRIPT_STATIC
 
 source "fs/Kconfig.binfmt"
@@ -261,7 +248,6 @@ endif
 
 #This is just to shut up some Kconfig warnings, so no prompt.
 config INPUT
-	bool
-	default n
+	def_bool n
 
 source "arch/um/Kconfig.debug"
