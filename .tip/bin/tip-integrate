@@ -24,7 +24,8 @@ git-checkout tip
 MB=`cat .tip/auto-branches/$BRANCH | grep -v "^[# \n]"`
 # switch back to linus
 git-checkout linus
-# Blow away the existing integration branch and create a new one
+# Blow away the existing integration branches and create a new one
+git-branch -f $BRANCH-base
 git-branch -f $BRANCH
 # Build the new integration branch
 git-checkout $BRANCH
