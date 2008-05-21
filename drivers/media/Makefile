@@ -2,7 +2,7 @@
 # Makefile for the kernel multimedia device drivers.
 #
 
-obj-y := common/
+obj-y := common/ video/
 
 obj-$(CONFIG_VIDEO_MEDIA) += common/
 
