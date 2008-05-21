@@ -39,7 +39,7 @@
 /*
  * Architectures can override it:
  */
-void __attribute__((weak)) early_printk(const char *fmt, ...)
+void asmlinkage __attribute__((weak)) early_printk(const char *fmt, ...)
 {
 }
 
