@@ -3,7 +3,7 @@
 # Sync all branches to the kernel.org repository
 #
 
-. ~/bin/tip/tip-lib
+. $(dirname "$0")/tip-lib
 
 check_master
 

@@ -3,7 +3,7 @@
 # Push the current branch to the kernel.org repository
 #
 
-. ~/bin/tip/tip-lib
+. $(dirname "$0")/tip-lib
 B=`get_current_branch`
 
 echo $B

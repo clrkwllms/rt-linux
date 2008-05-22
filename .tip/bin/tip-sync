@@ -3,7 +3,7 @@
 # Sync all branches to Linus latest
 #
 
-. ~/bin/tip/tip-lib
+. $(dirname "$0")/tip-lib
 
 check_master
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ~/bin/tip/tip-lib
+. $(dirname "$0")/tip-lib
 
 check_master
 

@@ -3,7 +3,7 @@
 # Get the latest version of -tip from kernel.org
 #
 
-. ~/bin/tip/tip-lib
+. $(dirname "$0")/tip-lib
 
 check_master
 

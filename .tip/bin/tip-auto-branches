@@ -4,7 +4,7 @@
 # Show all auto-generated -tip branches
 #
 
-. ~/bin/tip/tip-lib
+. $(dirname "$0")/tip-lib
 
 get_auto_branches
 

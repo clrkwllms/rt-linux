@@ -3,7 +3,7 @@
 # Automatically merge the branches for a given integration branch
 #
 
-. ~/bin/tip/tip-lib
+. $(dirname "$0")/tip-lib
 
 check_master
 
