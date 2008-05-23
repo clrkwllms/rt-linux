@@ -134,7 +134,6 @@ extern unsigned long nr_running(void);
 extern unsigned long nr_uninterruptible(void);
 extern unsigned long nr_active(void);
 extern unsigned long nr_iowait(void);
-extern unsigned long weighted_cpuload(const int cpu);
 
 struct seq_file;
 struct cfs_rq;
@@ -246,6 +245,8 @@ extern asmlinkage void schedule_tail(struct task_struct *prev);
 extern void init_idle(struct task_struct *idle, int cpu);
 extern void init_idle_bootup_task(struct task_struct *idle);
 
+extern int runqueue_is_locked(void);
+
 extern cpumask_t nohz_cpu_mask;
 #if defined(CONFIG_SMP) && defined(CONFIG_NO_HZ)
 extern int select_nohz_load_balancer(int cpu);
@@ -294,10 +295,11 @@ extern void softlockup_tick(void);
 extern void spawn_softlockup_task(void);
 extern void touch_softlockup_watchdog(void);
 extern void touch_all_softlockup_watchdogs(void);
-extern unsigned long  softlockup_thresh;
+extern unsigned int  softlockup_panic;
 extern unsigned long sysctl_hung_task_check_count;
 extern unsigned long sysctl_hung_task_timeout_secs;
 extern unsigned long sysctl_hung_task_warnings;
+extern int softlockup_thresh;
 #else
 static inline void softlockup_tick(void)
 {
@@ -823,23 +825,6 @@ extern void partition_sched_domains(int ndoms_new, cpumask_t *doms_new,
 extern int arch_reinit_sched_domains(void);
 
 #endif	/* CONFIG_SMP */
-
-/*
- * A runqueue laden with a single nice 0 task scores a weighted_cpuload of
- * SCHED_LOAD_SCALE. This function returns 1 if any cpu is laden with a
- * task of nice 0 or enough lower priority tasks to bring up the
- * weighted_cpuload
- */
-static inline int above_background_load(void)
-{
-	unsigned long cpu;
-
-	for_each_online_cpu(cpu) {
-		if (weighted_cpuload(cpu) >= SCHED_LOAD_SCALE)
-			return 1;
-	}
-	return 0;
-}
 
 struct io_context;			/* See blkdev.h */
 #define NGROUPS_SMALL		32
@@ -2117,6 +2102,18 @@ static inline void arch_pick_mmap_layout(struct mm_struct *mm)
 }
 #endif
 
+#ifdef CONFIG_TRACING
+extern void
+__trace_special(void *__tr, void *__data,
+		unsigned long arg1, unsigned long arg2, unsigned long arg3);
+#else
+static inline void
+__trace_special(void *__tr, void *__data,
+		unsigned long arg1, unsigned long arg2, unsigned long arg3)
+{
+}
+#endif
+
 extern long sched_setaffinity(pid_t pid, const cpumask_t *new_mask);
 extern long sched_getaffinity(pid_t pid, cpumask_t *mask);
 
@@ -2210,6 +2207,8 @@ static inline void mm_init_owner(struct mm_struct *mm, struct task_struct *p)
 {
 }
 #endif /* CONFIG_MM_OWNER */
+
+#define TASK_STATE_TO_CHAR_STR "RSDTtZX"
 
 #endif /* __KERNEL__ */
 

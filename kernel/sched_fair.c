@@ -585,11 +585,8 @@ static void enqueue_sleeper(struct cfs_rq *cfs_rq, struct sched_entity *se)
 		 * get a milliseconds-range estimation of the amount of
 		 * time that the task spent sleeping:
 		 */
-		if (unlikely(prof_on == SLEEP_PROFILING)) {
-
-			profile_hits(SLEEP_PROFILING, (void *)get_wchan(tsk),
+		profile_hits(SLEEP_PROFILING, (void *)get_wchan(task_of(se)),
 				     delta >> 20);
-		}
 		account_scheduler_latency(tsk, delta >> 10, 0);
 	}
 #endif
@@ -995,7 +992,7 @@ static int wake_idle(int cpu, struct task_struct *p)
 		    || ((sd->flags & SD_WAKE_IDLE_FAR)
 			&& !task_hot(p, task_rq(p)->clock, sd))) {
 			cpus_and(tmp, sd->span, p->cpus_allowed);
-			for_each_cpu_mask(i, tmp) {
+			for_each_cpu_mask_nr(i, tmp) {
 				if (idle_cpu(i)) {
 					if (i != task_cpu(p)) {
 						schedstat_inc(p,
@@ -1315,23 +1312,18 @@ __load_balance_iterator(struct cfs_rq *cfs_rq, struct list_head *next)
 	struct task_struct *p = NULL;
 	struct sched_entity *se;
 
-	if (next == &cfs_rq->tasks)
-		return NULL;
-
-	/* Skip over entities that are not tasks */
-	do {
+	while (next != &cfs_rq->tasks) {
 		se = list_entry(next, struct sched_entity, group_node);
 		next = next->next;
-	} while (next != &cfs_rq->tasks && !entity_is_task(se));
 
-	if (next == &cfs_rq->tasks)
-		return NULL;
+		/* Skip over entities that are not tasks */
+		if (entity_is_task(se)) {
+			p = task_of(se);
+			break;
+		}
+	}
 
 	cfs_rq->balance_iterator = next;
-
-	if (entity_is_task(se))
-		p = task_of(se);
-
 	return p;
 }
 
