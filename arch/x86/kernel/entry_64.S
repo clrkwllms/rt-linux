@@ -54,6 +54,110 @@
 
 	.code64
 
+#ifdef CONFIG_FTRACE
+#ifdef CONFIG_DYNAMIC_FTRACE
+ENTRY(mcount)
+
+	subq $0x38, %rsp
+	movq %rax, (%rsp)
+	movq %rcx, 8(%rsp)
+	movq %rdx, 16(%rsp)
+	movq %rsi, 24(%rsp)
+	movq %rdi, 32(%rsp)
+	movq %r8, 40(%rsp)
+	movq %r9, 48(%rsp)
+
+	movq 0x38(%rsp), %rdi
+
+.globl mcount_call
+mcount_call:
+	call ftrace_stub
+
+	movq 48(%rsp), %r9
+	movq 40(%rsp), %r8
+	movq 32(%rsp), %rdi
+	movq 24(%rsp), %rsi
+	movq 16(%rsp), %rdx
+	movq 8(%rsp), %rcx
+	movq (%rsp), %rax
+	addq $0x38, %rsp
+
+	retq
+END(mcount)
+
+ENTRY(ftrace_caller)
+
+	/* taken from glibc */
+	subq $0x38, %rsp
+	movq %rax, (%rsp)
+	movq %rcx, 8(%rsp)
+	movq %rdx, 16(%rsp)
+	movq %rsi, 24(%rsp)
+	movq %rdi, 32(%rsp)
+	movq %r8, 40(%rsp)
+	movq %r9, 48(%rsp)
+
+	movq 0x38(%rsp), %rdi
+	movq 8(%rbp), %rsi
+
+.globl ftrace_call
+ftrace_call:
+	call ftrace_stub
+
+	movq 48(%rsp), %r9
+	movq 40(%rsp), %r8
+	movq 32(%rsp), %rdi
+	movq 24(%rsp), %rsi
+	movq 16(%rsp), %rdx
+	movq 8(%rsp), %rcx
+	movq (%rsp), %rax
+	addq $0x38, %rsp
+
+.globl ftrace_stub
+ftrace_stub:
+	retq
+END(ftrace_caller)
+
+#else /* ! CONFIG_DYNAMIC_FTRACE */
+ENTRY(mcount)
+	cmpq $ftrace_stub, ftrace_trace_function
+	jnz trace
+.globl ftrace_stub
+ftrace_stub:
+	retq
+
+trace:
+	/* taken from glibc */
+	subq $0x38, %rsp
+	movq %rax, (%rsp)
+	movq %rcx, 8(%rsp)
+	movq %rdx, 16(%rsp)
+	movq %rsi, 24(%rsp)
+	movq %rdi, 32(%rsp)
+	movq %r8, 40(%rsp)
+	movq %r9, 48(%rsp)
+
+	movq 0x38(%rsp), %rdi
+	movq 8(%rbp), %rsi
+
+	call   *ftrace_trace_function
+
+	movq 48(%rsp), %r9
+	movq 40(%rsp), %r8
+	movq 32(%rsp), %rdi
+	movq 24(%rsp), %rsi
+	movq 16(%rsp), %rdx
+	movq 8(%rsp), %rcx
+	movq (%rsp), %rax
+	addq $0x38, %rsp
+
+	jmp ftrace_stub
+END(mcount)
+#endif /* CONFIG_DYNAMIC_FTRACE */
+#endif /* CONFIG_FTRACE */
+
+#define HARDNMI_MASK 0x40000000
+
 #ifndef CONFIG_PREEMPT
 #define retint_kernel retint_restore_args
 #endif	
@@ -596,6 +700,9 @@ ENTRY(native_iret)
 	.section __ex_table,"a"
 	.quad native_iret, bad_iret
 	.previous
+
+ENTRY(native_nmi_return)
+	NATIVE_INTERRUPT_RETURN_NMI_SAFE
 #endif
 
 	.section .fixup,"ax"
@@ -650,6 +757,23 @@ retint_signal:
 	movl $_TIF_NEED_RESCHED,%edi
 	GET_THREAD_INFO(%rcx)
 	jmp retint_check
+
+	/* Returning to kernel space from exception. */
+	/* rcx:	 threadinfo. interrupts off. */
+ENTRY(retexc_kernel)
+	testl $HARDNMI_MASK,threadinfo_preempt_count(%rcx)
+	jz retint_kernel		/* Not nested over NMI ? */
+	testw $X86_EFLAGS_TF,EFLAGS-ARGOFFSET(%rsp)	/* trap flag? */
+	jnz retint_kernel		/*
+					 * If single-stepping an NMI handler,
+					 * use the normal iret path instead of
+					 * the popf/lret because lret would be
+					 * single-stepped. It should not
+					 * happen : it will reactivate NMIs
+					 * prematurely.
+					 */
+	RESTORE_ARGS 0,8,0
+	INTERRUPT_RETURN_NMI_SAFE
 
 #ifdef CONFIG_PREEMPT
 	/* Returning to kernel space. Check if we need preemption */
@@ -809,9 +933,17 @@ paranoid_swapgs\trace:
 	TRACE_IRQS_IRETQ 0
 	.endif
 	SWAPGS_UNSAFE_STACK
-paranoid_restore\trace:
+paranoid_restore_no_nmi\trace:
 	RESTORE_ALL 8
 	jmp irq_return
+paranoid_restore\trace:
+	GET_THREAD_INFO(%rcx)
+	testl $HARDNMI_MASK,threadinfo_preempt_count(%rcx)
+	jz paranoid_restore_no_nmi\trace	/* Nested over NMI ? */
+	testw $X86_EFLAGS_TF,EFLAGS-0(%rsp)	/* trap flag? */
+	jnz paranoid_restore_no_nmi\trace
+	RESTORE_ALL 8
+	INTERRUPT_RETURN_NMI_SAFE
 paranoid_userspace\trace:
 	GET_THREAD_INFO(%rcx)
 	movl threadinfo_flags(%rcx),%ebx
@@ -910,7 +1042,7 @@ error_exit:
 	TRACE_IRQS_OFF
 	GET_THREAD_INFO(%rcx)	
 	testl %eax,%eax
-	jne  retint_kernel
+	jne  retexc_kernel
 	LOCKDEP_SYS_EXIT_IRQ
 	movl  threadinfo_flags(%rcx),%edx
 	movl  $_TIF_WORK_MASK,%edi
