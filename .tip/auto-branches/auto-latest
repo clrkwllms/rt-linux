@@ -1,6 +1,9 @@
 auto-sched-next
 auto-x86-next
 
+posix-timers
+pci-for-jesse
+
 ftrace
 kmemcheck
 out-of-tree
