@@ -799,6 +799,24 @@ config PROC_PAGE_MONITOR
 	  /proc/kpagecount, and /proc/kpageflags. Disabling these
           interfaces will reduce the size of the kernel by approximately 4kb.
 
+config HAVE_IMMEDIATE
+	def_bool n
+
+config IMMEDIATE
+	default y
+	depends on HAVE_IMMEDIATE
+	bool "Immediate value optimization" if EMBEDDED
+	help
+	  Immediate values are used as read-mostly variables that are rarely
+	  updated. They use code patching to modify the values inscribed in the
+	  instruction stream. It provides a way to save precious cache lines
+	  that would otherwise have to be used by these variables. They can be
+	  disabled through the EMBEDDED menu.
+
+	  It consumes slightly more memory and modifies the instruction stream
+	  each time any specially-marked variable is updated. Should really be
+	  disabled for embedded systems with read-only text.
+
 endmenu		# General setup
 
 config SLABINFO

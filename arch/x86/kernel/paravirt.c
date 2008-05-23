@@ -139,6 +139,7 @@ unsigned paravirt_patch_default(u8 type, u16 clobbers, void *insnbuf,
 		/* If the operation is a nop, then nop the callsite */
 		ret = paravirt_patch_nop();
 	else if (type == PARAVIRT_PATCH(pv_cpu_ops.iret) ||
+		 type == PARAVIRT_PATCH(pv_cpu_ops.nmi_return) ||
 		 type == PARAVIRT_PATCH(pv_cpu_ops.irq_enable_syscall_ret))
 		/* If operation requires a jmp, then jmp */
 		ret = paravirt_patch_jmp(insnbuf, opfunc, addr, len);
@@ -190,6 +191,7 @@ static void native_flush_tlb_single(unsigned long addr)
 
 /* These are in entry.S */
 extern void native_iret(void);
+extern void native_nmi_return(void);
 extern void native_irq_enable_syscall_ret(void);
 
 static int __init print_banner(void)
@@ -328,6 +330,7 @@ struct pv_cpu_ops pv_cpu_ops = {
 
 	.irq_enable_syscall_ret = native_irq_enable_syscall_ret,
 	.iret = native_iret,
+	.nmi_return = native_nmi_return,
 	.swapgs = native_swapgs,
 
 	.set_iopl_mask = native_set_iopl_mask,

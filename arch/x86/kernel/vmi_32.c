@@ -151,6 +151,8 @@ static unsigned vmi_patch(u8 type, u16 clobbers, void *insns,
 					      insns, ip);
 		case PARAVIRT_PATCH(pv_cpu_ops.iret):
 			return patch_internal(VMI_CALL_IRET, len, insns, ip);
+		case PARAVIRT_PATCH(pv_cpu_ops.nmi_return):
+			return patch_internal(VMI_CALL_IRET, len, insns, ip);
 		case PARAVIRT_PATCH(pv_cpu_ops.irq_enable_syscall_ret):
 			return patch_internal(VMI_CALL_SYSEXIT, len, insns, ip);
 		default:
