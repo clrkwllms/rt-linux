@@ -419,18 +419,34 @@ config PARAVIRT
 
 endif
 
-config MEMTEST
-	bool "Memtest"
+config MEMTEST_BOOTPARAM
+	bool "Memtest boot parameter"
 	depends on X86_64
 	default y
 	help
 	  This option adds a kernel parameter 'memtest', which allows memtest
-	  to be set.
-		memtest=0, mean disabled; -- default
-		memtest=1, mean do 1 test pattern;
-		...
-		memtest=4, mean do 4 test patterns.
+	  to be disabled at boot.  If this option is selected, memtest
+	  functionality can be disabled with memtest=0 on the kernel
+	  command line.  The purpose of this option is to allow a single
+	  kernel image to be distributed with memtest built in, but not
+	  necessarily enabled.
+
 	  If you are unsure how to answer this question, answer Y.
+
+config MEMTEST_BOOTPARAM_VALUE
+	int "Memtest boot parameter default value (0-4)"
+	depends on MEMTEST_BOOTPARAM
+	range 0 4
+	default 0
+	help
+	  This option sets the default value for the kernel parameter
+	  'memtest', which allows memtest to be disabled at boot.  If this
+	  option is set to 0 (zero), the memtest kernel parameter will
+	  default to 0, disabling memtest at bootup.  If this option is
+	  set to 4, the memtest kernel parameter will default to 4,
+	  enabling memtest at bootup, and use that as pattern number.
+
+	  If you are unsure how to answer this question, answer 0.
 
 config ACPI_SRAT
 	def_bool y
@@ -549,18 +565,18 @@ config IOMMU_HELPER
 	def_bool (CALGARY_IOMMU || GART_IOMMU || SWIOTLB)
 
 config NR_CPUS
-	int "Maximum number of CPUs (2-4096)"
-	range 2 4096
+	int "Maximum number of CPUs (2-255)"
+	range 2 255
 	depends on SMP
 	default "32" if X86_NUMAQ || X86_SUMMIT || X86_BIGSMP || X86_ES7000
 	default "8"
 	help
 	  This allows you to specify the maximum number of CPUs which this
-	  kernel will support.  The maximum supported value is 4096 and the
+	  kernel will support.  The maximum supported value is 255 and the
 	  minimum value which makes sense is 2.
 
 	  This is purely to save memory - each supported CPU adds
-	  approximately one kilobyte to the kernel image.
+	  approximately eight kilobytes to the kernel image.
 
 config SCHED_SMT
 	bool "SMT (Hyperthreading) scheduler support"
@@ -952,8 +968,8 @@ config NUMA_EMU
 	  number of nodes. This is only useful for debugging.
 
 config NODES_SHIFT
-	int "Max num nodes shift(1-9)"
-	range 1 9  if X86_64
+	int "Max num nodes shift(1-15)"
+	range 1 15  if X86_64
 	default "6" if X86_64
 	default "4" if X86_NUMAQ
 	default "3"
@@ -1075,40 +1091,6 @@ config MTRR
 	  just add about 9 KB to your kernel.
 
 	  See <file:Documentation/mtrr.txt> for more information.
-
-config MTRR_SANITIZER
-	def_bool y
-	prompt "MTRR cleanup support"
-	depends on MTRR
-	help
-	  Convert MTRR layout from continuous to discrete, so some X driver
-	  could add WB entries.
-
-	  Say N here if you see bootup problems (boot crash, boot hang,
-	  spontaneous reboots).
-
-	  Could be disabled with disable_mtrr_cleanup. Also mtrr_chunk_size
-	  could be used to send largest mtrr entry size for continuous block
-	  to hold holes (aka. UC entries)
-
-	  If unsure, say Y.
-
-config MTRR_SANITIZER_ENABLE_DEFAULT
-	int "MTRR cleanup enable value (0-1)"
-	range 0 1
-	default "0"
-	depends on MTRR_SANITIZER
-	help
-	  Enable mtrr cleanup default value
-
-config MTRR_SANITIZER_SPARE_REG_NR_DEFAULT
-	int "MTRR cleanup spare reg num (0-7)"
-	range 0 7
-	default "1"
-	depends on MTRR_SANITIZER
-	help
-	  mtrr cleanup spare entries default, it can be changed via
-	  mtrr_spare_reg_nr=
 
 config X86_PAT
 	bool
