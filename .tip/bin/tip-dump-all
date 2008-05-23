@@ -1,7 +1,7 @@
 
 for N in $(git-branch | grep -vE ' master$| base$|for-linus' | cut -c3-); do
 
-  ITEMS=$(git-rev-list --reverse base..$N)
+  ITEMS=$(git-rev-list --reverse base..$N -- $@)
   mkdir -p tip/$N
 
   for M in $ITEMS; do
