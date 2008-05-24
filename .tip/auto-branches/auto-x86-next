@@ -26,5 +26,6 @@ x86/timers
 x86/apic
 x86/xen
 x86/ldt
+x86/cpu
 
 
