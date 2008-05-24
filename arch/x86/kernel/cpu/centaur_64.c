@@ -1,6 +1,9 @@
 #include <linux/init.h>
 #include <linux/smp.h>
 
+#include <asm/cpufeature.h>
+#include <asm/processor.h>
+
 void __cpuinit early_init_centaur(struct cpuinfo_x86 *c)
 {
 	if (c->x86 == 0x6 && c->x86_model >= 0xf)
