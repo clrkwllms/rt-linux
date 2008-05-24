@@ -1,3 +1,4 @@
 tracing/ftrace
+tracing/sched_markers
 tracing/mmiotrace
 tracing/sysprof
