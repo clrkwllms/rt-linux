@@ -1,6 +1,8 @@
 auto-sched-next
 auto-x86-next
+
 auto-ftrace-next
+tracing/mmiotrace-mergefixups
 
 core/locking
 core/percpu
