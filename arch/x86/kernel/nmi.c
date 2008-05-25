@@ -145,6 +145,7 @@ int __init check_nmi_watchdog(void)
 
 	for_each_possible_cpu(cpu)
 		prev_nmi_count[cpu] = get_nmi_count(cpu);
+
 	local_irq_enable();
 	mdelay((20 * 1000) / nmi_hz); /* wait 20 ticks */
 
