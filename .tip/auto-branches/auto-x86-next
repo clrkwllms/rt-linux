@@ -4,28 +4,32 @@
 x86/urgent
 x86/numa-fixes
 
+x86/apic
+x86/bitops
 x86/build
 x86/cleanups
 x86/cpa
+x86/cpu
 x86/defconfig
 x86/gart
+x86/i8259
 x86/intel
 x86/irq
+x86/irqstats
 x86/kconfig
+x86/ldt
 x86/mce
 x86/memtest
-x86/mtrr
+x86/mpparse
 x86/nmi
 x86/numa
-# PEBS disabled - needs ack from Roland
-#x86/pebs
 x86/pat
-# x86/ptemask - upstream now
+x86/resumetrace
 x86/threadinfo
 x86/timers
-x86/apic
+x86/vdso
 x86/xen
-x86/ldt
-x86/cpu
 
-
+# PEBS disabled - needs ack from Roland
+#x86/pebs
+# x86/ptemask - upstream now
