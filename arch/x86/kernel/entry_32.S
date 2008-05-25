@@ -282,7 +282,7 @@ ENTRY(ia32_sysenter_target)
 	CFI_DEF_CFA esp, 0
 	CFI_REGISTER esp, ebp
 	movl TSS_sysenter_sp0(%esp),%esp
-sysenter_past_esp:
+ENTRY(sysenter_past_esp)
 	/*
 	 * Interrupts are disabled here, but we can't trace it until
 	 * enough kernel state to call TRACE_IRQS_OFF can be called - but
@@ -761,7 +761,7 @@ label:						\
 	CFI_ADJUST_CFA_OFFSET 4;		\
 	CFI_REL_OFFSET eip, 0
 
-KPROBE_ENTRY(debug)
+KPROBE_ENTRY(x86_debug)
 	RING0_INT_FRAME
 	cmpl $ia32_sysenter_target,(%esp)
 	jne debug_stack_correct
@@ -775,7 +775,7 @@ debug_stack_correct:
 	call do_debug
 	jmp ret_from_exception
 	CFI_ENDPROC
-KPROBE_END(debug)
+KPROBE_END(x86_debug)
 
 /*
  * NMI is doubly nasty. It can happen _while_ we're handling
@@ -829,7 +829,7 @@ nmi_debug_stack_check:
 	/* We have a RING0_INT_FRAME here */
 	cmpw $__KERNEL_CS,16(%esp)
 	jne nmi_stack_correct
-	cmpl $debug,(%esp)
+	cmpl $x86_debug,(%esp)
 	jb nmi_stack_correct
 	cmpl $debug_esp_fix_insn,(%esp)
 	ja nmi_stack_correct

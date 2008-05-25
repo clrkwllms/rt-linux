@@ -57,6 +57,7 @@
 #include <asm/nmi.h>
 #include <asm/smp.h>
 #include <asm/io.h>
+#include <asm/kmemcheck.h>
 
 #include "mach_traps.h"
 
@@ -330,7 +331,7 @@ void show_registers(struct pt_regs *regs)
 	int i;
 
 	print_modules();
-	__show_registers(regs, 0);
+	__show_regs(regs, 0);
 
 	printk(KERN_EMERG "Process %.*s (pid: %d, ti=%p task=%p task.ti=%p)",
 		TASK_COMM_LEN, current->comm, task_pid_nr(current),
@@ -874,6 +875,10 @@ void __kprobes do_int3(struct pt_regs *regs, long error_code)
 }
 #endif
 
+extern void ia32_sysenter_target(void);
+extern void sysenter_past_esp(void);
+extern void x86_debug(void);
+
 /*
  * Our handling of the processor debug registers is non-trivial.
  * We do not clear them on entry and exit from the kernel. Therefore
@@ -905,6 +910,14 @@ void __kprobes do_debug(struct pt_regs *regs, long error_code)
 
 	get_debugreg(condition, 6);
 
+	/* Catch kmemcheck conditions first of all! */
+	if (condition & DR_STEP) {
+		if (kmemcheck_active(regs)) {
+			kmemcheck_hide(regs);
+			return;
+		}
+	}
+
 	/*
 	 * The processor cleared BTF, so don't mark that we need it set.
 	 */
@@ -914,6 +927,7 @@ void __kprobes do_debug(struct pt_regs *regs, long error_code)
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
 					SIGTRAP) == NOTIFY_STOP)
 		return;
+
 	/* It's safe to allow irq's after DR6 has been saved */
 	if (regs->flags & X86_EFLAGS_IF)
 		local_irq_enable();
@@ -1199,7 +1213,7 @@ void __init trap_init(void)
 	init_apic_mappings();
 #endif
 	set_trap_gate(0,  &divide_error);
-	set_intr_gate(1,  &debug);
+	set_intr_gate(1,  &x86_debug);
 	set_intr_gate(2,  &nmi);
 	set_system_intr_gate(3, &int3); /* int3/4 can be called from all */
 	set_system_gate(4, &overflow);
