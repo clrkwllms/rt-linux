@@ -56,6 +56,7 @@
 #include <asm/desc.h>
 #include <video/edid.h>
 #include <asm/e820.h>
+#include <asm/mpspec.h>
 #include <asm/dma.h>
 #include <asm/gart.h>
 #include <asm/mpspec.h>
@@ -368,6 +369,9 @@ void __init setup_arch(char **cmdline_p)
 	 * we are rounding upwards:
 	 */
 	end_pfn = e820_end_of_ram();
+
+	/* pre allocte 4k for mptable mpc */
+	early_reserve_e820_mpc_new();
 	/* update e820 for memory not covered by WB MTRRs */
 	mtrr_bp_init();
 	if (mtrr_trim_uncached_memory(end_pfn)) {
@@ -503,7 +507,7 @@ void __init setup_arch(char **cmdline_p)
 	 * We trust e820 completely. No explicit ROM probing in memory.
 	 */
 	e820_reserve_resources();
-	e820_mark_nosave_regions();
+	e820_mark_nosave_regions(end_pfn);
 
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < ARRAY_SIZE(standard_io_resources); i++)
