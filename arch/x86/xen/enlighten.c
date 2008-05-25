@@ -995,6 +995,7 @@ static const struct pv_cpu_ops xen_cpu_ops __initdata = {
 	.read_pmc = native_read_pmc,
 
 	.iret = xen_iret,
+	.nmi_return = xen_iret,
 	.irq_enable_syscall_ret = xen_sysexit,
 
 	.load_tr_desc = paravirt_nop,
