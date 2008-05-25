@@ -391,8 +391,11 @@ void inc_rt_tasks(struct sched_rt_entity *rt_se, struct rt_rq *rt_rq)
 	WARN_ON(!rt_prio(rt_se_prio(rt_se)));
 	rt_rq->rt_nr_running++;
 #if defined CONFIG_SMP || defined CONFIG_RT_GROUP_SCHED
-	if (rt_se_prio(rt_se) < rt_rq->highest_prio)
+	if (rt_se_prio(rt_se) < rt_rq->highest_prio) {
+		struct rq *rq = rq_of_rt_rq(rt_rq);
 		rt_rq->highest_prio = rt_se_prio(rt_se);
+		cpupri_set(&rq->rd->cpupri, rq->cpu, rt_se_prio(rt_se));
+	}
 #endif
 #ifdef CONFIG_SMP
 	if (rt_se->nr_cpus_allowed > 1) {
@@ -416,6 +419,10 @@ void inc_rt_tasks(struct sched_rt_entity *rt_se, struct rt_rq *rt_rq)
 static inline
 void dec_rt_tasks(struct sched_rt_entity *rt_se, struct rt_rq *rt_rq)
 {
+#ifdef CONFIG_SMP
+	int highest_prio = rt_rq->highest_prio;
+#endif
+
 	WARN_ON(!rt_prio(rt_se_prio(rt_se)));
 	WARN_ON(!rt_rq->rt_nr_running);
 	rt_rq->rt_nr_running--;
@@ -439,6 +446,11 @@ void dec_rt_tasks(struct sched_rt_entity *rt_se, struct rt_rq *rt_rq)
 		rq->rt.rt_nr_migratory--;
 	}
 
+	if (rt_rq->highest_prio != highest_prio) {
+		struct rq *rq = rq_of_rt_rq(rt_rq);
+		cpupri_set(&rq->rd->cpupri, rq->cpu, rt_rq->highest_prio);
+	}
+
 	update_rt_migration(rq_of_rt_rq(rt_rq));
 #endif /* CONFIG_SMP */
 #ifdef CONFIG_RT_GROUP_SCHED
@@ -458,7 +470,13 @@ static void enqueue_rt_entity(struct sched_rt_entity *rt_se)
 	if (group_rq && rt_rq_throttled(group_rq))
 		return;
 
-	list_add_tail(&rt_se->run_list, array->queue + rt_se_prio(rt_se));
+	if (rt_se->nr_cpus_allowed == 1)
+		list_add_tail(&rt_se->run_list,
+			      array->xqueue + rt_se_prio(rt_se));
+	else
+		list_add_tail(&rt_se->run_list,
+			      array->squeue + rt_se_prio(rt_se));
+
 	__set_bit(rt_se_prio(rt_se), array->bitmap);
 
 	inc_rt_tasks(rt_se, rt_rq);
@@ -470,7 +488,8 @@ static void dequeue_rt_entity(struct sched_rt_entity *rt_se)
 	struct rt_prio_array *array = &rt_rq->active;
 
 	list_del_init(&rt_se->run_list);
-	if (list_empty(array->queue + rt_se_prio(rt_se)))
+	if (list_empty(array->squeue + rt_se_prio(rt_se))
+	    && list_empty(array->xqueue + rt_se_prio(rt_se)))
 		__clear_bit(rt_se_prio(rt_se), array->bitmap);
 
 	dec_rt_tasks(rt_se, rt_rq);
@@ -541,13 +560,19 @@ static void dequeue_task_rt(struct rq *rq, struct task_struct *p, int sleep)
 /*
  * Put task to the end of the run list without the overhead of dequeue
  * followed by enqueue.
+ *
+ * Note: We always enqueue the task to the shared-queue, regardless of its
+ * previous position w.r.t. exclusive vs shared.  This is so that exclusive RR
+ * tasks fairly round-robin with all tasks on the runqueue, not just other
+ * exclusive tasks.
  */
 static
 void requeue_rt_entity(struct rt_rq *rt_rq, struct sched_rt_entity *rt_se)
 {
 	struct rt_prio_array *array = &rt_rq->active;
 
-	list_move_tail(&rt_se->run_list, array->queue + rt_se_prio(rt_se));
+	list_del_init(&rt_se->run_list);
+	list_add_tail(&rt_se->run_list, array->squeue + rt_se_prio(rt_se));
 }
 
 static void requeue_task_rt(struct rq *rq, struct task_struct *p)
@@ -605,13 +630,46 @@ static int select_task_rq_rt(struct task_struct *p, int sync)
 }
 #endif /* CONFIG_SMP */
 
+static struct sched_rt_entity *pick_next_rt_entity(struct rq *rq,
+						   struct rt_rq *rt_rq);
+
 /*
  * Preempt the current task with a newly woken task if needed:
  */
 static void check_preempt_curr_rt(struct rq *rq, struct task_struct *p)
 {
-	if (p->prio < rq->curr->prio)
+	if (p->prio < rq->curr->prio) {
 		resched_task(rq->curr);
+		return;
+	}
+
+#ifdef CONFIG_SMP
+	/*
+	 * If:
+	 *
+	 * - the newly woken task is of equal priority to the current task
+	 * - the newly woken task is non-migratable while current is migratable
+	 * - current will be preempted on the next reschedule
+	 *
+	 * we should check to see if current can readily move to a different
+	 * cpu.  If so, we will reschedule to allow the push logic to try
+	 * to move current somewhere else, making room for our non-migratable
+	 * task.
+	 */
+	if((p->prio == rq->curr->prio)
+	   && p->rt.nr_cpus_allowed == 1
+	   && rq->curr->rt.nr_cpus_allowed != 1
+	   && pick_next_rt_entity(rq, &rq->rt) != &rq->curr->rt) {
+		cpumask_t mask;
+
+		if (cpupri_find(&rq->rd->cpupri, rq->curr, &mask))
+			/*
+			 * There appears to be other cpus that can accept
+			 * current, so lets reschedule to try and push it away
+			 */
+			resched_task(rq->curr);
+	}
+#endif
 }
 
 static struct sched_rt_entity *pick_next_rt_entity(struct rq *rq,
@@ -625,8 +683,15 @@ static struct sched_rt_entity *pick_next_rt_entity(struct rq *rq,
 	idx = sched_find_first_bit(array->bitmap);
 	BUG_ON(idx >= MAX_RT_PRIO);
 
-	queue = array->queue + idx;
-	next = list_entry(queue->next, struct sched_rt_entity, run_list);
+	queue = array->xqueue + idx;
+	if (!list_empty(queue))
+		next = list_entry(queue->next, struct sched_rt_entity,
+				  run_list);
+	else {
+		queue = array->squeue + idx;
+		next = list_entry(queue->next, struct sched_rt_entity,
+				  run_list);
+	}
 
 	return next;
 }
@@ -696,7 +761,7 @@ static struct task_struct *pick_next_highest_task_rt(struct rq *rq, int cpu)
 			continue;
 		if (next && next->prio < idx)
 			continue;
-		list_for_each_entry(rt_se, array->queue + idx, run_list) {
+		list_for_each_entry(rt_se, array->squeue + idx, run_list) {
 			struct task_struct *p = rt_task_of(rt_se);
 			if (pick_rt_task(rq, p, cpu)) {
 				next = p;
@@ -713,73 +778,6 @@ static struct task_struct *pick_next_highest_task_rt(struct rq *rq, int cpu)
 }
 
 static DEFINE_PER_CPU(cpumask_t, local_cpu_mask);
-
-static int find_lowest_cpus(struct task_struct *task, cpumask_t *lowest_mask)
-{
-	int       lowest_prio = -1;
-	int       lowest_cpu  = -1;
-	int       count       = 0;
-	int       cpu;
-
-	cpus_and(*lowest_mask, task_rq(task)->rd->online, task->cpus_allowed);
-
-	/*
-	 * Scan each rq for the lowest prio.
-	 */
-	for_each_cpu_mask(cpu, *lowest_mask) {
-		struct rq *rq = cpu_rq(cpu);
-
-		/* We look for lowest RT prio or non-rt CPU */
-		if (rq->rt.highest_prio >= MAX_RT_PRIO) {
-			/*
-			 * if we already found a low RT queue
-			 * and now we found this non-rt queue
-			 * clear the mask and set our bit.
-			 * Otherwise just return the queue as is
-			 * and the count==1 will cause the algorithm
-			 * to use the first bit found.
-			 */
-			if (lowest_cpu != -1) {
-				cpus_clear(*lowest_mask);
-				cpu_set(rq->cpu, *lowest_mask);
-			}
-			return 1;
-		}
-
-		/* no locking for now */
-		if ((rq->rt.highest_prio > task->prio)
-		    && (rq->rt.highest_prio >= lowest_prio)) {
-			if (rq->rt.highest_prio > lowest_prio) {
-				/* new low - clear old data */
-				lowest_prio = rq->rt.highest_prio;
-				lowest_cpu = cpu;
-				count = 0;
-			}
-			count++;
-		} else
-			cpu_clear(cpu, *lowest_mask);
-	}
-
-	/*
-	 * Clear out all the set bits that represent
-	 * runqueues that were of higher prio than
-	 * the lowest_prio.
-	 */
-	if (lowest_cpu > 0) {
-		/*
-		 * Perhaps we could add another cpumask op to
-		 * zero out bits. Like cpu_zero_bits(cpumask, nrbits);
-		 * Then that could be optimized to use memset and such.
-		 */
-		for_each_cpu_mask(cpu, *lowest_mask) {
-			if (cpu >= lowest_cpu)
-				break;
-			cpu_clear(cpu, *lowest_mask);
-		}
-	}
-
-	return count;
-}
 
 static inline int pick_optimal_cpu(int this_cpu, cpumask_t *mask)
 {
@@ -802,17 +800,12 @@ static int find_lowest_rq(struct task_struct *task)
 	cpumask_t *lowest_mask = &__get_cpu_var(local_cpu_mask);
 	int this_cpu = smp_processor_id();
 	int cpu      = task_cpu(task);
-	int count    = find_lowest_cpus(task, lowest_mask);
 
-	if (!count)
+	if (task->rt.nr_cpus_allowed == 1)
+		return -1; /* No other targets possible */
+
+	if (!cpupri_find(&task_rq(task)->rd->cpupri, task, lowest_mask))
 		return -1; /* No targets found */
-
-	/*
-	 * There is no sense in performing an optimal search if only one
-	 * target is found.
-	 */
-	if (count == 1)
-		return first_cpu(*lowest_mask);
 
 	/*
 	 * At this point we have built a mask of cpus representing the
@@ -1150,6 +1143,14 @@ static void set_cpus_allowed_rt(struct task_struct *p,
 		}
 
 		update_rt_migration(rq);
+
+		if (unlikely(weight == 1 || p->rt.nr_cpus_allowed == 1))
+			/*
+			 * If either the new or old weight is a "1", we need
+			 * to requeue to properly move between shared and
+			 * exclusive queues.
+			 */
+			requeue_task_rt(rq, p);
 	}
 
 	p->cpus_allowed    = *new_mask;
@@ -1161,6 +1162,8 @@ static void join_domain_rt(struct rq *rq)
 {
 	if (rq->rt.overloaded)
 		rt_set_overload(rq);
+
+	cpupri_set(&rq->rd->cpupri, rq->cpu, rq->rt.highest_prio);
 }
 
 /* Assumes rq->lock is held */
@@ -1168,6 +1171,8 @@ static void leave_domain_rt(struct rq *rq)
 {
 	if (rq->rt.overloaded)
 		rt_clear_overload(rq);
+
+	cpupri_set(&rq->rd->cpupri, rq->cpu, CPUPRI_INVALID);
 }
 
 /*
