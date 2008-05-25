@@ -5,6 +5,7 @@ x86/urgent
 x86/numa-fixes
 
 x86/apic
+x86/apm
 x86/bitops
 x86/build
 x86/cleanups
