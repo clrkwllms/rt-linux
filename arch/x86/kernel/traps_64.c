@@ -555,6 +555,10 @@ void __kprobes oops_end(unsigned long flags, struct pt_regs *regs, int signr)
 		oops_exit();
 		return;
 	}
+	if (in_nmi())
+		panic("Fatal exception in non-maskable interrupt");
+	if (in_interrupt())
+		panic("Fatal exception in interrupt");
 	if (panic_on_oops)
 		panic("Fatal exception");
 	oops_exit();
