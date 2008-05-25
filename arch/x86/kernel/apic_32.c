@@ -80,6 +80,11 @@ char system_vectors[NR_VECTORS] = { [0 ... NR_VECTORS-1] = SYS_VECTOR_FREE};
  */
 int apic_verbosity;
 
+int pic_mode;
+
+/* Have we found an MP table */
+int smp_found_config;
+
 static unsigned int calibration_result;
 
 static int lapic_next_event(unsigned long delta,
@@ -1206,7 +1211,7 @@ void __init init_apic_mappings(void)
 
 		for (i = 0; i < nr_ioapics; i++) {
 			if (smp_found_config) {
-				ioapic_phys = mp_ioapics[i].mpc_apicaddr;
+				ioapic_phys = mp_ioapics[i].mp_apicaddr;
 				if (!ioapic_phys) {
 					printk(KERN_ERR
 					       "WARNING: bogus zero IO-APIC "
