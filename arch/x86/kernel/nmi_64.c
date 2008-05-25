@@ -79,7 +79,7 @@ static __init void nmi_cpu_busy(void *data)
 
 int __init check_nmi_watchdog(void)
 {
-	int *prev_nmi_count;
+	unsigned int *prev_nmi_count;
 	int cpu;
 
 	if ((nmi_watchdog == NMI_NONE) || (nmi_watchdog == NMI_DISABLED))
@@ -88,7 +88,7 @@ int __init check_nmi_watchdog(void)
 	if (!atomic_read(&nmi_active))
 		return 0;
 
-	prev_nmi_count = kmalloc(NR_CPUS * sizeof(int), GFP_KERNEL);
+	prev_nmi_count = kmalloc(nr_cpu_ids * sizeof(int), GFP_KERNEL);
 	if (!prev_nmi_count)
 		return -1;
 
@@ -99,7 +99,7 @@ int __init check_nmi_watchdog(void)
 		smp_call_function(nmi_cpu_busy, (void *)&endflag, 0, 0);
 #endif
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++)
+	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
 		prev_nmi_count[cpu] = cpu_pda(cpu)->__nmi_count;
 	local_irq_enable();
 	mdelay((20*1000)/nmi_hz); // wait 20 ticks
@@ -316,7 +316,7 @@ EXPORT_SYMBOL(touch_nmi_watchdog);
 notrace __kprobes int
 nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 {
-	int sum;
+	unsigned int sum;
 	int touched = 0;
 	int cpu = smp_processor_id();
 	int rc = 0;
