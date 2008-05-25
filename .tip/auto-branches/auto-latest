@@ -2,6 +2,7 @@ auto-sched-next
 auto-x86-next
 
 auto-ftrace-next
+# Fixup RCU merge
 tracing/mmiotrace-mergefixups
 
 core/locking
@@ -14,6 +15,8 @@ core/stacktrace
 core/urgent
 
 cpus4096
+# Fixup cpus4096 merge
+tracing/ftrace-mergefixups
 
 kmemcheck
 
@@ -29,3 +32,9 @@ timers/clockevents
 timers/posixtimers
 
 x86/pebs
+
+tracing/markers
+tracing/textedit
+tracing/nmisafe
+tracing/stopmachine-allcpus
+tracing/immediates
