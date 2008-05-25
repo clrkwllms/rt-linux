@@ -16,6 +16,7 @@ then
     echo "available integration branches:"
     BS=`get_auto_branches`
     for B in $BS; do echo "    $B"; done
+    git-checkout master
     exit 1;
 fi
 
