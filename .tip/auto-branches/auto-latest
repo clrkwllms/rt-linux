@@ -1,14 +1,29 @@
 auto-sched-next
 auto-x86-next
+auto-ftrace-next
 
-posix-timers
+core/locking
+core/percpu
+core/printk
+core/rodata
+core/softirq
+core/softlockup
+core/stacktrace
+core/urgent
+
+cpus4096
+
+kmemcheck
+
 pci-for-jesse
 
-ftrace
-kmemcheck
-out-of-tree
-scratch
-stackprotector
 safe-poison-pointers
+
+sched-devel
+
+stackprotector
+
+timers/clockevents
+timers/posixtimers
 
 x86/pebs
