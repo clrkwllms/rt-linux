@@ -46,6 +46,7 @@
 #include <asm/cacheflush.h>
 #include <linux/license.h>
 #include <asm/sections.h>
+#include <linux/marker.h>
 
 #if 0
 #define DEBUGP printk
@@ -1373,6 +1374,8 @@ static int __unlink_module(void *_mod)
 /* Free a module, remove from lists, etc (must hold module_mutex). */
 static void free_module(struct module *mod)
 {
+	trace_mark(kernel_module_free, "name %s", mod->name);
+
 	/* Delete from various lists */
 	stop_machine_run(__unlink_module, mod, NR_CPUS);
 	remove_notes_attrs(mod);
@@ -2146,6 +2149,8 @@ static struct module *load_module(void __user *umod,
 
 	/* Get rid of temporary copy */
 	vfree(hdr);
+
+	trace_mark(kernel_module_load, "name %s", mod->name);
 
 	/* Done! */
 	return mod;
