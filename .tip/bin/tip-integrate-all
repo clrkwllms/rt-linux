@@ -1,4 +1,6 @@
 
+. $(dirname "$0")/tip-lib
+
 PREV_AUTO_LATEST=$(cat .git/refs/heads/auto-latest)
 
 tip-integrate auto-sched-next		|| { echo error1; exit -1; }
@@ -6,24 +8,36 @@ tip-integrate auto-ftrace-next		|| { echo error2; exit -1; }
 tip-integrate auto-x86-next		|| { echo error3; exit -1; }
 tip-integrate auto-latest		|| { echo error4; exit -1; }
 
-tip-checkout master			|| { echo error5; exit -1; }
+git-checkout auto-latest
+git branch -f master
+
 #
 # Ok, we have a new auto-integration result, now carry over
-# our local fixups (which are in 'master') into a new master:
+# our local fixups which are in out-of-tree
 #
-git-rebase -i -v -m --onto auto-latest $PREV_AUTO_LATEST || {
-  echo "rebase failed - restoring auto-latest."
-  echo $PREV_AUTO_LATEST > .git/refs/heads/auto-latest
-  exit -1;
+git checkout master
+
+git merge out-of-tree || {
+	echo Merging $B failed
+	echo merge conflict - run tip-mergetool
+	echo
+	echo running subshell - type "exit" when resolved
+	$SHELL || abort_merge
+
+	NCOM=`git-ls-files -u`
+	if [ ! -z "$NCOM" ]
+	then
+	    echo "Merge was not committed! Fixing it up"
+	    git-add $(git-ls-files -u | cut -f2 | sort | uniq)
+	    git-commit -s || abort_merge;
+	fi
 }
 
-D=`date | sed 's/[ :]/_/g'`
-
-#tip-checkout master
+D=`get_date_for_tag`
 
 # save the new master head:
 git-tag -m "auto-latest update: $D" tip-auto-history-$D master ||
-					   { echo error5; exit -1; }
+					   { echo error6; exit -1; }
 
 #
 # Do some backups ...
