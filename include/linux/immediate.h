@@ -75,7 +75,6 @@ extern int is_imv_cond_end(unsigned long addr1, unsigned long addr2);
 #define imv_set(name, i)		(name##__imv = (i))
 
 static inline void core_imv_update(void) { }
-static inline void module_imv_update(void) { }
 static inline void imv_unref_core_init(void) { }
 
 #endif

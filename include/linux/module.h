@@ -457,9 +457,6 @@ extern void print_modules(void);
 
 extern void module_update_markers(void);
 
-extern void _module_imv_update(void);
-extern void module_imv_update(void);
-
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
