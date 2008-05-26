@@ -183,7 +183,6 @@ struct class {
 	struct module		*owner;
 
 	struct kset		subsys;
-	struct list_head	children;
 	struct list_head	devices;
 	struct list_head	interfaces;
 	struct kset		class_dirs;
@@ -450,9 +449,21 @@ extern int __must_check device_reprobe(struct device *dev);
 /*
  * Easy functions for dynamically creating devices on the fly
  */
+extern struct device *device_create_vargs(struct class *cls,
+					  struct device *parent,
+					  dev_t devt,
+					  void *drvdata,
+					  const char *fmt,
+					  va_list vargs);
 extern struct device *device_create(struct class *cls, struct device *parent,
 				    dev_t devt, const char *fmt, ...)
 				    __attribute__((format(printf, 4, 5)));
+extern struct device *device_create_drvdata(struct class *cls,
+					    struct device *parent,
+					    dev_t devt,
+					    void *drvdata,
+					    const char *fmt, ...)
+				    __attribute__((format(printf, 5, 6)));
 extern void device_destroy(struct class *cls, dev_t devt);
 
 /*
