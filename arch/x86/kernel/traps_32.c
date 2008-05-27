@@ -476,6 +476,9 @@ void die(const char *str, struct pt_regs *regs, long err)
 	if (kexec_should_crash(current))
 		crash_kexec(regs);
 
+	if (in_nmi())
+		panic("Fatal exception in non-maskable interrupt");
+
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
