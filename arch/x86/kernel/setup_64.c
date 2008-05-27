@@ -71,6 +71,7 @@
 #include <asm/topology.h>
 #include <asm/trampoline.h>
 #include <asm/pat.h>
+#include <asm/mmconfig.h>
 
 #include <mach_apic.h>
 #ifdef CONFIG_PARAVIRT
@@ -118,7 +119,7 @@ EXPORT_SYMBOL_GPL(edid_info);
 
 extern int root_mountflags;
 
-char __initdata command_line[COMMAND_LINE_SIZE];
+static char __initdata command_line[COMMAND_LINE_SIZE];
 
 static struct resource standard_io_resources[] = {
 	{ .name = "dma1", .start = 0x00, .end = 0x1f,
@@ -292,18 +293,6 @@ static void __init parse_setup_data(void)
 		early_iounmap(data, PAGE_SIZE);
 	}
 }
-
-#ifdef CONFIG_PCI_MMCONFIG
-extern void __cpuinit fam10h_check_enable_mmcfg(void);
-extern void __init check_enable_amd_mmconf_dmi(void);
-#else
-void __cpuinit fam10h_check_enable_mmcfg(void)
-{
-}
-void __init check_enable_amd_mmconf_dmi(void)
-{
-}
-#endif
 
 /*
  * setup_arch - architecture-specific boot-time initializations
