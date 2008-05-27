@@ -132,7 +132,7 @@ int __init check_nmi_watchdog(void)
 	if (!atomic_read(&nmi_active))
 		return 0;
 
-	prev_nmi_count = kmalloc(NR_CPUS * sizeof(int), GFP_KERNEL);
+	prev_nmi_count = kmalloc(nr_cpu_ids * sizeof(int), GFP_KERNEL);
 	if (!prev_nmi_count)
 		goto error;
 
@@ -145,6 +145,7 @@ int __init check_nmi_watchdog(void)
 
 	for_each_possible_cpu(cpu)
 		prev_nmi_count[cpu] = get_nmi_count(cpu);
+
 	local_irq_enable();
 	mdelay((20 * 1000) / nmi_hz); /* wait 20 ticks */
 
