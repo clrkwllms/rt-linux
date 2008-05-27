@@ -121,7 +121,7 @@ config ARCH_HAS_CACHE_LINE_SIZE
 	def_bool y
 
 config HAVE_SETUP_PER_CPU_AREA
-	def_bool X86_64 || (X86_SMP && !X86_VOYAGER)
+	def_bool X86_64_SMP || (X86_SMP && !X86_VOYAGER)
 
 config HAVE_CPUMASK_OF_CPU_MAP
 	def_bool X86_64_SMP
@@ -251,7 +251,7 @@ config X86_ELAN
 
 config X86_VOYAGER
 	bool "Voyager (NCR)"
-	depends on X86_32 && (SMP || BROKEN)
+	depends on X86_32 && (SMP || BROKEN) && !PCI
 	help
 	  Voyager is an MCA-based 32-way capable SMP architecture proprietary
 	  to NCR Corp.  Machine classes 345x/35xx/4100/51xx are Voyager-based.
@@ -263,7 +263,7 @@ config X86_VOYAGER
 
 config X86_NUMAQ
 	bool "NUMAQ (IBM/Sequent)"
-	depends on SMP && X86_32
+	depends on SMP && X86_32 && PCI
 	select NUMA
 	help
 	  This option is used for getting Linux to run on a (IBM/Sequent) NUMA
@@ -293,7 +293,7 @@ config X86_BIGSMP
 
 config X86_VISWS
 	bool "SGI 320/540 (Visual Workstation)"
-	depends on X86_32
+	depends on X86_32 && !PCI
 	help
 	  The SGI Visual Workstation series is an IA32-based workstation
 	  based on SGI systems chips with some legacy PC hardware attached.
@@ -337,7 +337,7 @@ config X86_RDC321X
 config X86_VSMP
 	bool "Support for ScaleMP vSMP"
 	select PARAVIRT
-	depends on X86_64
+	depends on X86_64 && !PCI
 	help
 	  Support for ScaleMP vSMP systems.  Say 'Y' here if this kernel is
 	  supposed to run on these EM64T-based machines.  Only choose this option
@@ -412,34 +412,18 @@ config PARAVIRT
 
 endif
 
-config MEMTEST_BOOTPARAM
-	bool "Memtest boot parameter"
+config MEMTEST
+	bool "Memtest"
 	depends on X86_64
 	default y
 	help
 	  This option adds a kernel parameter 'memtest', which allows memtest
-	  to be disabled at boot.  If this option is selected, memtest
-	  functionality can be disabled with memtest=0 on the kernel
-	  command line.  The purpose of this option is to allow a single
-	  kernel image to be distributed with memtest built in, but not
-	  necessarily enabled.
-
+	  to be set.
+		memtest=0, mean disabled; -- default
+		memtest=1, mean do 1 test pattern;
+		...
+		memtest=4, mean do 4 test patterns.
 	  If you are unsure how to answer this question, answer Y.
-
-config MEMTEST_BOOTPARAM_VALUE
-	int "Memtest boot parameter default value (0-4)"
-	depends on MEMTEST_BOOTPARAM
-	range 0 4
-	default 0
-	help
-	  This option sets the default value for the kernel parameter
-	  'memtest', which allows memtest to be disabled at boot.  If this
-	  option is set to 0 (zero), the memtest kernel parameter will
-	  default to 0, disabling memtest at bootup.  If this option is
-	  set to 4, the memtest kernel parameter will default to 4,
-	  enabling memtest at bootup, and use that as pattern number.
-
-	  If you are unsure how to answer this question, answer 0.
 
 config ACPI_SRAT
 	def_bool y
@@ -556,20 +540,35 @@ config SWIOTLB
 
 config IOMMU_HELPER
 	def_bool (CALGARY_IOMMU || GART_IOMMU || SWIOTLB)
+config MAXSMP
+	bool "Configure Maximum number of SMP Processors and NUMA Nodes"
+	depends on X86_64 && SMP
+	default n
+	help
+	  Configure maximum number of CPUS and NUMA Nodes for this architecture.
+	  If unsure, say N.
 
+if MAXSMP
 config NR_CPUS
-	int "Maximum number of CPUs (2-255)"
-	range 2 255
+	int
+	default "4096"
+endif
+
+if !MAXSMP
+config NR_CPUS
+	int "Maximum number of CPUs (2-4096)"
+	range 2 4096
 	depends on SMP
 	default "32" if X86_NUMAQ || X86_SUMMIT || X86_BIGSMP || X86_ES7000
 	default "8"
 	help
 	  This allows you to specify the maximum number of CPUs which this
-	  kernel will support.  The maximum supported value is 255 and the
+	  kernel will support.  The maximum supported value is 4096 and the
 	  minimum value which makes sense is 2.
 
 	  This is purely to save memory - each supported CPU adds
-	  approximately eight kilobytes to the kernel image.
+	  approximately one kilobyte to the kernel image.
+endif
 
 config SCHED_SMT
 	bool "SMT (Hyperthreading) scheduler support"
@@ -960,13 +959,25 @@ config NUMA_EMU
 	  into virtual nodes when booted with "numa=fake=N", where N is the
 	  number of nodes. This is only useful for debugging.
 
+if MAXSMP
+
 config NODES_SHIFT
-	int "Max num nodes shift(1-15)"
-	range 1 15  if X86_64
+	int
+	default "9"
+endif
+
+if !MAXSMP
+config NODES_SHIFT
+	int "Maximum NUMA Nodes (as a power of 2)"
+	range 1 9   if X86_64
 	default "6" if X86_64
 	default "4" if X86_NUMAQ
 	default "3"
 	depends on NEED_MULTIPLE_NODES
+	help
+	  Specify the maximum number of NUMA Nodes available on the target
+	  system.  Increases memory reserved to accomodate various tables.
+endif
 
 config HAVE_ARCH_BOOTMEM_NODE
 	def_bool y
@@ -1084,6 +1095,40 @@ config MTRR
 	  just add about 9 KB to your kernel.
 
 	  See <file:Documentation/mtrr.txt> for more information.
+
+config MTRR_SANITIZER
+	def_bool y
+	prompt "MTRR cleanup support"
+	depends on MTRR
+	help
+	  Convert MTRR layout from continuous to discrete, so some X driver
+	  could add WB entries.
+
+	  Say N here if you see bootup problems (boot crash, boot hang,
+	  spontaneous reboots).
+
+	  Could be disabled with disable_mtrr_cleanup. Also mtrr_chunk_size
+	  could be used to send largest mtrr entry size for continuous block
+	  to hold holes (aka. UC entries)
+
+	  If unsure, say Y.
+
+config MTRR_SANITIZER_ENABLE_DEFAULT
+	int "MTRR cleanup enable value (0-1)"
+	range 0 1
+	default "0"
+	depends on MTRR_SANITIZER
+	help
+	  Enable mtrr cleanup default value
+
+config MTRR_SANITIZER_SPARE_REG_NR_DEFAULT
+	int "MTRR cleanup spare reg num (0-7)"
+	range 0 7
+	default "1"
+	depends on MTRR_SANITIZER
+	help
+	  mtrr cleanup spare entries default, it can be changed via
+	  mtrr_spare_reg_nr=
 
 config X86_PAT
 	bool
@@ -1470,8 +1515,7 @@ endmenu
 menu "Bus options (PCI etc.)"
 
 config PCI
-	bool "PCI support" if !X86_VISWS && !X86_VSMP
-	depends on !X86_VOYAGER
+	bool "PCI support"
 	default y
 	select ARCH_SUPPORTS_MSI if (X86_LOCAL_APIC && X86_IO_APIC)
 	help
