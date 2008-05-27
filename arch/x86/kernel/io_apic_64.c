@@ -61,7 +61,7 @@ struct irq_cfg {
 };
 
 /* irq_cfg is indexed by the sum of all RTEs in all I/O APICs. */
-struct irq_cfg irq_cfg[NR_IRQS] __read_mostly = {
+static struct irq_cfg irq_cfg[NR_IRQS] __read_mostly = {
 	[0]  = { .domain = CPU_MASK_ALL, .vector = IRQ0_VECTOR,  },
 	[1]  = { .domain = CPU_MASK_ALL, .vector = IRQ1_VECTOR,  },
 	[2]  = { .domain = CPU_MASK_ALL, .vector = IRQ2_VECTOR,  },
@@ -911,8 +911,7 @@ static void __init setup_IO_APIC_irqs(void)
 }
 
 /*
- * Set up the 8259A-master output pin as broadcast to all
- * CPUs.
+ * Set up the 8259A-master output pin to point to CPU 0.
  */
 static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, int vector)
 {
@@ -1669,11 +1668,8 @@ static inline void __init check_timer(void)
 	assign_irq_vector(0, TARGET_CPUS);
 
 	/*
-	 * Subtle, code in do_timer_interrupt() expects an AEOI
-	 * mode for the 8259A whenever interrupts are routed
-	 * through I/O APICs.  Also IRQ0 has to be enabled in
-	 * the 8259A which implies the virtual wire has to be
-	 * disabled in the local APIC.
+	 * As IRQ0 is to be enabled in the 8259A, the virtual
+	 * wire has to be disabled in the local APIC.
 	 */
 	apic_write(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_EXTINT);
 	init_8259A(1);
