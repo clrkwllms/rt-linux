@@ -24,6 +24,7 @@
 #include <linux/marker.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/immediate.h>
 
 extern struct marker __start___markers[];
 extern struct marker __stop___markers[];
@@ -543,7 +544,7 @@ static int set_marker(struct marker_entry **entry, struct marker *elem,
 	 */
 	smp_wmb();
 	elem->ptype = (*entry)->ptype;
-	elem->state = active;
+	elem->state__imv = active;
 
 	return 0;
 }
@@ -557,7 +558,7 @@ static int set_marker(struct marker_entry **entry, struct marker *elem,
 static void disable_marker(struct marker *elem)
 {
 	/* leave "call" as is. It is known statically. */
-	elem->state = 0;
+	elem->state__imv = 0;
 	elem->single.func = __mark_empty_function;
 	/* Update the function before setting the ptype */
 	smp_wmb();
@@ -621,6 +622,9 @@ static void marker_update_probes(void)
 	marker_update_probe_range(__start___markers, __stop___markers);
 	/* Markers in modules. */
 	module_update_markers();
+	/* Update immediate values */
+	core_imv_update();
+	module_imv_update();
 }
 
 /**
