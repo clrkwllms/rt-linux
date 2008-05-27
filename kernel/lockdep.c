@@ -40,6 +40,7 @@
 #include <linux/utsname.h>
 #include <linux/hash.h>
 #include <linux/ftrace.h>
+#include <linux/marker.h>
 
 #include <asm/sections.h>
 
@@ -2024,6 +2025,9 @@ void trace_hardirqs_on_caller(unsigned long a0)
 
 	time_hardirqs_on(CALLER_ADDR0, a0);
 
+	_trace_mark(locking_hardirqs_on, "ip #p%lu",
+		(unsigned long) __builtin_return_address(0));
+
 	if (unlikely(!debug_locks || current->lockdep_recursion))
 		return;
 
@@ -2078,6 +2082,9 @@ void trace_hardirqs_off_caller(unsigned long a0)
 
 	time_hardirqs_off(CALLER_ADDR0, a0);
 
+	_trace_mark(locking_hardirqs_off, "ip #p%lu",
+		(unsigned long) __builtin_return_address(0));
+
 	if (unlikely(!debug_locks || current->lockdep_recursion))
 		return;
 
@@ -2109,6 +2116,9 @@ EXPORT_SYMBOL(trace_hardirqs_off);
 void trace_softirqs_on(unsigned long ip)
 {
 	struct task_struct *curr = current;
+
+	_trace_mark(locking_softirqs_on, "ip #p%lu",
+		(unsigned long) __builtin_return_address(0));
 
 	if (unlikely(!debug_locks))
 		return;
@@ -2143,6 +2153,9 @@ void trace_softirqs_on(unsigned long ip)
 void trace_softirqs_off(unsigned long ip)
 {
 	struct task_struct *curr = current;
+
+	_trace_mark(locking_softirqs_off, "ip #p%lu",
+		(unsigned long) __builtin_return_address(0));
 
 	if (unlikely(!debug_locks))
 		return;
@@ -2375,6 +2388,10 @@ static int __lock_acquire(struct lockdep_map *lock, unsigned int subclass,
 	unsigned int depth, id;
 	int chain_head = 0;
 	u64 chain_key;
+
+	_trace_mark(locking_lock_acquire,
+		"ip #p%lu subclass %u lock %p trylock %d",
+		ip, subclass, lock, trylock);
 
 	if (!prove_locking)
 		check = 1;
@@ -2648,6 +2665,9 @@ static void
 __lock_release(struct lockdep_map *lock, int nested, unsigned long ip)
 {
 	struct task_struct *curr = current;
+
+	_trace_mark(locking_lock_release, "ip #p%lu lock %p nested %d",
+		ip, lock, nested);
 
 	if (!check_unlock(curr, lock, ip))
 		return;
