@@ -40,7 +40,7 @@ static unsigned long __read_mostly	tracing_nr_buffers;
 static cpumask_t __read_mostly		tracing_buffer_mask;
 
 #define for_each_tracing_cpu(cpu)	\
-	for_each_cpu_mask(cpu, tracing_buffer_mask)
+	for_each_cpu_mask_nr(cpu, tracing_buffer_mask)
 
 /* dummy trace to disable tracing */
 static struct tracer no_tracer __read_mostly = {
@@ -2564,7 +2564,7 @@ tracing_read_pipe(struct file *filp, char __user *ubuf,
 		cpu_set(cpu, mask);
 	}
 
-	for_each_cpu_mask(cpu, mask) {
+	for_each_cpu_mask_nr(cpu, mask) {
 		data = iter->tr->data[cpu];
 		__raw_spin_lock(&data->lock);
 
@@ -2591,12 +2591,12 @@ tracing_read_pipe(struct file *filp, char __user *ubuf,
 			break;
 	}
 
-	for_each_cpu_mask(cpu, mask) {
+	for_each_cpu_mask_nr(cpu, mask) {
 		data = iter->tr->data[cpu];
 		__raw_spin_unlock(&data->lock);
 	}
 
-	for_each_cpu_mask(cpu, mask) {
+	for_each_cpu_mask_nr(cpu, mask) {
 		data = iter->tr->data[cpu];
 		atomic_dec(&data->disabled);
 	}
