@@ -16,6 +16,7 @@
 #include <linux/syscalls.h>
 #include <linux/pagemap.h>
 #include <linux/splice.h>
+#include <linux/marker.h>
 #include "read_write.h"
 
 #include <asm/uaccess.h>
@@ -146,6 +147,9 @@ asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)
 		if (res != (loff_t)retval)
 			retval = -EOVERFLOW;	/* LFS: should only happen on 32 bit platforms */
 	}
+
+	trace_mark(fs_lseek, "fd %u offset %ld origin %u", fd, offset, origin);
+
 	fput_light(file, fput_needed);
 bad:
 	return retval;
@@ -171,6 +175,10 @@ asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
 		goto out_putf;
 
 	offset = vfs_llseek(file, ((loff_t) offset_high << 32) | offset_low,
+			origin);
+
+	trace_mark(fs_llseek, "fd %u offset %llu origin %u", fd,
+			(unsigned long long)offset,
 			origin);
 
 	retval = (int)offset;
@@ -359,6 +367,7 @@ asmlinkage ssize_t sys_read(unsigned int fd, char __user * buf, size_t count)
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		loff_t pos = file_pos_read(file);
+		trace_mark(fs_read, "fd %u count %zu", fd, count);
 		ret = vfs_read(file, buf, count, &pos);
 		file_pos_write(file, pos);
 		fput_light(file, fput_needed);
@@ -376,6 +385,7 @@ asmlinkage ssize_t sys_write(unsigned int fd, const char __user * buf, size_t co
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		loff_t pos = file_pos_read(file);
+		trace_mark(fs_write, "fd %u count %zu", fd, count);
 		ret = vfs_write(file, buf, count, &pos);
 		file_pos_write(file, pos);
 		fput_light(file, fput_needed);
@@ -397,8 +407,12 @@ asmlinkage ssize_t sys_pread64(unsigned int fd, char __user *buf,
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = -ESPIPE;
-		if (file->f_mode & FMODE_PREAD)
+		if (file->f_mode & FMODE_PREAD) {
+			trace_mark(fs_pread64, "fd %u count %zu pos %llu",
+				fd, count, (unsigned long long)pos);
 			ret = vfs_read(file, buf, count, &pos);
+		}
+
 		fput_light(file, fput_needed);
 	}
 
@@ -418,8 +432,11 @@ asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char __user *buf,
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = -ESPIPE;
-		if (file->f_mode & FMODE_PWRITE)  
+		if (file->f_mode & FMODE_PWRITE) {
+			trace_mark(fs_pwrite64, "fd %u count %zu pos %llu",
+				fd, count, (unsigned long long)pos);
 			ret = vfs_write(file, buf, count, &pos);
+		}
 		fput_light(file, fput_needed);
 	}
 
@@ -663,6 +680,7 @@ sys_readv(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		loff_t pos = file_pos_read(file);
+		trace_mark(fs_readv, "fd %lu vlen %lu", fd, vlen);
 		ret = vfs_readv(file, vec, vlen, &pos);
 		file_pos_write(file, pos);
 		fput_light(file, fput_needed);
@@ -684,6 +702,7 @@ sys_writev(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		loff_t pos = file_pos_read(file);
+		trace_mark(fs_writev, "fd %lu vlen %lu", fd, vlen);
 		ret = vfs_writev(file, vec, vlen, &pos);
 		file_pos_write(file, pos);
 		fput_light(file, fput_needed);
