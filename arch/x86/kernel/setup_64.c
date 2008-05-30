@@ -443,10 +443,12 @@ void __init setup_arch(char **cmdline_p)
 	if (efi_enabled)
 		efi_reserve_bootmem();
 
+#ifdef CONFIG_X86_MPPARSE
        /*
 	* Find and reserve possible boot-time SMP configuration:
 	*/
 	find_smp_config();
+#endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (boot_params.hdr.type_of_loader && boot_params.hdr.ramdisk_image) {
 		unsigned long ramdisk_image = boot_params.hdr.ramdisk_image;
@@ -489,11 +491,13 @@ void __init setup_arch(char **cmdline_p)
 
 	init_cpu_to_node();
 
+#ifdef CONFIG_X86_MPPARSE
 	/*
 	 * get boot-time SMP configuration:
 	 */
 	if (smp_found_config)
 		get_smp_config();
+#endif
 	init_apic_mappings();
 	ioapic_init_mappings();
 
@@ -503,7 +507,7 @@ void __init setup_arch(char **cmdline_p)
 	 * We trust e820 completely. No explicit ROM probing in memory.
 	 */
 	e820_reserve_resources();
-	e820_mark_nosave_regions();
+	e820_mark_nosave_regions(end_pfn);
 
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < ARRAY_SIZE(standard_io_resources); i++)
