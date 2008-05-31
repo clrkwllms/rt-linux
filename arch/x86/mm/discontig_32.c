@@ -156,24 +156,26 @@ static void __init propagate_e820_map_node(int nid)
  */
 static void __init allocate_pgdat(int nid)
 {
-	if (nid && node_has_online_mem(nid))
+	if (nid && node_has_online_mem(nid) && node_remap_start_vaddr[nid])
 		NODE_DATA(nid) = (pg_data_t *)node_remap_start_vaddr[nid];
 	else {
-		NODE_DATA(nid) = (pg_data_t *)(pfn_to_kaddr(min_low_pfn));
-		min_low_pfn += PFN_UP(sizeof(pg_data_t));
+		unsigned long pgdat_phys;
+		pgdat_phys = find_e820_area(min_low_pfn<<PAGE_SHIFT,
+				 max_low_pfn<<PAGE_SHIFT, sizeof(pg_data_t),
+				 PAGE_SIZE);
+		NODE_DATA(nid) = (pg_data_t *)(pfn_to_kaddr(pgdat_phys>>PAGE_SHIFT));
+		reserve_early(pgdat_phys, pgdat_phys + sizeof(pg_data_t),
+			      "NODE_DATA");
 	}
 }
 
-#ifdef CONFIG_DISCONTIGMEM
 /*
- * In the discontig memory model, a portion of the kernel virtual area (KVA)
- * is reserved and portions of nodes are mapped using it. This is to allow
- * node-local memory to be allocated for structures that would normally require
- * ZONE_NORMAL. The memory is allocated with alloc_remap() and callers
- * should be prepared to allocate from the bootmem allocator instead. This KVA
- * mechanism is incompatible with SPARSEMEM as it makes assumptions about the
- * layout of memory that are broken if alloc_remap() succeeds for some of the
- * map and fails for others
+ * In the DISCONTIGMEM and SPARSEMEM memory model, a portion of the kernel
+ * virtual address space (KVA) is reserved and portions of nodes are mapped
+ * using it. This is to allow node-local memory to be allocated for
+ * structures that would normally require ZONE_NORMAL. The memory is
+ * allocated with alloc_remap() and callers should be prepared to allocate
+ * from the bootmem allocator instead.
  */
 static unsigned long node_remap_start_pfn[MAX_NUMNODES];
 static void *node_remap_end_vaddr[MAX_NUMNODES];
@@ -290,25 +292,6 @@ static void init_remap_allocator(int nid)
 		(ulong) pfn_to_kaddr(highstart_pfn
 		   + node_remap_offset[nid] + node_remap_size[nid]));
 }
-#else
-void *alloc_remap(int nid, unsigned long size)
-{
-	return NULL;
-}
-
-static unsigned long calculate_numa_remap_pages(void)
-{
-	return 0;
-}
-
-static void init_remap_allocator(int nid)
-{
-}
-
-void __init remap_numa_kva(void)
-{
-}
-#endif /* CONFIG_DISCONTIGMEM */
 
 extern void setup_bootmem_allocator(void);
 unsigned long __init setup_memory(void)
@@ -352,6 +335,11 @@ unsigned long __init setup_memory(void)
 	printk("kva_start_pfn ~ %ld find_max_low_pfn() ~ %ld\n",
 		kva_start_pfn, max_low_pfn);
 	printk("max_pfn = %ld\n", max_pfn);
+
+	/* avoid clash with initrd */
+	reserve_early(kva_start_pfn<<PAGE_SHIFT,
+		      (kva_start_pfn + kva_pages)<<PAGE_SHIFT,
+		     "KVA PG");
 #ifdef CONFIG_HIGHMEM
 	highstart_pfn = highend_pfn = max_pfn;
 	if (max_pfn > system_max_low_pfn)
@@ -385,13 +373,6 @@ unsigned long __init setup_memory(void)
 	NODE_DATA(0)->bdata = &node0_bdata;
 	setup_bootmem_allocator();
 	return max_low_pfn;
-}
-
-void __init numa_kva_reserve(void)
-{
-	if (kva_pages)
-		reserve_bootmem(PFN_PHYS(kva_start_pfn), PFN_PHYS(kva_pages),
-				BOOTMEM_DEFAULT);
 }
 
 void __init zone_sizes_init(void)
