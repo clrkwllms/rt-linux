@@ -30,6 +30,11 @@ typedef u64 dma_addr_t;
 typedef u32 dma_addr_t;
 #endif
 
+#ifdef CONFIG_X86_64
+typedef u64 futex_val_t;
+#define __have_futex_val_t
+#endif
+
 #endif /* __ASSEMBLY__ */
 #endif /* __KERNEL__ */
 
