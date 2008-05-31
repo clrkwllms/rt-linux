@@ -42,6 +42,19 @@ static int nopat(char *str)
 early_param("nopat", nopat);
 #endif
 
+
+static int debug_enable;
+static int __init pat_debug_setup(char *str)
+{
+	debug_enable = 1;
+	return 0;
+}
+__setup("debugpat", pat_debug_setup);
+
+#define dprintk(fmt, arg...) \
+	do { if (debug_enable) printk(KERN_INFO fmt, ##arg); } while (0)
+
+
 static u64 __read_mostly boot_pat_state;
 
 enum {
@@ -151,32 +164,33 @@ static int pat_x_mtrr_type(u64 start, u64 end, unsigned long prot,
 	unsigned long pat_type;
 	u8 mtrr_type;
 
-	mtrr_type = mtrr_type_lookup(start, end);
-	if (mtrr_type == 0xFF) {		/* MTRR not enabled */
-		*ret_prot = prot;
-		return 0;
-	}
-	if (mtrr_type == 0xFE) {		/* MTRR match error */
-		*ret_prot = _PAGE_CACHE_UC;
-		return -1;
-	}
-	if (mtrr_type != MTRR_TYPE_UNCACHABLE &&
-	    mtrr_type != MTRR_TYPE_WRBACK &&
-	    mtrr_type != MTRR_TYPE_WRCOMB) {	/* MTRR type unhandled */
-		*ret_prot = _PAGE_CACHE_UC;
-		return -1;
-	}
-
 	pat_type = prot & _PAGE_CACHE_MASK;
 	prot &= (~_PAGE_CACHE_MASK);
 
-	/* Currently doing intersection by hand. Optimize it later. */
+	/*
+	 * We return the PAT request directly for types where PAT takes
+	 * precedence with respect to MTRR and for UC_MINUS.
+	 * Consistency checks with other PAT requests is done later
+	 * while going through memtype list.
+	 */
 	if (pat_type == _PAGE_CACHE_WC) {
 		*ret_prot = prot | _PAGE_CACHE_WC;
+		return 0;
 	} else if (pat_type == _PAGE_CACHE_UC_MINUS) {
 		*ret_prot = prot | _PAGE_CACHE_UC_MINUS;
-	} else if (pat_type == _PAGE_CACHE_UC ||
-	           mtrr_type == MTRR_TYPE_UNCACHABLE) {
+		return 0;
+	} else if (pat_type == _PAGE_CACHE_UC) {
+		*ret_prot = prot | _PAGE_CACHE_UC;
+		return 0;
+	}
+
+	/*
+	 * Look for MTRR hint to get the effective type in case where PAT
+	 * request is for WB.
+	 */
+	mtrr_type = mtrr_type_lookup(start, end);
+
+	if (mtrr_type == MTRR_TYPE_UNCACHABLE) {
 		*ret_prot = prot | _PAGE_CACHE_UC;
 	} else if (mtrr_type == MTRR_TYPE_WRCOMB) {
 		*ret_prot = prot | _PAGE_CACHE_WC;
@@ -233,14 +247,12 @@ int reserve_memtype(u64 start, u64 end, unsigned long req_type,
 
 	if (req_type == -1) {
 		/*
-		 * Special case where caller wants to inherit from mtrr or
-		 * existing pat mapping, defaulting to UC_MINUS in case of
-		 * no match.
+		 * Call mtrr_lookup to get the type hint. This is an
+		 * optimization for /dev/mem mmap'ers into WB memory (BIOS
+		 * tools and ACPI tools). Use WB request for WB memory and use
+		 * UC_MINUS otherwise.
 		 */
 		u8 mtrr_type = mtrr_type_lookup(start, end);
-		if (mtrr_type == 0xFE) { /* MTRR match error */
-			err = -1;
-		}
 
 		if (mtrr_type == MTRR_TYPE_WRBACK) {
 			req_type = _PAGE_CACHE_WB;
@@ -279,7 +291,7 @@ int reserve_memtype(u64 start, u64 end, unsigned long req_type,
 		struct memtype *saved_ptr;
 
 		if (parse->start >= end) {
-			pr_debug("New Entry\n");
+			dprintk("New Entry\n");
 			list_add(&new_entry->nd, parse->nd.prev);
 			new_entry = NULL;
 			break;
@@ -329,7 +341,7 @@ int reserve_memtype(u64 start, u64 end, unsigned long req_type,
 				break;
 			}
 
-			pr_debug("Overlap at 0x%Lx-0x%Lx\n",
+			dprintk("Overlap at 0x%Lx-0x%Lx\n",
 			       saved_ptr->start, saved_ptr->end);
 			/* No conflict. Go ahead and add this new entry */
 			list_add(&new_entry->nd, saved_ptr->nd.prev);
@@ -381,7 +393,7 @@ int reserve_memtype(u64 start, u64 end, unsigned long req_type,
 				break;
 			}
 
-			pr_debug(KERN_INFO "Overlap at 0x%Lx-0x%Lx\n",
+			dprintk("Overlap at 0x%Lx-0x%Lx\n",
 				 saved_ptr->start, saved_ptr->end);
 			/* No conflict. Go ahead and add this new entry */
 			list_add(&new_entry->nd, &saved_ptr->nd);
@@ -403,16 +415,16 @@ int reserve_memtype(u64 start, u64 end, unsigned long req_type,
 	if (new_entry) {
 		/* No conflict. Not yet added to the list. Add to the tail */
 		list_add_tail(&new_entry->nd, &memtype_list);
-		pr_debug("New Entry\n");
+		dprintk("New Entry\n");
 	}
 
 	if (ret_type) {
-		pr_debug(
+		dprintk(
 	"reserve_memtype added 0x%Lx-0x%Lx, track %s, req %s, ret %s\n",
 			start, end, cattr_name(actual_type),
 			cattr_name(req_type), cattr_name(*ret_type));
 	} else {
-		pr_debug(
+		dprintk(
 	"reserve_memtype added 0x%Lx-0x%Lx, track %s, req %s\n",
 			start, end, cattr_name(actual_type),
 			cattr_name(req_type));
@@ -453,7 +465,7 @@ int free_memtype(u64 start, u64 end)
 			current->comm, current->pid, start, end);
 	}
 
-	pr_debug("free_memtype request 0x%Lx-0x%Lx\n", start, end);
+	dprintk("free_memtype request 0x%Lx-0x%Lx\n", start, end);
 	return err;
 }
 
@@ -523,10 +535,10 @@ int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
 	 * we maintain the tradition of paranoia in this code.
 	 */
 	if (!pat_wc_enabled &&
-	    ! ( test_bit(X86_FEATURE_MTRR, boot_cpu_data.x86_capability) ||
-		test_bit(X86_FEATURE_K6_MTRR, boot_cpu_data.x86_capability) ||
-		test_bit(X86_FEATURE_CYRIX_ARR, boot_cpu_data.x86_capability) ||
-		test_bit(X86_FEATURE_CENTAUR_MCR, boot_cpu_data.x86_capability)) &&
+	    ! ( boot_cpu_has(X86_FEATURE_MTRR) ||
+		boot_cpu_has(X86_FEATURE_K6_MTRR) ||
+		boot_cpu_has(X86_FEATURE_CYRIX_ARR) ||
+		boot_cpu_has(X86_FEATURE_CENTAUR_MCR)) &&
 	   (pfn << PAGE_SHIFT) >= __pa(high_memory)) {
 		flags = _PAGE_CACHE_UC;
 	}
