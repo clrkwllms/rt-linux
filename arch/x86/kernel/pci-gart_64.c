@@ -26,6 +26,7 @@
 #include <linux/kdebug.h>
 #include <linux/scatterlist.h>
 #include <linux/iommu-helper.h>
+#include <linux/sysdev.h>
 #include <asm/atomic.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
@@ -533,8 +534,8 @@ static __init unsigned read_aperture(struct pci_dev *dev, u32 *size)
 	unsigned aper_size = 0, aper_base_32, aper_order;
 	u64 aper_base;
 
-	pci_read_config_dword(dev, 0x94, &aper_base_32);
-	pci_read_config_dword(dev, 0x90, &aper_order);
+	pci_read_config_dword(dev, AMD64_GARTAPERTUREBASE, &aper_base_32);
+	pci_read_config_dword(dev, AMD64_GARTAPERTURECTL, &aper_order);
 	aper_order = (aper_order >> 1) & 7;
 
 	aper_base = aper_base_32 & 0x7fff;
@@ -548,6 +549,28 @@ static __init unsigned read_aperture(struct pci_dev *dev, u32 *size)
 	return aper_base;
 }
 
+static int gart_resume(struct sys_device *dev)
+{
+	return 0;
+}
+
+static int gart_suspend(struct sys_device *dev, pm_message_t state)
+{
+	return -EINVAL;
+}
+
+static struct sysdev_class gart_sysdev_class = {
+	.name = "gart",
+	.suspend = gart_suspend,
+	.resume = gart_resume,
+
+};
+
+static struct sys_device device_gart = {
+	.id	= 0,
+	.cls	= &gart_sysdev_class,
+};
+
 /*
  * Private Northbridge GATT initialization in case we cannot use the
  * AGP driver for some reason.
@@ -558,7 +581,7 @@ static __init int init_k8_gatt(struct agp_kern_info *info)
 	unsigned aper_base, new_aper_base;
 	struct pci_dev *dev;
 	void *gatt;
-	int i;
+	int i, error;
 
 	printk(KERN_INFO "PCI-DMA: Disabling AGP.\n");
 	aper_size = aper_base = info->aper_size = 0;
@@ -592,20 +615,15 @@ static __init int init_k8_gatt(struct agp_kern_info *info)
 	agp_gatt_table = gatt;
 
 	for (i = 0; i < num_k8_northbridges; i++) {
-		u32 gatt_reg;
-		u32 ctl;
-
 		dev = k8_northbridges[i];
-		gatt_reg = __pa(gatt) >> 12;
-		gatt_reg <<= 4;
-		pci_write_config_dword(dev, 0x98, gatt_reg);
-		pci_read_config_dword(dev, 0x90, &ctl);
-
-		ctl |= 1;
-		ctl &= ~((1<<4) | (1<<5));
-
-		pci_write_config_dword(dev, 0x90, ctl);
+		enable_gart_translation(dev, __pa(gatt));
 	}
+
+	error = sysdev_class_register(&gart_sysdev_class);
+	if (!error)
+		error = sysdev_register(&device_gart);
+	if (error)
+		panic("Could not register gart_sysdev -- would corrupt data on next suspend");
 	flush_gart();
 
 	printk(KERN_INFO "PCI-DMA: aperture base @ %x size %u KB\n",
@@ -648,11 +666,11 @@ void gart_iommu_shutdown(void)
 		u32 ctl;
 
 		dev = k8_northbridges[i];
-		pci_read_config_dword(dev, 0x90, &ctl);
+		pci_read_config_dword(dev, AMD64_GARTAPERTURECTL, &ctl);
 
-		ctl &= ~1;
+		ctl &= ~GARTEN;
 
-		pci_write_config_dword(dev, 0x90, ctl);
+		pci_write_config_dword(dev, AMD64_GARTAPERTURECTL, ctl);
 	}
 }
 
