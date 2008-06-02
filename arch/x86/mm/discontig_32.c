@@ -159,8 +159,13 @@ static void __init allocate_pgdat(int nid)
 	if (nid && node_has_online_mem(nid) && node_remap_start_vaddr[nid])
 		NODE_DATA(nid) = (pg_data_t *)node_remap_start_vaddr[nid];
 	else {
-		NODE_DATA(nid) = (pg_data_t *)(pfn_to_kaddr(min_low_pfn));
-		min_low_pfn += PFN_UP(sizeof(pg_data_t));
+		unsigned long pgdat_phys;
+		pgdat_phys = find_e820_area(min_low_pfn<<PAGE_SHIFT,
+				 max_low_pfn<<PAGE_SHIFT, sizeof(pg_data_t),
+				 PAGE_SIZE);
+		NODE_DATA(nid) = (pg_data_t *)(pfn_to_kaddr(pgdat_phys>>PAGE_SHIFT));
+		reserve_early(pgdat_phys, pgdat_phys + sizeof(pg_data_t),
+			      "NODE_DATA");
 	}
 }
 
@@ -330,6 +335,11 @@ unsigned long __init setup_memory(void)
 	printk("kva_start_pfn ~ %ld find_max_low_pfn() ~ %ld\n",
 		kva_start_pfn, max_low_pfn);
 	printk("max_pfn = %ld\n", max_pfn);
+
+	/* avoid clash with initrd */
+	reserve_early(kva_start_pfn<<PAGE_SHIFT,
+		      (kva_start_pfn + kva_pages)<<PAGE_SHIFT,
+		     "KVA PG");
 #ifdef CONFIG_HIGHMEM
 	highstart_pfn = highend_pfn = max_pfn;
 	if (max_pfn > system_max_low_pfn)
@@ -363,13 +373,6 @@ unsigned long __init setup_memory(void)
 	NODE_DATA(0)->bdata = &node0_bdata;
 	setup_bootmem_allocator();
 	return max_low_pfn;
-}
-
-void __init numa_kva_reserve(void)
-{
-	if (kva_pages)
-		reserve_bootmem(PFN_PHYS(kva_start_pfn), PFN_PHYS(kva_pages),
-				BOOTMEM_DEFAULT);
 }
 
 void __init zone_sizes_init(void)
