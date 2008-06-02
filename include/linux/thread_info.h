@@ -23,9 +23,9 @@ struct restart_block {
 		};
 		/* For futex_wait */
 		struct {
-			u32 *uaddr;
-			u32 val;
-			u32 flags;
+			void __user *uaddr;
+			futex_val_t val;
+			int flags;
 			u32 bitset;
 			u64 time;
 		} futex;
