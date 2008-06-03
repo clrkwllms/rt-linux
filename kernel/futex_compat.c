@@ -176,6 +176,11 @@ asmlinkage long compat_sys_futex(u32 __user *uaddr, int op, u32 val,
 	int val2 = 0;
 	int cmd = op & FUTEX_CMD_MASK;
 
+	/* The compatibility interface is used for 32-bit entry points.
+	   Therefore it is not possible to support 64-bit futexes here.  */
+	if (op & FUTEX_64_FLAG)
+		return -ENOSYS;
+
 	if (utime && (cmd == FUTEX_WAIT || cmd == FUTEX_LOCK_PI ||
 		      cmd == FUTEX_WAIT_BITSET)) {
 		if (get_compat_timespec(&ts, utime))
