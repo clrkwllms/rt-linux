@@ -7,10 +7,13 @@ obj-y			+= proc.o feature_names.o
 
 obj-$(CONFIG_X86_32)	+= common.o bugs.o
 obj-$(CONFIG_X86_32)	+= amd.o
+obj-$(CONFIG_X86_64)	+= amd_64.o
 obj-$(CONFIG_X86_32)	+= cyrix.o
 obj-$(CONFIG_X86_32)	+= centaur.o
+obj-$(CONFIG_X86_64)	+= centaur_64.o
 obj-$(CONFIG_X86_32)	+= transmeta.o
 obj-$(CONFIG_X86_32)	+= intel.o
+obj-$(CONFIG_X86_64)	+= intel_64.o
 obj-$(CONFIG_X86_32)	+= umc.o
 
 obj-$(CONFIG_X86_MCE)	+= mcheck/
