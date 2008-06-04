@@ -299,6 +299,7 @@ static void rtc_wake_off(struct device *dev)
 
 static struct cmos_rtc_board_info rtc_info;
 
+#ifdef CONFIG_PNP
 
 /* PNP devices are registered in a subsys_initcall();
  * ACPI specifies the PNP IDs to use.
@@ -359,5 +360,7 @@ static int __init acpi_rtc_init(void)
 }
 /* do this between RTC subsys_initcall() and rtc_cmos driver_initcall() */
 fs_initcall(acpi_rtc_init);
+
+#endif /* CONFIG_PNP */
 
 #endif
