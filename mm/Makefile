@@ -34,3 +34,6 @@ obj-$(CONFIG_SMP) += allocpercpu.o
 obj-$(CONFIG_QUICKLIST) += quicklist.o
 obj-$(CONFIG_CGROUP_MEM_RES_CTLR) += memcontrol.o
 
+ifeq ($(CONFIG_KMEMCHECK),y)
+obj-$(CONFIG_SLUB) += slub_kmemcheck.o
+endif
