@@ -3,6 +3,16 @@
 
 #ifdef __KERNEL__
 
+/*
+ * If kmemcheck is enabled, our best bet is a custom memset() that disables
+ * checking in order to save a whole lot of (unnecessary) page faults.
+ */
+#ifdef CONFIG_KMEMCHECK
+void *kmemcheck_memset(void *s, int c, size_t n);
+#undef memset
+#define memset(s, c, n) kmemcheck_memset((s), (c), (n))
+#endif
+
 /* Let gcc decide whether to inline or use the out of line functions */
 
 #define __HAVE_ARCH_STRCPY
