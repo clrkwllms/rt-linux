@@ -25,7 +25,8 @@ union ktime;
 #define FUTEX_WAKE_BITSET	10
 
 #define FUTEX_PRIVATE_FLAG	128
-#define FUTEX_CMD_MASK		~FUTEX_PRIVATE_FLAG
+#define FUTEX_64_FLAG		256
+#define FUTEX_CMD_MASK		~(FUTEX_PRIVATE_FLAG | FUTEX_64_FLAG)
 
 #define FUTEX_WAIT_PRIVATE	(FUTEX_WAIT | FUTEX_PRIVATE_FLAG)
 #define FUTEX_WAKE_PRIVATE	(FUTEX_WAKE | FUTEX_PRIVATE_FLAG)
@@ -37,6 +38,9 @@ union ktime;
 #define FUTEX_TRYLOCK_PI_PRIVATE (FUTEX_TRYLOCK_PI | FUTEX_PRIVATE_FLAG)
 #define FUTEX_WAIT_BITSET_PRIVATE	(FUTEX_WAIT_BITS | FUTEX_PRIVATE_FLAG)
 #define FUTEX_WAKE_BITSET_PRIVATE	(FUTEX_WAKE_BITS | FUTEX_PRIVATE_FLAG)
+
+#define FUTEX_64_P(op) \
+	(sizeof(futex_val_t) >= sizeof(u64) && (op & FUTEX_64_FLAG))
 
 /*
  * Support for robust futexes: the kernel cleans up held futexes at
@@ -122,8 +126,8 @@ struct robust_list_head {
 #define FUTEX_BITSET_MATCH_ANY	0xffffffff
 
 #ifdef __KERNEL__
-long do_futex(u32 __user *uaddr, int op, u32 val, union ktime *timeout,
-	      u32 __user *uaddr2, u32 val2, u32 val3);
+long do_futex(void __user *uaddr, int op, futex_val_t val, ktime_t *timeout,
+	      void __user *uaddr2, u32 val2, futex_val_t val3);
 
 extern int
 handle_futex_death(u32 __user *uaddr, struct task_struct *curr, int pi);
@@ -183,6 +187,12 @@ static inline void exit_pi_state_list(struct task_struct *curr)
 #define FUTEX_OP_OR		2	/* *(int *)UADDR2 |= OPARG; */
 #define FUTEX_OP_ANDN		3	/* *(int *)UADDR2 &= ~OPARG; */
 #define FUTEX_OP_XOR		4	/* *(int *)UADDR2 ^= OPARG; */
+/* Similar for 64-bit futexes (if supported).  */
+#define FUTEX_OP64_SET		(FUTEX_OP_SET | 8)
+#define FUTEX_OP64_ADD		(FUTEX_OP_ADD | 8)
+#define FUTEX_OP64_OR		(FUTEX_OP_OR | 8)
+#define FUTEX_OP64_ANDN		(FUTEX_OP_ANDN | 8)
+#define FUTEX_OP64_XOR		(FUTEX_OP_XOR | 8)
 
 #define FUTEX_OP_OPARG_SHIFT	8	/* Use (1 << OPARG) instead of OPARG.  */
 

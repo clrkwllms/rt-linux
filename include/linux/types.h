@@ -206,4 +206,8 @@ struct ustat {
 
 #endif	/* __KERNEL__ */
 
+#ifndef __have_futex_val_t
+typedef u32 futex_val_t;
+#endif
+
 #endif /* _LINUX_TYPES_H */
