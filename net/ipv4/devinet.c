@@ -56,6 +56,7 @@
 #include <linux/sysctl.h>
 #endif
 #include <linux/kmod.h>
+#include <linux/marker.h>
 
 #include <net/arp.h>
 #include <net/ip.h>
@@ -258,6 +259,8 @@ static void __inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 		struct in_ifaddr **ifap1 = &ifa1->ifa_next;
 
 		while ((ifa = *ifap1) != NULL) {
+			trace_mark(net_del_ifa_ipv4, "label %s",
+				ifa->ifa_label);
 			if (!(ifa->ifa_flags & IFA_F_SECONDARY) &&
 			    ifa1->ifa_scope <= ifa->ifa_scope)
 				last_prim = ifa;
@@ -364,6 +367,9 @@ static int __inet_insert_ifa(struct in_ifaddr *ifa, struct nlmsghdr *nlh,
 			}
 			ifa->ifa_flags |= IFA_F_SECONDARY;
 		}
+		trace_mark(net_insert_ifa_ipv4, "label %s address #4u%lu",
+			ifa->ifa_label,
+			(unsigned long)ifa->ifa_address);
 	}
 
 	if (!(ifa->ifa_flags & IFA_F_SECONDARY)) {
