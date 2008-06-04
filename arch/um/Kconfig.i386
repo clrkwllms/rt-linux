@@ -32,16 +32,13 @@ config 3_LEVEL_PGTABLES
 	N (on x86-64 it's automatically enabled, instead, as it's safe there).
 
 config ARCH_HAS_SC_SIGNALS
-	bool
-	default y
+	def_bool y
 
 config ARCH_REUSE_HOST_VSYSCALL_AREA
-	bool
-	default y
+	def_bool y
 
 config GENERIC_HWEIGHT
-	bool
-	default y
+	def_bool y
 
 config ARCH_SUPPORTS_AOUT
 	def_bool y
