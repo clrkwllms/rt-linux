@@ -56,6 +56,7 @@
 #include <asm/desc.h>
 #include <video/edid.h>
 #include <asm/e820.h>
+#include <asm/mpspec.h>
 #include <asm/dma.h>
 #include <asm/gart.h>
 #include <asm/mpspec.h>
@@ -294,6 +295,18 @@ static void __init parse_setup_data(void)
 	}
 }
 
+#ifdef CONFIG_PCI_MMCONFIG
+extern void __cpuinit fam10h_check_enable_mmcfg(void);
+extern void __init check_enable_amd_mmconf_dmi(void);
+#else
+void __cpuinit fam10h_check_enable_mmcfg(void)
+{
+}
+void __init check_enable_amd_mmconf_dmi(void)
+{
+}
+#endif
+
 /*
  * setup_arch - architecture-specific boot-time initializations
  *
@@ -318,8 +331,10 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #ifdef CONFIG_EFI
 	if (!strncmp((char *)&boot_params.efi_info.efi_loader_signature,
-		     "EL64", 4))
+		     "EL64", 4)) {
 		efi_enabled = 1;
+		efi_reserve_early();
+	}
 #endif
 
 	ARCH_SETUP
@@ -370,6 +385,9 @@ void __init setup_arch(char **cmdline_p)
 	 * we are rounding upwards:
 	 */
 	end_pfn = e820_end_of_ram();
+
+	/* pre allocte 4k for mptable mpc */
+	early_reserve_e820_mpc_new();
 	/* update e820 for memory not covered by WB MTRRs */
 	mtrr_bp_init();
 	if (mtrr_trim_uncached_memory(end_pfn)) {
@@ -381,7 +399,7 @@ void __init setup_arch(char **cmdline_p)
 
 	check_efer();
 
-	max_pfn_mapped = init_memory_mapping(0, (max_pfn_mapped << PAGE_SHIFT));
+	max_pfn_mapped = init_memory_mapping(0, (end_pfn << PAGE_SHIFT));
 	if (efi_enabled)
 		efi_init();
 
@@ -442,13 +460,12 @@ void __init setup_arch(char **cmdline_p)
        acpi_reserve_bootmem();
 #endif
 
-	if (efi_enabled)
-		efi_reserve_bootmem();
-
+#ifdef CONFIG_X86_MPPARSE
        /*
 	* Find and reserve possible boot-time SMP configuration:
 	*/
 	find_smp_config();
+#endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (boot_params.hdr.type_of_loader && boot_params.hdr.ramdisk_image) {
 		unsigned long ramdisk_image = boot_params.hdr.ramdisk_image;
@@ -491,11 +508,13 @@ void __init setup_arch(char **cmdline_p)
 
 	init_cpu_to_node();
 
+#ifdef CONFIG_X86_MPPARSE
 	/*
 	 * get boot-time SMP configuration:
 	 */
 	if (smp_found_config)
 		get_smp_config();
+#endif
 	init_apic_mappings();
 	ioapic_init_mappings();
 
@@ -505,7 +524,7 @@ void __init setup_arch(char **cmdline_p)
 	 * We trust e820 completely. No explicit ROM probing in memory.
 	 */
 	e820_reserve_resources();
-	e820_mark_nosave_regions();
+	e820_mark_nosave_regions(end_pfn);
 
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < ARRAY_SIZE(standard_io_resources); i++)
