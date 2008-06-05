@@ -38,6 +38,7 @@
 #include <asm/setup.h>
 #include <asm/mmzone.h>
 #include <asm/bios_ebda.h>
+#include <asm/proto.h>
 
 struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
 EXPORT_SYMBOL(node_data);
@@ -59,14 +60,14 @@ unsigned long node_end_pfn[MAX_NUMNODES] __read_mostly;
 /*
  * 4) physnode_map     - the mapping between a pfn and owning node
  * physnode_map keeps track of the physical memory layout of a generic
- * numa node on a 256Mb break (each element of the array will
- * represent 256Mb of memory and will be marked by the node id.  so,
+ * numa node on a 64Mb break (each element of the array will
+ * represent 64Mb of memory and will be marked by the node id.  so,
  * if the first gig is on node 0, and the second gig is on node 1
  * physnode_map will contain:
  *
- *     physnode_map[0-3] = 0;
- *     physnode_map[4-7] = 1;
- *     physnode_map[8- ] = -1;
+ *     physnode_map[0-15] = 0;
+ *     physnode_map[16-31] = 1;
+ *     physnode_map[32- ] = -1;
  */
 s8 physnode_map[MAX_ELEMENTS] __read_mostly = { [0 ... (MAX_ELEMENTS - 1)] = -1};
 EXPORT_SYMBOL(physnode_map);
@@ -81,9 +82,9 @@ void memory_present(int nid, unsigned long start, unsigned long end)
 	printk(KERN_DEBUG "  ");
 	for (pfn = start; pfn < end; pfn += PAGES_PER_ELEMENT) {
 		physnode_map[pfn / PAGES_PER_ELEMENT] = nid;
-		printk("%ld ", pfn);
+		printk(KERN_CONT "%ld ", pfn);
 	}
-	printk("\n");
+	printk(KERN_CONT "\n");
 }
 
 unsigned long node_memmap_size_bytes(int nid, unsigned long start_pfn,
@@ -119,11 +120,11 @@ int __init get_memcfg_numa_flat(void)
 {
 	printk("NUMA - single node, flat memory mode\n");
 
-	/* Run the memory configuration and find the top of memory. */
-	propagate_e820_map();
 	node_start_pfn[0] = 0;
 	node_end_pfn[0] = max_pfn;
+	e820_register_active_regions(0, 0, max_pfn);
 	memory_present(0, 0, max_pfn);
+	node_remap_size[0] = node_memmap_size_bytes(0, 0, max_pfn);
 
         /* Indicate there is one node available. */
 	nodes_clear(node_online_map);
@@ -156,24 +157,29 @@ static void __init propagate_e820_map_node(int nid)
  */
 static void __init allocate_pgdat(int nid)
 {
-	if (nid && node_has_online_mem(nid))
+	if (nid && node_has_online_mem(nid) && node_remap_start_vaddr[nid])
 		NODE_DATA(nid) = (pg_data_t *)node_remap_start_vaddr[nid];
 	else {
-		NODE_DATA(nid) = (pg_data_t *)(pfn_to_kaddr(min_low_pfn));
-		min_low_pfn += PFN_UP(sizeof(pg_data_t));
+		unsigned long pgdat_phys;
+		pgdat_phys = find_e820_area(min_low_pfn<<PAGE_SHIFT,
+				 (nid ? max_low_pfn:max_pfn_mapped)<<PAGE_SHIFT,
+				 sizeof(pg_data_t),
+				 PAGE_SIZE);
+		NODE_DATA(nid) = (pg_data_t *)(pfn_to_kaddr(pgdat_phys>>PAGE_SHIFT));
+		reserve_early(pgdat_phys, pgdat_phys + sizeof(pg_data_t),
+			      "NODE_DATA");
 	}
+	printk(KERN_DEBUG "allocate_pgdat: node %d NODE_DATA %08lx\n",
+		nid, (unsigned long)NODE_DATA(nid));
 }
 
-#ifdef CONFIG_DISCONTIGMEM
 /*
- * In the discontig memory model, a portion of the kernel virtual area (KVA)
- * is reserved and portions of nodes are mapped using it. This is to allow
- * node-local memory to be allocated for structures that would normally require
- * ZONE_NORMAL. The memory is allocated with alloc_remap() and callers
- * should be prepared to allocate from the bootmem allocator instead. This KVA
- * mechanism is incompatible with SPARSEMEM as it makes assumptions about the
- * layout of memory that are broken if alloc_remap() succeeds for some of the
- * map and fails for others
+ * In the DISCONTIGMEM and SPARSEMEM memory model, a portion of the kernel
+ * virtual address space (KVA) is reserved and portions of nodes are mapped
+ * using it. This is to allow node-local memory to be allocated for
+ * structures that would normally require ZONE_NORMAL. The memory is
+ * allocated with alloc_remap() and callers should be prepared to allocate
+ * from the bootmem allocator instead.
  */
 static unsigned long node_remap_start_pfn[MAX_NUMNODES];
 static void *node_remap_end_vaddr[MAX_NUMNODES];
@@ -202,8 +208,12 @@ void __init remap_numa_kva(void)
 	int node;
 
 	for_each_online_node(node) {
+		printk(KERN_DEBUG "remap_numa_kva: node %d\n", node);
 		for (pfn=0; pfn < node_remap_size[node]; pfn += PTRS_PER_PTE) {
 			vaddr = node_remap_start_vaddr[node]+(pfn<<PAGE_SHIFT);
+			printk(KERN_DEBUG "remap_numa_kva: %08lx to pfn %08lx\n",
+				(unsigned long)vaddr,
+				node_remap_start_pfn[node] + pfn);
 			set_pmd_pfn((ulong) vaddr, 
 				node_remap_start_pfn[node] + pfn, 
 				PAGE_KERNEL_LARGE);
@@ -287,35 +297,15 @@ static void init_remap_allocator(int nid)
 
 	printk ("node %d will remap to vaddr %08lx - %08lx\n", nid,
 		(ulong) node_remap_start_vaddr[nid],
-		(ulong) pfn_to_kaddr(highstart_pfn
-		   + node_remap_offset[nid] + node_remap_size[nid]));
+		(ulong) node_remap_end_vaddr[nid]);
 }
-#else
-void *alloc_remap(int nid, unsigned long size)
-{
-	return NULL;
-}
-
-static unsigned long calculate_numa_remap_pages(void)
-{
-	return 0;
-}
-
-static void init_remap_allocator(int nid)
-{
-}
-
-void __init remap_numa_kva(void)
-{
-}
-#endif /* CONFIG_DISCONTIGMEM */
 
 extern void setup_bootmem_allocator(void);
 unsigned long __init setup_memory(void)
 {
 	int nid;
 	unsigned long system_start_pfn, system_max_low_pfn;
-	unsigned long wasted_pages;
+	long kva_target_pfn;
 
 	/*
 	 * When mapping a NUMA machine we allocate the node_mem_map arrays
@@ -324,34 +314,38 @@ unsigned long __init setup_memory(void)
 	 * this space and use it to adjust the boundary between ZONE_NORMAL
 	 * and ZONE_HIGHMEM.
 	 */
+
+	/* call find_max_low_pfn at first, it could update max_pfn */
+	system_max_low_pfn = max_low_pfn = find_max_low_pfn();
+
+	remove_all_active_ranges();
 	get_memcfg_numa();
 
-	kva_pages = calculate_numa_remap_pages();
+	kva_pages = round_up(calculate_numa_remap_pages(), PTRS_PER_PTE);
 
 	/* partially used pages are not usable - thus round upwards */
 	system_start_pfn = min_low_pfn = PFN_UP(init_pg_tables_end);
 
-	kva_start_pfn = find_max_low_pfn() - kva_pages;
+	kva_target_pfn = round_down(max_low_pfn - kva_pages, PTRS_PER_PTE);
+	do {
+		kva_start_pfn = find_e820_area(kva_target_pfn<<PAGE_SHIFT,
+					max_low_pfn<<PAGE_SHIFT,
+					kva_pages<<PAGE_SHIFT,
+					PTRS_PER_PTE<<PAGE_SHIFT) >> PAGE_SHIFT;
+		kva_target_pfn -= PTRS_PER_PTE;
+	} while (kva_start_pfn == -1UL && kva_target_pfn > min_low_pfn);
 
-#ifdef CONFIG_BLK_DEV_INITRD
-	/* Numa kva area is below the initrd */
-	if (initrd_start)
-		kva_start_pfn = PFN_DOWN(initrd_start - PAGE_OFFSET)
-			- kva_pages;
-#endif
+	if (kva_start_pfn == -1UL)
+		panic("Can not get kva space\n");
 
-	/*
-	 * We waste pages past at the end of the KVA for no good reason other
-	 * than how it is located. This is bad.
-	 */
-	wasted_pages = kva_start_pfn & (PTRS_PER_PTE-1);
-	kva_start_pfn -= wasted_pages;
-	kva_pages += wasted_pages;
-
-	system_max_low_pfn = max_low_pfn = find_max_low_pfn();
 	printk("kva_start_pfn ~ %ld find_max_low_pfn() ~ %ld\n",
 		kva_start_pfn, max_low_pfn);
 	printk("max_pfn = %ld\n", max_pfn);
+
+	/* avoid clash with initrd */
+	reserve_early(kva_start_pfn<<PAGE_SHIFT,
+		      (kva_start_pfn + kva_pages)<<PAGE_SHIFT,
+		     "KVA PG");
 #ifdef CONFIG_HIGHMEM
 	highstart_pfn = highend_pfn = max_pfn;
 	if (max_pfn > system_max_low_pfn)
@@ -387,16 +381,8 @@ unsigned long __init setup_memory(void)
 	return max_low_pfn;
 }
 
-void __init numa_kva_reserve(void)
-{
-	if (kva_pages)
-		reserve_bootmem(PFN_PHYS(kva_start_pfn), PFN_PHYS(kva_pages),
-				BOOTMEM_DEFAULT);
-}
-
 void __init zone_sizes_init(void)
 {
-	int nid;
 	unsigned long max_zone_pfns[MAX_NR_ZONES];
 	memset(max_zone_pfns, 0, sizeof(max_zone_pfns));
 	max_zone_pfns[ZONE_DMA] =
@@ -405,15 +391,6 @@ void __init zone_sizes_init(void)
 #ifdef CONFIG_HIGHMEM
 	max_zone_pfns[ZONE_HIGHMEM] = highend_pfn;
 #endif
-
-	/* If SRAT has not registered memory, register it now */
-	if (find_max_pfn_with_active_regions() == 0) {
-		for_each_online_node(nid) {
-			if (node_has_online_mem(nid))
-				add_active_range(nid, node_start_pfn[nid],
-							node_end_pfn[nid]);
-		}
-	}
 
 	free_area_init_nodes(max_zone_pfns);
 	return;
@@ -475,4 +452,22 @@ int memory_add_physaddr_to_nid(u64 addr)
 }
 
 EXPORT_SYMBOL_GPL(memory_add_physaddr_to_nid);
+#endif
+
+#if defined(CONFIG_ACPI_NUMA) && !defined(CONFIG_HAVE_ARCH_PARSE_SRAT)
+/*
+ * Dummy on 32-bit, for now:
+ */
+void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
+{
+}
+
+void __init
+acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
+{
+}
+
+void __init acpi_numa_arch_fixup(void)
+{
+}
 #endif
