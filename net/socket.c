@@ -85,6 +85,7 @@
 #include <linux/audit.h>
 #include <linux/wireless.h>
 #include <linux/nsproxy.h>
+#include <linux/marker.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -567,6 +568,11 @@ int sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 	struct sock_iocb siocb;
 	int ret;
 
+	trace_mark(net_socket_sendmsg,
+		"sock %p family %d type %d protocol %d size %zu",
+		sock, sock->sk->sk_family, sock->sk->sk_type,
+		sock->sk->sk_protocol, size);
+
 	init_sync_kiocb(&iocb, NULL);
 	iocb.private = &siocb;
 	ret = __sock_sendmsg(&iocb, sock, msg, size);
@@ -650,7 +656,13 @@ int sock_recvmsg(struct socket *sock, struct msghdr *msg,
 	struct sock_iocb siocb;
 	int ret;
 
+	trace_mark(net_socket_recvmsg,
+		"sock %p family %d type %d protocol %d size %zu",
+		sock, sock->sk->sk_family, sock->sk->sk_type,
+		sock->sk->sk_protocol, size);
+
 	init_sync_kiocb(&iocb, NULL);
+
 	iocb.private = &siocb;
 	ret = __sock_recvmsg(&iocb, sock, msg, size, flags);
 	if (-EIOCBQUEUED == ret)
@@ -1225,6 +1237,11 @@ asmlinkage long sys_socket(int family, int type, int protocol)
 	retval = sock_map_fd(sock);
 	if (retval < 0)
 		goto out_release;
+
+	trace_mark(net_socket_create,
+		"sock %p family %d type %d protocol %d fd %d",
+		sock, sock->sk->sk_family, sock->sk->sk_type,
+		sock->sk->sk_protocol, retval);
 
 out:
 	/* It may be already another descriptor 8) Not kernel problem. */
@@ -2023,6 +2040,8 @@ asmlinkage long sys_socketcall(int call, unsigned long __user *args)
 
 	a0 = a[0];
 	a1 = a[1];
+
+	trace_mark(net_socket_call, "call %d a0 %lu", call, a0);
 
 	switch (call) {
 	case SYS_SOCKET:
