@@ -15,6 +15,7 @@
 #include <linux/random.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
+#include <linux/marker.h>
 
 #include "internals.h"
 
@@ -130,6 +131,10 @@ irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action)
 {
 	irqreturn_t ret, retval = IRQ_NONE;
 	unsigned int status = 0;
+	struct pt_regs *regs = get_irq_regs();
+
+	trace_mark(kernel_irq_entry, "irq_id %u kernel_mode %u", irq,
+		(regs)?(!user_mode(regs)):(1));
 
 	handle_dynamic_tick(action);
 
@@ -147,6 +152,8 @@ irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action)
 	if (status & IRQF_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
 	local_irq_disable();
+
+	trace_mark(kernel_irq_exit, MARK_NOARGS);
 
 	return retval;
 }
