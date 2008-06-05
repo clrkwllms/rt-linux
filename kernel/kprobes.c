@@ -43,6 +43,7 @@
 #include <linux/seq_file.h>
 #include <linux/debugfs.h>
 #include <linux/kdebug.h>
+#include <linux/memory.h>
 
 #include <asm-generic/sections.h>
 #include <asm/cacheflush.h>
@@ -68,7 +69,7 @@ static struct hlist_head kretprobe_inst_table[KPROBE_TABLE_SIZE];
 /* NOTE: change this value only with kprobe_mutex held */
 static bool kprobe_enabled;
 
-DEFINE_MUTEX(kprobe_mutex);		/* Protects kprobe_table */
+static DEFINE_MUTEX(kprobe_mutex);	/* Protects kprobe_table */
 DEFINE_SPINLOCK(kretprobe_lock);	/* Protects kretprobe_inst_table */
 static DEFINE_PER_CPU(struct kprobe *, kprobe_instance) = NULL;
 
@@ -107,6 +108,10 @@ enum kprobe_slot_state {
 	SLOT_USED = 2,
 };
 
+/*
+ * Protects the kprobe_insn_pages list. Can nest into kprobe_mutex.
+ */
+static DEFINE_MUTEX(kprobe_insn_mutex);
 static struct hlist_head kprobe_insn_pages;
 static int kprobe_garbage_slots;
 static int collect_garbage_slots(void);
@@ -143,7 +148,9 @@ kprobe_opcode_t __kprobes *get_insn_slot(void)
 {
 	struct kprobe_insn_page *kip;
 	struct hlist_node *pos;
+	kprobe_opcode_t *ret;
 
+	mutex_lock(&kprobe_insn_mutex);
  retry:
 	hlist_for_each_entry(kip, pos, &kprobe_insn_pages, hlist) {
 		if (kip->nused < INSNS_PER_PAGE) {
@@ -152,7 +159,8 @@ kprobe_opcode_t __kprobes *get_insn_slot(void)
 				if (kip->slot_used[i] == SLOT_CLEAN) {
 					kip->slot_used[i] = SLOT_USED;
 					kip->nused++;
-					return kip->insns + (i * MAX_INSN_SIZE);
+					ret = kip->insns + (i * MAX_INSN_SIZE);
+					goto end;
 				}
 			}
 			/* Surprise!  No unused slots.  Fix kip->nused. */
@@ -166,8 +174,10 @@ kprobe_opcode_t __kprobes *get_insn_slot(void)
 	}
 	/* All out of space.  Need to allocate a new page. Use slot 0. */
 	kip = kmalloc(sizeof(struct kprobe_insn_page), GFP_KERNEL);
-	if (!kip)
-		return NULL;
+	if (!kip) {
+		ret = NULL;
+		goto end;
+	}
 
 	/*
 	 * Use module_alloc so this page is within +/- 2GB of where the
@@ -177,7 +187,8 @@ kprobe_opcode_t __kprobes *get_insn_slot(void)
 	kip->insns = module_alloc(PAGE_SIZE);
 	if (!kip->insns) {
 		kfree(kip);
-		return NULL;
+		ret = NULL;
+		goto end;
 	}
 	INIT_HLIST_NODE(&kip->hlist);
 	hlist_add_head(&kip->hlist, &kprobe_insn_pages);
@@ -185,7 +196,10 @@ kprobe_opcode_t __kprobes *get_insn_slot(void)
 	kip->slot_used[0] = SLOT_USED;
 	kip->nused = 1;
 	kip->ngarbage = 0;
-	return kip->insns;
+	ret = kip->insns;
+end:
+	mutex_unlock(&kprobe_insn_mutex);
+	return ret;
 }
 
 /* Return 1 if all garbages are collected, otherwise 0. */
@@ -219,7 +233,7 @@ static int __kprobes collect_garbage_slots(void)
 	struct kprobe_insn_page *kip;
 	struct hlist_node *pos, *next;
 
-	/* Ensure no-one is preepmted on the garbages */
+	/* Ensure no-one is preempted on the garbages */
 	if (check_safety() != 0)
 		return -EAGAIN;
 
@@ -243,6 +257,7 @@ void __kprobes free_insn_slot(kprobe_opcode_t * slot, int dirty)
 	struct kprobe_insn_page *kip;
 	struct hlist_node *pos;
 
+	mutex_lock(&kprobe_insn_mutex);
 	hlist_for_each_entry(kip, pos, &kprobe_insn_pages, hlist) {
 		if (kip->insns <= slot &&
 		    slot < kip->insns + (INSNS_PER_PAGE * MAX_INSN_SIZE)) {
@@ -259,6 +274,7 @@ void __kprobes free_insn_slot(kprobe_opcode_t * slot, int dirty)
 
 	if (dirty && ++kprobe_garbage_slots > INSNS_PER_PAGE)
 		collect_garbage_slots();
+	mutex_unlock(&kprobe_insn_mutex);
 }
 #endif
 
@@ -603,9 +619,10 @@ static int __kprobes __register_kprobe(struct kprobe *p,
 		goto out;
 	}
 
+	kernel_text_lock();
 	ret = arch_prepare_kprobe(p);
 	if (ret)
-		goto out;
+		goto out_unlock_text;
 
 	INIT_HLIST_NODE(&p->hlist);
 	hlist_add_head_rcu(&p->hlist,
@@ -613,7 +630,8 @@ static int __kprobes __register_kprobe(struct kprobe *p,
 
 	if (kprobe_enabled)
 		arch_arm_kprobe(p);
-
+out_unlock_text:
+	kernel_text_unlock();
 out:
 	mutex_unlock(&kprobe_mutex);
 
@@ -649,8 +667,11 @@ valid_p:
 		 * enabled - otherwise, the breakpoint would already have
 		 * been removed. We save on flushing icache.
 		 */
-		if (kprobe_enabled)
+		if (kprobe_enabled) {
+			kernel_text_lock();
 			arch_disarm_kprobe(p);
+			kernel_text_unlock();
+		}
 		hlist_del_rcu(&old_p->hlist);
 	} else {
 		if (p->break_handler)
@@ -847,7 +868,6 @@ static int __kprobes pre_handler_kretprobe(struct kprobe *p,
 		}
 
 		arch_prepare_kretprobe(ri, regs);
-
 		/* XXX(hch): why is there no hlist_move_head? */
 		hlist_del(&ri->uflist);
 		hlist_add_head(&ri->uflist, &ri->rp->used_instances);
@@ -1147,11 +1167,13 @@ static void __kprobes enable_all_kprobes(void)
 	if (kprobe_enabled)
 		goto already_enabled;
 
+	kernel_text_lock();
 	for (i = 0; i < KPROBE_TABLE_SIZE; i++) {
 		head = &kprobe_table[i];
 		hlist_for_each_entry_rcu(p, node, head, hlist)
 			arch_arm_kprobe(p);
 	}
+	kernel_text_unlock();
 
 	kprobe_enabled = true;
 	printk(KERN_INFO "Kprobes globally enabled\n");
@@ -1176,6 +1198,7 @@ static void __kprobes disable_all_kprobes(void)
 
 	kprobe_enabled = false;
 	printk(KERN_INFO "Kprobes globally disabled\n");
+	kernel_text_lock();
 	for (i = 0; i < KPROBE_TABLE_SIZE; i++) {
 		head = &kprobe_table[i];
 		hlist_for_each_entry_rcu(p, node, head, hlist) {
@@ -1183,6 +1206,7 @@ static void __kprobes disable_all_kprobes(void)
 				arch_disarm_kprobe(p);
 		}
 	}
+	kernel_text_unlock();
 
 	mutex_unlock(&kprobe_mutex);
 	/* Allow all currently running kprobes to complete */
