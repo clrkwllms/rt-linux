@@ -226,9 +226,13 @@ static int __init do_mount_root(char *name, char *fs, int flags, void *data)
 	return 0;
 }
 
+#if PAGE_SIZE < PATH_MAX
+# error increase the fs_names allocation size here
+#endif
+
 void __init mount_block_root(char *name, int flags)
 {
-	char *fs_names = __getname();
+	char *fs_names = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 1);
 	char *p;
 #ifdef CONFIG_BLOCK
 	char b[BDEVNAME_SIZE];
@@ -276,7 +280,7 @@ retry:
 #endif
 	panic("VFS: Unable to mount root fs on %s", b);
 out:
-	putname(fs_names);
+	free_pages((unsigned long)fs_names, 1);
 }
  
 #ifdef CONFIG_ROOT_NFS
