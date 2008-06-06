@@ -67,6 +67,8 @@
 		*(.rodata1)						\
 	}								\
 									\
+	BUG_TABLE							\
+									\
 	/* PCI quirks */						\
 	.pci_fixup        : AT(ADDR(.pci_fixup) - LOAD_OFFSET) {	\
 		VMLINUX_SYMBOL(__start_pci_fixups_early) = .;		\
@@ -312,6 +314,7 @@
 		.stab.indexstr 0 : { *(.stab.indexstr) }		\
 		.comment 0 : { *(.comment) }
 
+#ifdef CONFIG_GENERIC_BUG
 #define BUG_TABLE							\
 	. = ALIGN(8);							\
 	__bug_table : AT(ADDR(__bug_table) - LOAD_OFFSET) {		\
@@ -319,6 +322,9 @@
 		*(__bug_table)						\
 		__stop___bug_table = .;					\
 	}
+#else
+#define BUG_TABLE
+#endif
 
 #ifdef CONFIG_PM_TRACE
 #define TRACEDATA							\
@@ -362,6 +368,7 @@
 	. = ALIGN(align);						\
 	__per_cpu_start = .;						\
 	.data.percpu  : AT(ADDR(.data.percpu) - LOAD_OFFSET) {		\
+		*(.data.percpu.page_aligned)				\
 		*(.data.percpu)						\
 		*(.data.percpu.shared_aligned)				\
 	}								\
