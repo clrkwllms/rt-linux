@@ -160,6 +160,7 @@ KBUILD_AFLAGS += $(mflags-y)
 
 head-y := arch/x86/kernel/head_$(BITS).o
 head-y += arch/x86/kernel/head$(BITS).o
+head-y += arch/x86/kernel/head.o
 head-y += arch/x86/kernel/init_task.o
 
 libs-y  += arch/x86/lib/
@@ -210,12 +211,12 @@ all: bzImage
 
 # KBUILD_IMAGE specify target image being built
                     KBUILD_IMAGE := $(boot)/bzImage
-zImage zlilo zdisk: KBUILD_IMAGE := arch/x86/boot/zImage
+zImage zlilo zdisk: KBUILD_IMAGE := $(boot)/zImage
 
 zImage bzImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
 	$(Q)mkdir -p $(objtree)/arch/$(UTS_MACHINE)/boot
-	$(Q)ln -fsn ../../x86/boot/bzImage $(objtree)/arch/$(UTS_MACHINE)/boot/bzImage
+	$(Q)ln -fsn ../../x86/boot/bzImage $(objtree)/arch/$(UTS_MACHINE)/boot/$@
 
 compressed: zImage
 
