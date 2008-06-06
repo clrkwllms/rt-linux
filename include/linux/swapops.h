@@ -76,6 +76,14 @@ static inline pte_t swp_entry_to_pte(swp_entry_t entry)
 	return __swp_entry_to_pte(arch_entry);
 }
 
+static inline swp_entry_t page_swp_entry(struct page *page)
+{
+	swp_entry_t entry;
+	VM_BUG_ON(!PageSwapCache(page));
+	entry.val = page_private(page);
+	return entry;
+}
+
 #ifdef CONFIG_MIGRATION
 static inline swp_entry_t make_migration_entry(struct page *page, int write)
 {
