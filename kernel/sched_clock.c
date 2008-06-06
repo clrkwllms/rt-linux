@@ -141,6 +141,7 @@ u64 sched_clock_cpu(int cpu)
 	struct sched_clock_data *scd = cpu_sdc(cpu);
 	u64 now, clock;
 
+<<<<<<< HEAD:kernel/sched_clock.c
 	/*
 	 * Normally this is not called in NMI context - but if it is,
 	 * trying to do any locking here is totally lethal.
@@ -148,6 +149,8 @@ u64 sched_clock_cpu(int cpu)
 	if (unlikely(in_nmi()))
 		return scd->clock;
 
+=======
+>>>>>>> core/urgent:kernel/sched_clock.c
 	if (unlikely(!sched_clock_running))
 		return 0ull;
 
