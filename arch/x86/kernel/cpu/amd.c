@@ -4,8 +4,10 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/apic.h>
+#include <asm/mmconfig.h>
 
 #include <mach_apic.h>
+#include "../setup.h"
 #include "cpu.h"
 
 /*
@@ -308,6 +310,9 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 
 	if (cpu_has_xmm2)
 		set_cpu_cap(c, X86_FEATURE_MFENCE_RDTSC);
+
+	if (c->x86 == 0x10)
+		amd_enable_pci_ext_cfg(c);
 }
 
 static unsigned int __cpuinit amd_size_cache(struct cpuinfo_x86 *c, unsigned int size)
