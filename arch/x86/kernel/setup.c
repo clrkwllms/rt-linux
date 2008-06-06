@@ -150,3 +150,25 @@ void __cpuinit amd_enable_pci_ext_cfg(struct cpuinfo_x86 *c)
 }
 
 #endif
+
+void __init parse_setup_data(void)
+{
+	struct setup_data *data;
+	u64 pa_data;
+
+	if (boot_params.hdr.version < 0x0209)
+		return;
+	pa_data = boot_params.hdr.setup_data;
+	while (pa_data) {
+		data = early_ioremap(pa_data, PAGE_SIZE);
+		switch (data->type) {
+		default:
+			break;
+		}
+#ifndef CONFIG_DEBUG_BOOT_PARAMS
+		free_early(pa_data, pa_data+sizeof(*data)+data->len);
+#endif
+		pa_data = data->next;
+		early_iounmap(data, PAGE_SIZE);
+	}
+}
