@@ -72,20 +72,14 @@ int sis_apic_bug = -1;
 int nr_ioapic_registers[MAX_IO_APICS];
 
 /* I/O APIC entries */
-struct mp_config_ioapic mp_ioapics[MAX_IO_APICS];
+struct mpc_config_ioapic mp_ioapics[MAX_IO_APICS];
 int nr_ioapics;
 
 /* MP IRQ source entries */
-struct mp_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
+struct mpc_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
 
 /* # of MP IRQ source entries */
 int mp_irq_entries;
-
-#if defined (CONFIG_MCA) || defined (CONFIG_EISA)
-int mp_bus_id_to_type[MAX_MP_BUSSES];
-#endif
-
-DECLARE_BITMAP(mp_bus_not_pci, MAX_MP_BUSSES);
 
 static int disable_timer_pin_1 __initdata;
 
@@ -840,17 +834,17 @@ static int __init find_isa_irq_apic(int irq, int type)
 	int i;
 
 	for (i = 0; i < mp_irq_entries; i++) {
-		int lbus = mp_irqs[i].mp_srcbus;
+		int lbus = mp_irqs[i].mpc_srcbus;
 
 		if (test_bit(lbus, mp_bus_not_pci) &&
-		    (mp_irqs[i].mp_irqtype == type) &&
-		    (mp_irqs[i].mp_srcbusirq == irq))
+		    (mp_irqs[i].mpc_irqtype == type) &&
+		    (mp_irqs[i].mpc_srcbusirq == irq))
 			break;
 	}
 	if (i < mp_irq_entries) {
 		int apic;
 		for(apic = 0; apic < nr_ioapics; apic++) {
-			if (mp_ioapics[apic].mp_apicid == mp_irqs[i].mp_dstapic)
+			if (mp_ioapics[apic].mpc_apicid == mp_irqs[i].mpc_dstapic)
 				return apic;
 		}
 	}
@@ -870,28 +864,28 @@ int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin)
 
 	apic_printk(APIC_DEBUG, "querying PCI -> IRQ mapping bus:%d, "
 		"slot:%d, pin:%d.\n", bus, slot, pin);
-	if (test_bit(bus, mp_bus_not_pci)) {
+	if (mp_bus_id_to_pci_bus[bus] == -1) {
 		printk(KERN_WARNING "PCI BIOS passed nonexistent PCI bus %d!\n", bus);
 		return -1;
 	}
 	for (i = 0; i < mp_irq_entries; i++) {
-		int lbus = mp_irqs[i].mp_srcbus;
+		int lbus = mp_irqs[i].mpc_srcbus;
 
 		for (apic = 0; apic < nr_ioapics; apic++)
-			if (mp_ioapics[apic].mp_apicid == mp_irqs[i].mp_dstapic ||
-			    mp_irqs[i].mp_dstapic == MP_APIC_ALL)
+			if (mp_ioapics[apic].mpc_apicid == mp_irqs[i].mpc_dstapic ||
+			    mp_irqs[i].mpc_dstapic == MP_APIC_ALL)
 				break;
 
 		if (!test_bit(lbus, mp_bus_not_pci) &&
-		    !mp_irqs[i].mp_irqtype &&
+		    !mp_irqs[i].mpc_irqtype &&
 		    (bus == lbus) &&
-		    (slot == ((mp_irqs[i].mp_srcbusirq >> 2) & 0x1f))) {
-			int irq = pin_2_irq(i,apic,mp_irqs[i].mp_dstirq);
+		    (slot == ((mp_irqs[i].mpc_srcbusirq >> 2) & 0x1f))) {
+			int irq = pin_2_irq(i,apic,mp_irqs[i].mpc_dstirq);
 
 			if (!(apic || IO_APIC_IRQ(irq)))
 				continue;
 
-			if (pin == (mp_irqs[i].mp_srcbusirq & 3))
+			if (pin == (mp_irqs[i].mpc_srcbusirq & 3))
 				return irq;
 			/*
 			 * Use the first all-but-pin matching entry as a
@@ -975,13 +969,13 @@ static int EISA_ELCR(unsigned int irq)
 
 static int MPBIOS_polarity(int idx)
 {
-	int bus = mp_irqs[idx].mp_srcbus;
+	int bus = mp_irqs[idx].mpc_srcbus;
 	int polarity;
 
 	/*
 	 * Determine IRQ line polarity (high active or low active):
 	 */
-	switch (mp_irqs[idx].mp_irqflag & 3)
+	switch (mp_irqs[idx].mpc_irqflag & 3)
 	{
 		case 0: /* conforms, ie. bus-type dependent polarity */
 		{
@@ -1018,13 +1012,13 @@ static int MPBIOS_polarity(int idx)
 
 static int MPBIOS_trigger(int idx)
 {
-	int bus = mp_irqs[idx].mp_srcbus;
+	int bus = mp_irqs[idx].mpc_srcbus;
 	int trigger;
 
 	/*
 	 * Determine IRQ trigger mode (edge or level sensitive):
 	 */
-	switch ((mp_irqs[idx].mp_irqflag>>2) & 3)
+	switch ((mp_irqs[idx].mpc_irqflag>>2) & 3)
 	{
 		case 0: /* conforms, ie. bus-type dependent */
 		{
@@ -1759,14 +1753,14 @@ static void __init setup_ioapic_ids_from_mpc(void)
 		reg_00.raw = io_apic_read(apic, 0);
 		spin_unlock_irqrestore(&ioapic_lock, flags);
 		
-		old_id = mp_ioapics[apic].mp_apicid;
+		old_id = mp_ioapics[apic].mpc_apicid;
 
-		if (mp_ioapics[apic].mp_apicid >= get_physical_broadcast()) {
+		if (mp_ioapics[apic].mpc_apicid >= get_physical_broadcast()) {
 			printk(KERN_ERR "BIOS bug, IO-APIC#%d ID is %d in the MPC table!...\n",
-				apic, mp_ioapics[apic].mp_apicid);
+				apic, mp_ioapics[apic].mpc_apicid);
 			printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
 				reg_00.bits.ID);
-			mp_ioapics[apic].mp_apicid = reg_00.bits.ID;
+			mp_ioapics[apic].mpc_apicid = reg_00.bits.ID;
 		}
 
 		/*
