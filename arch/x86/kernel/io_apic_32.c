@@ -39,6 +39,8 @@
 
 #include <linux/io.h>
 #include <linux/smp.h>
+
+#include <asm/smp.h>
 #include <asm/desc.h>
 #include <asm/timer.h>
 #include <asm/i8259.h>
