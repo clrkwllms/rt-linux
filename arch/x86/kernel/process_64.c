@@ -56,15 +56,6 @@ asmlinkage extern void ret_from_fork(void);
 
 unsigned long kernel_thread_flags = CLONE_VM | CLONE_UNTRACED;
 
-unsigned long boot_option_idle_override = 0;
-EXPORT_SYMBOL(boot_option_idle_override);
-
-/*
- * Powermanagement idle function, if any..
- */
-void (*pm_idle)(void);
-EXPORT_SYMBOL(pm_idle);
-
 static ATOMIC_NOTIFIER_HEAD(idle_notifier);
 
 void idle_notifier_register(struct notifier_block *n)
@@ -92,25 +83,6 @@ void exit_idle(void)
 	if (current->pid)
 		return;
 	__exit_idle();
-}
-
-/*
- * We use this if we don't have any better
- * idle routine..
- */
-void default_idle(void)
-{
-	current_thread_info()->status &= ~TS_POLLING;
-	/*
-	 * TS_POLLING-cleared state must be visible before we
-	 * test NEED_RESCHED:
-	 */
-	smp_mb();
-	if (!need_resched())
-		safe_halt();	/* enables interrupts racelessly */
-	else
-		local_irq_enable();
-	current_thread_info()->status |= TS_POLLING;
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -150,12 +122,9 @@ void cpu_idle(void)
 	while (1) {
 		tick_nohz_stop_sched_tick();
 		while (!need_resched()) {
-			void (*idle)(void);
 
 			rmb();
-			idle = pm_idle;
-			if (!idle)
-				idle = default_idle;
+
 			if (cpu_is_offline(smp_processor_id()))
 				play_dead();
 			/*
@@ -165,7 +134,7 @@ void cpu_idle(void)
 			 */
 			local_irq_disable();
 			enter_idle();
-			idle();
+			pm_idle();
 			/* In many cases the interrupt that ended idle
 			   has already called exit_idle. But some idle
 			   loops can be woken up without interrupt. */

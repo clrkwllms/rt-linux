@@ -38,15 +38,12 @@ static inline void unset_nmi_pm_callback(struct pm_dev *dev)
 
 #ifdef CONFIG_X86_64
 extern void default_do_nmi(struct pt_regs *);
-extern void die_nmi(char *str, struct pt_regs *regs, int do_panic);
-extern void nmi_watchdog_default(void);
-#else
-#define nmi_watchdog_default() do {} while (0)
 #endif
 
+extern void die_nmi(char *str, struct pt_regs *regs, int do_panic);
+extern void nmi_watchdog_default(void);
 extern int check_nmi_watchdog(void);
 extern int nmi_watchdog_enabled;
-extern int unknown_nmi_panic;
 extern int avail_to_resrv_perfctr_nmi_bit(unsigned int);
 extern int avail_to_resrv_perfctr_nmi(unsigned int);
 extern int reserve_perfctr_nmi(unsigned int);
@@ -78,6 +75,11 @@ extern int unknown_nmi_panic;
 void __trigger_all_cpu_backtrace(void);
 #define trigger_all_cpu_backtrace() __trigger_all_cpu_backtrace()
 
+static inline void localise_nmi_watchdog(void)
+{
+	if (nmi_watchdog == NMI_IO_APIC)
+		nmi_watchdog = NMI_LOCAL_APIC;
+}
 #endif
 
 void lapic_watchdog_stop(void);

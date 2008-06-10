@@ -51,7 +51,7 @@
 #include <asm/percpu.h>
 #include <asm/dwarf2.h>
 #include <asm/processor-flags.h>
-#include "irq_vectors.h"
+#include <asm/irq_vectors.h>
 
 /*
  * We use macros for low-level operations which need to be overridden
@@ -248,6 +248,7 @@ ENTRY(resume_userspace)
  	DISABLE_INTERRUPTS(CLBR_ANY)	# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
+	TRACE_IRQS_OFF
 	movl TI_flags(%ebp), %ecx
 	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done on
 					# int/exception return?
