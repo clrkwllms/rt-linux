@@ -6960,7 +6960,12 @@ static int default_relax_domain_level = -1;
 
 static int __init setup_relax_domain_level(char *str)
 {
-	default_relax_domain_level = simple_strtoul(str, NULL, 0);
+	unsigned long val;
+
+	val = simple_strtoul(str, NULL, 0);
+	if (val < SD_LV_MAX)
+		default_relax_domain_level = val;
+
 	return 1;
 }
 __setup("relax_domain_level=", setup_relax_domain_level);
@@ -7920,7 +7925,7 @@ void __init sched_init(void)
 #endif
 
 #ifdef CONFIG_SMP
-	open_softirq(SCHED_SOFTIRQ, run_rebalance_domains, NULL);
+	open_softirq(SCHED_SOFTIRQ, run_rebalance_domains);
 #endif
 
 #ifdef CONFIG_RT_MUTEXES
