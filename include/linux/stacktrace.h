@@ -2,6 +2,8 @@
 #define __LINUX_STACKTRACE_H
 
 #ifdef CONFIG_STACKTRACE
+struct task_struct;
+
 struct stack_trace {
 	unsigned int nr_entries, max_entries;
 	unsigned long *entries;
