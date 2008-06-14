@@ -1160,6 +1160,9 @@ int mp_config_acpi_gsi(unsigned char number, unsigned int devfn, u8 pin,
 	struct mpc_config_intsrc intsrc;
 	int ioapic;
 
+	if (!enable_update_mptable)
+		return 0;
+
 	/* print the entry should happen on mptable identically */
 	intsrc.mpc_type = MP_INTSRC;
 	intsrc.mpc_irqtype = mp_INT;
