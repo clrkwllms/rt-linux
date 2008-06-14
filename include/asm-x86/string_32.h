@@ -262,6 +262,14 @@ __asm__  __volatile__( \
  __constant_c_x_memset((s),(0x01010101UL*(unsigned char)(c)),(count)) : \
  __memset((s),(c),(count)))
 
+/* If kmemcheck is enabled, our best bet is a custom memset() that disables
+ * checking in order to save a whole lot of (unnecessary) page faults. */
+#ifdef CONFIG_KMEMCHECK
+void *kmemcheck_memset(void *s, int c, size_t n);
+#undef memset
+#define memset(s, c, n) kmemcheck_memset((s), (c), (n))
+#endif
+
 /*
  * find the first occurrence of byte 'c', or 1 past the area if none
  */
