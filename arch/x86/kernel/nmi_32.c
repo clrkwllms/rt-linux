@@ -28,7 +28,6 @@
 #include <asm/io_apic.h>
 #include <asm/smp.h>
 #include <asm/nmi.h>
-#include <asm/timer.h>
 
 #include "mach_traps.h"
 
@@ -84,7 +83,7 @@ int __init check_nmi_watchdog(void)
 
 	prev_nmi_count = kmalloc(NR_CPUS * sizeof(int), GFP_KERNEL);
 	if (!prev_nmi_count)
-		goto error;
+		return -1;
 
 	printk(KERN_INFO "Testing NMI watchdog ... ");
 
@@ -121,7 +120,7 @@ int __init check_nmi_watchdog(void)
 	if (!atomic_read(&nmi_active)) {
 		kfree(prev_nmi_count);
 		atomic_set(&nmi_active, -1);
-		goto error;
+		return -1;
 	}
 	printk("OK.\n");
 

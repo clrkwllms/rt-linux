@@ -2132,13 +2132,9 @@ static inline void __init check_timer(void)
 	int apic1, pin1, apic2, pin2;
 	int no_pin1 = 0;
 	int vector;
-	unsigned int ver;
 	unsigned long flags;
 
 	local_irq_save(flags);
-
-	ver = apic_read(APIC_LVR);
-	ver = GET_APIC_VERSION(ver);
 
 	/*
 	 * get/set the timer IRQ vector:
