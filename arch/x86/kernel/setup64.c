@@ -12,6 +12,7 @@
 #include <linux/bitops.h>
 #include <linux/module.h>
 #include <linux/kgdb.h>
+#include <linux/topology.h>
 #include <asm/pda.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
@@ -34,9 +35,8 @@ struct boot_params boot_params;
 
 cpumask_t cpu_initialized __cpuinitdata = CPU_MASK_NONE;
 
-struct x8664_pda *_cpu_pda[NR_CPUS] __read_mostly;
+struct x8664_pda **_cpu_pda __read_mostly;
 EXPORT_SYMBOL(_cpu_pda);
-struct x8664_pda boot_cpu_pda[NR_CPUS] __cacheline_aligned;
 
 struct desc_ptr idt_descr = { 256 * 16 - 1, (unsigned long) idt_table };
 
@@ -114,8 +114,10 @@ void pda_init(int cpu)
 			__get_free_pages(GFP_ATOMIC, IRQSTACK_ORDER);
 		if (!pda->irqstackptr)
 			panic("cannot allocate irqstack for cpu %d", cpu); 
-	}
 
+		if (pda->nodenumber == 0 && cpu_to_node(cpu) != NUMA_NO_NODE)
+			pda->nodenumber = cpu_to_node(cpu);
+	}
 
 	pda->irqstackptr += IRQSTACKSIZE-64;
 } 
@@ -200,11 +202,8 @@ void __cpuinit cpu_init (void)
 	 * Initialize the per-CPU GDT with the boot GDT,
 	 * and set up the GDT descriptor:
 	 */
-	if (cpu)
-		memcpy(get_cpu_gdt_table(cpu), cpu_gdt_table, GDT_SIZE);
 
-	cpu_gdt_descr[cpu].size = GDT_SIZE;
-	load_gdt((const struct desc_ptr *)&cpu_gdt_descr[cpu]);
+	switch_to_new_gdt();
 	load_idt((const struct desc_ptr *)&idt_descr);
 
 	memset(me->thread.tls_array, 0, GDT_ENTRY_TLS_ENTRIES * 8);
@@ -248,6 +247,7 @@ void __cpuinit cpu_init (void)
 		BUG();
 	enter_lazy_tlb(&init_mm, me);
 
+	load_sp0(t, &current->thread);
 	set_tss_desc(cpu, t);
 	load_TR_desc();
 	load_LDT(&init_mm.context);

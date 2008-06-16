@@ -40,6 +40,7 @@ struct setup_header {
 	__u8	type_of_loader;
 	__u8	loadflags;
 #define LOADED_HIGH	(1<<0)
+#define QUIET_FLAG	(1<<5)
 #define KEEP_SEGMENTS	(1<<6)
 #define CAN_USE_HEAP	(1<<7)
 	__u16	setup_move_size;
@@ -105,5 +106,8 @@ struct boot_params {
 	struct edd_info eddbuf[EDDMAXNR];		/* 0xd00 */
 	__u8  _pad9[276];				/* 0xeec */
 } __attribute__((packed));
+
+void reserve_setup_data(void);
+void parse_setup_data(void);
 
 #endif /* _ASM_BOOTPARAM_H */
