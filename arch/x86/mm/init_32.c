@@ -162,6 +162,7 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte;
+	unsigned pages_2m = 0, pages_4k = 0;
 
 	pgd_idx = pgd_index(PAGE_OFFSET);
 	pgd = pgd_base + pgd_idx;
@@ -197,6 +198,7 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 				    is_kernel_text(addr2))
 					prot = PAGE_KERNEL_LARGE_EXEC;
 
+				pages_2m++;
 				set_pmd(pmd, pfn_pmd(pfn, prot));
 
 				pfn += PTRS_PER_PTE;
@@ -213,11 +215,14 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 				if (is_kernel_text(addr))
 					prot = PAGE_KERNEL_EXEC;
 
+				pages_4k++;
 				set_pte(pte, pfn_pte(pfn, prot));
 			}
 			max_pfn_mapped = pfn;
 		}
 	}
+	update_page_count(PG_LEVEL_2M, pages_2m);
+	update_page_count(PG_LEVEL_4K, pages_4k);
 }
 
 static inline int page_kills_ppro(unsigned long pagenr)
@@ -287,9 +292,10 @@ static void __init permanent_kmaps_init(pgd_t *pgd_base)
 	pkmap_page_table = pte;
 }
 
-void __init add_one_highpage_init(struct page *page, int pfn, int bad_ppro)
+static void __init
+add_one_highpage_init(struct page *page, int pfn, int bad_ppro)
 {
-	if (page_is_ram(pfn) && !(bad_ppro && page_kills_ppro(pfn))) {
+	if (!(bad_ppro && page_kills_ppro(pfn))) {
 		ClearPageReserved(page);
 		init_page_count(page);
 		__free_page(page);
@@ -298,18 +304,58 @@ void __init add_one_highpage_init(struct page *page, int pfn, int bad_ppro)
 		SetPageReserved(page);
 }
 
+struct add_highpages_data {
+	unsigned long start_pfn;
+	unsigned long end_pfn;
+	int bad_ppro;
+};
+
+static void __init add_highpages_work_fn(unsigned long start_pfn,
+					 unsigned long end_pfn, void *datax)
+{
+	int node_pfn;
+	struct page *page;
+	unsigned long final_start_pfn, final_end_pfn;
+	struct add_highpages_data *data;
+	int bad_ppro;
+
+	data = (struct add_highpages_data *)datax;
+	bad_ppro = data->bad_ppro;
+
+	final_start_pfn = max(start_pfn, data->start_pfn);
+	final_end_pfn = min(end_pfn, data->end_pfn);
+	if (final_start_pfn >= final_end_pfn)
+		return;
+
+	for (node_pfn = final_start_pfn; node_pfn < final_end_pfn;
+	     node_pfn++) {
+		if (!pfn_valid(node_pfn))
+			continue;
+		page = pfn_to_page(node_pfn);
+		add_one_highpage_init(page, node_pfn, bad_ppro);
+	}
+
+}
+
+void __init add_highpages_with_active_regions(int nid, unsigned long start_pfn,
+					      unsigned long end_pfn,
+					      int bad_ppro)
+{
+	struct add_highpages_data data;
+
+	data.start_pfn = start_pfn;
+	data.end_pfn = end_pfn;
+	data.bad_ppro = bad_ppro;
+
+	work_with_active_regions(nid, add_highpages_work_fn, &data);
+}
+
 #ifndef CONFIG_NUMA
 static void __init set_highmem_pages_init(int bad_ppro)
 {
-	int pfn;
+	add_highpages_with_active_regions(0, highstart_pfn, highend_pfn,
+						bad_ppro);
 
-	for (pfn = highstart_pfn; pfn < highend_pfn; pfn++) {
-		/*
-		 * Holes under sparsemem might not have no mem_map[]:
-		 */
-		if (pfn_valid(pfn))
-			add_one_highpage_init(pfn_to_page(pfn), pfn, bad_ppro);
-	}
 	totalram_pages += totalhigh_pages;
 }
 #endif /* !CONFIG_NUMA */
@@ -571,17 +617,6 @@ void __init mem_init(void)
 #endif
 	bad_ppro = ppro_with_ram_bug();
 
-#ifdef CONFIG_HIGHMEM
-	/* check that fixmap and pkmap do not overlap */
-	if (PKMAP_BASE + LAST_PKMAP*PAGE_SIZE >= FIXADDR_START) {
-		printk(KERN_ERR
-			"fixmap and kmap areas overlap - this will crash\n");
-		printk(KERN_ERR "pkstart: %lxh pkend: %lxh fixstart %lxh\n",
-				PKMAP_BASE, PKMAP_BASE + LAST_PKMAP*PAGE_SIZE,
-				FIXADDR_START);
-		BUG();
-	}
-#endif
 	/* this will put all low memory onto the freelists */
 	totalram_pages += free_all_bootmem();
 
@@ -614,7 +649,6 @@ void __init mem_init(void)
 		(unsigned long) (totalhigh_pages << (PAGE_SHIFT-10))
 	       );
 
-#if 1 /* double-sanity-check paranoia */
 	printk(KERN_INFO "virtual kernel memory layout:\n"
 		"    fixmap  : 0x%08lx - 0x%08lx   (%4ld kB)\n"
 #ifdef CONFIG_HIGHMEM
@@ -655,7 +689,6 @@ void __init mem_init(void)
 #endif
 	BUG_ON(VMALLOC_START				> VMALLOC_END);
 	BUG_ON((unsigned long)high_memory		> VMALLOC_START);
-#endif /* double-sanity-check paranoia */
 
 	if (boot_cpu_data.wp_works_ok < 0)
 		test_wp_bit();
@@ -784,3 +817,9 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 	free_init_pages("initrd memory", start, end);
 }
 #endif
+
+int __init reserve_bootmem_generic(unsigned long phys, unsigned long len,
+				   int flags)
+{
+	return reserve_bootmem(phys, len, flags);
+}
