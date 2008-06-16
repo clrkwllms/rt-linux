@@ -243,7 +243,7 @@ static void __init reserve_crashkernel(void)
 			return;
 		}
 
-		if (reserve_bootmem(crash_base, crash_size,
+		if (reserve_bootmem_generic(crash_base, crash_size,
 					BOOTMEM_EXCLUSIVE) < 0) {
 			printk(KERN_INFO "crashkernel reservation failed - "
 					"memory is in use\n");
@@ -376,15 +376,6 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_KVM_CLOCK
 	kvmclock_init();
-#endif
-
-#ifdef CONFIG_SMP
-	/* setup to use the early static init tables during kernel startup */
-	x86_cpu_to_apicid_early_ptr = (void *)x86_cpu_to_apicid_init;
-	x86_bios_cpu_apicid_early_ptr = (void *)x86_bios_cpu_apicid_init;
-#ifdef CONFIG_NUMA
-	x86_cpu_to_node_map_early_ptr = (void *)x86_cpu_to_node_map_init;
-#endif
 #endif
 
 #ifdef CONFIG_ACPI
