@@ -43,6 +43,11 @@ static void init_intel_pdc(struct acpi_processor *pr, struct cpuinfo_x86 *c)
 	buf[0] = ACPI_PDC_REVISION_ID;
 	buf[1] = 1;
 	buf[2] = ACPI_PDC_C_CAPABILITY_SMP;
+	/*
+	 * If mwait/monitor is unsupported, C2/C3_FFH will be disabled.
+	 */
+	if (!cpu_has(c, X86_FEATURE_MWAIT))
+		buf[2] &= ~ACPI_PDC_C_C2C3_FFH;
 
 	/*
 	 * The default of PDC_SMP_T_SWCOORD bit is set for intel x86 cpu so
