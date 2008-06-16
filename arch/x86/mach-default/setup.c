@@ -153,6 +153,7 @@ late_initcall(print_ipi_mode);
 char * __init machine_specific_memory_setup(void)
 {
 	char *who;
+	int new_nr;
 
 
 	who = "BIOS-e820";
@@ -163,7 +164,11 @@ char * __init machine_specific_memory_setup(void)
 	 * Otherwise fake a memory map; one section from 0k->640k,
 	 * the next section from 1mb->appropriate_mem_k
 	 */
-	sanitize_e820_map(boot_params.e820_map, &boot_params.e820_entries);
+	new_nr = boot_params.e820_entries;
+	sanitize_e820_map(boot_params.e820_map,
+			ARRAY_SIZE(boot_params.e820_map),
+			&new_nr);
+	boot_params.e820_entries = new_nr;
 	if (copy_e820_map(boot_params.e820_map, boot_params.e820_entries)
 	    < 0) {
 		unsigned long mem_size;
@@ -179,8 +184,8 @@ char * __init machine_specific_memory_setup(void)
 		}
 
 		e820.nr_map = 0;
-		add_memory_region(0, LOWMEMSIZE(), E820_RAM);
-		add_memory_region(HIGH_MEMORY, mem_size << 10, E820_RAM);
+		e820_add_region(0, LOWMEMSIZE(), E820_RAM);
+		e820_add_region(HIGH_MEMORY, mem_size << 10, E820_RAM);
   	}
 	return who;
 }
