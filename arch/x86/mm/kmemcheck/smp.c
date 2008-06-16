@@ -5,6 +5,7 @@
 #include <mach_ipi.h>
 
 #include "smp.h"
+#include <asm/irq_vectors.h>
 
 static spinlock_t nmi_spinlock;
 
