@@ -7,7 +7,11 @@
 #include <linux/module.h>
 #include <linux/pm.h>
 #include <asm/system.h>
+#include <asm/processor.h>
 #include <linux/clockchips.h>
+
+unsigned long idle_nomwait;
+EXPORT_SYMBOL(idle_nomwait);
 
 struct kmem_cache *task_xstate_cachep;
 
@@ -328,6 +332,16 @@ static int __init idle_setup(char *str)
 		force_mwait = 1;
 	else if (!strcmp(str, "halt"))
 		pm_idle = default_idle;
+	else if (!strcmp(str, "nomwait")) {
+		/*
+		 * If the boot option of "idle=nomwait" is added,
+		 * it means that mwait will be disabled for CPU C2/C3
+		 * states. In such case it won't touch the variable
+		 * of boot_option_idle_override.
+		 */
+		idle_nomwait = 1;
+		return 0;
+	}
 	else
 		return -1;
 
