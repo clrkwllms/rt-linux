@@ -6,6 +6,7 @@
 #include <linux/sched.h>
 #include <linux/module.h>
 #include <linux/pm.h>
+#include <asm/system.h>
 #include <linux/clockchips.h>
 
 struct kmem_cache *task_xstate_cachep;
@@ -325,6 +326,8 @@ static int __init idle_setup(char *str)
 		pm_idle = poll_idle;
 	} else if (!strcmp(str, "mwait"))
 		force_mwait = 1;
+	else if (!strcmp(str, "halt"))
+		pm_idle = default_idle;
 	else
 		return -1;
 
