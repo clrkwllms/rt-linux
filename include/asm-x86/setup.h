@@ -8,7 +8,6 @@
 /* Interrupt control for vSMPowered x86_64 systems */
 void vsmp_init(void);
 
-char *machine_specific_memory_setup(void);
 #ifndef CONFIG_PARAVIRT
 #define paravirt_post_allocator_init()	do {} while (0)
 #endif
@@ -50,19 +49,10 @@ extern struct boot_params boot_params;
  */
 #define LOWMEMSIZE()	(0x9f000)
 
-struct e820entry;
+void __init i386_start_kernel(void);
 
-char * __init machine_specific_memory_setup(void);
-char *memory_setup(void);
-
-int __init copy_e820_map(struct e820entry *biosmap, int nr_map);
-int __init sanitize_e820_map(struct e820entry *biosmap, char *pnr_map);
-void __init add_memory_region(unsigned long long start,
-			      unsigned long long size, int type);
-
+extern unsigned long init_pg_tables_start;
 extern unsigned long init_pg_tables_end;
-
-
 
 #endif /* __i386__ */
 #endif /* _SETUP */
