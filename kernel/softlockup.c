@@ -211,7 +211,7 @@ static int watchdog(void *__bind_cpu)
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
 	int this_cpu = (long)__bind_cpu;
 
-	sched_setscheduler(current, SCHED_FIFO, &param);
+	sched_setscheduler(current, SCHED_FIFO, &param, false);
 
 	/* initialize timestamp */
 	touch_softlockup_watchdog();

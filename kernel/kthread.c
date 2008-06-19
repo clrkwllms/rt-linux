@@ -104,7 +104,7 @@ static void create_kthread(struct kthread_create_info *create)
 		 * root may have changed our (kthreadd's) priority or CPU mask.
 		 * The kernel thread should not inherit these properties.
 		 */
-		sched_setscheduler(create->result, SCHED_NORMAL, &param);
+		sched_setscheduler(create->result, SCHED_NORMAL, &param, false);
 		set_user_nice(create->result, KTHREAD_NICE_LEVEL);
 		set_cpus_allowed(create->result, CPU_MASK_ALL);
 	}

@@ -327,7 +327,8 @@ static ssize_t sysfs_test_command(struct sys_device *dev, const char *buf,
 	switch (op) {
 	case RTTEST_SCHEDOT:
 		schedpar.sched_priority = 0;
-		ret = sched_setscheduler(threads[tid], SCHED_NORMAL, &schedpar);
+		ret = sched_setscheduler(threads[tid], SCHED_NORMAL, &schedpar,
+					 true);
 		if (ret)
 			return ret;
 		set_user_nice(current, 0);
@@ -335,7 +336,8 @@ static ssize_t sysfs_test_command(struct sys_device *dev, const char *buf,
 
 	case RTTEST_SCHEDRT:
 		schedpar.sched_priority = dat;
-		ret = sched_setscheduler(threads[tid], SCHED_FIFO, &schedpar);
+		ret = sched_setscheduler(threads[tid], SCHED_FIFO, &schedpar,
+					 true);
 		if (ret)
 			return ret;
 		break;

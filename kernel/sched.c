@@ -4749,11 +4749,12 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
  * @p: the task in question.
  * @policy: new policy.
  * @param: structure containing the new RT priority.
+ * @user: do checks to ensure this thread has permission
  *
  * NOTE that the task may be already dead.
  */
 int sched_setscheduler(struct task_struct *p, int policy,
-		       struct sched_param *param)
+		       struct sched_param *param, bool user)
 {
 	int retval, oldprio, oldpolicy = -1, on_rq, running;
 	unsigned long flags;
@@ -4785,7 +4786,7 @@ recheck:
 	/*
 	 * Allow unprivileged RT tasks to decrease priority:
 	 */
-	if (!capable(CAP_SYS_NICE)) {
+	if (user && !capable(CAP_SYS_NICE)) {
 		if (rt_policy(policy)) {
 			unsigned long rlim_rtprio;
 
@@ -4821,7 +4822,8 @@ recheck:
 	 * Do not allow realtime tasks into groups that have no runtime
 	 * assigned.
 	 */
-	if (rt_policy(policy) && task_group(p)->rt_bandwidth.rt_runtime == 0)
+	if (user
+	    && rt_policy(policy) && task_group(p)->rt_bandwidth.rt_runtime == 0)
 		return -EPERM;
 #endif
 
@@ -4888,7 +4890,7 @@ do_sched_setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 	retval = -ESRCH;
 	p = find_process_by_pid(pid);
 	if (p != NULL)
-		retval = sched_setscheduler(p, policy, &lparam);
+		retval = sched_setscheduler(p, policy, &lparam, true);
 	rcu_read_unlock();
 
 	return retval;

@@ -287,7 +287,7 @@ static int ucb1400_ts_thread(void *_ucb)
 	int valid = 0;
 	struct sched_param param = { .sched_priority = 1 };
 
-	sched_setscheduler(tsk, SCHED_FIFO, &param);
+	sched_setscheduler(tsk, SCHED_FIFO, &param, false);
 
 	set_freezable();
 	while (!kthread_should_stop()) {
