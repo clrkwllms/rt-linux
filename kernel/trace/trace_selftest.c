@@ -421,7 +421,7 @@ static int trace_wakeup_test_thread(void *data)
 	struct sched_param param = { .sched_priority = 5 };
 	struct completion *x = data;
 
-	sched_setscheduler(current, SCHED_FIFO, &param);
+	sched_setscheduler(current, SCHED_FIFO, &param, false);
 
 	/* Make it know we have a new prio */
 	complete(x);
