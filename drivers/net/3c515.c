@@ -574,7 +574,12 @@ static int corkscrew_setup(struct net_device *dev, int ioaddr,
 
 #ifdef __ISAPNP__
 	if (idev) {
+#ifdef __ISAPNP__
 		irq = pnp_irq(idev, 0);
+#else
+		/* Can not happen - in the !PNP case we always pass in NULL */
+		BUG_ON(1);
+#endif
 		vp->dev = &idev->dev;
 	} else {
 		irq = inw(ioaddr + 0x2002) & 15;
