@@ -235,6 +235,7 @@ config DVB_USB_OPERA1
 config DVB_USB_AF9005
 	tristate "Afatech AF9005 DVB-T USB1.1 support"
 	depends on DVB_USB && EXPERIMENTAL
+	depends on 0
 	select MEDIA_TUNER_MT2060 if !DVB_FE_CUSTOMISE
 	select MEDIA_TUNER_QT1010 if !DVB_FE_CUSTOMISE
 	help
