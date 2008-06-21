@@ -367,13 +367,11 @@ void __init setup_arch(char **cmdline_p)
 	kvmclock_init();
 #endif
 
-#ifdef CONFIG_ACPI
 	/*
 	 * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
 	 * Call this early for SRAT node setup.
 	 */
 	acpi_boot_table_init();
-#endif
 
 	/* How many end-of-memory variables you have, grandma! */
 	max_low_pfn = end_pfn;
@@ -444,12 +442,10 @@ void __init setup_arch(char **cmdline_p)
 
 	early_quirks();
 
-#ifdef CONFIG_ACPI
 	/*
 	 * Read APIC and some other early information from ACPI tables.
 	 */
 	acpi_boot_init();
-#endif
 
 	init_cpu_to_node();
 
