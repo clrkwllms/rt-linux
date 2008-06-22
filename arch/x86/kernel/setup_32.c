@@ -206,7 +206,6 @@ struct ist_info ist_info;
 EXPORT_SYMBOL(ist_info);
 #endif
 
-extern void early_cpu_init(void);
 extern int root_mountflags;
 
 unsigned long saved_video_mode;
@@ -605,12 +604,6 @@ static void set_mca_bus(int x)
 #else
 static void set_mca_bus(int x) { }
 #endif
-
-/* Overridden in paravirt.c if CONFIG_PARAVIRT */
-char * __init __attribute__((weak)) memory_setup(void)
-{
-	return machine_specific_memory_setup();
-}
 
 /*
  * Determine if we were loaded by an EFI loader.  If so, then we have also been
