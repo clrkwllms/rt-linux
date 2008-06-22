@@ -3670,7 +3670,7 @@ static void __init sort_node_map(void)
 }
 
 /* Find the lowest pfn for a node */
-unsigned long __init find_min_pfn_for_node(unsigned long nid)
+unsigned long __init find_min_pfn_for_node(int nid)
 {
 	int i;
 	unsigned long min_pfn = ULONG_MAX;
@@ -3681,7 +3681,7 @@ unsigned long __init find_min_pfn_for_node(unsigned long nid)
 
 	if (min_pfn == ULONG_MAX) {
 		printk(KERN_WARNING
-			"Could not find start_pfn for node %lu\n", nid);
+			"Could not find start_pfn for node %d\n", nid);
 		return 0;
 	}
 
