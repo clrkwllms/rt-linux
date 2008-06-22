@@ -154,6 +154,33 @@ static inline void copy_edd(void)
 }
 #endif
 
+void __init reserve_initrd(void)
+{
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (boot_params.hdr.type_of_loader && boot_params.hdr.ramdisk_image) {
+		unsigned long ramdisk_image = boot_params.hdr.ramdisk_image;
+		unsigned long ramdisk_size  = boot_params.hdr.ramdisk_size;
+		unsigned long ramdisk_end   = ramdisk_image + ramdisk_size;
+		unsigned long end_of_mem    = end_pfn << PAGE_SHIFT;
+
+		if (ramdisk_end <= end_of_mem) {
+			/*
+			 * don't need to reserve again, already reserved early
+			 * in x86_64_start_kernel, and early_res_to_bootmem
+			 * will convert that to reserved in bootmem
+			 */
+			initrd_start = ramdisk_image + PAGE_OFFSET;
+			initrd_end = initrd_start+ramdisk_size;
+		} else {
+			free_early(ramdisk_image, ramdisk_end);
+			printk(KERN_ERR "initrd extends beyond end of memory "
+			       "(0x%08lx > 0x%08lx)\ndisabling initrd\n",
+			       ramdisk_end, end_of_mem);
+			initrd_start = 0;
+		}
+	}
+#endif
+}
 /*
  * setup_arch - architecture-specific boot-time initializations
  *
@@ -246,6 +273,8 @@ void __init setup_arch(char **cmdline_p)
 		end_pfn = e820_end_of_ram();
 	}
 
+	reserve_initrd();
+
 	num_physpages = end_pfn;
 
 	check_efer();
@@ -301,30 +330,6 @@ void __init setup_arch(char **cmdline_p)
 	* Find and reserve possible boot-time SMP configuration:
 	*/
 	find_smp_config();
-#endif
-#ifdef CONFIG_BLK_DEV_INITRD
-	if (boot_params.hdr.type_of_loader && boot_params.hdr.ramdisk_image) {
-		unsigned long ramdisk_image = boot_params.hdr.ramdisk_image;
-		unsigned long ramdisk_size  = boot_params.hdr.ramdisk_size;
-		unsigned long ramdisk_end   = ramdisk_image + ramdisk_size;
-		unsigned long end_of_mem    = end_pfn << PAGE_SHIFT;
-
-		if (ramdisk_end <= end_of_mem) {
-			/*
-			 * don't need to reserve again, already reserved early
-			 * in x86_64_start_kernel, and early_res_to_bootmem
-			 * convert that to reserved in bootmem
-			 */
-			initrd_start = ramdisk_image + PAGE_OFFSET;
-			initrd_end = initrd_start+ramdisk_size;
-		} else {
-			free_bootmem(ramdisk_image, ramdisk_size);
-			printk(KERN_ERR "initrd extends beyond end of memory "
-			       "(0x%08lx > 0x%08lx)\ndisabling initrd\n",
-			       ramdisk_end, end_of_mem);
-			initrd_start = 0;
-		}
-	}
 #endif
 	reserve_crashkernel();
 
