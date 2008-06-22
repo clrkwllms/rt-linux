@@ -196,6 +196,15 @@ void local_bh_enable_ip(unsigned long ip)
 }
 EXPORT_SYMBOL(local_bh_enable_ip);
 
+#ifdef CONFIG_SOFTLOCKUP_SOFTIRQ_DEBUG
+static DEFINE_PER_CPU(void *, last_softirq_action);
+
+void *get_last_softirq_action(int cpu)
+{
+	return per_cpu(last_softirq_action, cpu);
+}
+#endif
+
 /*
  * We restart softirq processing MAX_SOFTIRQ_RESTART times,
  * and we fall back to softirqd after that.
@@ -231,6 +240,10 @@ restart:
 
 	do {
 		if (pending & 1) {
+#ifdef CONFIG_SOFTLOCKUP_SOFTIRQ_DEBUG
+			per_cpu(last_softirq_action, cpu) = h->action;
+#endif
+
 			h->action(h);
 			rcu_bh_qsctr_inc(cpu);
 		}

@@ -10,8 +10,10 @@
 #include <linux/cpu.h>
 #include <linux/nmi.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/freezer.h>
+#include <linux/kallsyms.h>
 #include <linux/kthread.h>
 #include <linux/notifier.h>
 #include <linux/module.h>
@@ -144,6 +146,10 @@ void softlockup_tick(void)
 			this_cpu, now - touch_timestamp,
 			current->comm, task_pid_nr(current));
 	print_modules();
+#ifdef CONFIG_SOFTLOCKUP_SOFTIRQ_DEBUG
+	print_symbol(KERN_ERR "Last softirq was %s\n",
+		(unsigned long) get_last_softirq_action(this_cpu));
+#endif
 	if (regs)
 		show_regs(regs);
 	else
