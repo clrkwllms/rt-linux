@@ -284,12 +284,6 @@ static inline void __init reserve_crashkernel(void)
 {}
 #endif
 
-/* Overridden in paravirt.c if CONFIG_PARAVIRT */
-void __attribute__((weak)) __init memory_setup(void)
-{
-       machine_specific_memory_setup();
-}
-
 /* Current gdt points %fs at the "master" per-cpu area: after this,
  * it's on the real one. */
 void switch_to_new_gdt(void)
@@ -333,7 +327,7 @@ void __init setup_arch(char **cmdline_p)
 
 	ARCH_SETUP
 
-	memory_setup();
+	setup_memory_map();
 	copy_edd();
 
 	if (!boot_params.hdr.root_flags)

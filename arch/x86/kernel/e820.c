@@ -359,6 +359,26 @@ static struct e820entry new_bios[E820_X_MAX] __initdata;
 	return 0;
 }
 
+static int __init __copy_e820_map(struct e820entry *biosmap, int nr_map)
+{
+	while (nr_map) {
+		u64 start = biosmap->addr;
+		u64 size = biosmap->size;
+		u64 end = start + size;
+		u32 type = biosmap->type;
+
+		/* Overflow in 64 bits? Ignore the memory map. */
+		if (start > end)
+			return -1;
+
+		e820_add_region(start, size, type);
+
+		biosmap++;
+		nr_map--;
+	}
+	return 0;
+}
+
 /*
  * Copy the BIOS e820 map into a safe place.
  *
@@ -374,19 +394,7 @@ int __init copy_e820_map(struct e820entry *biosmap, int nr_map)
 	if (nr_map < 2)
 		return -1;
 
-	do {
-		u64 start = biosmap->addr;
-		u64 size = biosmap->size;
-		u64 end = start + size;
-		u32 type = biosmap->type;
-
-		/* Overflow in 64 bits? Ignore the memory map. */
-		if (start > end)
-			return -1;
-
-		e820_add_region(start, size, type);
-	} while (biosmap++, --nr_map);
-	return 0;
+	return __copy_e820_map(biosmap, nr_map);
 }
 
 u64 __init e820_update_range(u64 start, u64 size, unsigned old_type,
@@ -494,6 +502,31 @@ __init void e820_setup_gap(void)
 	printk(KERN_INFO
 	       "Allocating PCI resources starting at %lx (gap: %lx:%lx)\n",
 	       pci_mem_start, gapstart, gapsize);
+}
+
+/**
+ * Because of the size limitation of struct boot_params, only first
+ * 128 E820 memory entries are passed to kernel via
+ * boot_params.e820_map, others are passed via SETUP_E820_EXT node of
+ * linked list of struct setup_data, which is parsed here.
+ */
+void __init parse_e820_ext(struct setup_data *sdata, unsigned long pa_data)
+{
+	u32 map_len;
+	int entries;
+	struct e820entry *extmap;
+
+	entries = sdata->len / sizeof(struct e820entry);
+	map_len = sdata->len + sizeof(struct setup_data);
+	if (map_len > PAGE_SIZE)
+		sdata = early_ioremap(pa_data, map_len);
+	extmap = (struct e820entry *)(sdata->data);
+	__copy_e820_map(extmap, entries);
+	sanitize_e820_map(e820.map, ARRAY_SIZE(e820.map), &e820.nr_map);
+	if (map_len > PAGE_SIZE)
+		early_iounmap(sdata, map_len);
+	printk(KERN_INFO "extended physical RAM map:\n");
+	e820_print_map("extended");
 }
 
 #if defined(CONFIG_X86_64) || \
@@ -965,3 +998,107 @@ void __init finish_e820_parsing(void)
 		e820_print_map("user");
 	}
 }
+
+/*
+ * Mark e820 reserved areas as busy for the resource manager.
+ */
+void __init e820_reserve_resources(void)
+{
+	int i;
+	struct resource *res;
+
+	res = alloc_bootmem_low(sizeof(struct resource) * e820.nr_map);
+	for (i = 0; i < e820.nr_map; i++) {
+		switch (e820.map[i].type) {
+		case E820_RAM:	res->name = "System RAM"; break;
+		case E820_ACPI:	res->name = "ACPI Tables"; break;
+		case E820_NVS:	res->name = "ACPI Non-volatile Storage"; break;
+		default:	res->name = "reserved";
+		}
+		res->start = e820.map[i].addr;
+		res->end = res->start + e820.map[i].size - 1;
+#ifndef CONFIG_RESOURCES_64BIT
+		if (res->end > 0x100000000ULL) {
+			res++;
+			continue;
+		}
+#endif
+		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+		insert_resource(&iomem_resource, res);
+		res++;
+	}
+}
+
+char *__init __attribute__((weak)) machine_specific_memory_setup(void)
+{
+	char *who = "BIOS-e820";
+	int new_nr;
+	/*
+	 * Try to copy the BIOS-supplied E820-map.
+	 *
+	 * Otherwise fake a memory map; one section from 0k->640k,
+	 * the next section from 1mb->appropriate_mem_k
+	 */
+	new_nr = boot_params.e820_entries;
+	sanitize_e820_map(boot_params.e820_map,
+			ARRAY_SIZE(boot_params.e820_map),
+			&new_nr);
+	boot_params.e820_entries = new_nr;
+	if (copy_e820_map(boot_params.e820_map, boot_params.e820_entries) < 0) {
+#ifdef CONFIG_X86_64
+		early_panic("Cannot find a valid memory map");
+#else
+		unsigned long mem_size;
+
+		/* compare results from other methods and take the greater */
+		if (boot_params.alt_mem_k
+		    < boot_params.screen_info.ext_mem_k) {
+			mem_size = boot_params.screen_info.ext_mem_k;
+			who = "BIOS-88";
+		} else {
+			mem_size = boot_params.alt_mem_k;
+			who = "BIOS-e801";
+		}
+
+		e820.nr_map = 0;
+		e820_add_region(0, LOWMEMSIZE(), E820_RAM);
+		e820_add_region(HIGH_MEMORY, mem_size << 10, E820_RAM);
+#endif
+	}
+
+	/* In case someone cares... */
+	return who;
+}
+
+/* Overridden in paravirt.c if CONFIG_PARAVIRT */
+char * __init __attribute__((weak)) memory_setup(void)
+{
+	return machine_specific_memory_setup();
+}
+
+void __init setup_memory_map(void)
+{
+	printk(KERN_INFO "BIOS-provided physical RAM map:\n");
+	e820_print_map(memory_setup());
+}
+
+#ifdef CONFIG_X86_64
+int __init arch_get_ram_range(int slot, u64 *addr, u64 *size)
+{
+	int i;
+
+	if (slot < 0 || slot >= e820.nr_map)
+		return -1;
+	for (i = slot; i < e820.nr_map; i++) {
+		if (e820.map[i].type != E820_RAM)
+			continue;
+		break;
+	}
+	if (i == e820.nr_map || e820.map[i].addr > (max_pfn << PAGE_SHIFT))
+		return -1;
+	*addr = e820.map[i].addr;
+	*size = min_t(u64, e820.map[i].size + e820.map[i].addr,
+		max_pfn << PAGE_SHIFT) - *addr;
+	return i + 1;
+}
+#endif
