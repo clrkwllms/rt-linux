@@ -154,7 +154,7 @@ static inline void copy_edd(void)
 }
 #endif
 
-void __init reserve_initrd(void)
+static void __init reserve_initrd(void)
 {
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (boot_params.hdr.type_of_loader && boot_params.hdr.ramdisk_image) {
