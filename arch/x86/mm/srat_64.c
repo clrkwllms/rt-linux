@@ -376,7 +376,7 @@ int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 		if (node == NUMA_NO_NODE)
 			continue;
 		if (!node_isset(node, node_possible_map))
-			numa_set_node(i, NUMA_NO_NODE);
+			numa_clear_node(i);
 	}
 	numa_init_array();
 	return 0;
@@ -495,6 +495,7 @@ int __node_distance(int a, int b)
 
 EXPORT_SYMBOL(__node_distance);
 
+#if defined(CONFIG_MEMORY_HOTPLUG_SPARSE) || defined(CONFIG_ACPI_HOTPLUG_MEMORY)
 int memory_add_physaddr_to_nid(u64 start)
 {
 	int i, ret = 0;
@@ -506,4 +507,4 @@ int memory_add_physaddr_to_nid(u64 start)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(memory_add_physaddr_to_nid);
-
+#endif
