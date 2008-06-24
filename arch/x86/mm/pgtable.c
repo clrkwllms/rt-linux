@@ -2,6 +2,7 @@
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/tlb.h>
+#include <asm/fixmap.h>
 
 pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
@@ -255,7 +256,7 @@ int ptep_test_and_clear_young(struct vm_area_struct *vma,
 
 	if (pte_young(*ptep))
 		ret = test_and_clear_bit(_PAGE_BIT_ACCESSED,
-					 &ptep->pte);
+					 (unsigned long *) &ptep->pte);
 
 	if (ret)
 		pte_update(vma->vm_mm, addr, ptep);
@@ -273,4 +274,23 @@ int ptep_clear_flush_young(struct vm_area_struct *vma,
 		flush_tlb_page(vma, address);
 
 	return young;
+}
+
+int fixmaps_set;
+
+void __native_set_fixmap(enum fixed_addresses idx, pte_t pte)
+{
+	unsigned long address = __fix_to_virt(idx);
+
+	if (idx >= __end_of_fixed_addresses) {
+		BUG();
+		return;
+	}
+	set_pte_vaddr(address, pte);
+	fixmaps_set++;
+}
+
+void native_set_fixmap(enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
+{
+	__native_set_fixmap(idx, pfn_pte(phys >> PAGE_SHIFT, flags));
 }
