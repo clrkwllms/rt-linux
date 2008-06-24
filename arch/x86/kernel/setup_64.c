@@ -254,6 +254,9 @@ void __init setup_arch(char **cmdline_p)
 	insert_resource(&iomem_resource, &data_resource);
 	insert_resource(&iomem_resource, &bss_resource);
 
+	if (efi_enabled)
+		efi_init();
+
 	early_gart_iommu_check();
 
 	e820_register_active_regions(0, 0, -1UL);
@@ -280,8 +283,6 @@ void __init setup_arch(char **cmdline_p)
 	check_efer();
 
 	max_pfn_mapped = init_memory_mapping(0, (end_pfn << PAGE_SHIFT));
-	if (efi_enabled)
-		efi_init();
 
 	vsmp_init();
 
