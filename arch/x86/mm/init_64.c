@@ -240,6 +240,7 @@ void __set_fixmap(enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 
 static unsigned long __initdata table_start;
 static unsigned long __meminitdata table_end;
+static unsigned long __meminitdata table_top;
 
 static __meminit void *alloc_low_page(unsigned long *phys)
 {
@@ -253,7 +254,7 @@ static __meminit void *alloc_low_page(unsigned long *phys)
 		return adr;
 	}
 
-	if (pfn >= end_pfn)
+	if (pfn >= table_top)
 		panic("alloc_low_page: ran out of memory");
 
 	adr = early_ioremap(pfn * PAGE_SIZE, PAGE_SIZE);
@@ -437,10 +438,10 @@ static void __init find_early_table_space(unsigned long end)
 
 	table_start >>= PAGE_SHIFT;
 	table_end = table_start;
+	table_top = table_start + (tables >> PAGE_SHIFT);
 
-	early_printk("kernel direct mapping tables up to %lx @ %lx-%lx\n",
-		end, table_start << PAGE_SHIFT,
-		(table_start << PAGE_SHIFT) + tables);
+	printk(KERN_DEBUG "kernel direct mapping tables up to %lx @ %lx-%lx\n",
+		end, table_start << PAGE_SHIFT, table_top << PAGE_SHIFT);
 }
 
 static void __init init_gbpages(void)
