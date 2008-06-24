@@ -298,7 +298,7 @@ struct add_highpages_data {
 	unsigned long end_pfn;
 };
 
-static void __init add_highpages_work_fn(unsigned long start_pfn,
+static int __init add_highpages_work_fn(unsigned long start_pfn,
 					 unsigned long end_pfn, void *datax)
 {
 	int node_pfn;
@@ -311,7 +311,7 @@ static void __init add_highpages_work_fn(unsigned long start_pfn,
 	final_start_pfn = max(start_pfn, data->start_pfn);
 	final_end_pfn = min(end_pfn, data->end_pfn);
 	if (final_start_pfn >= final_end_pfn)
-		return;
+		return 0;
 
 	for (node_pfn = final_start_pfn; node_pfn < final_end_pfn;
 	     node_pfn++) {
@@ -320,6 +320,8 @@ static void __init add_highpages_work_fn(unsigned long start_pfn,
 		page = pfn_to_page(node_pfn);
 		add_one_highpage_init(page, node_pfn);
 	}
+
+	return 0;
 
 }
 
@@ -537,6 +539,172 @@ static void __init set_nx(void)
 	}
 }
 #endif
+
+/* user-defined highmem size */
+static unsigned int highmem_pages = -1;
+
+/*
+ * highmem=size forces highmem to be exactly 'size' bytes.
+ * This works even on boxes that have no highmem otherwise.
+ * This also works to reduce highmem size on bigger boxes.
+ */
+static int __init parse_highmem(char *arg)
+{
+	if (!arg)
+		return -EINVAL;
+
+	highmem_pages = memparse(arg, &arg) >> PAGE_SHIFT;
+	return 0;
+}
+early_param("highmem", parse_highmem);
+
+/*
+ * Determine low and high memory ranges:
+ */
+void __init find_low_pfn_range(void)
+{
+	/* it could update max_pfn */
+
+	/* max_low_pfn is 0, we already have early_res support */
+
+	max_low_pfn = max_pfn;
+	if (max_low_pfn > MAXMEM_PFN) {
+		if (highmem_pages == -1)
+			highmem_pages = max_pfn - MAXMEM_PFN;
+		if (highmem_pages + MAXMEM_PFN < max_pfn)
+			max_pfn = MAXMEM_PFN + highmem_pages;
+		if (highmem_pages + MAXMEM_PFN > max_pfn) {
+			printk(KERN_WARNING "only %luMB highmem pages "
+				"available, ignoring highmem size of %uMB.\n",
+				pages_to_mb(max_pfn - MAXMEM_PFN),
+				pages_to_mb(highmem_pages));
+			highmem_pages = 0;
+		}
+		max_low_pfn = MAXMEM_PFN;
+#ifndef CONFIG_HIGHMEM
+		/* Maximum memory usable is what is directly addressable */
+		printk(KERN_WARNING "Warning only %ldMB will be used.\n",
+					MAXMEM>>20);
+		if (max_pfn > MAX_NONPAE_PFN)
+			printk(KERN_WARNING
+				 "Use a HIGHMEM64G enabled kernel.\n");
+		else
+			printk(KERN_WARNING "Use a HIGHMEM enabled kernel.\n");
+		max_pfn = MAXMEM_PFN;
+#else /* !CONFIG_HIGHMEM */
+#ifndef CONFIG_HIGHMEM64G
+		if (max_pfn > MAX_NONPAE_PFN) {
+			max_pfn = MAX_NONPAE_PFN;
+			printk(KERN_WARNING "Warning only 4GB will be used."
+				"Use a HIGHMEM64G enabled kernel.\n");
+		}
+#endif /* !CONFIG_HIGHMEM64G */
+#endif /* !CONFIG_HIGHMEM */
+	} else {
+		if (highmem_pages == -1)
+			highmem_pages = 0;
+#ifdef CONFIG_HIGHMEM
+		if (highmem_pages >= max_pfn) {
+			printk(KERN_ERR "highmem size specified (%uMB) is "
+				"bigger than pages available (%luMB)!.\n",
+				pages_to_mb(highmem_pages),
+				pages_to_mb(max_pfn));
+			highmem_pages = 0;
+		}
+		if (highmem_pages) {
+			if (max_low_pfn - highmem_pages <
+			    64*1024*1024/PAGE_SIZE){
+				printk(KERN_ERR "highmem size %uMB results in "
+				"smaller than 64MB lowmem, ignoring it.\n"
+					, pages_to_mb(highmem_pages));
+				highmem_pages = 0;
+			}
+			max_low_pfn -= highmem_pages;
+		}
+#else
+		if (highmem_pages)
+			printk(KERN_ERR "ignoring highmem size on non-highmem"
+					" kernel!\n");
+#endif
+	}
+}
+
+#ifndef CONFIG_NEED_MULTIPLE_NODES
+void __init initmem_init(unsigned long start_pfn,
+				  unsigned long end_pfn)
+{
+#ifdef CONFIG_HIGHMEM
+	highstart_pfn = highend_pfn = max_pfn;
+	if (max_pfn > max_low_pfn)
+		highstart_pfn = max_low_pfn;
+	memory_present(0, 0, highend_pfn);
+	printk(KERN_NOTICE "%ldMB HIGHMEM available.\n",
+		pages_to_mb(highend_pfn - highstart_pfn));
+	num_physpages = highend_pfn;
+	high_memory = (void *) __va(highstart_pfn * PAGE_SIZE - 1) + 1;
+#else
+	memory_present(0, 0, max_low_pfn);
+	num_physpages = max_low_pfn;
+	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE - 1) + 1;
+#endif
+#ifdef CONFIG_FLATMEM
+	max_mapnr = num_physpages;
+#endif
+	printk(KERN_NOTICE "%ldMB LOWMEM available.\n",
+			pages_to_mb(max_low_pfn));
+
+	setup_bootmem_allocator();
+}
+
+void __init zone_sizes_init(void)
+{
+	unsigned long max_zone_pfns[MAX_NR_ZONES];
+	memset(max_zone_pfns, 0, sizeof(max_zone_pfns));
+	max_zone_pfns[ZONE_DMA] =
+		virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
+	max_zone_pfns[ZONE_NORMAL] = max_low_pfn;
+	remove_all_active_ranges();
+#ifdef CONFIG_HIGHMEM
+	max_zone_pfns[ZONE_HIGHMEM] = highend_pfn;
+	e820_register_active_regions(0, 0, highend_pfn);
+#else
+	e820_register_active_regions(0, 0, max_low_pfn);
+#endif
+
+	free_area_init_nodes(max_zone_pfns);
+}
+#endif /* !CONFIG_NEED_MULTIPLE_NODES */
+
+void __init setup_bootmem_allocator(void)
+{
+	int i;
+	unsigned long bootmap_size, bootmap;
+	/*
+	 * Initialize the boot-time allocator (with low memory only):
+	 */
+	bootmap_size = bootmem_bootmap_pages(max_low_pfn)<<PAGE_SHIFT;
+	bootmap = find_e820_area(min_low_pfn<<PAGE_SHIFT,
+				 max_pfn_mapped<<PAGE_SHIFT, bootmap_size,
+				 PAGE_SIZE);
+	if (bootmap == -1L)
+		panic("Cannot find bootmem map of size %ld\n", bootmap_size);
+	reserve_early(bootmap, bootmap + bootmap_size, "BOOTMAP");
+
+	/* don't touch min_low_pfn */
+	bootmap_size = init_bootmem_node(NODE_DATA(0), bootmap >> PAGE_SHIFT,
+					 min_low_pfn, max_low_pfn);
+	printk(KERN_INFO "  mapped low ram: 0 - %08lx\n",
+		 max_pfn_mapped<<PAGE_SHIFT);
+	printk(KERN_INFO "  low ram: %08lx - %08lx\n",
+		 min_low_pfn<<PAGE_SHIFT, max_low_pfn<<PAGE_SHIFT);
+	printk(KERN_INFO "  bootmap %08lx - %08lx\n",
+		 bootmap, bootmap + bootmap_size);
+	for_each_online_node(i)
+		free_bootmem_with_active_regions(i, max_low_pfn);
+	early_res_to_bootmem(0, max_low_pfn<<PAGE_SHIFT);
+
+}
+
 
 /*
  * paging_init() sets up the page tables - note that the first 8MB are
