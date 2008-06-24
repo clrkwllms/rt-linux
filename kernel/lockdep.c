@@ -1458,7 +1458,14 @@ out_bug:
 }
 
 unsigned long nr_lock_chains;
-static struct lock_chain lock_chains[MAX_LOCKDEP_CHAINS];
+struct lock_chain lock_chains[MAX_LOCKDEP_CHAINS];
+int nr_chain_hlocks;
+static u16 chain_hlocks[MAX_LOCKDEP_CHAIN_HLOCKS];
+
+struct lock_class *lock_chain_get_class(struct lock_chain *chain, int i)
+{
+	return lock_classes + chain_hlocks[chain->base + i];
+}
 
 /*
  * Look up a dependency chain. If the key is not present yet then
@@ -1466,10 +1473,15 @@ static struct lock_chain lock_chains[MAX_LOCKDEP_CHAINS];
  * validated. If the key is already hashed, return 0.
  * (On return with 1 graph_lock is held.)
  */
-static inline int lookup_chain_cache(u64 chain_key, struct lock_class *class)
+static inline int lookup_chain_cache(struct task_struct *curr,
+				     struct held_lock *hlock,
+				     u64 chain_key)
 {
+	struct lock_class *class = hlock->class;
 	struct list_head *hash_head = chainhashentry(chain_key);
 	struct lock_chain *chain;
+	struct held_lock *hlock_curr, *hlock_next;
+	int i, j, n, cn;
 
 	if (DEBUG_LOCKS_WARN_ON(!irqs_disabled()))
 		return 0;
@@ -1517,6 +1529,32 @@ cache_hit:
 	}
 	chain = lock_chains + nr_lock_chains++;
 	chain->chain_key = chain_key;
+	chain->irq_context = hlock->irq_context;
+	/* Find the first held_lock of current chain */
+	hlock_next = hlock;
+	for (i = curr->lockdep_depth - 1; i >= 0; i--) {
+		hlock_curr = curr->held_locks + i;
+		if (hlock_curr->irq_context != hlock_next->irq_context)
+			break;
+		hlock_next = hlock;
+	}
+	i++;
+	chain->depth = curr->lockdep_depth + 1 - i;
+	cn = nr_chain_hlocks;
+	while (cn + chain->depth <= MAX_LOCKDEP_CHAIN_HLOCKS) {
+		n = cmpxchg(&nr_chain_hlocks, cn, cn + chain->depth);
+		if (n == cn)
+			break;
+		cn = n;
+	}
+	if (likely(cn + chain->depth <= MAX_LOCKDEP_CHAIN_HLOCKS)) {
+		chain->base = cn;
+		for (j = 0; j < chain->depth - 1; j++, i++) {
+			int lock_id = curr->held_locks[i].class - lock_classes;
+			chain_hlocks[chain->base + j] = lock_id;
+		}
+		chain_hlocks[chain->base + j] = class - lock_classes;
+	}
 	list_add_tail_rcu(&chain->entry, hash_head);
 	debug_atomic_inc(&chain_lookup_misses);
 	inc_chains();
@@ -1538,7 +1576,7 @@ static int validate_chain(struct task_struct *curr, struct lockdep_map *lock,
 	 * graph_lock for us)
 	 */
 	if (!hlock->trylock && (hlock->check == 2) &&
-			lookup_chain_cache(chain_key, hlock->class)) {
+	    lookup_chain_cache(curr, hlock, chain_key)) {
 		/*
 		 * Check whether last held lock:
 		 *
