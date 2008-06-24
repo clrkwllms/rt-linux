@@ -290,10 +290,6 @@ void __init setup_arch(char **cmdline_p)
 
 	io_delay_init();
 
-#ifdef CONFIG_KVM_CLOCK
-	kvmclock_init();
-#endif
-
 	/*
 	 * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
 	 * Call this early for SRAT node setup.
@@ -336,6 +332,9 @@ void __init setup_arch(char **cmdline_p)
 
 	reserve_ibft_region();
 
+#ifdef CONFIG_KVM_CLOCK
+	kvmclock_init();
+#endif
 	paging_init();
 	map_vsyscall();
 
