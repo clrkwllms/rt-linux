@@ -403,6 +403,7 @@ static inline void check_geode_tsc_reliable(void) { }
 void __init tsc_init(void)
 {
 	int cpu;
+	u64 lpj;
 
 	if (!cpu_has_tsc || tsc_disabled > 0)
 		return;
@@ -414,6 +415,10 @@ void __init tsc_init(void)
 		mark_tsc_unstable("could not calculate TSC khz");
 		return;
 	}
+
+	lpj = ((u64)tsc_khz * 1000);
+	do_div(lpj, HZ);
+	lpj_tsc = lpj;
 
 	/* now allow native_sched_clock() to use rdtsc */
 	tsc_disabled = 0;
