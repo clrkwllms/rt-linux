@@ -2627,6 +2627,21 @@ struct module *__module_text_address(unsigned long addr)
 {
 	struct module *mod;
 
+	/*
+	 * shortcut for the architectures that have a well
+	 * defined start/end virtual address of modules:
+	 * we can decide something for sure isn't a module
+	 * without walking the potentially long module list.
+	 */
+#ifdef MODULES_VADDR
+	if (addr < MODULES_VADDR)
+		return NULL;
+#endif
+#ifdef MODULES_END
+	if (addr > MODULES_END)
+		return NULL;
+#endif
+
 	list_for_each_entry(mod, &modules, list)
 		if (within(addr, mod->module_init, mod->init_text_size)
 		    || within(addr, mod->module_core, mod->core_text_size))
