@@ -1363,6 +1363,62 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	0x2609, quirk_intel_pcie_pm);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	0x260a, quirk_intel_pcie_pm);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	0x260b, quirk_intel_pcie_pm);
 
+#ifdef CONFIG_X86_IO_APIC
+/*
+ * Boot interrupts on some chipsets cannot be turned off. For these chipsets,
+ * remap the original interrupt in the linux kernel to the boot interrupt, so
+ * that a PCI device's interrupt handler is installed on the boot interrupt
+ * line instead.
+ */
+static void quirk_reroute_to_boot_interrupts_intel(struct pci_dev *dev)
+{
+	if (noioapicquirk)
+		return;
+
+	dev->irq_reroute_variant = INTEL_IRQ_REROUTE_VARIANT;
+
+	printk(KERN_INFO "PCI quirk: reroute interrupts for 0x%04x:0x%04x\n",
+			dev->vendor, dev->device);
+	return;
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_1,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ESB2_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXH_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXH_1,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXHV,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80332_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80332_1,	quirk_reroute_to_boot_interrupts_intel);
+
+/*
+ * On some chipsets we can disable the generation of legacy INTx boot
+ * interrupts.
+ */
+
+/*
+ * IO-APIC1 on 6300ESB generates boot interrupts, see intel order no
+ * 300641-004US, section 5.7.3.
+ */
+#define INTEL_6300_IOAPIC_ABAR		0x40
+#define INTEL_6300_DISABLE_BOOT_IRQ	(1<<14)
+
+static void quirk_disable_intel_boot_interrupt(struct pci_dev *dev)
+{
+	u16 pci_config_word;
+
+	if (noioapicquirk)
+		return;
+
+	pci_read_config_word(dev, INTEL_6300_IOAPIC_ABAR, &pci_config_word);
+	pci_config_word |= INTEL_6300_DISABLE_BOOT_IRQ;
+	pci_write_config_word(dev, INTEL_6300_IOAPIC_ABAR, pci_config_word);
+
+	printk(KERN_INFO "disabled boot interrupt on device 0x%04x:0x%04x\n",
+		dev->vendor, dev->device);
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,   PCI_DEVICE_ID_INTEL_ESB_10, 	quirk_disable_intel_boot_interrupt);
+#endif /* CONFIG_X86_IO_APIC */
+
 /*
  * Toshiba TC86C001 IDE controller reports the standard 8-byte BAR0 size
  * but the PIO transfers won't work if BAR0 falls at the odd 8 bytes.
