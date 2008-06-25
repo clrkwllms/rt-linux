@@ -61,7 +61,7 @@
 #endif	
 
 #ifdef CONFIG_PARAVIRT
-ENTRY(native_usergs_sysret)
+ENTRY(native_usergs_sysret64)
 	swapgs
 	sysretq
 #endif /* CONFIG_PARAVIRT */
@@ -277,7 +277,7 @@ sysret_check:
 	RESTORE_ARGS 0,-ARG_SKIP,1
 	/*CFI_REGISTER	rflags,r11*/
 	movq	%gs:pda_oldrsp, %rsp
-	USERGS_SYSRET
+	USERGS_SYSRET64
 
 	CFI_RESTORE_STATE
 	/* Handle reschedules */
