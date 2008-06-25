@@ -44,6 +44,7 @@ enum {
 	CPU_DOTHAN_A1,
 	CPU_DOTHAN_A2,
 	CPU_DOTHAN_B0,
+	CPU_DOTHAN_C0,
 	CPU_MP4HT_D0,
 	CPU_MP4HT_E0,
 };
@@ -53,6 +54,7 @@ static const struct cpu_id cpu_ids[] = {
 	[CPU_DOTHAN_A1]	= { 6, 13, 1 },
 	[CPU_DOTHAN_A2]	= { 6, 13, 2 },
 	[CPU_DOTHAN_B0]	= { 6, 13, 6 },
+	[CPU_DOTHAN_C0]	= { 6, 13, 8 },
 	[CPU_MP4HT_D0]	= {15,  3, 4 },
 	[CPU_MP4HT_E0]	= {15,  4, 1 },
 };
@@ -194,6 +196,88 @@ static struct cpufreq_frequency_table banias_1700[] =
 };
 #undef OP
 
+
+#define OPEX(mhz, base, mva, mvb, mvc, mvd)                     \
+{                                                               \
+        .frequency = (mhz) * 1000,                              \
+        .index = (((mhz)/(base)) << 8) | ((mva - 700) / 16)     \
+}
+
+/* Intel Pentium M processor 730 / 1.60 GHz (Sonoma) */
+static struct cpufreq_frequency_table sonoma_1596[] =
+{
+        OPEX( 798, 133,  988,  988,  988,  988),
+        OPEX(1064, 133, 1116, 1111, 1084, 1079),
+        OPEX(1330, 133, 1244, 1233, 1180, 1169),
+        OPEX(1596, 133, 1356, 1356, 1260, 1260),
+        { .frequency = CPUFREQ_TABLE_END }
+};
+
+/* Intel Pentium M processor 740 / 1.73 GHz (Sonoma) */
+static struct cpufreq_frequency_table sonoma_1729[] =
+{
+        OPEX( 798, 133,  988,  988,  988,  988),
+        OPEX(1064, 133, 1100, 1093, 1068, 1066),
+        OPEX(1330, 133, 1212, 1198, 1148, 1143),
+        OPEX(1729, 133, 1356, 1356, 1260, 1260),
+        { .frequency = CPUFREQ_TABLE_END }
+};
+
+/* Intel Pentium M processor 750 / 1.86 GHz (Sonoma) */
+static struct cpufreq_frequency_table sonoma_1862[] =
+{
+        OPEX( 798, 133,  988,  988,  988,  988),
+        OPEX(1064, 133, 1084, 1080, 1068, 1056),
+        OPEX(1330, 133, 1180, 1172, 1132, 1124),
+        OPEX(1596, 133, 1276, 1264, 1196, 1192),
+        OPEX(1862, 133, 1356, 1356, 1260, 1260),
+        { .frequency = CPUFREQ_TABLE_END }
+};
+
+/* Intel Pentium M processor 760 / 2.00 GHz (Sonoma) */
+static struct cpufreq_frequency_table sonoma_1995[] =
+{
+        OPEX( 798, 133, 988, 988, 988, 988),
+        OPEX(1064, 133, 1084, 1070, 1052, 1048),
+        OPEX(1330, 133, 1164, 1152, 1116, 1109),
+        OPEX(1596, 133, 1244, 1233, 1180, 1169),
+        OPEX(1995, 133, 1356, 1356, 1260, 1260),
+        { .frequency = CPUFREQ_TABLE_END }
+};
+/* Intel Pentium M processor 770 / 2.13 GHz (Sonoma) */
+static struct cpufreq_frequency_table sonoma_2128[] =
+{
+        OPEX( 798, 133, 988, 988, 988, 988),
+        OPEX(1064, 133, 1068, 1065, 1052, 1042),
+        OPEX(1330, 133, 1148, 1142, 1100, 1097),
+        OPEX(1596, 133, 1228, 1218, 1164, 1151),
+        OPEX(1862, 133, 1308, 1295, 1212, 1206),
+        OPEX(2128, 133, 1372, 1372, 1260, 1260),
+        { .frequency = CPUFREQ_TABLE_END }
+};
+
+/* Intel Pentium M processor 780 / 2.26 GHz (Sonoma) */
+static struct cpufreq_frequency_table sonoma_2261[] =
+{
+        OPEX( 798, 133, 988, 988, 988, 988),
+        OPEX(1064, 133, 1068, 1064, 1052, 1037),
+        OPEX(1330, 133, 1148, 1139, 1100, 1087),
+        OPEX(1596, 133, 1228, 1215, 1148, 1136),
+        OPEX(1862, 133, 1292, 1291, 1196, 1186),
+        OPEX(2261, 133, 1404, 1404, 1260, 1260),
+        { .frequency = CPUFREQ_TABLE_END }
+};
+
+#undef OPEX
+
+#define SONOMA(cpuid, max, base, name)  \
+{       .cpu_id         = cpuid,        \
+        .model_name     = "Intel(R) Pentium(R) M processor " name "GHz", \
+        .max_freq       = (max)*1000,   \
+        .op_points      = sonoma_##max, \
+}
+
+
 #define _BANIAS(cpuid, max, name)	\
 {	.cpu_id		= cpuid,	\
 	.model_name	= "Intel(R) Pentium(R) M processor " name "MHz", \
@@ -215,6 +299,15 @@ static struct cpu_model models[] =
 	BANIAS(1500),
 	BANIAS(1600),
 	BANIAS(1700),
+
+        /* Builtin tables for Dothan C0 CPUs, a.k.a Sonoma */
+        SONOMA(&cpu_ids[CPU_DOTHAN_C0], 1596, 133, "1.60"),
+        SONOMA(&cpu_ids[CPU_DOTHAN_C0], 1729, 133, "1.73"),
+        SONOMA(&cpu_ids[CPU_DOTHAN_C0], 1862, 133, "1.86"),
+        SONOMA(&cpu_ids[CPU_DOTHAN_C0], 1995, 133, "2.00"),
+        SONOMA(&cpu_ids[CPU_DOTHAN_C0], 2128, 133, "2.13"),
+        SONOMA(&cpu_ids[CPU_DOTHAN_C0], 2261, 133, "2.26"),
+
 
 	/* NULL model_name is a wildcard */
 	{ &cpu_ids[CPU_DOTHAN_A1], NULL, 0, NULL },
