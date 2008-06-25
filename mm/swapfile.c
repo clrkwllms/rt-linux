@@ -28,6 +28,7 @@
 #include <linux/capability.h>
 #include <linux/syscalls.h>
 #include <linux/memcontrol.h>
+#include <linux/marker.h>
 
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
@@ -1310,6 +1311,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	swap_map = p->swap_map;
 	p->swap_map = NULL;
 	p->flags = 0;
+	trace_mark(mm_swap_file_close, "filp %p", swap_file);
 	spin_unlock(&swap_lock);
 	mutex_unlock(&swapon_mutex);
 	vfree(swap_map);
@@ -1695,6 +1697,8 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	} else {
 		swap_info[prev].next = p - swap_info;
 	}
+	trace_mark(mm_swap_file_open, "filp %p filename %s",
+		swap_file, name);
 	spin_unlock(&swap_lock);
 	mutex_unlock(&swapon_mutex);
 	error = 0;
@@ -1848,3 +1852,22 @@ int valid_swaphandles(swp_entry_t entry, unsigned long *offset)
 	*offset = ++toff;
 	return nr_pages? ++nr_pages: 0;
 }
+
+void ltt_dump_swap_files(void *call_data)
+{
+	int type;
+	struct swap_info_struct *p = NULL;
+
+	mutex_lock(&swapon_mutex);
+	for (type = swap_list.head; type >= 0; type = swap_info[type].next) {
+		p = swap_info + type;
+		if ((p->flags & SWP_ACTIVE) != SWP_ACTIVE)
+			continue;
+		__trace_mark(0, statedump_swap_files, call_data,
+			"filp %p vfsmount %p dname %s",
+			p->swap_file, p->swap_file->f_vfsmnt,
+			p->swap_file->f_dentry->d_name.name);
+	}
+	mutex_unlock(&swapon_mutex);
+}
+EXPORT_SYMBOL_GPL(ltt_dump_swap_files);
