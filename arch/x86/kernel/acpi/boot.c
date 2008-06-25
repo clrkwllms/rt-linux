@@ -1414,6 +1414,16 @@ static int __init force_acpi_ht(const struct dmi_system_id *d)
 	return 0;
 }
 
+#ifdef CONFIG_X86_IO_APIC
+static int __init force_skip_timer_override(const struct dmi_system_id *d)
+{
+	printk(KERN_NOTICE "%s detected: disabling timer overrides",
+	       d->ident);
+	acpi_skip_timer_override = 1;
+	return 0;
+}
+#endif
+
 /*
  * If your system is blacklisted here, but you find that acpi=force
  * works for you, please contact acpi-devel@sourceforge.net
@@ -1581,6 +1591,24 @@ static struct dmi_system_id __initdata acpi_dmi_table[] = {
 		     DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate 360"),
 		     },
 	 },
+#ifdef CONFIG_X86_IO_APIC
+	{
+	 .callback = force_skip_timer_override,
+	 .ident = "HP NX6125 laptop",
+	 .matches = {
+		     DMI_MATCH(DMI_SYS_VENDOR, "Hewlett-Packard"),
+		     DMI_MATCH(DMI_PRODUCT_NAME, "HP Compaq nx6125"),
+		     },
+	 },
+	{
+	 .callback = force_skip_timer_override,
+	 .ident = "HP NX6325 laptop",
+	 .matches = {
+		     DMI_MATCH(DMI_SYS_VENDOR, "Hewlett-Packard"),
+		     DMI_MATCH(DMI_PRODUCT_NAME, "HP Compaq nx6325"),
+		     },
+	 },
+#endif
 	{}
 };
 
