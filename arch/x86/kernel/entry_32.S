@@ -58,7 +58,7 @@
  * for paravirtualization.  The following will never clobber any registers:
  *   INTERRUPT_RETURN (aka. "iret")
  *   GET_CR0_INTO_EAX (aka. "movl %cr0, %eax")
- *   ENABLE_INTERRUPTS_SYSCALL_RET (aka "sti; sysexit").
+ *   ENABLE_INTERRUPTS_SYSEXIT (aka "sti; sysexit").
  *
  * For DISABLE_INTERRUPTS/ENABLE_INTERRUPTS (aka "cli"/"sti"), you must
  * specify what registers can be overwritten (CLBR_NONE, CLBR_EAX/EDX/ECX/ANY).
@@ -375,7 +375,7 @@ sysenter_past_esp:
 	xorl %ebp,%ebp
 	TRACE_IRQS_ON
 1:	mov  PT_FS(%esp), %fs
-	ENABLE_INTERRUPTS_SYSCALL_RET
+	ENABLE_INTERRUPTS_SYSEXIT
 	CFI_ENDPROC
 .pushsection .fixup,"ax"
 2:	movl $0,PT_FS(%esp)
@@ -904,10 +904,10 @@ ENTRY(native_nmi_return)
 	NATIVE_INTERRUPT_RETURN_NMI_SAFE # Should we deal with popf exception ?
 END(native_nmi_return)
 
-ENTRY(native_irq_enable_syscall_ret)
+ENTRY(native_irq_enable_sysexit)
 	sti
 	sysexit
-END(native_irq_enable_syscall_ret)
+END(native_irq_enable_sysexit)
 #endif
 
 KPROBE_ENTRY(int3)

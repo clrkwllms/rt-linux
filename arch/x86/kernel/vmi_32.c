@@ -153,7 +153,7 @@ static unsigned vmi_patch(u8 type, u16 clobbers, void *insns,
 			return patch_internal(VMI_CALL_IRET, len, insns, ip);
 		case PARAVIRT_PATCH(pv_cpu_ops.nmi_return):
 			return patch_internal(VMI_CALL_IRET, len, insns, ip);
-		case PARAVIRT_PATCH(pv_cpu_ops.irq_enable_syscall_ret):
+		case PARAVIRT_PATCH(pv_cpu_ops.irq_enable_sysexit):
 			return patch_internal(VMI_CALL_SYSEXIT, len, insns, ip);
 		default:
 			break;
@@ -898,7 +898,7 @@ static inline int __init activate_vmi(void)
 	 * the backend.  They are performance critical anyway, so requiring
 	 * a patch is not a big problem.
 	 */
-	pv_cpu_ops.irq_enable_syscall_ret = (void *)0xfeedbab0;
+	pv_cpu_ops.irq_enable_sysexit = (void *)0xfeedbab0;
 	pv_cpu_ops.iret = (void *)0xbadbab0;
 
 #ifdef CONFIG_SMP

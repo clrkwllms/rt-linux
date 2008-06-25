@@ -1090,7 +1090,7 @@ static const struct pv_cpu_ops xen_cpu_ops __initdata = {
 
 	.iret = xen_iret,
 	.nmi_return = xen_iret,
-	.irq_enable_syscall_ret = xen_sysexit,
+	.irq_enable_sysexit = xen_sysexit,
 
 	.load_tr_desc = paravirt_nop,
 	.set_ldt = xen_set_ldt,
