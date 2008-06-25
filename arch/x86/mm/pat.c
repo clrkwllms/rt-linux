@@ -26,11 +26,11 @@
 #include <asm/io.h>
 
 #ifdef CONFIG_X86_PAT
-int __read_mostly pat_wc_enabled = 1;
+int __read_mostly pat_enabled = 1;
 
 void __cpuinit pat_disable(char *reason)
 {
-	pat_wc_enabled = 0;
+	pat_enabled = 0;
 	printk(KERN_INFO "%s\n", reason);
 }
 
@@ -41,6 +41,19 @@ static int __init nopat(char *str)
 }
 early_param("nopat", nopat);
 #endif
+
+
+static int debug_enable;
+static int __init pat_debug_setup(char *str)
+{
+	debug_enable = 1;
+	return 0;
+}
+__setup("debugpat", pat_debug_setup);
+
+#define dprintk(fmt, arg...) \
+	do { if (debug_enable) printk(KERN_INFO fmt, ##arg); } while (0)
+
 
 static u64 __read_mostly boot_pat_state;
 
@@ -53,24 +66,25 @@ enum {
 	PAT_UC_MINUS = 7,	/* UC, but can be overriden by MTRR */
 };
 
-#define PAT(x,y)	((u64)PAT_ ## y << ((x)*8))
+#define PAT(x, y)	((u64)PAT_ ## y << ((x)*8))
 
 void pat_init(void)
 {
 	u64 pat;
 
-	if (!pat_wc_enabled)
+	if (!pat_enabled)
 		return;
 
 	/* Paranoia check. */
-	if (!cpu_has_pat) {
-		printk(KERN_ERR "PAT enabled, but CPU feature cleared\n");
+	if (!cpu_has_pat && boot_pat_state) {
 		/*
-		 * Panic if this happens on the secondary CPU, and we
+		 * If this happens we are on a secondary CPU, but
 		 * switched to PAT on the boot CPU. We have no way to
 		 * undo PAT.
-		*/
-		BUG_ON(boot_pat_state);
+		 */
+		printk(KERN_ERR "PAT enabled, "
+		       "but not supported by secondary CPU\n");
+		BUG();
 	}
 
 	/* Set PWT to Write-Combining. All other bits stay the same */
@@ -86,8 +100,8 @@ void pat_init(void)
 	 *      011 UC		_PAGE_CACHE_UC
 	 * PAT bit unused
 	 */
-	pat = PAT(0,WB) | PAT(1,WC) | PAT(2,UC_MINUS) | PAT(3,UC) |
-	      PAT(4,WB) | PAT(5,WC) | PAT(6,UC_MINUS) | PAT(7,UC);
+	pat = PAT(0, WB) | PAT(1, WC) | PAT(2, UC_MINUS) | PAT(3, UC) |
+	      PAT(4, WB) | PAT(5, WC) | PAT(6, UC_MINUS) | PAT(7, UC);
 
 	/* Boot CPU check */
 	if (!boot_pat_state)
@@ -103,11 +117,11 @@ void pat_init(void)
 static char *cattr_name(unsigned long flags)
 {
 	switch (flags & _PAGE_CACHE_MASK) {
-		case _PAGE_CACHE_UC:		return "uncached";
-		case _PAGE_CACHE_UC_MINUS:	return "uncached-minus";
-		case _PAGE_CACHE_WB:		return "write-back";
-		case _PAGE_CACHE_WC:		return "write-combining";
-		default:			return "broken";
+	case _PAGE_CACHE_UC:		return "uncached";
+	case _PAGE_CACHE_UC_MINUS:	return "uncached-minus";
+	case _PAGE_CACHE_WB:		return "write-back";
+	case _PAGE_CACHE_WC:		return "write-combining";
+	default:			return "broken";
 	}
 }
 
@@ -211,8 +225,8 @@ int reserve_memtype(u64 start, u64 end, unsigned long req_type,
 	unsigned long actual_type;
 	int err = 0;
 
-	/* Only track when pat_wc_enabled */
-	if (!pat_wc_enabled) {
+	/* Only track when pat_enabled */
+	if (!pat_enabled) {
 		/* This is identical to page table setting without PAT */
 		if (ret_type) {
 			if (req_type == -1) {
@@ -278,7 +292,7 @@ int reserve_memtype(u64 start, u64 end, unsigned long req_type,
 		struct memtype *saved_ptr;
 
 		if (parse->start >= end) {
-			pr_debug("New Entry\n");
+			dprintk("New Entry\n");
 			list_add(&new_entry->nd, parse->nd.prev);
 			new_entry = NULL;
 			break;
@@ -328,7 +342,7 @@ int reserve_memtype(u64 start, u64 end, unsigned long req_type,
 				break;
 			}
 
-			pr_debug("Overlap at 0x%Lx-0x%Lx\n",
+			dprintk("Overlap at 0x%Lx-0x%Lx\n",
 			       saved_ptr->start, saved_ptr->end);
 			/* No conflict. Go ahead and add this new entry */
 			list_add(&new_entry->nd, saved_ptr->nd.prev);
@@ -380,7 +394,7 @@ int reserve_memtype(u64 start, u64 end, unsigned long req_type,
 				break;
 			}
 
-			pr_debug(KERN_INFO "Overlap at 0x%Lx-0x%Lx\n",
+			dprintk("Overlap at 0x%Lx-0x%Lx\n",
 				 saved_ptr->start, saved_ptr->end);
 			/* No conflict. Go ahead and add this new entry */
 			list_add(&new_entry->nd, &saved_ptr->nd);
@@ -402,16 +416,16 @@ int reserve_memtype(u64 start, u64 end, unsigned long req_type,
 	if (new_entry) {
 		/* No conflict. Not yet added to the list. Add to the tail */
 		list_add_tail(&new_entry->nd, &memtype_list);
-		pr_debug("New Entry\n");
+		dprintk("New Entry\n");
 	}
 
 	if (ret_type) {
-		pr_debug(
+		dprintk(
 	"reserve_memtype added 0x%Lx-0x%Lx, track %s, req %s, ret %s\n",
 			start, end, cattr_name(actual_type),
 			cattr_name(req_type), cattr_name(*ret_type));
 	} else {
-		pr_debug(
+		dprintk(
 	"reserve_memtype added 0x%Lx-0x%Lx, track %s, req %s\n",
 			start, end, cattr_name(actual_type),
 			cattr_name(req_type));
@@ -426,8 +440,8 @@ int free_memtype(u64 start, u64 end)
 	struct memtype *ml;
 	int err = -EINVAL;
 
-	/* Only track when pat_wc_enabled */
-	if (!pat_wc_enabled) {
+	/* Only track when pat_enabled */
+	if (!pat_enabled) {
 		return 0;
 	}
 
@@ -452,7 +466,7 @@ int free_memtype(u64 start, u64 end)
 			current->comm, current->pid, start, end);
 	}
 
-	pr_debug("free_memtype request 0x%Lx-0x%Lx\n", start, end);
+	dprintk("free_memtype request 0x%Lx-0x%Lx\n", start, end);
 	return err;
 }
 
@@ -521,12 +535,12 @@ int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
 	 * caching for the high addresses through the KEN pin, but
 	 * we maintain the tradition of paranoia in this code.
 	 */
-	if (!pat_wc_enabled &&
-	    ! ( test_bit(X86_FEATURE_MTRR, boot_cpu_data.x86_capability) ||
-		test_bit(X86_FEATURE_K6_MTRR, boot_cpu_data.x86_capability) ||
-		test_bit(X86_FEATURE_CYRIX_ARR, boot_cpu_data.x86_capability) ||
-		test_bit(X86_FEATURE_CENTAUR_MCR, boot_cpu_data.x86_capability)) &&
-	   (pfn << PAGE_SHIFT) >= __pa(high_memory)) {
+	if (!pat_enabled &&
+	    !(boot_cpu_has(X86_FEATURE_MTRR) ||
+	      boot_cpu_has(X86_FEATURE_K6_MTRR) ||
+	      boot_cpu_has(X86_FEATURE_CYRIX_ARR) ||
+	      boot_cpu_has(X86_FEATURE_CENTAUR_MCR)) &&
+	    (pfn << PAGE_SHIFT) >= __pa(high_memory)) {
 		flags = _PAGE_CACHE_UC;
 	}
 #endif
@@ -548,7 +562,7 @@ int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
 		return 0;
 
 	if (pfn <= max_pfn_mapped &&
-            ioremap_change_attr((unsigned long)__va(offset), size, flags) < 0) {
+	    ioremap_change_attr((unsigned long)__va(offset), size, flags) < 0) {
 		free_memtype(offset, offset + size);
 		printk(KERN_INFO
 		"%s:%d /dev/mem ioremap_change_attr failed %s for %Lx-%Lx\n",
@@ -586,4 +600,3 @@ void unmap_devmem(unsigned long pfn, unsigned long size, pgprot_t vma_prot)
 
 	free_memtype(addr, addr + size);
 }
-

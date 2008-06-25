@@ -18,6 +18,7 @@
 #include <linux/swap.h>
 #include <linux/smp.h>
 #include <linux/init.h>
+#include <linux/initrd.h>
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
 #include <linux/proc_fs.h>
@@ -46,6 +47,18 @@
 #include <asm/kdebug.h>
 #include <asm/numa.h>
 #include <asm/cacheflush.h>
+
+/*
+ * PFN of last memory page.
+ */
+unsigned long end_pfn;
+
+/*
+ * end_pfn only includes RAM, while max_pfn_mapped includes all e820 entries.
+ * The direct mapping extends to max_pfn_mapped, so that we can directly access
+ * apertures, ACPI and other tables without having to play with fixmaps.
+ */
+unsigned long max_pfn_mapped;
 
 static unsigned long dma_reserve __initdata;
 
@@ -312,6 +325,8 @@ __meminit void early_iounmap(void *addr, unsigned long size)
 static unsigned long __meminit
 phys_pmd_init(pmd_t *pmd_page, unsigned long address, unsigned long end)
 {
+	unsigned long pages = 0;
+
 	int i = pmd_index(address);
 
 	for (; i < PTRS_PER_PMD; i++, address += PMD_SIZE) {
@@ -328,9 +343,11 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long address, unsigned long end)
 		if (pmd_val(*pmd))
 			continue;
 
+		pages++;
 		set_pte((pte_t *)pmd,
 			pfn_pte(address >> PAGE_SHIFT, PAGE_KERNEL_LARGE));
 	}
+	update_page_count(PG_LEVEL_2M, pages);
 	return address;
 }
 
@@ -350,6 +367,7 @@ phys_pmd_update(pud_t *pud, unsigned long address, unsigned long end)
 static unsigned long __meminit
 phys_pud_init(pud_t *pud_page, unsigned long addr, unsigned long end)
 {
+	unsigned long pages = 0;
 	unsigned long last_map_addr = end;
 	int i = pud_index(addr);
 
@@ -374,6 +392,7 @@ phys_pud_init(pud_t *pud_page, unsigned long addr, unsigned long end)
 		}
 
 		if (direct_gbpages) {
+			pages++;
 			set_pte((pte_t *)pud,
 				pfn_pte(addr >> PAGE_SHIFT, PAGE_KERNEL_LARGE));
 			last_map_addr = (addr & PUD_MASK) + PUD_SIZE;
@@ -390,6 +409,7 @@ phys_pud_init(pud_t *pud_page, unsigned long addr, unsigned long end)
 		unmap_low_page(pmd);
 	}
 	__flush_tlb_all();
+	update_page_count(PG_LEVEL_1G, pages);
 
 	return last_map_addr >> PAGE_SHIFT;
 }
@@ -431,7 +451,7 @@ static void __init init_gbpages(void)
 		direct_gbpages = 0;
 }
 
-#ifdef CONFIG_MEMTEST_BOOTPARAM
+#ifdef CONFIG_MEMTEST
 
 static void __init memtest(unsigned long start_phys, unsigned long size,
 				 unsigned pattern)
@@ -493,7 +513,8 @@ static void __init memtest(unsigned long start_phys, unsigned long size,
 
 }
 
-static int memtest_pattern __initdata = CONFIG_MEMTEST_BOOTPARAM_VALUE;
+/* default is disabled */
+static int memtest_pattern __initdata;
 
 static int __init parse_memtest(char *arg)
 {
@@ -602,6 +623,24 @@ unsigned long __init_refok init_memory_mapping(unsigned long start, unsigned lon
 }
 
 #ifndef CONFIG_NUMA
+void __init initmem_init(unsigned long start_pfn, unsigned long end_pfn)
+{
+	unsigned long bootmap_size, bootmap;
+
+	bootmap_size = bootmem_bootmap_pages(end_pfn)<<PAGE_SHIFT;
+	bootmap = find_e820_area(0, end_pfn<<PAGE_SHIFT, bootmap_size,
+				 PAGE_SIZE);
+	if (bootmap == -1L)
+		panic("Cannot find bootmem map of size %ld\n", bootmap_size);
+	/* don't touch min_low_pfn */
+	bootmap_size = init_bootmem_node(NODE_DATA(0), bootmap >> PAGE_SHIFT,
+					 0, end_pfn);
+	e820_register_active_regions(0, start_pfn, end_pfn);
+	free_bootmem_with_active_regions(0, end_pfn);
+	early_res_to_bootmem(0, end_pfn<<PAGE_SHIFT);
+	reserve_bootmem(bootmap, bootmap_size, BOOTMEM_DEFAULT);
+}
+
 void __init paging_init(void)
 {
 	unsigned long max_zone_pfns[MAX_NR_ZONES];
@@ -798,10 +837,12 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 }
 #endif
 
-void __init reserve_bootmem_generic(unsigned long phys, unsigned len)
+int __init reserve_bootmem_generic(unsigned long phys, unsigned long len,
+				   int flags)
 {
 #ifdef CONFIG_NUMA
 	int nid, next_nid;
+	int ret;
 #endif
 	unsigned long pfn = phys >> PAGE_SHIFT;
 
@@ -811,11 +852,11 @@ void __init reserve_bootmem_generic(unsigned long phys, unsigned len)
 		 * firmware tables:
 		 */
 		if (pfn < max_pfn_mapped)
-			return;
+			return -EFAULT;
 
-		printk(KERN_ERR "reserve_bootmem: illegal reserve %lx %u\n",
+		printk(KERN_ERR "reserve_bootmem: illegal reserve %lx %lu\n",
 				phys, len);
-		return;
+		return -EFAULT;
 	}
 
 	/* Should check here against the e820 map to avoid double free */
@@ -823,9 +864,13 @@ void __init reserve_bootmem_generic(unsigned long phys, unsigned len)
 	nid = phys_to_nid(phys);
 	next_nid = phys_to_nid(phys + len - 1);
 	if (nid == next_nid)
-		reserve_bootmem_node(NODE_DATA(nid), phys, len, BOOTMEM_DEFAULT);
+		ret = reserve_bootmem_node(NODE_DATA(nid), phys, len, flags);
 	else
-		reserve_bootmem(phys, len, BOOTMEM_DEFAULT);
+		ret = reserve_bootmem(phys, len, flags);
+
+	if (ret != 0)
+		return ret;
+
 #else
 	reserve_bootmem(phys, len, BOOTMEM_DEFAULT);
 #endif
@@ -834,6 +879,8 @@ void __init reserve_bootmem_generic(unsigned long phys, unsigned len)
 		dma_reserve += len / PAGE_SIZE;
 		set_dma_reserve(dma_reserve);
 	}
+
+	return 0;
 }
 
 int kern_addr_valid(unsigned long addr)
