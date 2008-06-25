@@ -263,6 +263,7 @@ void flush_thread(void)
 	/*
 	 * Forget coprocessor state..
 	 */
+	tsk->fpu_counter = 0;
 	clear_fpu(tsk);
 	clear_used_math();
 }
