@@ -142,7 +142,7 @@ unsigned paravirt_patch_default(u8 type, u16 clobbers, void *insnbuf,
 	else if (type == PARAVIRT_PATCH(pv_cpu_ops.iret) ||
 		 type == PARAVIRT_PATCH(pv_cpu_ops.nmi_return) ||
 		 type == PARAVIRT_PATCH(pv_cpu_ops.irq_enable_sysexit) ||
-		 type == PARAVIRT_PATCH(pv_cpu_ops.usersp_sysret))
+		 type == PARAVIRT_PATCH(pv_cpu_ops.usergs_sysret))
 		/* If operation requires a jmp, then jmp */
 		ret = paravirt_patch_jmp(insnbuf, opfunc, addr, len);
 	else
@@ -195,7 +195,7 @@ static void native_flush_tlb_single(unsigned long addr)
 extern void native_iret(void);
 extern void native_nmi_return(void);
 extern void native_irq_enable_sysexit(void);
-extern void native_usersp_sysret(void);
+extern void native_usergs_sysret(void);
 
 static int __init print_banner(void)
 {
@@ -334,7 +334,7 @@ struct pv_cpu_ops pv_cpu_ops = {
 #ifdef CONFIG_X86_32
 	.irq_enable_sysexit = native_irq_enable_sysexit,
 #else
-	.usersp_sysret = native_usersp_sysret,
+	.usergs_sysret = native_usergs_sysret,
 #endif
 	.iret = native_iret,
 	.nmi_return = native_nmi_return,
