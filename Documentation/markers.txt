@@ -15,10 +15,12 @@ provide at runtime. A marker can be "on" (a probe is connected to it) or "off"
 (no probe is attached). When a marker is "off" it has no effect, except for
 adding a tiny time penalty (checking a condition for a branch) and space
 penalty (adding a few bytes for the function call at the end of the
-instrumented function and adds a data structure in a separate section).  When a
-marker is "on", the function you provide is called each time the marker is
-executed, in the execution context of the caller. When the function provided
-ends its execution, it returns to the caller (continuing from the marker site).
+instrumented function and adds a data structure in a separate section). The
+immediate values are used to minimize the impact on data cache, encoding the
+condition in the instruction stream. When a marker is "on", the function you
+provide is called each time the marker is executed, in the execution context of
+the caller. When the function provided ends its execution, it returns to the
+caller (continuing from the marker site).
 
 You can put markers at important locations in the code. Markers are
 lightweight hooks that can pass an arbitrary number of parameters,
@@ -67,6 +69,13 @@ to be detected to have a different format string not to be armed and will output
 a printk warning which identifies the inconsistency:
 
 "Format mismatch for probe probe_name (format), marker (format)"
+
+
+* Optimization for a given architecture
+
+To force use of a non-optimized version of the markers, _trace_mark() should be
+used. It takes the same parameters as the normal markers, but it does not use
+the immediate values based on code patching.
 
 
 * Probe / marker example
