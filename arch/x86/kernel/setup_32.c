@@ -42,7 +42,6 @@
 #include <linux/iscsi_ibft.h>
 #include <linux/nodemask.h>
 #include <linux/kexec.h>
-#include <linux/crash_dump.h>
 #include <linux/dmi.h>
 #include <linux/pfn.h>
 #include <linux/pci.h>
@@ -59,6 +58,7 @@
 #include <asm/setup.h>
 #include <asm/arch_hooks.h>
 #include <asm/sections.h>
+#include <asm/dmi.h>
 #include <asm/io_apic.h>
 #include <asm/ist.h>
 #include <asm/io.h>
@@ -67,10 +67,13 @@
 #include <asm/bios_ebda.h>
 #include <asm/cacheflush.h>
 #include <asm/processor.h>
+#include <asm/efi.h>
+#include <asm/bugs.h>
 
 /* This value is set up by the early boot code to point to the value
    immediately after the boot time page tables.  It contains a *physical*
    address, and must not be in the .bss segment! */
+unsigned long init_pg_tables_start __initdata = ~0UL;
 unsigned long init_pg_tables_end __initdata = ~0UL;
 
 /*
@@ -104,58 +107,6 @@ static struct resource video_ram_resource = {
 	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
 };
 
-static struct resource standard_io_resources[] = { {
-	.name	= "dma1",
-	.start	= 0x0000,
-	.end	= 0x001f,
-	.flags	= IORESOURCE_BUSY | IORESOURCE_IO
-}, {
-	.name	= "pic1",
-	.start	= 0x0020,
-	.end	= 0x0021,
-	.flags	= IORESOURCE_BUSY | IORESOURCE_IO
-}, {
-	.name   = "timer0",
-	.start	= 0x0040,
-	.end    = 0x0043,
-	.flags  = IORESOURCE_BUSY | IORESOURCE_IO
-}, {
-	.name   = "timer1",
-	.start  = 0x0050,
-	.end    = 0x0053,
-	.flags	= IORESOURCE_BUSY | IORESOURCE_IO
-}, {
-	.name	= "keyboard",
-	.start	= 0x0060,
-	.end	= 0x0060,
-	.flags	= IORESOURCE_BUSY | IORESOURCE_IO
-}, {
-	.name	= "keyboard",
-	.start	= 0x0064,
-	.end	= 0x0064,
-	.flags	= IORESOURCE_BUSY | IORESOURCE_IO
-}, {
-	.name	= "dma page reg",
-	.start	= 0x0080,
-	.end	= 0x008f,
-	.flags	= IORESOURCE_BUSY | IORESOURCE_IO
-}, {
-	.name	= "pic2",
-	.start	= 0x00a0,
-	.end	= 0x00a1,
-	.flags	= IORESOURCE_BUSY | IORESOURCE_IO
-}, {
-	.name	= "dma2",
-	.start	= 0x00c0,
-	.end	= 0x00df,
-	.flags	= IORESOURCE_BUSY | IORESOURCE_IO
-}, {
-	.name	= "fpu",
-	.start	= 0x00f0,
-	.end	= 0x00ff,
-	.flags	= IORESOURCE_BUSY | IORESOURCE_IO
-} };
-
 /* cpu data as detected by the assembly code in head.S */
 struct cpuinfo_x86 new_cpu_data __cpuinitdata = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 /* common cpu data for all cpus */
@@ -178,8 +129,11 @@ unsigned int BIOS_revision;
 /* Boot loader ID as an integer, for the benefit of proc_dointvec */
 int bootloader_type;
 
-/* user-defined highmem size */
-static unsigned int highmem_pages = -1;
+/*
+ * Early DMI memory
+ */
+int dmi_alloc_index;
+char dmi_alloc_data[DMI_MAX_DATA];
 
 /*
  * Setup options
@@ -196,7 +150,6 @@ struct ist_info ist_info;
 EXPORT_SYMBOL(ist_info);
 #endif
 
-extern void early_cpu_init(void);
 extern int root_mountflags;
 
 unsigned long saved_video_mode;
@@ -206,12 +159,6 @@ unsigned long saved_video_mode;
 #define RAMDISK_LOAD_FLAG		0x4000
 
 static char __initdata command_line[COMMAND_LINE_SIZE];
-
-#ifndef CONFIG_DEBUG_BOOT_PARAMS
-struct boot_params __initdata boot_params;
-#else
-struct boot_params boot_params;
-#endif
 
 #if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
 struct edd edd;
@@ -237,382 +184,76 @@ static inline void copy_edd(void)
 }
 #endif
 
-int __initdata user_defined_memmap;
-
-/*
- * "mem=nopentium" disables the 4MB page tables.
- * "mem=XXX[kKmM]" defines a memory region from HIGH_MEM
- * to <mem>, overriding the bios size.
- * "memmap=XXX[KkmM]@XXX[KkmM]" defines a memory region from
- * <start> to <start>+<mem>, overriding the bios size.
- *
- * HPA tells me bootloaders need to parse mem=, so no new
- * option should be mem=  [also see Documentation/i386/boot.txt]
- */
-static int __init parse_mem(char *arg)
-{
-	if (!arg)
-		return -EINVAL;
-
-	if (strcmp(arg, "nopentium") == 0) {
-		setup_clear_cpu_cap(X86_FEATURE_PSE);
-	} else {
-		/* If the user specifies memory size, we
-		 * limit the BIOS-provided memory map to
-		 * that size. exactmap can be used to specify
-		 * the exact map. mem=number can be used to
-		 * trim the existing memory map.
-		 */
-		unsigned long long mem_size;
-
-		mem_size = memparse(arg, &arg);
-		limit_regions(mem_size);
-		user_defined_memmap = 1;
-	}
-	return 0;
-}
-early_param("mem", parse_mem);
-
-#ifdef CONFIG_PROC_VMCORE
-/* elfcorehdr= specifies the location of elf core header
- * stored by the crashed kernel.
- */
-static int __init parse_elfcorehdr(char *arg)
-{
-	if (!arg)
-		return -EINVAL;
-
-	elfcorehdr_addr = memparse(arg, &arg);
-	return 0;
-}
-early_param("elfcorehdr", parse_elfcorehdr);
-#endif /* CONFIG_PROC_VMCORE */
-
-/*
- * highmem=size forces highmem to be exactly 'size' bytes.
- * This works even on boxes that have no highmem otherwise.
- * This also works to reduce highmem size on bigger boxes.
- */
-static int __init parse_highmem(char *arg)
-{
-	if (!arg)
-		return -EINVAL;
-
-	highmem_pages = memparse(arg, &arg) >> PAGE_SHIFT;
-	return 0;
-}
-early_param("highmem", parse_highmem);
-
-/*
- * vmalloc=size forces the vmalloc area to be exactly 'size'
- * bytes. This can be used to increase (or decrease) the
- * vmalloc area - the default is 128m.
- */
-static int __init parse_vmalloc(char *arg)
-{
-	if (!arg)
-		return -EINVAL;
-
-	__VMALLOC_RESERVE = memparse(arg, &arg);
-	return 0;
-}
-early_param("vmalloc", parse_vmalloc);
-
-/*
- * reservetop=size reserves a hole at the top of the kernel address space which
- * a hypervisor can load into later.  Needed for dynamically loaded hypervisors,
- * so relocating the fixmap can be done before paging initialization.
- */
-static int __init parse_reservetop(char *arg)
-{
-	unsigned long address;
-
-	if (!arg)
-		return -EINVAL;
-
-	address = memparse(arg, &arg);
-	reserve_top_address(address);
-	return 0;
-}
-early_param("reservetop", parse_reservetop);
-
-/*
- * Determine low and high memory ranges:
- */
-unsigned long __init find_max_low_pfn(void)
-{
-	unsigned long max_low_pfn;
-
-	max_low_pfn = max_pfn;
-	if (max_low_pfn > MAXMEM_PFN) {
-		if (highmem_pages == -1)
-			highmem_pages = max_pfn - MAXMEM_PFN;
-		if (highmem_pages + MAXMEM_PFN < max_pfn)
-			max_pfn = MAXMEM_PFN + highmem_pages;
-		if (highmem_pages + MAXMEM_PFN > max_pfn) {
-			printk("only %luMB highmem pages available, ignoring highmem size of %uMB.\n", pages_to_mb(max_pfn - MAXMEM_PFN), pages_to_mb(highmem_pages));
-			highmem_pages = 0;
-		}
-		max_low_pfn = MAXMEM_PFN;
-#ifndef CONFIG_HIGHMEM
-		/* Maximum memory usable is what is directly addressable */
-		printk(KERN_WARNING "Warning only %ldMB will be used.\n",
-					MAXMEM>>20);
-		if (max_pfn > MAX_NONPAE_PFN)
-			printk(KERN_WARNING "Use a HIGHMEM64G enabled kernel.\n");
-		else
-			printk(KERN_WARNING "Use a HIGHMEM enabled kernel.\n");
-		max_pfn = MAXMEM_PFN;
-#else /* !CONFIG_HIGHMEM */
-#ifndef CONFIG_HIGHMEM64G
-		if (max_pfn > MAX_NONPAE_PFN) {
-			max_pfn = MAX_NONPAE_PFN;
-			printk(KERN_WARNING "Warning only 4GB will be used.\n");
-			printk(KERN_WARNING "Use a HIGHMEM64G enabled kernel.\n");
-		}
-#endif /* !CONFIG_HIGHMEM64G */
-#endif /* !CONFIG_HIGHMEM */
-	} else {
-		if (highmem_pages == -1)
-			highmem_pages = 0;
-#ifdef CONFIG_HIGHMEM
-		if (highmem_pages >= max_pfn) {
-			printk(KERN_ERR "highmem size specified (%uMB) is bigger than pages available (%luMB)!.\n", pages_to_mb(highmem_pages), pages_to_mb(max_pfn));
-			highmem_pages = 0;
-		}
-		if (highmem_pages) {
-			if (max_low_pfn-highmem_pages < 64*1024*1024/PAGE_SIZE){
-				printk(KERN_ERR "highmem size %uMB results in smaller than 64MB lowmem, ignoring it.\n", pages_to_mb(highmem_pages));
-				highmem_pages = 0;
-			}
-			max_low_pfn -= highmem_pages;
-		}
-#else
-		if (highmem_pages)
-			printk(KERN_ERR "ignoring highmem size on non-highmem kernel!\n");
-#endif
-	}
-	return max_low_pfn;
-}
-
-#define BIOS_LOWMEM_KILOBYTES 0x413
-
-/*
- * The BIOS places the EBDA/XBDA at the top of conventional
- * memory, and usually decreases the reported amount of
- * conventional memory (int 0x12) too. This also contains a
- * workaround for Dell systems that neglect to reserve EBDA.
- * The same workaround also avoids a problem with the AMD768MPX
- * chipset: reserve a page before VGA to prevent PCI prefetch
- * into it (errata #56). Usually the page is reserved anyways,
- * unless you have no PS/2 mouse plugged in.
- */
-static void __init reserve_ebda_region(void)
-{
-	unsigned int lowmem, ebda_addr;
-
-	/* To determine the position of the EBDA and the */
-	/* end of conventional memory, we need to look at */
-	/* the BIOS data area. In a paravirtual environment */
-	/* that area is absent. We'll just have to assume */
-	/* that the paravirt case can handle memory setup */
-	/* correctly, without our help. */
-	if (paravirt_enabled())
-		return;
-
-	/* end of low (conventional) memory */
-	lowmem = *(unsigned short *)__va(BIOS_LOWMEM_KILOBYTES);
-	lowmem <<= 10;
-
-	/* start of EBDA area */
-	ebda_addr = get_bios_ebda();
-
-	/* Fixup: bios puts an EBDA in the top 64K segment */
-	/* of conventional memory, but does not adjust lowmem. */
-	if ((lowmem - ebda_addr) <= 0x10000)
-		lowmem = ebda_addr;
-
-	/* Fixup: bios does not report an EBDA at all. */
-	/* Some old Dells seem to need 4k anyhow (bugzilla 2990) */
-	if ((ebda_addr == 0) && (lowmem >= 0x9f000))
-		lowmem = 0x9f000;
-
-	/* Paranoia: should never happen, but... */
-	if ((lowmem == 0) || (lowmem >= 0x100000))
-		lowmem = 0x9f000;
-
-	/* reserve all memory between lowmem and the 1MB mark */
-	reserve_bootmem(lowmem, 0x100000 - lowmem, BOOTMEM_DEFAULT);
-}
-
-#ifndef CONFIG_NEED_MULTIPLE_NODES
-static void __init setup_bootmem_allocator(void);
-static unsigned long __init setup_memory(void)
-{
-	/*
-	 * partially used pages are not usable - thus
-	 * we are rounding upwards:
-	 */
-	min_low_pfn = PFN_UP(init_pg_tables_end);
-
-	max_low_pfn = find_max_low_pfn();
-
-#ifdef CONFIG_HIGHMEM
-	highstart_pfn = highend_pfn = max_pfn;
-	if (max_pfn > max_low_pfn) {
-		highstart_pfn = max_low_pfn;
-	}
-	printk(KERN_NOTICE "%ldMB HIGHMEM available.\n",
-		pages_to_mb(highend_pfn - highstart_pfn));
-	num_physpages = highend_pfn;
-	high_memory = (void *) __va(highstart_pfn * PAGE_SIZE - 1) + 1;
-#else
-	num_physpages = max_low_pfn;
-	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE - 1) + 1;
-#endif
-#ifdef CONFIG_FLATMEM
-	max_mapnr = num_physpages;
-#endif
-	printk(KERN_NOTICE "%ldMB LOWMEM available.\n",
-			pages_to_mb(max_low_pfn));
-
-	setup_bootmem_allocator();
-
-	return max_low_pfn;
-}
-
-static void __init zone_sizes_init(void)
-{
-	unsigned long max_zone_pfns[MAX_NR_ZONES];
-	memset(max_zone_pfns, 0, sizeof(max_zone_pfns));
-	max_zone_pfns[ZONE_DMA] =
-		virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
-	max_zone_pfns[ZONE_NORMAL] = max_low_pfn;
-#ifdef CONFIG_HIGHMEM
-	max_zone_pfns[ZONE_HIGHMEM] = highend_pfn;
-	add_active_range(0, 0, highend_pfn);
-#else
-	add_active_range(0, 0, max_low_pfn);
-#endif
-
-	free_area_init_nodes(max_zone_pfns);
-}
-#else
-extern unsigned long __init setup_memory(void);
-extern void zone_sizes_init(void);
-#endif /* !CONFIG_NEED_MULTIPLE_NODES */
-
-static inline unsigned long long get_total_mem(void)
-{
-	unsigned long long total;
-
-	total = max_low_pfn - min_low_pfn;
-#ifdef CONFIG_HIGHMEM
-	total += highend_pfn - highstart_pfn;
-#endif
-
-	return total << PAGE_SHIFT;
-}
-
-#ifdef CONFIG_KEXEC
-static void __init reserve_crashkernel(void)
-{
-	unsigned long long total_mem;
-	unsigned long long crash_size, crash_base;
-	int ret;
-
-	total_mem = get_total_mem();
-
-	ret = parse_crashkernel(boot_command_line, total_mem,
-			&crash_size, &crash_base);
-	if (ret == 0 && crash_size > 0) {
-		if (crash_base > 0) {
-			printk(KERN_INFO "Reserving %ldMB of memory at %ldMB "
-					"for crashkernel (System RAM: %ldMB)\n",
-					(unsigned long)(crash_size >> 20),
-					(unsigned long)(crash_base >> 20),
-					(unsigned long)(total_mem >> 20));
-
-			if (reserve_bootmem(crash_base, crash_size,
-					BOOTMEM_EXCLUSIVE) < 0) {
-				printk(KERN_INFO "crashkernel reservation "
-					"failed - memory is in use\n");
-				return;
-			}
-
-			crashk_res.start = crash_base;
-			crashk_res.end   = crash_base + crash_size - 1;
-		} else
-			printk(KERN_INFO "crashkernel reservation failed - "
-					"you have to specify a base address\n");
-	}
-}
-#else
-static inline void __init reserve_crashkernel(void)
-{}
-#endif
-
 #ifdef CONFIG_BLK_DEV_INITRD
 
-static bool do_relocate_initrd = false;
+static void __init relocate_initrd(void);
 
 static void __init reserve_initrd(void)
 {
-	unsigned long ramdisk_image = boot_params.hdr.ramdisk_image;
-	unsigned long ramdisk_size  = boot_params.hdr.ramdisk_size;
-	unsigned long ramdisk_end   = ramdisk_image + ramdisk_size;
-	unsigned long end_of_lowmem = max_low_pfn << PAGE_SHIFT;
-	unsigned long ramdisk_here;
-
-	initrd_start = 0;
+	u64 ramdisk_image = boot_params.hdr.ramdisk_image;
+	u64 ramdisk_size  = boot_params.hdr.ramdisk_size;
+	u64 ramdisk_end   = ramdisk_image + ramdisk_size;
+	u64 end_of_lowmem = max_low_pfn << PAGE_SHIFT;
+	u64 ramdisk_here;
 
 	if (!boot_params.hdr.type_of_loader ||
 	    !ramdisk_image || !ramdisk_size)
 		return;		/* No initrd provided by bootloader */
 
-	if (ramdisk_end < ramdisk_image) {
-		printk(KERN_ERR "initrd wraps around end of memory, "
-		       "disabling initrd\n");
-		return;
-	}
-	if (ramdisk_size >= end_of_lowmem/2) {
+	initrd_start = 0;
+
+	if (ramdisk_size >= (end_of_lowmem>>1)) {
+		free_early(ramdisk_image, ramdisk_end);
 		printk(KERN_ERR "initrd too large to handle, "
 		       "disabling initrd\n");
 		return;
 	}
+
+	printk(KERN_INFO "old RAMDISK: %08llx - %08llx\n", ramdisk_image,
+			ramdisk_end);
+
+
 	if (ramdisk_end <= end_of_lowmem) {
 		/* All in lowmem, easy case */
-		reserve_bootmem(ramdisk_image, ramdisk_size, BOOTMEM_DEFAULT);
+		/*
+		 * don't need to reserve again, already reserved early
+		 * in i386_start_kernel
+		 */
 		initrd_start = ramdisk_image + PAGE_OFFSET;
-		initrd_end = initrd_start+ramdisk_size;
+		initrd_end = initrd_start + ramdisk_size;
 		return;
 	}
 
 	/* We need to move the initrd down into lowmem */
-	ramdisk_here = (end_of_lowmem - ramdisk_size) & PAGE_MASK;
+	ramdisk_here = find_e820_area(0, end_of_lowmem, ramdisk_size,
+					 PAGE_SIZE);
+
+	if (ramdisk_here == -1ULL)
+		panic("Cannot find place for new RAMDISK of size %lld\n",
+			 ramdisk_size);
 
 	/* Note: this includes all the lowmem currently occupied by
 	   the initrd, we rely on that fact to keep the data intact. */
-	reserve_bootmem(ramdisk_here, ramdisk_size, BOOTMEM_DEFAULT);
+	reserve_early(ramdisk_here, ramdisk_here + ramdisk_size,
+			 "NEW RAMDISK");
 	initrd_start = ramdisk_here + PAGE_OFFSET;
 	initrd_end   = initrd_start + ramdisk_size;
+	printk(KERN_INFO "Allocated new RAMDISK: %08llx - %08llx\n",
+			 ramdisk_here, ramdisk_here + ramdisk_size);
 
-	do_relocate_initrd = true;
+	relocate_initrd();
 }
 
 #define MAX_MAP_CHUNK	(NR_FIX_BTMAPS << PAGE_SHIFT)
 
 static void __init relocate_initrd(void)
 {
-	unsigned long ramdisk_image = boot_params.hdr.ramdisk_image;
-	unsigned long ramdisk_size  = boot_params.hdr.ramdisk_size;
-	unsigned long end_of_lowmem = max_low_pfn << PAGE_SHIFT;
-	unsigned long ramdisk_here;
+	u64 ramdisk_image = boot_params.hdr.ramdisk_image;
+	u64 ramdisk_size  = boot_params.hdr.ramdisk_size;
+	u64 end_of_lowmem = max_low_pfn << PAGE_SHIFT;
+	u64 ramdisk_here;
 	unsigned long slop, clen, mapaddr;
 	char *p, *q;
-
-	if (!do_relocate_initrd)
-		return;
 
 	ramdisk_here = initrd_start - PAGE_OFFSET;
 
@@ -642,85 +283,24 @@ static void __init relocate_initrd(void)
 		ramdisk_image += clen;
 		ramdisk_size  -= clen;
 	}
-}
+	/* high pages is not converted by early_res_to_bootmem */
+	ramdisk_image = boot_params.hdr.ramdisk_image;
+	ramdisk_size  = boot_params.hdr.ramdisk_size;
+	printk(KERN_INFO "Copied RAMDISK from %016llx - %016llx to %08llx - %08llx\n",
+		ramdisk_image, ramdisk_image + ramdisk_size - 1,
+		ramdisk_here, ramdisk_here + ramdisk_size - 1);
 
+	/*
+	 * need to free old one, otherwise init cross max_low_pfn could be
+	 * converted to bootmem
+	 */
+	free_early(ramdisk_image, ramdisk_image+ramdisk_size);
+}
+#else
+void __init reserve_initrd(void)
+{
+}
 #endif /* CONFIG_BLK_DEV_INITRD */
-
-void __init setup_bootmem_allocator(void)
-{
-	unsigned long bootmap_size;
-	/*
-	 * Initialize the boot-time allocator (with low memory only):
-	 */
-	bootmap_size = init_bootmem(min_low_pfn, max_low_pfn);
-
-	register_bootmem_low_pages(max_low_pfn);
-
-	/*
-	 * Reserve the bootmem bitmap itself as well. We do this in two
-	 * steps (first step was init_bootmem()) because this catches
-	 * the (very unlikely) case of us accidentally initializing the
-	 * bootmem allocator with an invalid RAM area.
-	 */
-	reserve_bootmem(__pa_symbol(_text), (PFN_PHYS(min_low_pfn) +
-			 bootmap_size + PAGE_SIZE-1) - __pa_symbol(_text),
-			 BOOTMEM_DEFAULT);
-
-	/*
-	 * reserve physical page 0 - it's a special BIOS page on many boxes,
-	 * enabling clean reboots, SMP operation, laptop functions.
-	 */
-	reserve_bootmem(0, PAGE_SIZE, BOOTMEM_DEFAULT);
-
-	/* reserve EBDA region */
-	reserve_ebda_region();
-
-#ifdef CONFIG_SMP
-	/*
-	 * But first pinch a few for the stack/trampoline stuff
-	 * FIXME: Don't need the extra page at 4K, but need to fix
-	 * trampoline before removing it. (see the GDT stuff)
-	 */
-	reserve_bootmem(PAGE_SIZE, PAGE_SIZE, BOOTMEM_DEFAULT);
-#endif
-#ifdef CONFIG_ACPI_SLEEP
-	/*
-	 * Reserve low memory region for sleep support.
-	 */
-	acpi_reserve_bootmem();
-#endif
-#ifdef CONFIG_X86_FIND_SMP_CONFIG
-	/*
-	 * Find and reserve possible boot-time SMP configuration:
-	 */
-	find_smp_config();
-#endif
-#ifdef CONFIG_BLK_DEV_INITRD
-	reserve_initrd();
-#endif
-	numa_kva_reserve();
-	reserve_crashkernel();
-
-	reserve_ibft_region();
-}
-
-/*
- * The node 0 pgdat is initialized before all of these because
- * it's needed for bootmem.  node>0 pgdats have their virtual
- * space allocated before the pagetables are in place to access
- * them, so they can't be cleared then.
- *
- * This should all compile down to nothing when NUMA is off.
- */
-static void __init remapped_pgdat_init(void)
-{
-	int nid;
-
-	for_each_online_node(nid) {
-		if (nid != 0)
-			memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
-	}
-}
 
 #ifdef CONFIG_MCA
 static void set_mca_bus(int x)
@@ -729,24 +309,6 @@ static void set_mca_bus(int x)
 }
 #else
 static void set_mca_bus(int x) { }
-#endif
-
-/* Overridden in paravirt.c if CONFIG_PARAVIRT */
-char * __init __attribute__((weak)) memory_setup(void)
-{
-	return machine_specific_memory_setup();
-}
-
-#ifdef CONFIG_NUMA
-/*
- * In the golden day, when everything among i386 and x86_64 will be
- * integrated, this will not live here
- */
-void *x86_cpu_to_node_map_early_ptr;
-int x86_cpu_to_node_map_init[NR_CPUS] = {
-	[0 ... NR_CPUS-1] = NUMA_NO_NODE
-};
-DEFINE_PER_CPU(int, x86_cpu_to_node_map) = NUMA_NO_NODE;
 #endif
 
 /*
@@ -758,18 +320,11 @@ DEFINE_PER_CPU(int, x86_cpu_to_node_map) = NUMA_NO_NODE;
  */
 void __init setup_arch(char **cmdline_p)
 {
-	unsigned long max_low_pfn;
-
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 	pre_setup_arch_hook();
 	early_cpu_init();
 	early_ioremap_init();
-
-#ifdef CONFIG_EFI
-	if (!strncmp((char *)&boot_params.efi_info.efi_loader_signature,
-		     "EL32", 4))
-		efi_enabled = 1;
-#endif
+	reserve_setup_data();
 
 	ROOT_DEV = old_decode_dev(boot_params.hdr.root_dev);
 	screen_info = boot_params.screen_info;
@@ -790,11 +345,17 @@ void __init setup_arch(char **cmdline_p)
 	rd_prompt = ((boot_params.hdr.ram_size & RAMDISK_PROMPT_FLAG) != 0);
 	rd_doload = ((boot_params.hdr.ram_size & RAMDISK_LOAD_FLAG) != 0);
 #endif
+#ifdef CONFIG_EFI
+	if (!strncmp((char *)&boot_params.efi_info.efi_loader_signature,
+		     "EL32", 4)) {
+		efi_enabled = 1;
+		efi_reserve_early();
+	}
+#endif
+
 	ARCH_SETUP
 
-	printk(KERN_INFO "BIOS-provided physical RAM map:\n");
-	print_memory_map(memory_setup());
-
+	setup_memory_map();
 	copy_edd();
 
 	if (!boot_params.hdr.root_flags)
@@ -811,26 +372,98 @@ void __init setup_arch(char **cmdline_p)
 	bss_resource.start = virt_to_phys(&__bss_start);
 	bss_resource.end = virt_to_phys(&__bss_stop)-1;
 
-	parse_early_param();
-
-	if (user_defined_memmap) {
-		printk(KERN_INFO "user-defined physical RAM map:\n");
-		print_memory_map("user");
-	}
-
 	strlcpy(command_line, boot_command_line, COMMAND_LINE_SIZE);
 	*cmdline_p = command_line;
+
+	parse_setup_data();
+
+	parse_early_param();
+
+	if (acpi_mps_check()){
+#ifdef CONFIG_X86_LOCAL_APIC
+		enable_local_apic = -1;
+#endif
+		clear_cpu_cap(&boot_cpu_data, X86_FEATURE_APIC);
+	}
+
+	finish_e820_parsing();
+
+	probe_roms();
+
+	/* after parse_early_param, so could debug it */
+	insert_resource(&iomem_resource, &code_resource);
+	insert_resource(&iomem_resource, &data_resource);
+	insert_resource(&iomem_resource, &bss_resource);
 
 	if (efi_enabled)
 		efi_init();
 
-	/* update e820 for memory not covered by WB MTRRs */
-	propagate_e820_map();
-	mtrr_bp_init();
-	if (mtrr_trim_uncached_memory(max_pfn))
-		propagate_e820_map();
+	if (ppro_with_ram_bug()) {
+		e820_update_range(0x70000000ULL, 0x40000ULL, E820_RAM,
+				  E820_RESERVED);
+		sanitize_e820_map(e820.map, ARRAY_SIZE(e820.map), &e820.nr_map);
+		printk(KERN_INFO "fixed physical RAM map:\n");
+		e820_print_map("bad_ppro");
+	}
 
-	max_low_pfn = setup_memory();
+	e820_register_active_regions(0, 0, -1UL);
+	/*
+	 * partially used pages are not usable - thus
+	 * we are rounding upwards:
+	 */
+	max_pfn = e820_end_of_ram();
+
+	/* preallocate 4k for mptable mpc */
+	early_reserve_e820_mpc_new();
+	/* update e820 for memory not covered by WB MTRRs */
+	mtrr_bp_init();
+	if (mtrr_trim_uncached_memory(max_pfn)) {
+		remove_all_active_ranges();
+		e820_register_active_regions(0, 0, -1UL);
+		max_pfn = e820_end_of_ram();
+	}
+
+	/* max_low_pfn get updated here */
+	find_low_pfn_range();
+
+	/* max_pfn_mapped is updated here */
+	init_memory_mapping(0, (max_low_pfn << PAGE_SHIFT));
+
+	reserve_initrd();
+
+	dmi_scan_machine();
+
+	io_delay_init();
+
+	/*
+	 * Parse the ACPI tables for possible boot-time SMP configuration.
+	 */
+	acpi_boot_table_init();
+
+#ifdef CONFIG_ACPI_NUMA
+        /*
+         * Parse SRAT to discover nodes.
+         */
+        acpi_numa_init();
+#endif
+
+	initmem_init(0, max_pfn);
+
+#ifdef CONFIG_ACPI_SLEEP
+	/*
+	 * Reserve low memory region for sleep support.
+	 */
+	acpi_reserve_bootmem();
+#endif
+#ifdef CONFIG_X86_FIND_SMP_CONFIG
+	/*
+	 * Find and reserve possible boot-time SMP configuration:
+	 */
+	find_smp_config();
+#endif
+	reserve_crashkernel();
+
+	reserve_ibft_region();
 
 #ifdef CONFIG_KVM_CLOCK
 	kvmclock_init();
@@ -843,8 +476,6 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	vmi_init();
 #endif
-	kvm_guest_init();
-
 	/*
 	 * NOTE: before this point _nobody_ is allowed to allocate
 	 * any memory using the bootmem allocator.  Although the
@@ -855,9 +486,6 @@ void __init setup_arch(char **cmdline_p)
 	 * not to exceed the 8Mb limit.
 	 */
 
-#ifdef CONFIG_SMP
-	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
-#endif
 	paging_init();
 
 	/*
@@ -869,66 +497,39 @@ void __init setup_arch(char **cmdline_p)
 		init_ohci1394_dma_on_all_controllers();
 #endif
 
-	remapped_pgdat_init();
-	sparse_init();
-	zone_sizes_init();
-
-	/*
-	 * NOTE: at this point the bootmem allocator is fully available.
-	 */
-
-#ifdef CONFIG_BLK_DEV_INITRD
-	relocate_initrd();
-#endif
-
-	paravirt_post_allocator_init();
-
-	dmi_scan_machine();
-
-	io_delay_init();
-
-#ifdef CONFIG_X86_SMP
-	/*
-	 * setup to use the early static init tables during kernel startup
-	 * X86_SMP will exclude sub-arches that don't deal well with it.
-	 */
-	x86_cpu_to_apicid_early_ptr = (void *)x86_cpu_to_apicid_init;
-	x86_bios_cpu_apicid_early_ptr = (void *)x86_bios_cpu_apicid_init;
-#ifdef CONFIG_NUMA
-	x86_cpu_to_node_map_early_ptr = (void *)x86_cpu_to_node_map_init;
-#endif
-#endif
-
 #ifdef CONFIG_X86_GENERICARCH
 	generic_apic_probe();
 #endif
 
-#ifdef CONFIG_ACPI
-	/*
-	 * Parse the ACPI tables for possible boot-time SMP configuration.
-	 */
-	acpi_boot_table_init();
-#endif
-
 	early_quirks();
 
-#ifdef CONFIG_ACPI
+	/*
+	 * Read APIC and some other early information from ACPI tables.
+	 */
 	acpi_boot_init();
 
+#if defined(CONFIG_X86_MPPARSE) || defined(CONFIG_X86_VISWS)
+	/*
+	 * get boot-time SMP configuration:
+	 */
+	if (smp_found_config)
+		get_smp_config();
+#endif
 #if defined(CONFIG_SMP) && defined(CONFIG_X86_PC)
 	if (def_to_bigsmp)
 		printk(KERN_WARNING "More than 8 CPUs detected and "
 			"CONFIG_X86_PC cannot handle it.\nUse "
 			"CONFIG_X86_GENERICARCH or CONFIG_X86_BIGSMP.\n");
 #endif
-#endif
-#ifdef CONFIG_X86_LOCAL_APIC
-	if (smp_found_config)
-		get_smp_config();
-#endif
+	kvm_guest_init();
 
-	e820_register_memory();
-	e820_mark_nosave_regions();
+	e820_reserve_resources();
+	e820_mark_nosave_regions(max_low_pfn);
+
+	request_resource(&iomem_resource, &video_ram_resource);
+	reserve_standard_io_resources();
+
+	e820_setup_gap();
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
@@ -940,25 +541,3 @@ void __init setup_arch(char **cmdline_p)
 #endif
 }
 
-/*
- * Request address space for all standard resources
- *
- * This is called just before pcibios_init(), which is also a
- * subsys_initcall, but is linked in later (in arch/i386/pci/common.c).
- */
-static int __init request_standard_resources(void)
-{
-	int i;
-
-	printk(KERN_INFO "Setting up standard PCI resources\n");
-	init_iomem_resources(&code_resource, &data_resource, &bss_resource);
-
-	request_resource(&iomem_resource, &video_ram_resource);
-
-	/* request I/O space for devices used on all i[345]86 PCs */
-	for (i = 0; i < ARRAY_SIZE(standard_io_resources); i++)
-		request_resource(&ioport_resource, &standard_io_resources[i]);
-	return 0;
-}
-
-subsys_initcall(request_standard_resources);

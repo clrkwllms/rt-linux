@@ -52,29 +52,34 @@
 
 unsigned long mp_lapic_addr;
 
-DEFINE_PER_CPU(u16, x86_bios_cpu_apicid) = BAD_APICID;
-EXPORT_PER_CPU_SYMBOL(x86_bios_cpu_apicid);
-
 /*
  * Knob to control our willingness to enable the local APIC.
  *
  * -1=force-disable, +1=force-enable
  */
-static int enable_local_apic __initdata;
+int enable_local_apic;
 
 /* Local APIC timer verification ok */
 static int local_apic_timer_verify_ok;
-/* Disable local APIC timer from the kernel commandline or via dmi quirk
-   or using CPU MSR check */
-int local_apic_timer_disabled;
+/* Disable local APIC timer from the kernel commandline or via dmi quirk */
+static int local_apic_timer_disabled;
 /* Local APIC timer works in C2 */
 int local_apic_timer_c2_ok;
 EXPORT_SYMBOL_GPL(local_apic_timer_c2_ok);
+
+int first_system_vector = 0xfe;
+
+char system_vectors[NR_VECTORS] = { [0 ... NR_VECTORS-1] = SYS_VECTOR_FREE};
 
 /*
  * Debug level, exported for io_apic.c
  */
 int apic_verbosity;
+
+int pic_mode;
+
+/* Have we found an MP table */
+int smp_found_config;
 
 static unsigned int calibration_result;
 
@@ -545,7 +550,7 @@ void __init setup_boot_APIC_clock(void)
 			lapic_clockevent.features &= ~CLOCK_EVT_FEAT_DUMMY;
 		else
 			printk(KERN_WARNING "APIC timer registered as dummy,"
-			       " due to nmi_watchdog=1!\n");
+				" due to nmi_watchdog=%d!\n", nmi_watchdog);
 	}
 
 	/* Setup the lapic or request the broadcast */
@@ -1154,9 +1159,6 @@ static int __init detect_init_APIC(void)
 	if (l & MSR_IA32_APICBASE_ENABLE)
 		mp_lapic_addr = l & MSR_IA32_APICBASE_BASE;
 
-	if (nmi_watchdog != NMI_NONE && nmi_watchdog != NMI_DISABLED)
-		nmi_watchdog = NMI_LOCAL_APIC;
-
 	printk(KERN_INFO "Found and enabled local APIC!\n");
 
 	apic_pm_activate();
@@ -1202,7 +1204,7 @@ void __init init_apic_mappings(void)
 
 		for (i = 0; i < nr_ioapics; i++) {
 			if (smp_found_config) {
-				ioapic_phys = mp_ioapics[i].mpc_apicaddr;
+				ioapic_phys = mp_ioapics[i].mp_apicaddr;
 				if (!ioapic_phys) {
 					printk(KERN_ERR
 					       "WARNING: bogus zero IO-APIC "
@@ -1269,6 +1271,10 @@ int __init APIC_init_uniprocessor(void)
 
 	setup_local_APIC();
 
+#ifdef CONFIG_X86_IO_APIC
+	if (!smp_found_config || skip_ioapic_setup || !nr_ioapics)
+#endif
+		localise_nmi_watchdog();
 	end_local_APIC_setup();
 #ifdef CONFIG_X86_IO_APIC
 	if (smp_found_config)
@@ -1351,13 +1357,13 @@ void __init smp_intr_init(void)
 	 * The reschedule interrupt is a CPU-to-CPU reschedule-helper
 	 * IPI, driven by wakeup.
 	 */
-	set_intr_gate(RESCHEDULE_VECTOR, reschedule_interrupt);
+	alloc_intr_gate(RESCHEDULE_VECTOR, reschedule_interrupt);
 
 	/* IPI for invalidation */
-	set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
+	alloc_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
 
 	/* IPI for generic function call */
-	set_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
+	alloc_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
 }
 #endif
 
@@ -1370,15 +1376,15 @@ void __init apic_intr_init(void)
 	smp_intr_init();
 #endif
 	/* self generated IPI for local APIC timer */
-	set_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
+	alloc_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
 
 	/* IPI vectors for APIC spurious and error interrupts */
-	set_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
-	set_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
+	alloc_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
+	alloc_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
 
 	/* thermal monitor LVT interrupt */
 #ifdef CONFIG_X86_MCE_P4THERMAL
-	set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
+	alloc_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
 #endif
 }
 
@@ -1513,6 +1519,9 @@ void __cpuinit generic_processor_info(int apicid, int version)
 		 */
 		cpu = 0;
 
+	if (apicid > max_physical_apicid)
+		max_physical_apicid = apicid;
+
 	/*
 	 * Would be preferable to switch to bigsmp when CONFIG_HOTPLUG_CPU=y
 	 * but we need to work other dependencies like SMP_SUSPEND etc
@@ -1520,7 +1529,7 @@ void __cpuinit generic_processor_info(int apicid, int version)
 	 * if (CPU_HOTPLUG_ENABLED || num_processors > 8)
 	 *       - Ashok Raj <ashok.raj@intel.com>
 	 */
-	if (num_processors > 8) {
+	if (max_physical_apicid >= 8) {
 		switch (boot_cpu_data.x86_vendor) {
 		case X86_VENDOR_INTEL:
 			if (!APIC_XAPIC(version)) {
@@ -1534,9 +1543,9 @@ void __cpuinit generic_processor_info(int apicid, int version)
 	}
 #ifdef CONFIG_SMP
 	/* are we being called early in kernel startup? */
-	if (x86_cpu_to_apicid_early_ptr) {
-		u16 *cpu_to_apicid = x86_cpu_to_apicid_early_ptr;
-		u16 *bios_cpu_apicid = x86_bios_cpu_apicid_early_ptr;
+	if (early_per_cpu_ptr(x86_cpu_to_apicid)) {
+		u16 *cpu_to_apicid = early_per_cpu_ptr(x86_cpu_to_apicid);
+		u16 *bios_cpu_apicid = early_per_cpu_ptr(x86_bios_cpu_apicid);
 
 		cpu_to_apicid[cpu] = apicid;
 		bios_cpu_apicid[cpu] = apicid;

@@ -18,6 +18,7 @@
 #include <asm/page.h>
 #include <asm/msr.h>
 #include <asm/cache.h>
+#include <asm/processor-flags.h>
 
 #ifdef CONFIG_PARAVIRT
 #include <asm/asm-offsets.h>
@@ -154,9 +155,7 @@ ENTRY(secondary_startup_64)
 	 */
 
 	/* Enable PAE mode and PGE */
-	xorq	%rax, %rax
-	btsq	$5, %rax
-	btsq	$7, %rax
+	movl	$(X86_CR4_PAE | X86_CR4_PGE), %eax
 	movq	%rax, %cr4
 
 	/* Setup early boot stage 4 level pagetables. */
@@ -184,19 +183,15 @@ ENTRY(secondary_startup_64)
 1:	wrmsr				/* Make changes effective */
 
 	/* Setup cr0 */
-#define CR0_PM				1		/* protected mode */
-#define CR0_MP				(1<<1)
-#define CR0_ET				(1<<4)
-#define CR0_NE				(1<<5)
-#define CR0_WP				(1<<16)
-#define CR0_AM				(1<<18)
-#define CR0_PAGING 			(1<<31)
-	movl $CR0_PM|CR0_MP|CR0_ET|CR0_NE|CR0_WP|CR0_AM|CR0_PAGING,%eax
+#define CR0_STATE	(X86_CR0_PE | X86_CR0_MP | X86_CR0_ET | \
+			 X86_CR0_NE | X86_CR0_WP | X86_CR0_AM | \
+			 X86_CR0_PG)
+	movl	$CR0_STATE, %eax
 	/* Make changes effective */
 	movq	%rax, %cr0
 
 	/* Setup a boot time stack */
-	movq init_rsp(%rip),%rsp
+	movq stack_start(%rip),%rsp
 
 	/* zero EFLAGS after setting rsp */
 	pushq $0
@@ -208,7 +203,7 @@ ENTRY(secondary_startup_64)
 	 * addresses where we're currently running on. We have to do that here
 	 * because in 32bit we couldn't load a 64bit linear address.
 	 */
-	lgdt	cpu_gdt_descr(%rip)
+	lgdt	early_gdt_descr(%rip)
 
 	/* set up data segments. actually 0 would do too */
 	movl $__KERNEL_DS,%eax
@@ -257,8 +252,9 @@ ENTRY(secondary_startup_64)
 	.quad	x86_64_start_kernel
 	__FINITDATA
 
-	ENTRY(init_rsp)
+	ENTRY(stack_start)
 	.quad  init_thread_union+THREAD_SIZE-8
+	.word  0
 
 bad_address:
 	jmp bad_address
@@ -327,11 +323,11 @@ early_idt_ripmsg:
 ENTRY(name)
 
 /* Automate the creation of 1 to 1 mapping pmd entries */
-#define PMDS(START, PERM, COUNT)		\
-	i = 0 ;					\
-	.rept (COUNT) ;				\
-	.quad	(START) + (i << 21) + (PERM) ;	\
-	i = i + 1 ;				\
+#define PMDS(START, PERM, COUNT)			\
+	i = 0 ;						\
+	.rept (COUNT) ;					\
+	.quad	(START) + (i << PMD_SHIFT) + (PERM) ;	\
+	i = i + 1 ;					\
 	.endr
 
 	/*
@@ -395,54 +391,16 @@ NEXT_PAGE(level2_spare_pgt)
 
 	.data
 	.align 16
-	.globl cpu_gdt_descr
-cpu_gdt_descr:
-	.word	gdt_end-cpu_gdt_table-1
-gdt:
-	.quad	cpu_gdt_table
-#ifdef CONFIG_SMP
-	.rept	NR_CPUS-1
-	.word	0
-	.quad	0
-	.endr
-#endif
+	.globl early_gdt_descr
+early_gdt_descr:
+	.word	GDT_ENTRIES*8-1
+	.quad   per_cpu__gdt_page
 
 ENTRY(phys_base)
 	/* This must match the first entry in level2_kernel_pgt */
 	.quad   0x0000000000000000
 
-/* We need valid kernel segments for data and code in long mode too
- * IRET will check the segment types  kkeil 2000/10/28
- * Also sysret mandates a special GDT layout 
- */
-		 		
-	.section .data.page_aligned, "aw"
-	.align PAGE_SIZE
-
-/* The TLS descriptors are currently at a different place compared to i386.
-   Hopefully nobody expects them at a fixed place (Wine?) */
 	
-ENTRY(cpu_gdt_table)
-	.quad	0x0000000000000000	/* NULL descriptor */
-	.quad	0x00cf9b000000ffff	/* __KERNEL32_CS */
-	.quad	0x00af9b000000ffff	/* __KERNEL_CS */
-	.quad	0x00cf93000000ffff	/* __KERNEL_DS */
-	.quad	0x00cffb000000ffff	/* __USER32_CS */
-	.quad	0x00cff3000000ffff	/* __USER_DS, __USER32_DS  */
-	.quad	0x00affb000000ffff	/* __USER_CS */
-	.quad	0x0			/* unused */
-	.quad	0,0			/* TSS */
-	.quad	0,0			/* LDT */
-	.quad   0,0,0			/* three TLS descriptors */ 
-	.quad	0x0000f40000000000	/* node/CPU stored in limit */
-gdt_end:	
-	/* asm/segment.h:GDT_ENTRIES must match this */	
-	/* This should be a multiple of the cache line size */
-	/* GDTs of other CPUs are now dynamically allocated */
-
-	/* zero the remaining page */
-	.fill PAGE_SIZE / 8 - GDT_ENTRIES,8,0
-
 	.section .bss, "aw", @nobits
 	.align L1_CACHE_BYTES
 ENTRY(idt_table)
