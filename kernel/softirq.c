@@ -21,6 +21,7 @@
 #include <linux/rcupdate.h>
 #include <linux/smp.h>
 #include <linux/tick.h>
+#include <linux/marker.h>
 
 #include <asm/irq.h>
 /*
@@ -218,7 +219,15 @@ restart:
 			per_cpu(last_softirq_action, cpu) = h->action;
 #endif
 
+			trace_mark(kernel_softirq_entry, "softirq_id %lu",
+				((unsigned long)h
+					- (unsigned long)softirq_vec)
+					/ sizeof(*h));
 			h->action(h);
+			trace_mark(kernel_softirq_exit, "softirq_id %lu",
+				((unsigned long)h
+					- (unsigned long)softirq_vec)
+					/ sizeof(*h));
 			rcu_bh_qsctr_inc(cpu);
 		}
 		h++;
@@ -310,6 +319,8 @@ void irq_exit(void)
  */
 inline void raise_softirq_irqoff(unsigned int nr)
 {
+	trace_mark(kernel_softirq_raise, "softirq_id %u", nr);
+
 	__raise_softirq_irqoff(nr);
 
 	/*
@@ -407,7 +418,13 @@ static void tasklet_action(struct softirq_action *a)
 			if (!atomic_read(&t->count)) {
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
+				trace_mark(kernel_tasklet_low_entry,
+						"func %p data %lu",
+						t->func, t->data);
 				t->func(t->data);
+				trace_mark(kernel_tasklet_low_exit,
+						"func %p data %lu",
+						t->func, t->data);
 				tasklet_unlock(t);
 				continue;
 			}
@@ -442,7 +459,13 @@ static void tasklet_hi_action(struct softirq_action *a)
 			if (!atomic_read(&t->count)) {
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
+				trace_mark(kernel_tasklet_high_entry,
+						"func %p data %lu",
+						t->func, t->data);
 				t->func(t->data);
+				trace_mark(kernel_tasklet_high_exit,
+						"func %p data %lu",
+						t->func, t->data);
 				tasklet_unlock(t);
 				continue;
 			}
