@@ -37,12 +37,9 @@ extern void generic_apic_probe(void);
 
 extern int apic_verbosity;
 extern int local_apic_timer_c2_ok;
-extern int local_apic_timer_disabled;
 
-extern int apic_runs_main_timer;
 extern int ioapic_force;
 extern int disable_apic;
-extern int disable_apic_timer;
 
 /*
  * Basic functions accessing APICs.
