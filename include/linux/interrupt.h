@@ -295,6 +295,9 @@ extern void softirq_init(void);
 extern void raise_softirq_irqoff(unsigned int nr);
 extern void raise_softirq(unsigned int nr);
 
+#ifdef CONFIG_SOFTLOCKUP_SOFTIRQ_DEBUG
+extern void *get_last_softirq_action(int cpu);
+#endif
 
 /* Tasklets --- multithreaded analogue of BHs.
 
