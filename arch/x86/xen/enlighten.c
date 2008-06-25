@@ -168,7 +168,9 @@ static void __init xen_banner(void)
 {
 	printk(KERN_INFO "Booting paravirtualized kernel on %s\n",
 	       pv_info.name);
-	printk(KERN_INFO "Hypervisor signature: %s\n", xen_start_info->magic);
+	printk(KERN_INFO "Hypervisor signature: %s%s\n",
+	       xen_start_info->magic,
+	       xen_feature(XENFEAT_mmu_pt_update_preserve_ad) ? " (preserve-AD)" : "");
 }
 
 static void xen_cpuid(unsigned int *ax, unsigned int *bx,
@@ -1165,6 +1167,9 @@ static const struct pv_mmu_ops xen_mmu_ops __initdata = {
 	.set_pte_at = xen_set_pte_at,
 	.set_pmd = xen_set_pmd_hyper,
 
+	.ptep_modify_prot_start = __ptep_modify_prot_start,
+	.ptep_modify_prot_commit = __ptep_modify_prot_commit,
+
 	.pte_val = xen_pte_val,
 	.pte_flags = native_pte_val,
 	.pgd_val = xen_pgd_val,
@@ -1269,6 +1274,8 @@ asmlinkage void __init xen_start_kernel(void)
 
 	BUG_ON(memcmp(xen_start_info->magic, "xen-3", 5) != 0);
 
+	xen_setup_features();
+
 	/* Install Xen paravirt ops */
 	pv_info = xen_info;
 	pv_init_ops = xen_init_ops;
@@ -1278,13 +1285,16 @@ asmlinkage void __init xen_start_kernel(void)
 	pv_apic_ops = xen_apic_ops;
 	pv_mmu_ops = xen_mmu_ops;
 
+	if (xen_feature(XENFEAT_mmu_pt_update_preserve_ad)) {
+		pv_mmu_ops.ptep_modify_prot_start = xen_ptep_modify_prot_start;
+		pv_mmu_ops.ptep_modify_prot_commit = xen_ptep_modify_prot_commit;
+	}
+
 	machine_ops = xen_machine_ops;
 
 #ifdef CONFIG_SMP
 	smp_ops = xen_smp_ops;
 #endif
-
-	xen_setup_features();
 
 	/* Get mfn list */
 	if (!xen_feature(XENFEAT_auto_translated_physmap))
@@ -1310,11 +1320,6 @@ asmlinkage void __init xen_start_kernel(void)
 	pv_info.kernel_rpl = 1;
 	if (xen_feature(XENFEAT_supervisor_mode_kernel))
 		pv_info.kernel_rpl = 0;
-
-	/* Prevent unwanted bits from being set in PTEs. */
-	__supported_pte_mask &= ~_PAGE_GLOBAL;
-	if (!is_initial_xendomain())
-		__supported_pte_mask &= ~(_PAGE_PWT | _PAGE_PCD);
 
 	/* set the limit of our address space */
 	xen_reserve_top();
