@@ -161,7 +161,7 @@ static void __init reserve_initrd(void)
 		unsigned long ramdisk_image = boot_params.hdr.ramdisk_image;
 		unsigned long ramdisk_size  = boot_params.hdr.ramdisk_size;
 		unsigned long ramdisk_end   = ramdisk_image + ramdisk_size;
-		unsigned long end_of_mem    = end_pfn << PAGE_SHIFT;
+		unsigned long end_of_mem    = max_pfn << PAGE_SHIFT;
 
 		if (ramdisk_end <= end_of_mem) {
 			/*
@@ -264,25 +264,25 @@ void __init setup_arch(char **cmdline_p)
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
-	end_pfn = e820_end_of_ram();
+	max_pfn = e820_end_of_ram();
 
 	/* pre allocte 4k for mptable mpc */
 	early_reserve_e820_mpc_new();
 	/* update e820 for memory not covered by WB MTRRs */
 	mtrr_bp_init();
-	if (mtrr_trim_uncached_memory(end_pfn)) {
+	if (mtrr_trim_uncached_memory(max_pfn)) {
 		remove_all_active_ranges();
 		e820_register_active_regions(0, 0, -1UL);
-		end_pfn = e820_end_of_ram();
+		max_pfn = e820_end_of_ram();
 	}
 
 	reserve_initrd();
 
-	num_physpages = end_pfn;
+	num_physpages = max_pfn;
 
 	check_efer();
 
-	max_pfn_mapped = init_memory_mapping(0, (end_pfn << PAGE_SHIFT));
+	max_pfn_mapped = init_memory_mapping(0, (max_pfn << PAGE_SHIFT));
 
 	vsmp_init();
 
@@ -297,9 +297,8 @@ void __init setup_arch(char **cmdline_p)
 	acpi_boot_table_init();
 
 	/* How many end-of-memory variables you have, grandma! */
-	max_low_pfn = end_pfn;
-	max_pfn = end_pfn;
-	high_memory = (void *)__va(end_pfn * PAGE_SIZE - 1) + 1;
+	max_low_pfn = max_pfn;
+	high_memory = (void *)__va(max_pfn * PAGE_SIZE - 1) + 1;
 
 	/* Remove active ranges so rediscovery with NUMA-awareness happens */
 	remove_all_active_ranges();
@@ -311,7 +310,7 @@ void __init setup_arch(char **cmdline_p)
 	acpi_numa_init();
 #endif
 
-	initmem_init(0, end_pfn);
+	initmem_init(0, max_pfn);
 
 	dma32_reserve_bootmem();
 
@@ -363,7 +362,7 @@ void __init setup_arch(char **cmdline_p)
 	 * We trust e820 completely. No explicit ROM probing in memory.
 	 */
 	e820_reserve_resources();
-	e820_mark_nosave_regions(end_pfn);
+	e820_mark_nosave_regions(max_pfn);
 
 	reserve_standard_io_resources();
 
