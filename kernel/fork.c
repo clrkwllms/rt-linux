@@ -55,6 +55,7 @@
 #include <linux/proc_fs.h>
 #include <linux/blkdev.h>
 #include <linux/marker.h>
+#include <linux/marker.h>
 #include <linux/magic.h>
 
 #include <asm/pgtable.h>
@@ -1361,6 +1362,10 @@ long do_fork(unsigned long clone_flags,
 	 */
 	if (!IS_ERR(p)) {
 		struct completion vfork;
+
+		trace_mark(kernel_process_fork,
+			"parent_pid %d child_pid %d child_tgid %d",
+			current->pid, p->pid, p->tgid);
 
 		trace_mark(kernel_process_fork,
 			"parent_pid %d child_pid %d child_tgid %d",
