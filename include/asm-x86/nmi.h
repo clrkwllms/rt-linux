@@ -20,7 +20,6 @@ extern void default_do_nmi(struct pt_regs *);
 #endif
 
 extern void die_nmi(char *str, struct pt_regs *regs, int do_panic);
-extern void nmi_watchdog_default(void);
 extern int check_nmi_watchdog(void);
 extern int nmi_watchdog_enabled;
 extern int avail_to_resrv_perfctr_nmi_bit(unsigned int);
@@ -38,12 +37,10 @@ extern int nmi_watchdog_tick(struct pt_regs *regs, unsigned reason);
 
 extern atomic_t nmi_active;
 extern unsigned int nmi_watchdog;
-#define NMI_DISABLED    -1
 #define NMI_NONE	0
 #define NMI_IO_APIC	1
 #define NMI_LOCAL_APIC	2
 #define NMI_INVALID	3
-#define NMI_DEFAULT	NMI_DISABLED
 
 struct ctl_table;
 struct file;
@@ -58,6 +55,19 @@ static inline void localise_nmi_watchdog(void)
 {
 	if (nmi_watchdog == NMI_IO_APIC)
 		nmi_watchdog = NMI_LOCAL_APIC;
+}
+
+/* check if nmi_watchdog is active (ie was specified at boot) */
+static inline int nmi_watchdog_active(void)
+{
+	/*
+	 * actually it should be:
+	 * 	return (nmi_watchdog == NMI_LOCAL_APIC ||
+	 * 		nmi_watchdog == NMI_IO_APIC)
+	 * but since they are power of two we could use a
+	 * cheaper way --cvg
+	 */
+	return nmi_watchdog & 0x3;
 }
 #endif
 
