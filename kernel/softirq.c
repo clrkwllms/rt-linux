@@ -218,7 +218,6 @@ restart:
 #ifdef CONFIG_SOFTLOCKUP_SOFTIRQ_DEBUG
 			per_cpu(last_softirq_action, cpu) = h->action;
 #endif
-
 			trace_mark(kernel_softirq_entry, "softirq_id %lu",
 				((unsigned long)h
 					- (unsigned long)softirq_vec)
