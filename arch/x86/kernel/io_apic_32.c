@@ -1209,6 +1209,11 @@ static int assign_irq_vector(int irq)
 
 	return vector;
 }
+
+void setup_vector_irq(int cpu)
+{
+}
+
 static struct irq_chip ioapic_chip;
 
 #define IOAPIC_AUTO	-1

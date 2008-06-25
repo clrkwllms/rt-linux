@@ -407,7 +407,6 @@ EXPORT_SYMBOL(node_to_cpumask);
 
 #endif /* X86_64_NUMA */
 
-
 /*
  * --------- Crashkernel reservation ------------------------------
  */
@@ -464,4 +463,3 @@ void __init reserve_crashkernel(void)
 void __init reserve_crashkernel(void)
 {}
 #endif
-
