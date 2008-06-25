@@ -289,7 +289,7 @@ static inline void native_wbinvd(void)
 
 #endif/* CONFIG_PARAVIRT */
 
-#define stts() write_cr0(8 | read_cr0())
+#define stts() write_cr0(read_cr0() | X86_CR0_TS)
 
 #endif /* __KERNEL__ */
 
@@ -303,7 +303,6 @@ static inline void clflush(volatile void *__p)
 void disable_hlt(void);
 void enable_hlt(void);
 
-extern int es7000_plat;
 void cpu_idle_wait(void);
 
 extern unsigned long arch_align_stack(unsigned long sp);
