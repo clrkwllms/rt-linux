@@ -230,18 +230,35 @@ static bool page_pinned(void *ptr)
 	return PagePinned(page);
 }
 
-void xen_set_pmd_hyper(pmd_t *ptr, pmd_t val)
+static void extend_mmu_update(const struct mmu_update *update)
 {
 	struct multicall_space mcs;
 	struct mmu_update *u;
 
+	mcs = xen_mc_extend_args(__HYPERVISOR_mmu_update, sizeof(*u));
+
+	if (mcs.mc != NULL)
+		mcs.mc->args[1]++;
+	else {
+		mcs = __xen_mc_entry(sizeof(*u));
+		MULTI_mmu_update(mcs.mc, mcs.args, 1, NULL, DOMID_SELF);
+	}
+
+	u = mcs.args;
+	*u = *update;
+}
+
+void xen_set_pmd_hyper(pmd_t *ptr, pmd_t val)
+{
+	struct mmu_update u;
+
 	preempt_disable();
 
-	mcs = xen_mc_entry(sizeof(*u));
-	u = mcs.args;
-	u->ptr = virt_to_machine(ptr).maddr;
-	u->val = pmd_val_ma(val);
-	MULTI_mmu_update(mcs.mc, u, 1, NULL, DOMID_SELF);
+	xen_mc_batch();
+
+	u.ptr = virt_to_machine(ptr).maddr;
+	u.val = pmd_val_ma(val);
+	extend_mmu_update(&u);
 
 	xen_mc_issue(PARAVIRT_LAZY_MMU);
 
@@ -323,68 +340,81 @@ out:
 		preempt_enable();
 }
 
-/* Assume pteval_t is equivalent to all the other *val_t types. */
-static pteval_t pte_mfn_to_pfn(pteval_t val)
+pte_t xen_ptep_modify_prot_start(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
-	if (val & _PAGE_PRESENT) {
-		unsigned long mfn = (val & PTE_MASK) >> PAGE_SHIFT;
-		pteval_t flags = val & ~PTE_MASK;
-		val = (mfn_to_pfn(mfn) << PAGE_SHIFT) | flags;
-	}
-
-	return val;
+	/* Just return the pte as-is.  We preserve the bits on commit */
+	return *ptep;
 }
 
-static pteval_t pte_pfn_to_mfn(pteval_t val)
+void xen_ptep_modify_prot_commit(struct mm_struct *mm, unsigned long addr,
+				 pte_t *ptep, pte_t pte)
 {
-	if (val & _PAGE_PRESENT) {
-		unsigned long pfn = (val & PTE_MASK) >> PAGE_SHIFT;
-		pteval_t flags = val & ~PTE_MASK;
-		val = (pfn_to_mfn(pfn) << PAGE_SHIFT) | flags;
-	}
+	struct mmu_update u;
 
-	return val;
+	xen_mc_batch();
+
+	u.ptr = virt_to_machine(ptep).maddr | MMU_PT_UPDATE_PRESERVE_AD;
+	u.val = pte_val_ma(pte);
+	extend_mmu_update(&u);
+
+	xen_mc_issue(PARAVIRT_LAZY_MMU);
 }
 
 pteval_t xen_pte_val(pte_t pte)
 {
-	return pte_mfn_to_pfn(pte.pte);
+	pteval_t ret = pte.pte;
+
+	if (ret & _PAGE_PRESENT)
+		ret = machine_to_phys(XMADDR(ret)).paddr | _PAGE_PRESENT;
+
+	return ret;
 }
 
 pgdval_t xen_pgd_val(pgd_t pgd)
 {
-	return pte_mfn_to_pfn(pgd.pgd);
+	pgdval_t ret = pgd.pgd;
+	if (ret & _PAGE_PRESENT)
+		ret = machine_to_phys(XMADDR(ret)).paddr | _PAGE_PRESENT;
+	return ret;
 }
 
 pte_t xen_make_pte(pteval_t pte)
 {
-	pte = pte_pfn_to_mfn(pte);
-	return native_make_pte(pte);
+	if (pte & _PAGE_PRESENT) {
+		pte = phys_to_machine(XPADDR(pte)).maddr;
+		pte &= ~(_PAGE_PCD | _PAGE_PWT);
+	}
+
+	return (pte_t){ .pte = pte };
 }
 
 pgd_t xen_make_pgd(pgdval_t pgd)
 {
-	pgd = pte_pfn_to_mfn(pgd);
-	return native_make_pgd(pgd);
+	if (pgd & _PAGE_PRESENT)
+		pgd = phys_to_machine(XPADDR(pgd)).maddr;
+
+	return (pgd_t){ pgd };
 }
 
 pmdval_t xen_pmd_val(pmd_t pmd)
 {
-	return pte_mfn_to_pfn(pmd.pmd);
+	pmdval_t ret = native_pmd_val(pmd);
+	if (ret & _PAGE_PRESENT)
+		ret = machine_to_phys(XMADDR(ret)).paddr | _PAGE_PRESENT;
+	return ret;
 }
 
 void xen_set_pud_hyper(pud_t *ptr, pud_t val)
 {
-	struct multicall_space mcs;
-	struct mmu_update *u;
+	struct mmu_update u;
 
 	preempt_disable();
 
-	mcs = xen_mc_entry(sizeof(*u));
-	u = mcs.args;
-	u->ptr = virt_to_machine(ptr).maddr;
-	u->val = pud_val_ma(val);
-	MULTI_mmu_update(mcs.mc, u, 1, NULL, DOMID_SELF);
+	xen_mc_batch();
+
+	u.ptr = virt_to_machine(ptr).maddr;
+	u.val = pud_val_ma(val);
+	extend_mmu_update(&u);
 
 	xen_mc_issue(PARAVIRT_LAZY_MMU);
 
@@ -429,7 +459,9 @@ void xen_pmd_clear(pmd_t *pmdp)
 
 pmd_t xen_make_pmd(pmdval_t pmd)
 {
-	pmd = pte_pfn_to_mfn(pmd);
+	if (pmd & _PAGE_PRESENT)
+		pmd = phys_to_machine(XPADDR(pmd)).maddr;
+
 	return native_make_pmd(pmd);
 }
 
