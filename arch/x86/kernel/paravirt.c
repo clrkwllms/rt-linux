@@ -403,6 +403,7 @@ struct pv_mmu_ops pv_mmu_ops = {
 #endif /* PAGETABLE_LEVELS >= 3 */
 
 	.pte_val = native_pte_val,
+	.pte_flags = native_pte_val,
 	.pgd_val = native_pgd_val,
 
 	.make_pte = native_make_pte,
@@ -416,6 +417,8 @@ struct pv_mmu_ops pv_mmu_ops = {
 		.enter = paravirt_nop,
 		.leave = paravirt_nop,
 	},
+
+	.set_fixmap = native_set_fixmap,
 };
 
 EXPORT_SYMBOL_GPL(pv_time_ops);
