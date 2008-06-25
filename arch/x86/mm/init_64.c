@@ -294,7 +294,7 @@ __meminit void *early_ioremap(unsigned long addr, unsigned long size)
 continue_outer_loop:
 		;
 	}
-	printk(KERN_ERR "early_ioremap(0x%lx, %lu) failed\n", addr, size);
+	printk(KERN_ERR "early_ioremap(%#lx, %lu) failed\n", addr, size);
 
 	return NULL;
 }
