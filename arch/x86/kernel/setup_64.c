@@ -56,6 +56,7 @@
 #include <asm/desc.h>
 #include <video/edid.h>
 #include <asm/e820.h>
+#include <asm/mpspec.h>
 #include <asm/dma.h>
 #include <asm/gart.h>
 #include <asm/mpspec.h>
@@ -227,74 +228,6 @@ static inline void copy_edd(void)
 }
 #endif
 
-#ifdef CONFIG_KEXEC
-static void __init reserve_crashkernel(void)
-{
-	unsigned long long total_mem;
-	unsigned long long crash_size, crash_base;
-	int ret;
-
-	total_mem = ((unsigned long long)max_low_pfn - min_low_pfn) << PAGE_SHIFT;
-
-	ret = parse_crashkernel(boot_command_line, total_mem,
-			&crash_size, &crash_base);
-	if (ret == 0 && crash_size) {
-		if (crash_base <= 0) {
-			printk(KERN_INFO "crashkernel reservation failed - "
-					"you have to specify a base address\n");
-			return;
-		}
-
-		if (reserve_bootmem(crash_base, crash_size,
-					BOOTMEM_EXCLUSIVE) < 0) {
-			printk(KERN_INFO "crashkernel reservation failed - "
-					"memory is in use\n");
-			return;
-		}
-
-		printk(KERN_INFO "Reserving %ldMB of memory at %ldMB "
-				"for crashkernel (System RAM: %ldMB)\n",
-				(unsigned long)(crash_size >> 20),
-				(unsigned long)(crash_base >> 20),
-				(unsigned long)(total_mem >> 20));
-		crashk_res.start = crash_base;
-		crashk_res.end   = crash_base + crash_size - 1;
-		insert_resource(&iomem_resource, &crashk_res);
-	}
-}
-#else
-static inline void __init reserve_crashkernel(void)
-{}
-#endif
-
-/* Overridden in paravirt.c if CONFIG_PARAVIRT */
-void __attribute__((weak)) __init memory_setup(void)
-{
-       machine_specific_memory_setup();
-}
-
-static void __init parse_setup_data(void)
-{
-	struct setup_data *data;
-	unsigned long pa_data;
-
-	if (boot_params.hdr.version < 0x0209)
-		return;
-	pa_data = boot_params.hdr.setup_data;
-	while (pa_data) {
-		data = early_ioremap(pa_data, PAGE_SIZE);
-		switch (data->type) {
-		default:
-			break;
-		}
-#ifndef CONFIG_DEBUG_BOOT_PARAMS
-		free_early(pa_data, pa_data+sizeof(*data)+data->len);
-#endif
-		pa_data = data->next;
-		early_iounmap(data, PAGE_SIZE);
-	}
-}
-
 /*
  * setup_arch - architecture-specific boot-time initializations
  *
@@ -319,13 +252,15 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #ifdef CONFIG_EFI
 	if (!strncmp((char *)&boot_params.efi_info.efi_loader_signature,
-		     "EL64", 4))
+		     "EL64", 4)) {
 		efi_enabled = 1;
+		efi_reserve_early();
+	}
 #endif
 
 	ARCH_SETUP
 
-	memory_setup();
+	setup_memory_map();
 	copy_edd();
 
 	if (!boot_params.hdr.root_flags)
@@ -372,9 +307,13 @@ void __init setup_arch(char **cmdline_p)
 	 * we are rounding upwards:
 	 */
 	end_pfn = e820_end_of_ram();
+
+	/* pre allocte 4k for mptable mpc */
+	early_reserve_e820_mpc_new();
 	/* update e820 for memory not covered by WB MTRRs */
 	mtrr_bp_init();
 	if (mtrr_trim_uncached_memory(end_pfn)) {
+		remove_all_active_ranges();
 		e820_register_active_regions(0, 0, -1UL);
 		end_pfn = e820_end_of_ram();
 	}
@@ -383,7 +322,7 @@ void __init setup_arch(char **cmdline_p)
 
 	check_efer();
 
-	max_pfn_mapped = init_memory_mapping(0, (max_pfn_mapped << PAGE_SHIFT));
+	max_pfn_mapped = init_memory_mapping(0, (end_pfn << PAGE_SHIFT));
 	if (efi_enabled)
 		efi_init();
 
@@ -395,15 +334,6 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_KVM_CLOCK
 	kvmclock_init();
-#endif
-
-#ifdef CONFIG_SMP
-	/* setup to use the early static init tables during kernel startup */
-	x86_cpu_to_apicid_early_ptr = (void *)x86_cpu_to_apicid_init;
-	x86_bios_cpu_apicid_early_ptr = (void *)x86_bios_cpu_apicid_init;
-#ifdef CONFIG_NUMA
-	x86_cpu_to_node_map_early_ptr = (void *)x86_cpu_to_node_map_init;
-#endif
 #endif
 
 #ifdef CONFIG_ACPI
@@ -444,13 +374,12 @@ void __init setup_arch(char **cmdline_p)
        acpi_reserve_bootmem();
 #endif
 
-	if (efi_enabled)
-		efi_reserve_bootmem();
-
+#ifdef CONFIG_X86_MPPARSE
        /*
 	* Find and reserve possible boot-time SMP configuration:
 	*/
 	find_smp_config();
+#endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (boot_params.hdr.type_of_loader && boot_params.hdr.ramdisk_image) {
 		unsigned long ramdisk_image = boot_params.hdr.ramdisk_image;
@@ -493,11 +422,13 @@ void __init setup_arch(char **cmdline_p)
 
 	init_cpu_to_node();
 
+#ifdef CONFIG_X86_MPPARSE
 	/*
 	 * get boot-time SMP configuration:
 	 */
 	if (smp_found_config)
 		get_smp_config();
+#endif
 	init_apic_mappings();
 	ioapic_init_mappings();
 
@@ -507,7 +438,7 @@ void __init setup_arch(char **cmdline_p)
 	 * We trust e820 completely. No explicit ROM probing in memory.
 	 */
 	e820_reserve_resources();
-	e820_mark_nosave_regions();
+	e820_mark_nosave_regions(end_pfn);
 
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < ARRAY_SIZE(standard_io_resources); i++)
