@@ -865,6 +865,28 @@ asmlinkage notrace  __kprobes void default_do_nmi(struct pt_regs *regs)
 		io_check_error(reason, regs);
 }
 
+asmlinkage notrace __kprobes void
+do_nmi(struct pt_regs *regs, long error_code)
+{
+	nmi_enter();
+	add_pda(__nmi_count, 1);
+	if (!ignore_nmis)
+		default_do_nmi(regs);
+	nmi_exit();
+}
+
+void stop_nmi(void)
+{
+	nmi_acpi_disable();
+	ignore_nmis++;
+}
+
+void restart_nmi(void)
+{
+	ignore_nmis--;
+	nmi_acpi_enable();
+}
+
 /* runs on IST stack. */
 asmlinkage void __kprobes do_int3(struct pt_regs * regs, long error_code)
 {

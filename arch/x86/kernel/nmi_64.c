@@ -214,7 +214,7 @@ late_initcall(init_lapic_nmi_sysfs);
 
 #endif	/* CONFIG_PM */
 
-static void __acpi_nmi_enable(void *__unused)
+static void __nmi_acpi_enable(void *__unused)
 {
 	apic_write(APIC_LVT0, APIC_DM_NMI);
 }
@@ -222,13 +222,13 @@ static void __acpi_nmi_enable(void *__unused)
 /*
  * Enable timer based NMIs on all CPUs:
  */
-void acpi_nmi_enable(void)
+void nmi_acpi_enable(void)
 {
 	if (atomic_read(&nmi_active) && nmi_watchdog == NMI_IO_APIC)
-		on_each_cpu(__acpi_nmi_enable, NULL, 0, 1);
+		on_each_cpu(__nmi_acpi_enable, NULL, 0, 1);
 }
 
-static void __acpi_nmi_disable(void *__unused)
+static void __nmi_acpi_disable(void *__unused)
 {
 	apic_write(APIC_LVT0, APIC_DM_NMI | APIC_LVT_MASKED);
 }
@@ -236,10 +236,10 @@ static void __acpi_nmi_disable(void *__unused)
 /*
  * Disable timer based NMIs on all CPUs:
  */
-void acpi_nmi_disable(void)
+void nmi_acpi_disable(void)
 {
 	if (atomic_read(&nmi_active) && nmi_watchdog == NMI_IO_APIC)
-		on_each_cpu(__acpi_nmi_disable, NULL, 0, 1);
+		on_each_cpu(__nmi_acpi_disable, NULL, 0, 1);
 }
 
 void setup_apic_nmi_watchdog(void *unused)
@@ -397,14 +397,14 @@ do_nmi(struct pt_regs *regs, long error_code)
 
 void stop_nmi(void)
 {
-	acpi_nmi_disable();
+	nmi_acpi_disable();
 	ignore_nmis++;
 }
 
 void restart_nmi(void)
 {
 	ignore_nmis--;
-	acpi_nmi_enable();
+	nmi_acpi_enable();
 }
 
 #ifdef CONFIG_SYSCTL

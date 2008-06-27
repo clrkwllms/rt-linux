@@ -847,14 +847,14 @@ notrace __kprobes void do_nmi(struct pt_regs *regs, long error_code)
 
 void stop_nmi(void)
 {
-	acpi_nmi_disable();
+	nmi_acpi_disable();
 	ignore_nmis++;
 }
 
 void restart_nmi(void)
 {
 	ignore_nmis--;
-	acpi_nmi_enable();
+	nmi_acpi_enable();
 }
 
 #ifdef CONFIG_KPROBES
