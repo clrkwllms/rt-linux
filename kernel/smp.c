@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #include <linux/percpu.h>
 #include <linux/rcupdate.h>
+#include <linux/rculist.h>
 #include <linux/smp.h>
 
 static DEFINE_PER_CPU(struct call_single_queue, call_single_queue);
