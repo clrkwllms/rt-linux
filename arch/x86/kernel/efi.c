@@ -64,6 +64,17 @@ static int __init setup_noefi(char *arg)
 }
 early_param("noefi", setup_noefi);
 
+int add_efi_memmap;
+EXPORT_SYMBOL(add_efi_memmap);
+
+static int __init setup_add_efi_memmap(char *arg)
+{
+	add_efi_memmap = 1;
+	return 0;
+}
+early_param("add_efi_memmap", setup_add_efi_memmap);
+
+
 static efi_status_t virt_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
 {
 	return efi_call_virt2(get_time, tm, tc);
@@ -219,7 +230,7 @@ unsigned long efi_get_time(void)
  * (zeropage) memory map.
  */
 
-static void __init add_efi_memmap(void)
+static void __init do_add_efi_memmap(void)
 {
 	void *p;
 
@@ -242,9 +253,11 @@ void __init efi_reserve_early(void)
 {
 	unsigned long pmap;
 
+#ifdef CONFIG_X86_32
 	pmap = boot_params.efi_info.efi_memmap;
-#ifdef CONFIG_X86_64
-	pmap += (__u64)boot_params.efi_info.efi_memmap_hi << 32;
+#else
+	pmap = (boot_params.efi_info.efi_memmap |
+		((__u64)boot_params.efi_info.efi_memmap_hi<<32));
 #endif
 	memmap.phys_map = (void *)pmap;
 	memmap.nr_map = boot_params.efi_info.efi_memmap_size /
@@ -284,10 +297,12 @@ void __init efi_init(void)
 	int i = 0;
 	void *tmp;
 
+#ifdef CONFIG_X86_32
 	efi_phys.systab = (efi_system_table_t *)boot_params.efi_info.efi_systab;
-#ifdef CONFIG_X86_64
-	efi_phys.systab = (void *)efi_phys.systab +
-		((__u64)boot_params.efi_info.efi_systab_hi<<32);
+#else
+	efi_phys.systab = (efi_system_table_t *)
+		(boot_params.efi_info.efi_systab |
+		 ((__u64)boot_params.efi_info.efi_systab_hi<<32));
 #endif
 
 	efi.systab = early_ioremap((unsigned long)efi_phys.systab,
@@ -402,7 +417,8 @@ void __init efi_init(void)
 	if (memmap.desc_size != sizeof(efi_memory_desc_t))
 		printk(KERN_WARNING "Kernel-defined memdesc"
 		       "doesn't match the one from EFI!\n");
-	add_efi_memmap();
+	if (add_efi_memmap)
+		do_add_efi_memmap();
 
 	/* Setup for EFI runtime service */
 	reboot_type = BOOT_EFI;

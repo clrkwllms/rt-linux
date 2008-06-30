@@ -2933,10 +2933,14 @@ void __init free_bootmem_with_active_regions(int nid,
 void __init work_with_active_regions(int nid, work_fn_t work_fn, void *data)
 {
 	int i;
+	int ret;
 
-	for_each_active_range_index_in_nid(i, nid)
-		work_fn(early_node_map[i].start_pfn, early_node_map[i].end_pfn,
-			data);
+	for_each_active_range_index_in_nid(i, nid) {
+		ret = work_fn(early_node_map[i].start_pfn,
+			      early_node_map[i].end_pfn, data);
+		if (ret)
+			break;
+	}
 }
 /**
  * sparse_memory_present_with_active_regions - Call memory_present for each active range
@@ -3517,7 +3521,7 @@ void __init add_active_range(unsigned int nid, unsigned long start_pfn,
 {
 	int i;
 
-	printk(KERN_DEBUG "Entering add_active_range(%d, %lu, %lu) "
+	printk(KERN_DEBUG "Entering add_active_range(%d, %#lx, %#lx) "
 			  "%d entries of %d used\n",
 			  nid, start_pfn, end_pfn,
 			  nr_nodemap_entries, MAX_ACTIVE_REGIONS);
@@ -3666,7 +3670,7 @@ static void __init sort_node_map(void)
 }
 
 /* Find the lowest pfn for a node */
-unsigned long __init find_min_pfn_for_node(unsigned long nid)
+unsigned long __init find_min_pfn_for_node(int nid)
 {
 	int i;
 	unsigned long min_pfn = ULONG_MAX;
@@ -3677,7 +3681,7 @@ unsigned long __init find_min_pfn_for_node(unsigned long nid)
 
 	if (min_pfn == ULONG_MAX) {
 		printk(KERN_WARNING
-			"Could not find start_pfn for node %lu\n", nid);
+			"Could not find start_pfn for node %d\n", nid);
 		return 0;
 	}
 
@@ -3933,7 +3937,7 @@ void __init free_area_init_nodes(unsigned long *max_zone_pfn)
 	for (i = 0; i < MAX_NR_ZONES; i++) {
 		if (i == ZONE_MOVABLE)
 			continue;
-		printk("  %-8s %8lu -> %8lu\n",
+		printk("  %-8s %0#10lx -> %0#10lx\n",
 				zone_names[i],
 				arch_zone_lowest_possible_pfn[i],
 				arch_zone_highest_possible_pfn[i]);
@@ -3949,7 +3953,7 @@ void __init free_area_init_nodes(unsigned long *max_zone_pfn)
 	/* Print out the early_node_map[] */
 	printk("early_node_map[%d] active PFN ranges\n", nr_nodemap_entries);
 	for (i = 0; i < nr_nodemap_entries; i++)
-		printk("  %3d: %8lu -> %8lu\n", early_node_map[i].nid,
+		printk("  %3d: %0#10lx -> %0#10lx\n", early_node_map[i].nid,
 						early_node_map[i].start_pfn,
 						early_node_map[i].end_pfn);
 
