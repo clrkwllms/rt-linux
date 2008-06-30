@@ -828,16 +828,26 @@ void __init free_early(u64 start, u64 end)
 
 void __init early_res_to_bootmem(u64 start, u64 end)
 {
-	int i;
+	int i, count;
 	u64 final_start, final_end;
-	for (i = 0; i < MAX_EARLY_RES && early_res[i].end; i++) {
+
+	count  = 0;
+	for (i = 0; i < MAX_EARLY_RES && early_res[i].end; i++)
+		count++;
+
+	printk(KERN_INFO "(%d early reservations) ==> bootmem\n", count);
+	for (i = 0; i < count; i++) {
 		struct early_res *r = &early_res[i];
+		printk(KERN_INFO "  #%d [ %010llx - %010llx ] %16s", i,
+			r->start, r->end, r->name);
 		final_start = max(start, r->start);
 		final_end = min(end, r->end);
-		if (final_start >= final_end)
+		if (final_start >= final_end) {
+			printk(KERN_CONT "\n");
 			continue;
-		printk(KERN_INFO "  early res: %d [%llx-%llx] %s\n", i,
-			final_start, final_end - 1, r->name);
+		}
+		printk(KERN_CONT " ===> [ %010llx - %010llx ]\n",
+			final_start, final_end);
 		reserve_bootmem_generic(final_start, final_end - final_start,
 				BOOTMEM_DEFAULT);
 	}
@@ -1117,6 +1127,9 @@ static int __init parse_memopt(char *p)
 
 	mem_size = memparse(p, &p);
 	end_user_pfn = mem_size>>PAGE_SHIFT;
+	e820_update_range(mem_size, ULLONG_MAX - mem_size,
+		E820_RAM, E820_RESERVED);
+
 	return 0;
 }
 early_param("mem", parse_memopt);
@@ -1161,6 +1174,8 @@ static int __init parse_memmap_opt(char *p)
 		e820_add_region(start_at, mem_size, E820_RESERVED);
 	} else {
 		end_user_pfn = (mem_size >> PAGE_SHIFT);
+		e820_update_range(mem_size, ULLONG_MAX - mem_size,
+			E820_RAM, E820_RESERVED);
 	}
 	return *p == '\0' ? 0 : -EINVAL;
 }
@@ -1187,6 +1202,7 @@ void __init e820_reserve_resources(void)
 {
 	int i;
 	struct resource *res;
+	u64 end;
 
 	res = alloc_bootmem_low(sizeof(struct resource) * e820.nr_map);
 	for (i = 0; i < e820.nr_map; i++) {
@@ -1196,14 +1212,16 @@ void __init e820_reserve_resources(void)
 		case E820_NVS:	res->name = "ACPI Non-volatile Storage"; break;
 		default:	res->name = "reserved";
 		}
-		res->start = e820.map[i].addr;
-		res->end = res->start + e820.map[i].size - 1;
+		end = e820.map[i].addr + e820.map[i].size - 1;
 #ifndef CONFIG_RESOURCES_64BIT
-		if (res->end > 0x100000000ULL) {
+		if (end > 0x100000000ULL) {
 			res++;
 			continue;
 		}
 #endif
+		res->start = e820.map[i].addr;
+		res->end = end;
+
 		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 		insert_resource(&iomem_resource, res);
 		res++;
