@@ -452,10 +452,13 @@ is386:	movl $2,%ecx		# set MP
 	je   1f
 	movl $(__KERNEL_PERCPU), %eax
 	movl %eax,%fs		# set this cpu's percpu
-	jmp initialize_secondary # all other CPUs call initialize_secondary
+	movl (stack_start), %esp
 1:
 #endif /* CONFIG_SMP */
-	jmp i386_start_kernel
+	jmp *(initial_code)
+.align 4
+ENTRY(initial_code)
+	.long i386_start_kernel
 
 /*
  * We depend on ET to be correct. This checks for 287/387.
