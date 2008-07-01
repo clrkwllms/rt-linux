@@ -27,8 +27,10 @@ static void memset_one_page(void *s, int c, size_t n)
 		return;
 	}
 
-	/* While we are not guarding the page in question, nobody else
-	 * should be able to change them. */
+	/*
+	 * While we are not guarding the page in question, nobody else
+	 * should be able to change them.
+	 */
 	local_irq_save(flags);
 
 	kmemcheck_pause_allbutself();
@@ -68,8 +70,10 @@ void *kmemcheck_memset(void *s, int c, size_t n)
 	end_page = (addr + n) & PAGE_MASK;
 
 	if (start_page == end_page) {
-		/* The entire area is within the same page. Good, we only
-		 * need one memset(). */
+		/*
+		 * The entire area is within the same page. Good, we only
+		 * need one memset().
+		 */
 		memset_one_page(s, c, n);
 		return s;
 	}

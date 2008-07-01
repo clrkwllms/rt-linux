@@ -6,6 +6,7 @@
 #include <linux/stacktrace.h>
 #include <linux/string.h>
 
+#include "error.h"
 #include "shadow.h"
 
 enum kmemcheck_error_type {

@@ -399,7 +399,7 @@ void __tasklet_hi_schedule_first(struct tasklet_struct *t)
 
 	t->next = __get_cpu_var(tasklet_hi_vec).head;
 	__get_cpu_var(tasklet_hi_vec).head = t;
-	__raise_softirq_irqoff(TASKLET_SOFTIRQ);
+	__raise_softirq_irqoff(HI_SOFTIRQ);
 }
 
 EXPORT_SYMBOL(__tasklet_hi_schedule_first);

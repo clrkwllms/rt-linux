@@ -21,10 +21,12 @@ static bool opcode_is_rex_prefix(uint8_t b)
 	return (b & 0xf0) == 0x40;
 }
 
-/* This is a VERY crude opcode decoder. We only need to find the size of the
+/*
+ * This is a VERY crude opcode decoder. We only need to find the size of the
  * load/store that caused our #PF and this should work for all the opcodes
  * that we care about. Moreover, the ones who invented this instruction set
- * should be shot. */
+ * should be shot.
+ */
 unsigned int kmemcheck_opcode_get_size(const uint8_t *op)
 {
 	/* Default operand size */

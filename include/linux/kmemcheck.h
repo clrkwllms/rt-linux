@@ -1,6 +1,7 @@
 #ifndef LINUX_KMEMCHECK_H
 #define LINUX_KMEMCHECK_H
 
+#include <linux/mm_types.h>
 #include <linux/types.h>
 
 #ifdef CONFIG_KMEMCHECK

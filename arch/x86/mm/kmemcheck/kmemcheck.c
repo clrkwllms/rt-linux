@@ -39,8 +39,10 @@ void __init kmemcheck_init(void)
 	kmemcheck_smp_init();
 
 #if defined(CONFIG_SMP) && !defined(CONFIG_KMEMCHECK_USE_SMP)
-	/* Limit SMP to use a single CPU. We rely on the fact that this code
-	* runs before SMP is set up. */
+	/*
+	 * Limit SMP to use a single CPU. We rely on the fact that this code
+	 * runs before SMP is set up.
+	 */
 	if (setup_max_cpus > 1) {
 		printk(KERN_INFO
 			"kmemcheck: Limiting number of CPUs to 1.\n");
@@ -144,8 +146,10 @@ void kmemcheck_show(struct pt_regs *regs)
 	n += kmemcheck_show_addr(data->addr1);
 	n += kmemcheck_show_addr(data->addr2);
 
-	/* None of the addresses actually belonged to kmemcheck. Note that
-	 * this is not an error. */
+	/*
+	 * None of the addresses actually belonged to kmemcheck. Note that
+	 * this is not an error.
+	 */
 	if (n == 0) {
 		kmemcheck_resume();
 		return;
@@ -348,7 +352,7 @@ enum kmemcheck_method {
 	KMEMCHECK_WRITE,
 };
 
-void kmemcheck_access(struct pt_regs *regs,
+static void kmemcheck_access(struct pt_regs *regs,
 	unsigned long fallback_address, enum kmemcheck_method fallback_method)
 {
 	const uint8_t *insn;
@@ -414,8 +418,10 @@ void kmemcheck_access(struct pt_regs *regs,
 		/* MOVS, MOVSB, MOVSW, MOVSD */
 	case 0xa4:
 	case 0xa5:
-		/* These instructions are special because they take two
-		 * addresses, but we only get one page fault. */
+		/*
+		 * These instructions are special because they take two
+		 * addresses, but we only get one page fault.
+		 */
 		kmemcheck_read(regs, regs->si, size);
 		kmemcheck_write(regs, regs->di, size);
 		data->addr1 = regs->si;
@@ -434,9 +440,11 @@ void kmemcheck_access(struct pt_regs *regs,
 		return;
 	}
 
-	/* If the opcode isn't special in any way, we use the data from the
+	/*
+	 * If the opcode isn't special in any way, we use the data from the
 	 * page fault handler to determine the address and type of memory
-	 * access. */
+	 * access.
+	 */
 	switch (fallback_method) {
 	case KMEMCHECK_READ:
 		kmemcheck_read(regs, fallback_address, size);
