@@ -348,7 +348,7 @@ enum kmemcheck_method {
 	KMEMCHECK_WRITE,
 };
 
-void kmemcheck_access(struct pt_regs *regs,
+static void kmemcheck_access(struct pt_regs *regs,
 	unsigned long fallback_address, enum kmemcheck_method fallback_method)
 {
 	const uint8_t *insn;

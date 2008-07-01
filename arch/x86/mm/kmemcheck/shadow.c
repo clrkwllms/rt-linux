@@ -1,3 +1,4 @@
+#include <linux/kmemcheck.h>
 #include <linux/mm.h>
 
 #include <asm/page.h>
