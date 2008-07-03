@@ -1,6 +1,7 @@
 #include <linux/sched.h>
 #include <linux/clocksource.h>
 #include <linux/workqueue.h>
+#include <linux/delay.h>
 #include <linux/cpufreq.h>
 #include <linux/jiffies.h>
 #include <linux/init.h>
@@ -286,7 +287,6 @@ core_initcall(cpufreq_tsc);
 
 /* clock source code */
 
-static unsigned long current_tsc_khz;
 static struct clocksource clocksource_tsc;
 
 /*
@@ -404,6 +404,7 @@ static inline void check_geode_tsc_reliable(void) { }
 void __init tsc_init(void)
 {
 	int cpu;
+	u64 lpj;
 
 	if (!cpu_has_tsc || tsc_disabled > 0)
 		return;
@@ -415,6 +416,10 @@ void __init tsc_init(void)
 		mark_tsc_unstable("could not calculate TSC khz");
 		return;
 	}
+
+	lpj = ((u64)tsc_khz * 1000);
+	do_div(lpj, HZ);
+	lpj_fine = lpj;
 
 	/* now allow native_sched_clock() to use rdtsc */
 	tsc_disabled = 0;
@@ -439,9 +444,8 @@ void __init tsc_init(void)
 
 	unsynchronized_tsc();
 	check_geode_tsc_reliable();
-	current_tsc_khz = tsc_khz;
-	clocksource_tsc.mult = clocksource_khz2mult(current_tsc_khz,
-							clocksource_tsc.shift);
+	clocksource_tsc.mult = clocksource_khz2mult(tsc_khz,
+						    clocksource_tsc.shift);
 	/* lower the rating if we already know its unstable: */
 	if (check_tsc_unstable()) {
 		clocksource_tsc.rating = 0;

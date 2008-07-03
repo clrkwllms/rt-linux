@@ -756,9 +756,9 @@ unknown_nmi_error(unsigned char reason, struct pt_regs *regs)
 
 static DEFINE_SPINLOCK(nmi_print_lock);
 
-void notrace __kprobes die_nmi(struct pt_regs *regs, const char *msg)
+void notrace __kprobes die_nmi(char *str, struct pt_regs *regs, int do_panic)
 {
-	if (notify_die(DIE_NMIWATCHDOG, msg, regs, 0, 2, SIGINT) == NOTIFY_STOP)
+	if (notify_die(DIE_NMIWATCHDOG, str, regs, 0, 2, SIGINT) == NOTIFY_STOP)
 		return;
 
 	spin_lock(&nmi_print_lock);
@@ -767,10 +767,12 @@ void notrace __kprobes die_nmi(struct pt_regs *regs, const char *msg)
 	* to get a message out:
 	*/
 	bust_spinlocks(1);
-	printk(KERN_EMERG "%s", msg);
+	printk(KERN_EMERG "%s", str);
 	printk(" on CPU%d, ip %08lx, registers:\n",
 		smp_processor_id(), regs->ip);
 	show_registers(regs);
+	if (do_panic)
+		panic("Non maskable interrupt");
 	console_silent();
 	spin_unlock(&nmi_print_lock);
 	bust_spinlocks(0);
@@ -1117,7 +1119,7 @@ void do_spurious_interrupt_bug(struct pt_regs *regs, long error_code)
 
 unsigned long patch_espfix_desc(unsigned long uesp, unsigned long kesp)
 {
-	struct desc_struct *gdt = __get_cpu_var(gdt_page).gdt;
+	struct desc_struct *gdt = get_cpu_gdt_table(smp_processor_id());
 	unsigned long base = (kesp - uesp) & -THREAD_SIZE;
 	unsigned long new_kesp = kesp - base;
 	unsigned long lim_pages = (new_kesp | (THREAD_SIZE - 1)) >> PAGE_SHIFT;
@@ -1196,10 +1198,6 @@ void __init trap_init(void)
 	early_iounmap(p, 4);
 #endif
 
-#ifdef CONFIG_X86_LOCAL_APIC
-	init_apic_mappings();
-#endif
-	set_trap_gate(0,  &divide_error);
 	set_intr_gate(1,  &debug);
 	set_intr_gate(2,  &nmi);
 	set_system_intr_gate(3, &int3); /* int3/4 can be called from all */
