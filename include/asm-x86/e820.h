@@ -44,6 +44,9 @@
 #define E820_ACPI	3
 #define E820_NVS	4
 
+/* reserved RAM used by kernel itself */
+#define E820_RESERVED_KERN        128
+
 #ifndef __ASSEMBLY__
 struct e820entry {
 	__u64 addr;	/* start of memory segment */
@@ -64,7 +67,6 @@ extern void e820_add_region(u64 start, u64 size, int type);
 extern void e820_print_map(char *who);
 extern int
 sanitize_e820_map(struct e820entry *biosmap, int max_nr_map, int *pnr_map);
-extern int copy_e820_map(struct e820entry *biosmap, int nr_map);
 extern u64 e820_update_range(u64 start, u64 size, unsigned old_type,
 			       unsigned new_type);
 extern u64 e820_remove_range(u64 start, u64 size, unsigned old_type,
@@ -72,7 +74,7 @@ extern u64 e820_remove_range(u64 start, u64 size, unsigned old_type,
 extern void update_e820(void);
 extern void e820_setup_gap(void);
 extern int e820_search_gap(unsigned long *gapstart, unsigned long *gapsize,
-				unsigned long start_addr);
+			unsigned long start_addr, unsigned long long end_addr);
 struct setup_data;
 extern void parse_e820_ext(struct setup_data *data, unsigned long pa_data);
 

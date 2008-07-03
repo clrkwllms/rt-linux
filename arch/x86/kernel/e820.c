@@ -120,6 +120,7 @@ void __init e820_print_map(char *who)
 		       (e820.map[i].addr + e820.map[i].size));
 		switch (e820.map[i].type) {
 		case E820_RAM:
+		case E820_RESERVED_KERN:
 			printk(KERN_CONT "(usable)\n");
 			break;
 		case E820_RESERVED:
@@ -359,7 +360,7 @@ int __init sanitize_e820_map(struct e820entry *biosmap, int max_nr_map,
 	return 0;
 }
 
-static int __init __copy_e820_map(struct e820entry *biosmap, int nr_map)
+static int __init __append_e820_map(struct e820entry *biosmap, int nr_map)
 {
 	while (nr_map) {
 		u64 start = biosmap->addr;
@@ -388,13 +389,13 @@ static int __init __copy_e820_map(struct e820entry *biosmap, int nr_map)
  * will have given us a memory map that we can use to properly
  * set up memory.  If we aren't, we'll fake a memory map.
  */
-int __init copy_e820_map(struct e820entry *biosmap, int nr_map)
+static int __init append_e820_map(struct e820entry *biosmap, int nr_map)
 {
 	/* Only one memory region (or negative)? Ignore it */
 	if (nr_map < 2)
 		return -1;
 
-	return __copy_e820_map(biosmap, nr_map);
+	return __append_e820_map(biosmap, nr_map);
 }
 
 u64 __init e820_update_range(u64 start, u64 size, unsigned old_type,
@@ -486,16 +487,18 @@ void __init update_e820(void)
 	printk(KERN_INFO "modified physical RAM map:\n");
 	e820_print_map("modified");
 }
-
+#define MAX_GAP_END 0x100000000ull
 /*
- * Search for a gap in the e820 memory space from start_addr to 2^32.
+ * Search for a gap in the e820 memory space from start_addr to end_addr.
  */
 __init int e820_search_gap(unsigned long *gapstart, unsigned long *gapsize,
-		unsigned long start_addr)
+		unsigned long start_addr, unsigned long long end_addr)
 {
-	unsigned long long last = 0x100000000ull;
+	unsigned long long last;
 	int i = e820.nr_map;
 	int found = 0;
+
+	last = (end_addr && end_addr < MAX_GAP_END) ? end_addr : MAX_GAP_END;
 
 	while (--i >= 0) {
 		unsigned long long start = e820.map[i].addr;
@@ -536,7 +539,7 @@ __init void e820_setup_gap(void)
 
 	gapstart = 0x10000000;
 	gapsize = 0x400000;
-	found  = e820_search_gap(&gapstart, &gapsize, 0);
+	found  = e820_search_gap(&gapstart, &gapsize, 0, MAX_GAP_END);
 
 #ifdef CONFIG_X86_64
 	if (!found) {
@@ -580,7 +583,7 @@ void __init parse_e820_ext(struct setup_data *sdata, unsigned long pa_data)
 	if (map_len > PAGE_SIZE)
 		sdata = early_ioremap(pa_data, map_len);
 	extmap = (struct e820entry *)(sdata->data);
-	__copy_e820_map(extmap, entries);
+	__append_e820_map(extmap, entries);
 	sanitize_e820_map(e820.map, ARRAY_SIZE(e820.map), &e820.nr_map);
 	if (map_len > PAGE_SIZE)
 		early_iounmap(sdata, map_len);
@@ -611,7 +614,7 @@ void __init e820_mark_nosave_regions(unsigned long limit_pfn)
 			register_nosave_region(pfn, PFN_UP(ei->addr));
 
 		pfn = PFN_DOWN(ei->addr + ei->size);
-		if (ei->type != E820_RAM)
+		if (ei->type != E820_RAM && ei->type != E820_RESERVED_KERN)
 			register_nosave_region(PFN_UP(ei->addr), pfn);
 
 		if (pfn >= limit_pfn)
@@ -838,7 +841,7 @@ void __init early_res_to_bootmem(u64 start, u64 end)
 	printk(KERN_INFO "(%d early reservations) ==> bootmem\n", count);
 	for (i = 0; i < count; i++) {
 		struct early_res *r = &early_res[i];
-		printk(KERN_INFO "  #%d [ %010llx - %010llx ] %16s", i,
+		printk(KERN_INFO "  #%d [%010llx - %010llx] %16s", i,
 			r->start, r->end, r->name);
 		final_start = max(start, r->start);
 		final_end = min(end, r->end);
@@ -846,7 +849,7 @@ void __init early_res_to_bootmem(u64 start, u64 end)
 			printk(KERN_CONT "\n");
 			continue;
 		}
-		printk(KERN_CONT " ===> [ %010llx - %010llx ]\n",
+		printk(KERN_CONT " ==> [%010llx - %010llx]\n",
 			final_start, final_end);
 		reserve_bootmem_generic(final_start, final_end - final_start,
 				BOOTMEM_DEFAULT);
@@ -1207,6 +1210,7 @@ void __init e820_reserve_resources(void)
 	res = alloc_bootmem_low(sizeof(struct resource) * e820.nr_map);
 	for (i = 0; i < e820.nr_map; i++) {
 		switch (e820.map[i].type) {
+		case E820_RESERVED_KERN:
 		case E820_RAM:	res->name = "System RAM"; break;
 		case E820_ACPI:	res->name = "ACPI Tables"; break;
 		case E820_NVS:	res->name = "ACPI Non-volatile Storage"; break;
@@ -1243,7 +1247,8 @@ char *__init default_machine_specific_memory_setup(void)
 			ARRAY_SIZE(boot_params.e820_map),
 			&new_nr);
 	boot_params.e820_entries = new_nr;
-	if (copy_e820_map(boot_params.e820_map, boot_params.e820_entries) < 0) {
+	if (append_e820_map(boot_params.e820_map, boot_params.e820_entries)
+	  < 0) {
 		u64 mem_size;
 
 		/* compare results from other methods and take the greater */
