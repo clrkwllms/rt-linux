@@ -120,6 +120,7 @@ void __init e820_print_map(char *who)
 		       (e820.map[i].addr + e820.map[i].size));
 		switch (e820.map[i].type) {
 		case E820_RAM:
+		case E820_RESERVED_KERN:
 			printk(KERN_CONT "(usable)\n");
 			break;
 		case E820_RESERVED:
@@ -486,16 +487,18 @@ void __init update_e820(void)
 	printk(KERN_INFO "modified physical RAM map:\n");
 	e820_print_map("modified");
 }
-
+#define MAX_GAP_END 0x100000000ull
 /*
- * Search for a gap in the e820 memory space from start_addr to 2^32.
+ * Search for a gap in the e820 memory space from start_addr to end_addr.
  */
 __init int e820_search_gap(unsigned long *gapstart, unsigned long *gapsize,
-		unsigned long start_addr)
+		unsigned long start_addr, unsigned long long end_addr)
 {
-	unsigned long long last = 0x100000000ull;
+	unsigned long long last;
 	int i = e820.nr_map;
 	int found = 0;
+
+	last = (end_addr && end_addr < MAX_GAP_END) ? end_addr : MAX_GAP_END;
 
 	while (--i >= 0) {
 		unsigned long long start = e820.map[i].addr;
@@ -536,7 +539,7 @@ __init void e820_setup_gap(void)
 
 	gapstart = 0x10000000;
 	gapsize = 0x400000;
-	found  = e820_search_gap(&gapstart, &gapsize, 0);
+	found  = e820_search_gap(&gapstart, &gapsize, 0, MAX_GAP_END);
 
 #ifdef CONFIG_X86_64
 	if (!found) {
@@ -611,7 +614,7 @@ void __init e820_mark_nosave_regions(unsigned long limit_pfn)
 			register_nosave_region(pfn, PFN_UP(ei->addr));
 
 		pfn = PFN_DOWN(ei->addr + ei->size);
-		if (ei->type != E820_RAM)
+		if (ei->type != E820_RAM && ei->type != E820_RESERVED_KERN)
 			register_nosave_region(PFN_UP(ei->addr), pfn);
 
 		if (pfn >= limit_pfn)
@@ -1207,6 +1210,7 @@ void __init e820_reserve_resources(void)
 	res = alloc_bootmem_low(sizeof(struct resource) * e820.nr_map);
 	for (i = 0; i < e820.nr_map; i++) {
 		switch (e820.map[i].type) {
+		case E820_RESERVED_KERN:
 		case E820_RAM:	res->name = "System RAM"; break;
 		case E820_ACPI:	res->name = "ACPI Tables"; break;
 		case E820_NVS:	res->name = "ACPI Non-volatile Storage"; break;
