@@ -455,7 +455,7 @@ config ACPI_SRAT
 
 config HAVE_ARCH_PARSE_SRAT
 	def_bool y
-	depends on ACPI_SRAT || X86_64
+	depends on ACPI_SRAT
 
 config X86_SUMMIT_NUMA
 	def_bool y
