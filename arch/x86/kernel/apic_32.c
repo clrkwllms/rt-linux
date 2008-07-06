@@ -55,9 +55,10 @@ unsigned long mp_lapic_addr;
 /*
  * Knob to control our willingness to enable the local APIC.
  *
- * -1=force-disable, +1=force-enable
+ * +1=force-enable
  */
-int enable_local_apic;
+static int force_enable_local_apic;
+int disable_apic;
 
 /* Local APIC timer verification ok */
 static int local_apic_timer_verify_ok;
@@ -1099,7 +1100,7 @@ static int __init detect_init_APIC(void)
 	u32 h, l, features;
 
 	/* Disabled by kernel option? */
-	if (enable_local_apic < 0)
+	if (disable_apic)
 		return -1;
 
 	switch (boot_cpu_data.x86_vendor) {
@@ -1122,7 +1123,7 @@ static int __init detect_init_APIC(void)
 		 * Over-ride BIOS and try to enable the local APIC only if
 		 * "lapic" specified.
 		 */
-		if (enable_local_apic <= 0) {
+		if (!force_enable_local_apic) {
 			printk(KERN_INFO "Local APIC disabled by BIOS -- "
 			       "you can enable it with \"lapic\"\n");
 			return -1;
@@ -1197,36 +1198,6 @@ void __init init_apic_mappings(void)
 	if (boot_cpu_physical_apicid == -1U)
 		boot_cpu_physical_apicid = GET_APIC_ID(read_apic_id());
 
-#ifdef CONFIG_X86_IO_APIC
-	{
-		unsigned long ioapic_phys, idx = FIX_IO_APIC_BASE_0;
-		int i;
-
-		for (i = 0; i < nr_ioapics; i++) {
-			if (smp_found_config) {
-				ioapic_phys = mp_ioapics[i].mp_apicaddr;
-				if (!ioapic_phys) {
-					printk(KERN_ERR
-					       "WARNING: bogus zero IO-APIC "
-					       "address found in MPTABLE, "
-					       "disabling IO/APIC support!\n");
-					smp_found_config = 0;
-					skip_ioapic_setup = 1;
-					goto fake_ioapic_page;
-				}
-			} else {
-fake_ioapic_page:
-				ioapic_phys = (unsigned long)
-					      alloc_bootmem_pages(PAGE_SIZE);
-				ioapic_phys = __pa(ioapic_phys);
-			}
-			set_fixmap_nocache(idx, ioapic_phys);
-			printk(KERN_DEBUG "mapped IOAPIC to %08lx (%08lx)\n",
-			       __fix_to_virt(idx), ioapic_phys);
-			idx++;
-		}
-	}
-#endif
 }
 
 /*
@@ -1238,7 +1209,7 @@ int apic_version[MAX_APICS];
 
 int __init APIC_init_uniprocessor(void)
 {
-	if (enable_local_apic < 0)
+	if (disable_apic)
 		clear_cpu_cap(&boot_cpu_data, X86_FEATURE_APIC);
 
 	if (!smp_found_config && !cpu_has_apic)
@@ -1712,14 +1683,14 @@ static void apic_pm_activate(void) { }
  */
 static int __init parse_lapic(char *arg)
 {
-	enable_local_apic = 1;
+	force_enable_local_apic = 1;
 	return 0;
 }
 early_param("lapic", parse_lapic);
 
 static int __init parse_nolapic(char *arg)
 {
-	enable_local_apic = -1;
+	disable_apic = 1;
 	clear_cpu_cap(&boot_cpu_data, X86_FEATURE_APIC);
 	return 0;
 }

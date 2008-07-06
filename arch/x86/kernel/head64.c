@@ -123,7 +123,6 @@ void __init x86_64_start_kernel(char * real_mode_data)
 #endif
 
 	reserve_ebda_region();
-	reserve_setup_data();
 
 	/*
 	 * At this point everything still needed from the boot loader
