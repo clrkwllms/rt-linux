@@ -244,3 +244,16 @@ unsigned long long __attribute__((weak)) sched_clock(void)
 {
 	return (unsigned long long)jiffies * (NSEC_PER_SEC / HZ);
 }
+
+unsigned long long cpu_clock(int cpu)
+{
+	unsigned long long clock;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	clock = sched_clock_cpu(cpu);
+	local_irq_restore(flags);
+
+	return clock;
+}
+EXPORT_SYMBOL_GPL(cpu_clock);
