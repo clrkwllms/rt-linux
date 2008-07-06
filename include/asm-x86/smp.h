@@ -109,8 +109,6 @@ int native_cpu_up(unsigned int cpunum);
 extern int __cpu_disable(void);
 extern void __cpu_die(unsigned int cpu);
 
-extern void prefill_possible_map(void);
-
 void smp_store_cpu_info(int id);
 #define cpu_physical_id(cpu)	per_cpu(x86_cpu_to_apicid, cpu)
 
@@ -120,6 +118,14 @@ static inline int num_booting_cpus(void)
 	return cpus_weight(cpu_callout_map);
 }
 #endif /* CONFIG_SMP */
+
+#if defined(CONFIG_SMP) && defined(CONFIG_HOTPLUG_CPU)
+extern void prefill_possible_map(void);
+#else
+static inline void prefill_possible_map(void)
+{
+}
+#endif
 
 extern unsigned disabled_cpus __cpuinitdata;
 
