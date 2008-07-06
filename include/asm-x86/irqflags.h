@@ -51,6 +51,61 @@ static inline void native_halt(void)
 
 #endif
 
+#ifdef CONFIG_X86_64
+/*
+ * Only returns from a trap or exception to a NMI context (intra-privilege
+ * level near return) to the same SS and CS segments. Should be used
+ * upon trap or exception return when nested over a NMI context so no iret is
+ * issued. It takes care of modifying the eflags, rsp and returning to the
+ * previous function.
+ *
+ * The stack, at that point, looks like :
+ *
+ * 0(rsp)  RIP
+ * 8(rsp)  CS
+ * 16(rsp) EFLAGS
+ * 24(rsp) RSP
+ * 32(rsp) SS
+ *
+ * Upon execution :
+ * Copy EIP to the top of the return stack
+ * Update top of return stack address
+ * Pop eflags into the eflags register
+ * Make the return stack current
+ * Near return (popping the return address from the return stack)
+ */
+#define NATIVE_INTERRUPT_RETURN_NMI_SAFE	pushq %rax;		\
+						movq %rsp, %rax;	\
+						movq 24+8(%rax), %rsp;	\
+						pushq 0+8(%rax);	\
+						pushq 16+8(%rax);	\
+						movq (%rax), %rax;	\
+						popfq;			\
+						ret
+#else
+/*
+ * Protected mode only, no V8086. Implies that protected mode must
+ * be entered before NMIs or MCEs are enabled. Only returns from a trap or
+ * exception to a NMI context (intra-privilege level far return). Should be used
+ * upon trap or exception return when nested over a NMI context so no iret is
+ * issued.
+ *
+ * The stack, at that point, looks like :
+ *
+ * 0(esp) EIP
+ * 4(esp) CS
+ * 8(esp) EFLAGS
+ *
+ * Upon execution :
+ * Copy the stack eflags to top of stack
+ * Pop eflags into the eflags register
+ * Far return: pop EIP and CS into their register, and additionally pop EFLAGS.
+ */
+#define NATIVE_INTERRUPT_RETURN_NMI_SAFE	pushl 8(%esp);	\
+						popfl;		\
+						lret $4
+#endif
+
 #ifdef CONFIG_PARAVIRT
 #include <asm/paravirt.h>
 #else
@@ -109,16 +164,38 @@ static inline unsigned long __raw_local_irq_save(void)
 
 #define ENABLE_INTERRUPTS(x)	sti
 #define DISABLE_INTERRUPTS(x)	cli
+#define INTERRUPT_RETURN_NMI_SAFE	NATIVE_INTERRUPT_RETURN_NMI_SAFE
 
 #ifdef CONFIG_X86_64
+#define SWAPGS	swapgs
+/*
+ * Currently paravirt can't handle swapgs nicely when we
+ * don't have a stack we can rely on (such as a user space
+ * stack).  So we either find a way around these or just fault
+ * and emulate if a guest tries to call swapgs directly.
+ *
+ * Either way, this is a good way to document that we don't
+ * have a reliable stack. x86_64 only.
+ */
+#define SWAPGS_UNSAFE_STACK	swapgs
+
+#define PARAVIRT_ADJUST_EXCEPTION_FRAME	/*  */
+
 #define INTERRUPT_RETURN	iretq
-#define ENABLE_INTERRUPTS_SYSCALL_RET			\
-			movq	%gs:pda_oldrsp, %rsp;	\
-			swapgs;				\
-			sysretq;
+#define USERGS_SYSRET64				\
+	swapgs;					\
+	sysretq;
+#define USERGS_SYSRET32				\
+	swapgs;					\
+	sysretl
+#define ENABLE_INTERRUPTS_SYSEXIT32		\
+	swapgs;					\
+	sti;					\
+	sysexit
+
 #else
 #define INTERRUPT_RETURN		iret
-#define ENABLE_INTERRUPTS_SYSCALL_RET	sti; sysexit
+#define ENABLE_INTERRUPTS_SYSEXIT	sti; sysexit
 #define GET_CR0_INTO_EAX		movl %cr0, %eax
 #endif
 
@@ -169,16 +246,6 @@ static inline void trace_hardirqs_fixup(void)
 #else
 
 #ifdef CONFIG_X86_64
-/*
- * Currently paravirt can't handle swapgs nicely when we
- * don't have a stack we can rely on (such as a user space
- * stack).  So we either find a way around these or just fault
- * and emulate if a guest tries to call swapgs directly.
- *
- * Either way, this is a good way to document that we don't
- * have a reliable stack. x86_64 only.
- */
-#define SWAPGS_UNSAFE_STACK	swapgs
 #define ARCH_TRACE_IRQS_ON		call trace_hardirqs_on_thunk
 #define ARCH_TRACE_IRQS_OFF		call trace_hardirqs_off_thunk
 #define ARCH_LOCKDEP_SYS_EXIT		call lockdep_sys_exit_thunk
