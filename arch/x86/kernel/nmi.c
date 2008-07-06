@@ -11,8 +11,6 @@
  *  Mikael Pettersson	: PM converted to driver model. Disable/enable API.
  */
 
-#include <asm/apic.h>
-
 #include <linux/nmi.h>
 #include <linux/mm.h>
 #include <linux/delay.h>
@@ -27,10 +25,9 @@
 #include <linux/kdebug.h>
 #include <linux/smp.h>
 
+#include <asm/apic.h>
 #include <asm/i8259.h>
 #include <asm/io_apic.h>
-#include <asm/smp.h>
-#include <asm/nmi.h>
 #include <asm/proto.h>
 #include <asm/timer.h>
 
@@ -146,6 +143,7 @@ int __init check_nmi_watchdog(void)
 
 	for_each_possible_cpu(cpu)
 		prev_nmi_count[cpu] = get_nmi_count(cpu);
+
 	local_irq_enable();
 	mdelay((20 * 1000) / nmi_hz); /* wait 20 ticks */
 
@@ -182,6 +180,7 @@ int __init check_nmi_watchdog(void)
 error:
 	if (nmi_watchdog == NMI_IO_APIC && !timer_through_8259)
 		disable_8259A_irq(0);
+
 	return -1;
 }
 
