@@ -266,6 +266,18 @@ static int acpi_processor_set_pdc(struct acpi_processor *pr)
 	if (!pdc_in)
 		return status;
 
+	if (idle_nomwait) {
+		/*
+		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
+		 * mode will be disabled in the parameter of _PDC object.
+		 */
+		union acpi_object *obj;
+		u32 *buffer = NULL;
+
+		obj = pdc_in->pointer;
+		buffer = (u32 *)(obj->buffer.pointer);
+		buffer[2] &= ~(ACPI_PDC_C_C2C3_FFH);
+	}
 	status = acpi_evaluate_object(pr->handle, "_PDC", pdc_in, NULL);
 
 	if (ACPI_FAILURE(status))
