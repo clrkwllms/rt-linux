@@ -399,6 +399,7 @@ static void __init reserve_setup_data(void)
 	struct setup_data *data;
 	u64 pa_data;
 	char buf[32];
+	int found = 0;
 
 	if (boot_params.hdr.version < 0x0209)
 		return;
@@ -409,9 +410,13 @@ static void __init reserve_setup_data(void)
 		reserve_early(pa_data, pa_data+sizeof(*data)+data->len, buf);
 		e820_update_range(pa_data, sizeof(*data)+data->len,
 			 E820_RAM, E820_RESERVED_KERN);
+		found = 1;
 		pa_data = data->next;
 		early_iounmap(data, sizeof(*data));
 	}
+	if (!found)
+		return;
+
 	sanitize_e820_map(e820.map, ARRAY_SIZE(e820.map), &e820.nr_map);
 	printk(KERN_INFO "extended physical RAM map:\n");
 	e820_print_map("reserve setup_data");
@@ -744,10 +749,8 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	acpi_boot_table_init();
 
-#ifdef CONFIG_X86_64
 	/* Remove active ranges so rediscovery with NUMA-awareness happens */
 	remove_all_active_ranges();
-#endif
 
 #ifdef CONFIG_ACPI_NUMA
 	/*
@@ -807,16 +810,17 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	acpi_boot_init();
 
-#ifdef CONFIG_X86_64
-	init_cpu_to_node();
-#endif
-
 #if defined(CONFIG_X86_MPPARSE) || defined(CONFIG_X86_VISWS)
 	/*
 	 * get boot-time SMP configuration:
 	 */
 	if (smp_found_config)
 		get_smp_config();
+#endif
+
+	prefill_possible_map();
+#ifdef CONFIG_X86_64
+	init_cpu_to_node();
 #endif
 
 	init_apic_mappings();
