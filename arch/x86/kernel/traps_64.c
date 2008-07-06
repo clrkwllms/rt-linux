@@ -53,6 +53,7 @@
 #include <asm/proto.h>
 #include <asm/nmi.h>
 #include <asm/stacktrace.h>
+#include <asm/kmemcheck.h>
 
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
@@ -448,7 +449,7 @@ void show_registers(struct pt_regs *regs)
 	sp = regs->sp;
 	ip = (u8 *) regs->ip - code_prologue;
 	printk("CPU %d ", cpu);
-	__show_regs(regs);
+	__show_regs(regs, 1);
 	printk("Process %s (pid: %d, threadinfo %p, task %p)\n",
 		cur->comm, cur->pid, task_thread_info(cur), cur);
 
@@ -914,6 +915,14 @@ asmlinkage void __kprobes do_debug(struct pt_regs * regs,
 	trace_hardirqs_fixup();
 
 	get_debugreg(condition, 6);
+
+	/* Catch kmemcheck conditions first of all! */
+	if (condition & DR_STEP) {
+		if (kmemcheck_active(regs)) {
+			kmemcheck_hide(regs);
+			return;
+		}
+	}
 
 	/*
 	 * The processor cleared BTF, so don't mark that we need it set.
