@@ -233,7 +233,6 @@ config SMP
 config X86_FIND_SMP_CONFIG
 	def_bool y
 	depends on X86_MPPARSE || X86_VOYAGER || X86_VISWS
-	depends on X86_32
 
 if ACPI
 config X86_MPPARSE
@@ -456,7 +455,7 @@ config ACPI_SRAT
 
 config HAVE_ARCH_PARSE_SRAT
 	def_bool y
-	depends on ACPI_SRAT || X86_64
+	depends on ACPI_SRAT
 
 config X86_SUMMIT_NUMA
 	def_bool y
@@ -1255,7 +1254,6 @@ config KEXEC
 
 config CRASH_DUMP
 	bool "kernel crash dumps (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
 	depends on X86_64 || (X86_32 && HIGHMEM)
 	help
 	  Generate crash dump after being started by kexec.

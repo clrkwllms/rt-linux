@@ -120,6 +120,7 @@ void __init e820_print_map(char *who)
 		       (e820.map[i].addr + e820.map[i].size));
 		switch (e820.map[i].type) {
 		case E820_RAM:
+		case E820_RESERVED_KERN:
 			printk(KERN_CONT "(usable)\n");
 			break;
 		case E820_RESERVED:
@@ -486,16 +487,18 @@ void __init update_e820(void)
 	printk(KERN_INFO "modified physical RAM map:\n");
 	e820_print_map("modified");
 }
-
+#define MAX_GAP_END 0x100000000ull
 /*
- * Search for a gap in the e820 memory space from start_addr to 2^32.
+ * Search for a gap in the e820 memory space from start_addr to end_addr.
  */
 __init int e820_search_gap(unsigned long *gapstart, unsigned long *gapsize,
-		unsigned long start_addr)
+		unsigned long start_addr, unsigned long long end_addr)
 {
-	unsigned long long last = 0x100000000ull;
+	unsigned long long last;
 	int i = e820.nr_map;
 	int found = 0;
+
+	last = (end_addr && end_addr < MAX_GAP_END) ? end_addr : MAX_GAP_END;
 
 	while (--i >= 0) {
 		unsigned long long start = e820.map[i].addr;
@@ -536,7 +539,7 @@ __init void e820_setup_gap(void)
 
 	gapstart = 0x10000000;
 	gapsize = 0x400000;
-	found  = e820_search_gap(&gapstart, &gapsize, 0);
+	found  = e820_search_gap(&gapstart, &gapsize, 0, MAX_GAP_END);
 
 #ifdef CONFIG_X86_64
 	if (!found) {
@@ -611,7 +614,7 @@ void __init e820_mark_nosave_regions(unsigned long limit_pfn)
 			register_nosave_region(pfn, PFN_UP(ei->addr));
 
 		pfn = PFN_DOWN(ei->addr + ei->size);
-		if (ei->type != E820_RAM)
+		if (ei->type != E820_RAM && ei->type != E820_RESERVED_KERN)
 			register_nosave_region(PFN_UP(ei->addr), pfn);
 
 		if (pfn >= limit_pfn)
@@ -828,16 +831,26 @@ void __init free_early(u64 start, u64 end)
 
 void __init early_res_to_bootmem(u64 start, u64 end)
 {
-	int i;
+	int i, count;
 	u64 final_start, final_end;
-	for (i = 0; i < MAX_EARLY_RES && early_res[i].end; i++) {
+
+	count  = 0;
+	for (i = 0; i < MAX_EARLY_RES && early_res[i].end; i++)
+		count++;
+
+	printk(KERN_INFO "(%d early reservations) ==> bootmem\n", count);
+	for (i = 0; i < count; i++) {
 		struct early_res *r = &early_res[i];
+		printk(KERN_INFO "  #%d [ %010llx - %010llx ] %16s", i,
+			r->start, r->end, r->name);
 		final_start = max(start, r->start);
 		final_end = min(end, r->end);
-		if (final_start >= final_end)
+		if (final_start >= final_end) {
+			printk(KERN_CONT "\n");
 			continue;
-		printk(KERN_INFO "  early res: %d [%llx-%llx] %s\n", i,
-			final_start, final_end - 1, r->name);
+		}
+		printk(KERN_CONT " ===> [ %010llx - %010llx ]\n",
+			final_start, final_end);
 		reserve_bootmem_generic(final_start, final_end - final_start,
 				BOOTMEM_DEFAULT);
 	}
@@ -1117,6 +1130,9 @@ static int __init parse_memopt(char *p)
 
 	mem_size = memparse(p, &p);
 	end_user_pfn = mem_size>>PAGE_SHIFT;
+	e820_update_range(mem_size, ULLONG_MAX - mem_size,
+		E820_RAM, E820_RESERVED);
+
 	return 0;
 }
 early_param("mem", parse_memopt);
@@ -1161,6 +1177,8 @@ static int __init parse_memmap_opt(char *p)
 		e820_add_region(start_at, mem_size, E820_RESERVED);
 	} else {
 		end_user_pfn = (mem_size >> PAGE_SHIFT);
+		e820_update_range(mem_size, ULLONG_MAX - mem_size,
+			E820_RAM, E820_RESERVED);
 	}
 	return *p == '\0' ? 0 : -EINVAL;
 }
@@ -1187,23 +1205,27 @@ void __init e820_reserve_resources(void)
 {
 	int i;
 	struct resource *res;
+	u64 end;
 
 	res = alloc_bootmem_low(sizeof(struct resource) * e820.nr_map);
 	for (i = 0; i < e820.nr_map; i++) {
 		switch (e820.map[i].type) {
+		case E820_RESERVED_KERN:
 		case E820_RAM:	res->name = "System RAM"; break;
 		case E820_ACPI:	res->name = "ACPI Tables"; break;
 		case E820_NVS:	res->name = "ACPI Non-volatile Storage"; break;
 		default:	res->name = "reserved";
 		}
-		res->start = e820.map[i].addr;
-		res->end = res->start + e820.map[i].size - 1;
+		end = e820.map[i].addr + e820.map[i].size - 1;
 #ifndef CONFIG_RESOURCES_64BIT
-		if (res->end > 0x100000000ULL) {
+		if (end > 0x100000000ULL) {
 			res++;
 			continue;
 		}
 #endif
+		res->start = e820.map[i].addr;
+		res->end = end;
+
 		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 		insert_resource(&iomem_resource, res);
 		res++;

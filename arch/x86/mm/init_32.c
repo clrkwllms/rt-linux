@@ -184,8 +184,9 @@ static inline int is_kernel_text(unsigned long addr)
  * PAGE_OFFSET:
  */
 static void __init kernel_physical_mapping_init(pgd_t *pgd_base,
-						unsigned long start,
-						unsigned long end)
+						unsigned long start_pfn,
+						unsigned long end_pfn,
+						int use_pse)
 {
 	int pgd_idx, pmd_idx, pte_ofs;
 	unsigned long pfn;
@@ -193,32 +194,33 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base,
 	pmd_t *pmd;
 	pte_t *pte;
 	unsigned pages_2m = 0, pages_4k = 0;
-	unsigned limit_pfn = end >> PAGE_SHIFT;
 
-	pgd_idx = pgd_index(PAGE_OFFSET);
+	if (!cpu_has_pse)
+		use_pse = 0;
+
+	pfn = start_pfn;
+	pgd_idx = pgd_index((pfn<<PAGE_SHIFT) + PAGE_OFFSET);
 	pgd = pgd_base + pgd_idx;
-	pfn = start >> PAGE_SHIFT;
-
 	for (; pgd_idx < PTRS_PER_PGD; pgd++, pgd_idx++) {
 		pmd = one_md_table_init(pgd);
-		if (pfn >= limit_pfn)
-			continue;
 
-		for (pmd_idx = 0;
-		     pmd_idx < PTRS_PER_PMD && pfn < limit_pfn;
+		if (pfn >= end_pfn)
+			continue;
+#ifdef CONFIG_X86_PAE
+		pmd_idx = pmd_index((pfn<<PAGE_SHIFT) + PAGE_OFFSET);
+		pmd += pmd_idx;
+#else
+		pmd_idx = 0;
+#endif
+		for (; pmd_idx < PTRS_PER_PMD && pfn < end_pfn;
 		     pmd++, pmd_idx++) {
 			unsigned int addr = pfn * PAGE_SIZE + PAGE_OFFSET;
 
 			/*
 			 * Map with big pages if possible, otherwise
 			 * create normal page tables:
-			 *
-			 * Don't use a large page for the first 2/4MB of memory
-			 * because there are often fixed size MTRRs in there
-			 * and overlapping MTRRs into large pages can cause
-			 * slowdowns.
 			 */
-			if (cpu_has_pse && !(pgd_idx == 0 && pmd_idx == 0)) {
+			if (use_pse) {
 				unsigned int addr2;
 				pgprot_t prot = PAGE_KERNEL_LARGE;
 
@@ -233,13 +235,13 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base,
 				set_pmd(pmd, pfn_pmd(pfn, prot));
 
 				pfn += PTRS_PER_PTE;
-				max_pfn_mapped = pfn;
 				continue;
 			}
 			pte = one_page_table_init(pmd);
 
-			for (pte_ofs = 0;
-			     pte_ofs < PTRS_PER_PTE && pfn < max_low_pfn;
+			pte_ofs = pte_index((pfn<<PAGE_SHIFT) + PAGE_OFFSET);
+			pte += pte_ofs;
+			for (; pte_ofs < PTRS_PER_PTE && pfn < end_pfn;
 			     pte++, pfn++, pte_ofs++, addr += PAGE_SIZE) {
 				pgprot_t prot = PAGE_KERNEL;
 
@@ -249,7 +251,6 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base,
 				pages_4k++;
 				set_pte(pte, pfn_pte(pfn, prot));
 			}
-			max_pfn_mapped = pfn;
 		}
 	}
 	update_page_count(PG_LEVEL_2M, pages_2m);
@@ -442,12 +443,9 @@ void __init native_pagetable_setup_done(pgd_t *base)
  * be partially populated, and so it avoids stomping on any existing
  * mappings.
  */
-static void __init pagetable_init(void)
+static void __init early_ioremap_page_table_range_init(pgd_t *pgd_base)
 {
-	pgd_t *pgd_base = swapper_pg_dir;
 	unsigned long vaddr, end;
-
-	paravirt_pagetable_setup_start(pgd_base);
 
 	/*
 	 * Fixed mappings, only the page table structure has to be
@@ -458,6 +456,13 @@ static void __init pagetable_init(void)
 	end = (FIXADDR_TOP + PMD_SIZE - 1) & PMD_MASK;
 	page_table_range_init(vaddr, end, pgd_base);
 	early_ioremap_reset();
+}
+
+static void __init pagetable_init(void)
+{
+	pgd_t *pgd_base = swapper_pg_dir;
+
+	paravirt_pagetable_setup_start(pgd_base);
 
 	permanent_kmaps_init(pgd_base);
 
@@ -725,13 +730,27 @@ void __init setup_bootmem_allocator(void)
 
 static void __init find_early_table_space(unsigned long end)
 {
-	unsigned long puds, pmds, tables, start;
+	unsigned long puds, pmds, ptes, tables, start;
 
 	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
 	tables = PAGE_ALIGN(puds * sizeof(pud_t));
 
 	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
 	tables += PAGE_ALIGN(pmds * sizeof(pmd_t));
+
+	if (cpu_has_pse) {
+		unsigned long extra;
+
+		extra = end - ((end>>PMD_SHIFT) << PMD_SHIFT);
+		extra += PMD_SIZE;
+		ptes = (extra + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	} else
+		ptes = (end + PAGE_SIZE - 1) >> PAGE_SHIFT;
+
+	tables += PAGE_ALIGN(ptes * sizeof(pte_t));
+
+	/* for fixmap */
+	tables += PAGE_SIZE * 2;
 
 	/*
 	 * RED-PEN putting page tables only on node 0 could
@@ -757,6 +776,8 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 						unsigned long end)
 {
 	pgd_t *pgd_base = swapper_pg_dir;
+	unsigned long start_pfn, end_pfn;
+	unsigned long big_page_start;
 
 	/*
 	 * Find space for the kernel direct mapping tables.
@@ -781,7 +802,46 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 		__PAGE_KERNEL_EXEC |= _PAGE_GLOBAL;
 	}
 
-	kernel_physical_mapping_init(pgd_base, start, end);
+	/*
+	 * Don't use a large page for the first 2/4MB of memory
+	 * because there are often fixed size MTRRs in there
+	 * and overlapping MTRRs into large pages can cause
+	 * slowdowns.
+	 */
+	big_page_start = PMD_SIZE;
+
+	if (start < big_page_start) {
+		start_pfn = start >> PAGE_SHIFT;
+		end_pfn = min(big_page_start>>PAGE_SHIFT, end>>PAGE_SHIFT);
+	} else {
+		/* head is not big page alignment ? */
+		start_pfn = start >> PAGE_SHIFT;
+		end_pfn = ((start + (PMD_SIZE - 1))>>PMD_SHIFT)
+				 << (PMD_SHIFT - PAGE_SHIFT);
+	}
+	if (start_pfn < end_pfn)
+		kernel_physical_mapping_init(pgd_base, start_pfn, end_pfn, 0);
+
+	/* big page range */
+	start_pfn = ((start + (PMD_SIZE - 1))>>PMD_SHIFT)
+			 << (PMD_SHIFT - PAGE_SHIFT);
+	if (start_pfn < (big_page_start >> PAGE_SHIFT))
+		start_pfn =  big_page_start >> PAGE_SHIFT;
+	end_pfn = (end>>PMD_SHIFT) << (PMD_SHIFT - PAGE_SHIFT);
+	if (start_pfn < end_pfn)
+		kernel_physical_mapping_init(pgd_base, start_pfn, end_pfn,
+						cpu_has_pse);
+
+	/* tail is not big page alignment ? */
+	start_pfn = end_pfn;
+	if (start_pfn > (big_page_start>>PAGE_SHIFT)) {
+		end_pfn = end >> PAGE_SHIFT;
+		if (start_pfn < end_pfn)
+			kernel_physical_mapping_init(pgd_base, start_pfn,
+							 end_pfn, 0);
+	}
+
+	early_ioremap_page_table_range_init(pgd_base);
 
 	load_cr3(swapper_pg_dir);
 
@@ -793,6 +853,7 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 
 	return end >> PAGE_SHIFT;
 }
+
 
 /*
  * paging_init() sets up the page tables - note that the first 8MB are
