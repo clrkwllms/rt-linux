@@ -199,7 +199,6 @@ acpi_parse_processor_affinity(struct acpi_subtable_header * header,
 	return 0;
 }
 
-#ifdef CONFIG_HAVE_ARCH_PARSE_SRAT
 static int __init
 acpi_parse_memory_affinity(struct acpi_subtable_header * header,
 			   const unsigned long end)
@@ -217,7 +216,6 @@ acpi_parse_memory_affinity(struct acpi_subtable_header * header,
 
 	return 0;
 }
-#endif
 
 static int __init acpi_parse_srat(struct acpi_table_header *table)
 {
@@ -246,11 +244,9 @@ int __init acpi_numa_init(void)
 	if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
 		acpi_table_parse_srat(ACPI_SRAT_TYPE_CPU_AFFINITY,
 				      acpi_parse_processor_affinity, NR_CPUS);
-#ifdef CONFIG_HAVE_ARCH_PARSE_SRAT
 		acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
 				      acpi_parse_memory_affinity,
 				      NR_NODE_MEMBLKS);
-#endif
 	}
 
 	/* SLIT: System Locality Information Table */
