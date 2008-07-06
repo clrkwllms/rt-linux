@@ -45,6 +45,7 @@
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
 #include <asm/reboot.h>
+#include <asm/pgalloc.h>
 
 #include "xen-ops.h"
 #include "mmu.h"
@@ -1088,7 +1089,8 @@ static const struct pv_cpu_ops xen_cpu_ops __initdata = {
 	.read_pmc = native_read_pmc,
 
 	.iret = xen_iret,
-	.irq_enable_syscall_ret = xen_sysexit,
+	.nmi_return = xen_iret,
+	.irq_enable_sysexit = xen_sysexit,
 
 	.load_tr_desc = paravirt_nop,
 	.set_ldt = xen_set_ldt,
@@ -1122,6 +1124,9 @@ static const struct pv_irq_ops xen_irq_ops __initdata = {
 	.irq_enable = xen_irq_enable,
 	.safe_halt = xen_safe_halt,
 	.halt = xen_halt,
+#ifdef CONFIG_X86_64
+	.adjust_exception_frame = paravirt_nop,
+#endif
 };
 
 static const struct pv_apic_ops xen_apic_ops __initdata = {
@@ -1152,6 +1157,9 @@ static const struct pv_mmu_ops xen_mmu_ops __initdata = {
 
 	.pte_update = paravirt_nop,
 	.pte_update_defer = paravirt_nop,
+
+	.pgd_alloc = __paravirt_pgd_alloc,
+	.pgd_free = paravirt_nop,
 
 	.alloc_pte = xen_alloc_pte_init,
 	.release_pte = xen_release_pte_init,

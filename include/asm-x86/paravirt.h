@@ -115,6 +115,9 @@ struct pv_cpu_ops {
 	void (*set_ldt)(const void *desc, unsigned entries);
 	unsigned long (*store_tr)(void);
 	void (*load_tls)(struct thread_struct *t, unsigned int cpu);
+#ifdef CONFIG_X86_64
+	void (*load_gs_index)(unsigned int idx);
+#endif
 	void (*write_ldt_entry)(struct desc_struct *ldt, int entrynum,
 				const void *desc);
 	void (*write_gdt_entry)(struct desc_struct *,
@@ -141,9 +144,36 @@ struct pv_cpu_ops {
 	u64 (*read_pmc)(int counter);
 	unsigned long long (*read_tscp)(unsigned int *aux);
 
-	/* These two are jmp to, not actually called. */
-	void (*irq_enable_syscall_ret)(void);
+	/*
+	 * Atomically enable interrupts and return to userspace.  This
+	 * is only ever used to return to 32-bit processes; in a
+	 * 64-bit kernel, it's used for 32-on-64 compat processes, but
+	 * never native 64-bit processes.  (Jump, not call.)
+	 */
+	void (*irq_enable_sysexit)(void);
+
+	/*
+	 * Switch to usermode gs and return to 64-bit usermode using
+	 * sysret.  Only used in 64-bit kernels to return to 64-bit
+	 * processes.  Usermode register state, including %rsp, must
+	 * already be restored.
+	 */
+	void (*usergs_sysret64)(void);
+
+	/*
+	 * Switch to usermode gs and return to 32-bit usermode using
+	 * sysret.  Used to return to 32-on-64 compat processes.
+	 * Other usermode register state, including %esp, must already
+	 * be restored.
+	 */
+	void (*usergs_sysret32)(void);
+
+	/* Normal iret.  Jump to this with the standard iret stack
+	   frame set up. */
 	void (*iret)(void);
+
+	/* Return from NMI. (?) */
+	void (*nmi_return)(void);
 
 	void (*swapgs)(void);
 
@@ -165,6 +195,10 @@ struct pv_irq_ops {
 	void (*irq_enable)(void);
 	void (*safe_halt)(void);
 	void (*halt)(void);
+
+#ifdef CONFIG_X86_64
+	void (*adjust_exception_frame)(void);
+#endif
 };
 
 struct pv_apic_ops {
@@ -219,7 +253,14 @@ struct pv_mmu_ops {
 	void (*flush_tlb_others)(const cpumask_t *cpus, struct mm_struct *mm,
 				 unsigned long va);
 
-	/* Hooks for allocating/releasing pagetable pages */
+	/* Hooks for allocating and freeing a pagetable top-level */
+	int  (*pgd_alloc)(struct mm_struct *mm);
+	void (*pgd_free)(struct mm_struct *mm, pgd_t *pgd);
+
+	/*
+	 * Hooks for allocating/releasing pagetable pages when they're
+	 * attached to a pagetable
+	 */
 	void (*alloc_pte)(struct mm_struct *mm, u32 pfn);
 	void (*alloc_pmd)(struct mm_struct *mm, u32 pfn);
 	void (*alloc_pmd_clone)(u32 pfn, u32 clonepfn, u32 start, u32 count);
@@ -452,10 +493,17 @@ int paravirt_disable_iospace(void);
 #define VEXTRA_CLOBBERS	 , "rax", "r8", "r9", "r10", "r11"
 #endif
 
+#ifdef CONFIG_PARAVIRT_DEBUG
+#define PVOP_TEST_NULL(op)	BUG_ON(op == NULL)
+#else
+#define PVOP_TEST_NULL(op)	((void)op)
+#endif
+
 #define __PVOP_CALL(rettype, op, pre, post, ...)			\
 	({								\
 		rettype __ret;						\
 		PVOP_CALL_ARGS;					\
+		PVOP_TEST_NULL(op);					\
 		/* This is 32-bit specific, but is okay in 64-bit */	\
 		/* since this condition will never hold */		\
 		if (sizeof(rettype) > sizeof(unsigned long)) {		\
@@ -484,6 +532,7 @@ int paravirt_disable_iospace(void);
 #define __PVOP_VCALL(op, pre, post, ...)				\
 	({								\
 		PVOP_VCALL_ARGS;					\
+		PVOP_TEST_NULL(op);					\
 		asm volatile(pre					\
 			     paravirt_alt(PARAVIRT_CALL)		\
 			     post					\
@@ -802,6 +851,13 @@ static inline void load_TLS(struct thread_struct *t, unsigned cpu)
 	PVOP_VCALL2(pv_cpu_ops.load_tls, t, cpu);
 }
 
+#ifdef CONFIG_X86_64
+static inline void load_gs_index(unsigned int gs)
+{
+	PVOP_VCALL1(pv_cpu_ops.load_gs_index, gs);
+}
+#endif
+
 static inline void write_ldt_entry(struct desc_struct *dt, int entry,
 				   const void *desc)
 {
@@ -923,6 +979,16 @@ static inline void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
 				    unsigned long va)
 {
 	PVOP_VCALL3(pv_mmu_ops.flush_tlb_others, &cpumask, mm, va);
+}
+
+static inline int paravirt_pgd_alloc(struct mm_struct *mm)
+{
+	return PVOP_CALL1(int, pv_mmu_ops.pgd_alloc, mm);
+}
+
+static inline void paravirt_pgd_free(struct mm_struct *mm, pgd_t *pgd)
+{
+	PVOP_VCALL2(pv_mmu_ops.pgd_free, mm, pgd);
 }
 
 static inline void paravirt_alloc_pte(struct mm_struct *mm, unsigned pfn)
@@ -1430,54 +1496,90 @@ static inline unsigned long __raw_local_irq_save(void)
 #define PV_RESTORE_REGS popq %rdx; popq %rcx; popq %rdi; popq %rax
 #define PARA_PATCH(struct, off)        ((PARAVIRT_PATCH_##struct + (off)) / 8)
 #define PARA_SITE(ptype, clobbers, ops) _PVSITE(ptype, clobbers, ops, .quad, 8)
+#define PARA_INDIRECT(addr)	*addr(%rip)
 #else
 #define PV_SAVE_REGS   pushl %eax; pushl %edi; pushl %ecx; pushl %edx
 #define PV_RESTORE_REGS popl %edx; popl %ecx; popl %edi; popl %eax
 #define PARA_PATCH(struct, off)        ((PARAVIRT_PATCH_##struct + (off)) / 4)
 #define PARA_SITE(ptype, clobbers, ops) _PVSITE(ptype, clobbers, ops, .long, 4)
+#define PARA_INDIRECT(addr)	*%cs:addr
 #endif
 
 #define INTERRUPT_RETURN						\
 	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_iret), CLBR_NONE,	\
-		  jmp *%cs:pv_cpu_ops+PV_CPU_iret)
+		  jmp PARA_INDIRECT(pv_cpu_ops+PV_CPU_iret))
+
+#define INTERRUPT_RETURN_NMI_SAFE					\
+	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_nmi_return), CLBR_NONE,	\
+		  jmp *%cs:pv_cpu_ops+PV_CPU_nmi_return)
 
 #define DISABLE_INTERRUPTS(clobbers)					\
 	PARA_SITE(PARA_PATCH(pv_irq_ops, PV_IRQ_irq_disable), clobbers, \
-		  PV_SAVE_REGS;			\
-		  call *%cs:pv_irq_ops+PV_IRQ_irq_disable;		\
+		  PV_SAVE_REGS;						\
+		  call PARA_INDIRECT(pv_irq_ops+PV_IRQ_irq_disable);	\
 		  PV_RESTORE_REGS;)			\
 
 #define ENABLE_INTERRUPTS(clobbers)					\
 	PARA_SITE(PARA_PATCH(pv_irq_ops, PV_IRQ_irq_enable), clobbers,	\
-		  PV_SAVE_REGS;			\
-		  call *%cs:pv_irq_ops+PV_IRQ_irq_enable;		\
+		  PV_SAVE_REGS;						\
+		  call PARA_INDIRECT(pv_irq_ops+PV_IRQ_irq_enable);	\
 		  PV_RESTORE_REGS;)
 
-#define ENABLE_INTERRUPTS_SYSCALL_RET					\
-	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_irq_enable_syscall_ret),\
+#define USERGS_SYSRET32							\
+	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_usergs_sysret32),	\
 		  CLBR_NONE,						\
-		  jmp *%cs:pv_cpu_ops+PV_CPU_irq_enable_syscall_ret)
-
+		  jmp PARA_INDIRECT(pv_cpu_ops+PV_CPU_usergs_sysret32))
 
 #ifdef CONFIG_X86_32
-#define GET_CR0_INTO_EAX			\
-	push %ecx; push %edx;			\
-	call *pv_cpu_ops+PV_CPU_read_cr0;	\
+#define GET_CR0_INTO_EAX				\
+	push %ecx; push %edx;				\
+	call PARA_INDIRECT(pv_cpu_ops+PV_CPU_read_cr0);	\
 	pop %edx; pop %ecx
-#else
+
+#define ENABLE_INTERRUPTS_SYSEXIT					\
+	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_irq_enable_sysexit),	\
+		  CLBR_NONE,						\
+		  jmp PARA_INDIRECT(pv_cpu_ops+PV_CPU_irq_enable_sysexit))
+
+
+#else	/* !CONFIG_X86_32 */
+
+/*
+ * If swapgs is used while the userspace stack is still current,
+ * there's no way to call a pvop.  The PV replacement *must* be
+ * inlined, or the swapgs instruction must be trapped and emulated.
+ */
+#define SWAPGS_UNSAFE_STACK						\
+	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_swapgs), CLBR_NONE,	\
+		  swapgs)
+
 #define SWAPGS								\
 	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_swapgs), CLBR_NONE,	\
 		  PV_SAVE_REGS;						\
-		  call *pv_cpu_ops+PV_CPU_swapgs;			\
+		  call PARA_INDIRECT(pv_cpu_ops+PV_CPU_swapgs);		\
 		  PV_RESTORE_REGS					\
 		 )
 
-#define GET_CR2_INTO_RCX			\
-	call *pv_mmu_ops+PV_MMU_read_cr2;	\
-	movq %rax, %rcx;			\
+#define GET_CR2_INTO_RCX				\
+	call PARA_INDIRECT(pv_mmu_ops+PV_MMU_read_cr2);	\
+	movq %rax, %rcx;				\
 	xorq %rax, %rax;
 
-#endif
+#define PARAVIRT_ADJUST_EXCEPTION_FRAME					\
+	PARA_SITE(PARA_PATCH(pv_irq_ops, PV_IRQ_adjust_exception_frame), \
+		  CLBR_NONE,						\
+		  call PARA_INDIRECT(pv_irq_ops+PV_IRQ_adjust_exception_frame))
+
+#define USERGS_SYSRET64							\
+	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_usergs_sysret64),	\
+		  CLBR_NONE,						\
+		  jmp PARA_INDIRECT(pv_cpu_ops+PV_CPU_usergs_sysret64))
+
+#define ENABLE_INTERRUPTS_SYSEXIT32					\
+	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_irq_enable_sysexit),	\
+		  CLBR_NONE,						\
+		  jmp PARA_INDIRECT(pv_cpu_ops+PV_CPU_irq_enable_sysexit))
+#endif	/* CONFIG_X86_32 */
 
 #endif /* __ASSEMBLY__ */
 #endif /* CONFIG_PARAVIRT */

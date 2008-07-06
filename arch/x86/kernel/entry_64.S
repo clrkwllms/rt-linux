@@ -54,13 +54,14 @@
 
 	.code64
 
+#define HARDNMI_MASK 0x40000000
+
 #ifndef CONFIG_PREEMPT
 #define retint_kernel retint_restore_args
 #endif	
 
 #ifdef CONFIG_PARAVIRT
-ENTRY(native_irq_enable_syscall_ret)
-	movq	%gs:pda_oldrsp,%rsp
+ENTRY(native_usergs_sysret64)
 	swapgs
 	sysretq
 #endif /* CONFIG_PARAVIRT */
@@ -104,7 +105,7 @@ ENTRY(native_irq_enable_syscall_ret)
 	.macro FAKE_STACK_FRAME child_rip
 	/* push in order ss, rsp, eflags, cs, rip */
 	xorl %eax, %eax
-	pushq %rax /* ss */
+	pushq $__KERNEL_DS /* ss */
 	CFI_ADJUST_CFA_OFFSET	8
 	/*CFI_REL_OFFSET	ss,0*/
 	pushq %rax /* rsp */
@@ -275,7 +276,8 @@ sysret_check:
 	CFI_REGISTER	rip,rcx
 	RESTORE_ARGS 0,-ARG_SKIP,1
 	/*CFI_REGISTER	rflags,r11*/
-	ENABLE_INTERRUPTS_SYSCALL_RET
+	movq	%gs:pda_oldrsp, %rsp
+	USERGS_SYSRET64
 
 	CFI_RESTORE_STATE
 	/* Handle reschedules */
@@ -595,6 +597,9 @@ ENTRY(native_iret)
 	.section __ex_table,"a"
 	.quad native_iret, bad_iret
 	.previous
+
+ENTRY(native_nmi_return)
+	NATIVE_INTERRUPT_RETURN_NMI_SAFE
 #endif
 
 	.section .fixup,"ax"
@@ -649,6 +654,23 @@ retint_signal:
 	movl $_TIF_NEED_RESCHED,%edi
 	GET_THREAD_INFO(%rcx)
 	jmp retint_check
+
+	/* Returning to kernel space from exception. */
+	/* rcx:	 threadinfo. interrupts off. */
+ENTRY(retexc_kernel)
+	testl $HARDNMI_MASK,threadinfo_preempt_count(%rcx)
+	jz retint_kernel		/* Not nested over NMI ? */
+	testw $X86_EFLAGS_TF,EFLAGS-ARGOFFSET(%rsp)	/* trap flag? */
+	jnz retint_kernel		/*
+					 * If single-stepping an NMI handler,
+					 * use the normal iret path instead of
+					 * the popf/lret because lret would be
+					 * single-stepped. It should not
+					 * happen : it will reactivate NMIs
+					 * prematurely.
+					 */
+	RESTORE_ARGS 0,8,0
+	INTERRUPT_RETURN_NMI_SAFE
 
 #ifdef CONFIG_PREEMPT
 	/* Returning to kernel space. Check if we need preemption */
@@ -736,6 +758,7 @@ END(spurious_interrupt)
  */ 		
 	.macro zeroentry sym
 	INTR_FRAME
+	PARAVIRT_ADJUST_EXCEPTION_FRAME
 	pushq $0	/* push error code/oldrax */ 
 	CFI_ADJUST_CFA_OFFSET 8
 	pushq %rax	/* push real oldrax to the rdi slot */ 
@@ -748,6 +771,7 @@ END(spurious_interrupt)
 
 	.macro errorentry sym
 	XCPT_FRAME
+	PARAVIRT_ADJUST_EXCEPTION_FRAME
 	pushq %rax
 	CFI_ADJUST_CFA_OFFSET 8
 	CFI_REL_OFFSET rax,0
@@ -812,9 +836,17 @@ paranoid_swapgs\trace:
 	TRACE_IRQS_IRETQ 0
 	.endif
 	SWAPGS_UNSAFE_STACK
-paranoid_restore\trace:
+paranoid_restore_no_nmi\trace:
 	RESTORE_ALL 8
 	jmp irq_return
+paranoid_restore\trace:
+	GET_THREAD_INFO(%rcx)
+	testl $HARDNMI_MASK,threadinfo_preempt_count(%rcx)
+	jz paranoid_restore_no_nmi\trace	/* Nested over NMI ? */
+	testw $X86_EFLAGS_TF,EFLAGS-0(%rsp)	/* trap flag? */
+	jnz paranoid_restore_no_nmi\trace
+	RESTORE_ALL 8
+	INTERRUPT_RETURN_NMI_SAFE
 paranoid_userspace\trace:
 	GET_THREAD_INFO(%rcx)
 	movl threadinfo_flags(%rcx),%ebx
@@ -913,7 +945,7 @@ error_exit:
 	TRACE_IRQS_OFF
 	GET_THREAD_INFO(%rcx)	
 	testl %eax,%eax
-	jne  retint_kernel
+	jne  retexc_kernel
 	LOCKDEP_SYS_EXIT_IRQ
 	movl  threadinfo_flags(%rcx),%edx
 	movl  $_TIF_WORK_MASK,%edi
@@ -942,7 +974,7 @@ KPROBE_END(error_entry)
 	
        /* Reload gs selector with exception handling */
        /* edi:  new selector */ 
-ENTRY(load_gs_index)
+ENTRY(native_load_gs_index)
 	CFI_STARTPROC
 	pushf
 	CFI_ADJUST_CFA_OFFSET 8
@@ -956,7 +988,7 @@ gs_change:
 	CFI_ADJUST_CFA_OFFSET -8
         ret
 	CFI_ENDPROC
-ENDPROC(load_gs_index)
+ENDPROC(native_load_gs_index)
        
         .section __ex_table,"a"
         .align 8
