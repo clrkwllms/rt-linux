@@ -83,6 +83,7 @@
 #include <linux/rwsem.h>
 #include <linux/nsproxy.h>
 #include <linux/ipc_namespace.h>
+#include <linux/marker.h>
 
 #include <asm/uaccess.h>
 #include "util.h"
@@ -314,6 +315,7 @@ asmlinkage long sys_semget(key_t key, int nsems, int semflg)
 	struct ipc_namespace *ns;
 	struct ipc_ops sem_ops;
 	struct ipc_params sem_params;
+	long err;
 
 	ns = current->nsproxy->ipc_ns;
 
@@ -328,7 +330,9 @@ asmlinkage long sys_semget(key_t key, int nsems, int semflg)
 	sem_params.flg = semflg;
 	sem_params.u.nsems = nsems;
 
-	return ipcget(ns, &sem_ids(ns), &sem_ops, &sem_params);
+	err = ipcget(ns, &sem_ids(ns), &sem_ops, &sem_params);
+	trace_mark(ipc_sem_create, "id %ld flags %d", err, semflg);
+	return err;
 }
 
 /* Manage the doubly linked list sma->sem_pending as a FIFO:

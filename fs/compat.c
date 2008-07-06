@@ -51,6 +51,7 @@
 #include <linux/poll.h>
 #include <linux/mm.h>
 #include <linux/eventpoll.h>
+#include <linux/marker.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -1402,6 +1403,7 @@ int compat_do_execve(char * filename,
 
 	retval = search_binary_handler(bprm, regs);
 	if (retval >= 0) {
+		trace_mark(fs_exec, "filename %s", filename);
 		/* execve success */
 		security_bprm_free(bprm);
 		acct_update_integrals(current);
