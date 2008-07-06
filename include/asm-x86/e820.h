@@ -67,8 +67,12 @@ sanitize_e820_map(struct e820entry *biosmap, int max_nr_map, int *pnr_map);
 extern int copy_e820_map(struct e820entry *biosmap, int nr_map);
 extern u64 e820_update_range(u64 start, u64 size, unsigned old_type,
 			       unsigned new_type);
+extern u64 e820_remove_range(u64 start, u64 size, unsigned old_type,
+			     int checktype);
 extern void update_e820(void);
 extern void e820_setup_gap(void);
+extern int e820_search_gap(unsigned long *gapstart, unsigned long *gapsize,
+				unsigned long start_addr);
 struct setup_data;
 extern void parse_e820_ext(struct setup_data *data, unsigned long pa_data);
 
@@ -86,6 +90,7 @@ extern unsigned long end_user_pfn;
 extern u64 find_e820_area(u64 start, u64 end, u64 size, u64 align);
 extern u64 find_e820_area_size(u64 start, u64 *sizep, u64 align);
 extern void reserve_early(u64 start, u64 end, char *name);
+extern void reserve_early_overlap_ok(u64 start, u64 end, char *name);
 extern void free_early(u64 start, u64 end);
 extern void early_res_to_bootmem(u64 start, u64 end);
 extern u64 early_reserve_e820(u64 startt, u64 sizet, u64 align);
