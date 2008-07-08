@@ -1129,7 +1129,7 @@ static int omap_ep_set_halt(struct usb_ep *_ep, int value)
 			status = -EINVAL;
 		else if (value) {
 			if (ep->udc->ep0_set_config) {
-				WARN("error changing config?\n");
+				WARNING("error changing config?\n");
 				UDC_SYSCON2_REG = UDC_CLR_CFG;
 			}
 			UDC_SYSCON2_REG = UDC_STALL_CMD;
@@ -1746,7 +1746,7 @@ do_stall:
 					u.r.bRequestType, u.r.bRequest, status);
 			if (udc->ep0_set_config) {
 				if (udc->ep0_reset_config)
-					WARN("error resetting config?\n");
+					WARNING("error resetting config?\n");
 				else
 					UDC_SYSCON2_REG = UDC_CLR_CFG;
 			}
@@ -3052,7 +3052,7 @@ static int omap_udc_suspend(struct platform_device *dev, pm_message_t message)
 	 * which would prevent entry to deep sleep...
 	 */
 	if ((devstat & UDC_ATT) != 0 && (devstat & UDC_SUS) == 0) {
-		WARN("session active; suspend requires disconnect\n");
+		WARNING("session active; suspend requires disconnect\n");
 		omap_pullup(&udc->gadget, 0);
 	}
 
