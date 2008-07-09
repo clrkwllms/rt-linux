@@ -23,6 +23,8 @@ config X86
 	select HAVE_OPROFILE
 	select HAVE_KPROBES
 	select HAVE_KRETPROBES
+	select HAVE_DYNAMIC_FTRACE
+	select HAVE_FTRACE
 	select HAVE_KVM if ((X86_32 && !X86_VOYAGER && !X86_VISWS && !X86_NUMAQ) || X86_64)
 	select HAVE_ARCH_KGDB if !X86_VOYAGER
 
@@ -168,6 +170,7 @@ config GENERIC_PENDING_IRQ
 config X86_SMP
 	bool
 	depends on SMP && ((X86_32 && !X86_VOYAGER) || X86_64)
+	select USE_GENERIC_SMP_HELPERS
 	default y
 
 config X86_32_SMP
@@ -1061,6 +1064,11 @@ config ARCH_MEMORY_PROBE
 	def_bool X86_64
 	depends on MEMORY_HOTPLUG
 
+config ILLEGAL_POINTER_VALUE
+       hex
+       default 0 if X86_32
+       default 0xffffc10000000000 if X86_64
+
 source "mm/Kconfig"
 
 config HIGHPTE
@@ -1221,13 +1229,17 @@ config SECCOMP
 
 	  If unsure, say Y. Only embedded should say N here.
 
+config CC_STACKPROTECTOR_ALL
+	bool
+
 config CC_STACKPROTECTOR
 	bool "Enable -fstack-protector buffer overflow detection (EXPERIMENTAL)"
-	depends on X86_64 && EXPERIMENTAL && BROKEN
+	depends on X86_64
+	select CC_STACKPROTECTOR_ALL
 	help
-         This option turns on the -fstack-protector GCC feature. This
-	  feature puts, at the beginning of critical functions, a canary
-	  value on the stack just before the return address, and validates
+          This option turns on the -fstack-protector GCC feature. This
+	  feature puts, at the beginning of functions, a canary value on
+	  the stack just before the return address, and validates
 	  the value just before actually returning.  Stack based buffer
 	  overflows (that need to overwrite this return address) now also
 	  overwrite the canary, which gets detected and the attack is then
@@ -1235,15 +1247,8 @@ config CC_STACKPROTECTOR
 
 	  This feature requires gcc version 4.2 or above, or a distribution
 	  gcc with the feature backported. Older versions are automatically
-	  detected and for those versions, this configuration option is ignored.
-
-config CC_STACKPROTECTOR_ALL
-	bool "Use stack-protector for all functions"
-	depends on CC_STACKPROTECTOR
-	help
-	  Normally, GCC only inserts the canary value protection for
-	  functions that use large-ish on-stack buffers. By enabling
-	  this option, GCC will be asked to do this for ALL functions.
+	  detected and for those versions, this configuration option is
+	  ignored. (and a warning is printed during bootup)
 
 source kernel/Kconfig.hz
 

@@ -10,6 +10,7 @@
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/ptrace.h>
+#include <linux/mmiotrace.h>
 #include <linux/mman.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
@@ -25,6 +26,7 @@
 #include <linux/kprobes.h>
 #include <linux/uaccess.h>
 #include <linux/kdebug.h>
+#include <linux/magic.h>
 
 #include <asm/system.h>
 #include <asm/desc.h>
@@ -48,6 +50,16 @@
 #define PF_USER		(1<<2)
 #define PF_RSVD		(1<<3)
 #define PF_INSTR	(1<<4)
+
+static inline int kmmio_fault(struct pt_regs *regs, unsigned long addr)
+{
+#ifdef CONFIG_MMIOTRACE_HOOKS
+	if (unlikely(is_kmmio_active()))
+		if (kmmio_handler(regs, addr) == 1)
+			return -1;
+#endif
+	return 0;
+}
 
 static inline int notify_page_fault(struct pt_regs *regs)
 {
@@ -578,6 +590,8 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	unsigned long address;
 	int write, si_code;
 	int fault;
+	unsigned long *stackend;
+
 #ifdef CONFIG_X86_64
 	unsigned long flags;
 #endif
@@ -597,6 +611,8 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	si_code = SEGV_MAPERR;
 
 	if (notify_page_fault(regs))
+		return;
+	if (unlikely(kmmio_fault(regs, address)))
 		return;
 
 	/*
@@ -842,6 +858,10 @@ no_context:
 #endif
 
 	show_fault_oops(regs, error_code, address);
+
+ 	stackend = end_of_stack(tsk);
+	if (*stackend != STACK_END_MAGIC)
+		printk(KERN_ALERT "Thread overran stack, or stack corrupted\n");
 
 	tsk->thread.cr2 = address;
 	tsk->thread.trap_no = 14;
