@@ -34,6 +34,41 @@ struct cpa_data {
 	unsigned	force_split : 1;
 };
 
+#ifdef CONFIG_PROC_FS
+static unsigned long direct_pages_count[PG_LEVEL_NUM];
+
+void update_page_count(int level, unsigned long pages)
+{
+	unsigned long flags;
+
+	/* Protect against CPA */
+	spin_lock_irqsave(&pgd_lock, flags);
+	direct_pages_count[level] += pages;
+	spin_unlock_irqrestore(&pgd_lock, flags);
+}
+
+static void split_page_count(int level)
+{
+	direct_pages_count[level]--;
+	direct_pages_count[level - 1] += PTRS_PER_PTE;
+}
+
+int arch_report_meminfo(char *page)
+{
+	int n = sprintf(page, "DirectMap4k:  %8lu\n"
+			"DirectMap2M:  %8lu\n",
+			direct_pages_count[PG_LEVEL_4K],
+			direct_pages_count[PG_LEVEL_2M]);
+#ifdef CONFIG_X86_64
+	n += sprintf(page + n, "DirectMap1G:  %8lu\n",
+		     direct_pages_count[PG_LEVEL_1G]);
+#endif
+	return n;
+}
+#else
+static inline void split_page_count(int level) { }
+#endif
+
 #ifdef CONFIG_X86_64
 
 static inline unsigned long highmap_start_pfn(void)
@@ -106,7 +141,7 @@ static void cpa_flush_all(unsigned long cache)
 {
 	BUG_ON(irqs_disabled());
 
-	on_each_cpu(__cpa_flush_all, (void *) cache, 1, 1);
+	on_each_cpu(__cpa_flush_all, (void *) cache, 1);
 }
 
 static void __cpa_flush_range(void *arg)
@@ -127,7 +162,7 @@ static void cpa_flush_range(unsigned long start, int numpages, int cache)
 	BUG_ON(irqs_disabled());
 	WARN_ON(PAGE_ALIGN(start) != start);
 
-	on_each_cpu(__cpa_flush_range, NULL, 1, 1);
+	on_each_cpu(__cpa_flush_range, NULL, 1);
 
 	if (!cache)
 		return;
@@ -227,6 +262,7 @@ pte_t *lookup_address(unsigned long address, unsigned int *level)
 
 	return pte_offset_kernel(pmd, address);
 }
+EXPORT_SYMBOL_GPL(lookup_address);
 
 /*
  * Set the new pmd in all the pgds we know about:
@@ -499,6 +535,10 @@ static int split_large_page(pte_t *kpte, unsigned long address)
 	pfn = pte_pfn(*kpte);
 	for (i = 0; i < PTRS_PER_PTE; i++, pfn += pfninc)
 		set_pte(&pbase[i], pfn_pte(pfn, ref_prot));
+
+	if (address >= (unsigned long)__va(0) &&
+		address < (unsigned long)__va(max_pfn_mapped << PAGE_SHIFT))
+		split_page_count(level);
 
 	/*
 	 * Install the new, split up pagetable. Important details here:
@@ -805,7 +845,7 @@ int _set_memory_wc(unsigned long addr, int numpages)
 
 int set_memory_wc(unsigned long addr, int numpages)
 {
-	if (!pat_wc_enabled)
+	if (!pat_enabled)
 		return set_memory_uc(addr, numpages);
 
 	if (reserve_memtype(addr, addr + numpages * PAGE_SIZE,

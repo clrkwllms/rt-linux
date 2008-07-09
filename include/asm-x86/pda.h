@@ -16,12 +16,12 @@ struct x8664_pda {
 	unsigned long oldrsp;		/* 24 user rsp for system call */
 	int irqcount;			/* 32 Irq nesting counter. Starts -1 */
 	unsigned int cpunumber;		/* 36 Logical CPU number */
-#ifdef CONFIG_CC_STACKPROTECTOR
 	unsigned long stack_canary;	/* 40 stack canary value */
 					/* gcc-ABI: this canary MUST be at
 					   offset 40!!! */
-#endif
 	char *irqstackptr;
+	short nodenumber;		/* number of current node (32k max) */
+	short in_bootmem;		/* pda lives in bootmem */
 	unsigned int __softirq_pending;
 	unsigned int __nmi_count;	/* number of NMI on this CPUs */
 	short mmu_state;
@@ -37,8 +37,7 @@ struct x8664_pda {
 	unsigned irq_spurious_count;
 } ____cacheline_aligned_in_smp;
 
-extern struct x8664_pda *_cpu_pda[];
-extern struct x8664_pda boot_cpu_pda[];
+extern struct x8664_pda **_cpu_pda;
 extern void pda_init(int);
 
 #define cpu_pda(i) (_cpu_pda[i])
