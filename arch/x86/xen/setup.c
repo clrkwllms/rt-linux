@@ -86,27 +86,68 @@ static void xen_idle(void)
  */
 static void __init fiddle_vdso(void)
 {
+#if defined(CONFIG_X86_32) || defined(CONFIG_IA32_EMULATION)
 	extern const char vdso32_default_start;
 	u32 *mask = VDSO32_SYMBOL(&vdso32_default_start, NOTE_MASK);
 	*mask |= 1 << VDSO_NOTE_NONEGSEG_BIT;
+#endif
 }
 
-void xen_enable_sysenter(void)
+static __cpuinit int register_callback(unsigned type, const void *func)
 {
-	int cpu = smp_processor_id();
-	extern void xen_sysenter_target(void);
-	/* Mask events on entry, even though they get enabled immediately */
-	static struct callback_register sysenter = {
-		.type = CALLBACKTYPE_sysenter,
-		.address = { __KERNEL_CS, (unsigned long)xen_sysenter_target },
+	struct callback_register callback = {
+		.type = type,
+		.address = XEN_CALLBACK(__KERNEL_CS, func),
 		.flags = CALLBACKF_mask_events,
 	};
 
-	if (!boot_cpu_has(X86_FEATURE_SEP) ||
-	    HYPERVISOR_callback_op(CALLBACKOP_register, &sysenter) != 0) {
+	return HYPERVISOR_callback_op(CALLBACKOP_register, &callback);
+}
+
+void __cpuinit xen_enable_sysenter(void)
+{
+	int cpu = smp_processor_id();
+	extern void xen_sysenter_target(void);
+	int ret;
+
+#ifdef CONFIG_X86_32
+	if (!boot_cpu_has(X86_FEATURE_SEP)) {
+		return;
+	}
+#else
+	if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL &&
+	    boot_cpu_data.x86_vendor != X86_VENDOR_CENTAUR) {
+		return;
+	}
+#endif
+
+	ret = register_callback(CALLBACKTYPE_sysenter, xen_sysenter_target);
+	if(ret != 0) {
 		clear_cpu_cap(&cpu_data(cpu), X86_FEATURE_SEP);
 		clear_cpu_cap(&boot_cpu_data, X86_FEATURE_SEP);
 	}
+}
+
+void __cpuinit xen_enable_syscall(void)
+{
+#ifdef CONFIG_X86_64
+	int cpu = smp_processor_id();
+	int ret;
+	extern void xen_syscall_target(void);
+	extern void xen_syscall32_target(void);
+
+	ret = register_callback(CALLBACKTYPE_syscall, xen_syscall_target);
+	if (ret != 0) {
+		printk("failed to set syscall: %d\n", ret);
+		clear_cpu_cap(&cpu_data(cpu), X86_FEATURE_SYSCALL);
+		clear_cpu_cap(&boot_cpu_data, X86_FEATURE_SYSCALL);
+	} else {
+		ret = register_callback(CALLBACKTYPE_syscall32,
+					xen_syscall32_target);
+		if (ret != 0)
+			printk("failed to set 32-bit syscall: %d\n", ret);
+	}
+#endif /* CONFIG_X86_64 */
 }
 
 void __init xen_arch_setup(void)
@@ -120,10 +161,12 @@ void __init xen_arch_setup(void)
 	if (!xen_feature(XENFEAT_auto_translated_physmap))
 		HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_pae_extended_cr3);
 
-	HYPERVISOR_set_callbacks(__KERNEL_CS, (unsigned long)xen_hypervisor_callback,
-				 __KERNEL_CS, (unsigned long)xen_failsafe_callback);
+	if (register_callback(CALLBACKTYPE_event, xen_hypervisor_callback) ||
+	    register_callback(CALLBACKTYPE_failsafe, xen_failsafe_callback))
+		BUG();
 
 	xen_enable_sysenter();
+	xen_enable_syscall();
 
 	set_iopl.iopl = 1;
 	rc = HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
@@ -142,11 +185,6 @@ void __init xen_arch_setup(void)
 	       COMMAND_LINE_SIZE : MAX_GUEST_CMDLINE);
 
 	pm_idle = xen_idle;
-
-#ifdef CONFIG_SMP
-	/* fill cpus_possible with all available cpus */
-	xen_fill_possible_map();
-#endif
 
 	paravirt_disable_iospace();
 
