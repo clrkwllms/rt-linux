@@ -310,9 +310,9 @@ config KMEMCHECK_USE_SMP
 	  time.
 
 	  If you want to compile a kernel specifically for the purpose of
-	  playing with kmemcheck, you should say n here. If you want a normal
+	  playing with kmemcheck, you should say N here. If you want a normal
 	  kernel with the possibility of enabling kmemcheck without
-	  recompiling, you should say y here.
+	  recompiling, you should say Y here.
 
 config KMEMCHECK_QUEUE_SIZE
 	int "kmemcheck: error queue size"
