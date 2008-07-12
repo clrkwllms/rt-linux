@@ -1124,8 +1124,11 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 		stat(get_cpu_slab(s, raw_smp_processor_id()), ORDER_FALLBACK);
 	}
 
-	if (kmemcheck_enabled && !(s->flags & SLAB_NOTRACK))
+	if (kmemcheck_enabled
+		&& !(s->flags & (SLAB_NOTRACK | DEBUG_DEFAULT_FLAGS)))
+	{
 		kmemcheck_alloc_shadow(s, flags, node, page, compound_order(page));
+	}
 
 	page->objects = oo_objects(oo);
 	mod_zone_page_state(page_zone(page),
