@@ -1628,7 +1628,7 @@ static void kmem_freepages(struct kmem_cache *cachep, void *addr)
 	struct page *page = virt_to_page(addr);
 	const unsigned long nr_freed = i;
 
-	if (kmemcheck_page_is_tracked(page) && !(cachep->flags & SLAB_NOTRACK))
+	if (kmemcheck_page_is_tracked(page))
 		kmemcheck_free_shadow(cachep, page, cachep->gfporder);
 
 	if (cachep->flags & SLAB_RECLAIM_ACCOUNT)

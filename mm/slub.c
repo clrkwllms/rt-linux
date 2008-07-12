@@ -1203,7 +1203,7 @@ static void __free_slab(struct kmem_cache *s, struct page *page)
 		ClearSlabDebug(page);
 	}
 
-	if (kmemcheck_page_is_tracked(page) && !(s->flags & SLAB_NOTRACK))
+	if (kmemcheck_page_is_tracked(page))
 		kmemcheck_free_shadow(s, page, compound_order(page));
 
 	mod_zone_page_state(page_zone(page),
