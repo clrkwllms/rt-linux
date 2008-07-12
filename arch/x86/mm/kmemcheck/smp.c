@@ -7,7 +7,7 @@
 #include "smp.h"
 #include <asm/irq_vectors.h>
 
-static spinlock_t nmi_spinlock;
+static DEFINE_SPINLOCK(nmi_spinlock);
 
 static atomic_t nmi_wait;
 static atomic_t nmi_resume;
