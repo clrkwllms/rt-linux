@@ -296,6 +296,7 @@ config KMEMCHECK_USE_SMP
 	bool "kmemcheck: use multiple CPUs"
 	depends on KMEMCHECK
 	depends on SMP
+	depends on BROKEN
 	default n
 	help
 	  This option will prevent kmemcheck from disabling all but one CPU
