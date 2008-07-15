@@ -670,6 +670,8 @@ comment "Random Number Generation"
 
 config CRYPTO_PRNG
 	tristate "Pseudo Random Number Generation for Cryptographic modules"
+	# causes bootup crashes with config-Tue_Jul_15_10_35_22_CEST_2008.bad
+	depends on 0
 	help
 	  This option enables the generic pseudo random number generator
 	  for cryptographic modules.  Uses the Algorithm specified in
