@@ -16,6 +16,7 @@
 #include <asm/i387.h>
 #include <asm/msr.h>
 #include <asm/io.h>
+#include <asm/linkage.h>
 #include <asm/mmu_context.h>
 #include <asm/mtrr.h>
 #include <asm/mce.h>
@@ -316,9 +317,6 @@ static void __cpuinit early_identify_cpu(struct cpuinfo_x86 *c)
 		c->x86_phys_bits = eax & 0xff;
 	}
 
-	/* Assume all 64-bit CPUs support 32-bit syscall */
-	set_cpu_cap(c, X86_FEATURE_SYSCALL32);
-
 	if (c->x86_vendor != X86_VENDOR_UNKNOWN &&
 	    cpu_devs[c->x86_vendor]->c_early_init)
 		cpu_devs[c->x86_vendor]->c_early_init(c);
@@ -517,8 +515,7 @@ void pda_init(int cpu)
 }
 
 char boot_exception_stacks[(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ +
-			   DEBUG_STKSZ]
-__attribute__((section(".bss.page_aligned")));
+			   DEBUG_STKSZ] __page_aligned_bss;
 
 extern asmlinkage void ignore_sysret(void);
 
