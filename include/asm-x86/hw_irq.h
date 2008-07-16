@@ -48,6 +48,7 @@ extern void irq_move_cleanup_interrupt(void);
 extern void threshold_interrupt(void);
 
 extern void call_function_interrupt(void);
+extern void call_function_single_interrupt(void);
 
 /* PIC specific functions */
 extern void disable_8259A_irq(unsigned int irq);
@@ -97,9 +98,9 @@ extern void (*const interrupt[NR_IRQS])(void);
 #else
 typedef int vector_irq_t[NR_VECTORS];
 DECLARE_PER_CPU(vector_irq_t, vector_irq);
-extern void __setup_vector_irq(int cpu);
 extern spinlock_t vector_lock;
 #endif
+extern void setup_vector_irq(int cpu);
 
 #endif /* !ASSEMBLY_ */
 
