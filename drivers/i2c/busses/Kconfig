@@ -136,28 +136,15 @@ config I2C_PIIX4
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-piix4.
 
-config I2C_NFORCE2
-	tristate "Nvidia nForce2, nForce3 and nForce4"
-	depends on PCI
+config I2C_MV64XXX
+	tristate "Marvell mv64xxx I2C Controller"
+	depends on (MV64X60 || PLAT_ORION) && EXPERIMENTAL
 	help
-	  If you say yes to this option, support will be included for the Nvidia
-	  nForce2, nForce3 and nForce4 families of mainboard I2C interfaces.
+	  If you say yes to this option, support will be included for the
+	  built-in I2C interface on the Marvell 64xxx line of host bridges.
 
 	  This driver can also be built as a module.  If so, the module
-	  will be called i2c-nforce2.
-
-config I2C_NFORCE2_S4985
-	tristate "SMBus multiplexing on the Tyan S4985"
-	depends on I2C_NFORCE2 && EXPERIMENTAL
-	help
-	  Enabling this option will add specific SMBus support for the Tyan
-	  S4985 motherboard.  On this 4-CPU board, the SMBus is multiplexed
-	  over 4 different channels, where the various memory module EEPROMs
-	  live.  Saying yes here will give you access to these in addition
-	  to the trunk.
-
-	  This driver can also be built as a module.  If so, the module
-	  will be called i2c-nforce2-s4985.
+	  will be called i2c-mv64xxx.
 
 config I2C_SIS5595
 	tristate "SiS 5595"
@@ -376,15 +363,15 @@ config I2C_MPC
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-mpc.
 
-config I2C_MV64XXX
-	tristate "Marvell mv64xxx I2C Controller"
-	depends on (MV64X60 || PLAT_ORION) && EXPERIMENTAL
+config I2C_NFORCE2
+	tristate "Nvidia nForce2, nForce3 and nForce4"
+	depends on PCI
 	help
-	  If you say yes to this option, support will be included for the
-	  built-in I2C interface on the Marvell 64xxx line of host bridges.
+	  If you say yes to this option, support will be included for the Nvidia
+	  nForce2, nForce3 and nForce4 families of mainboard I2C interfaces.
 
 	  This driver can also be built as a module.  If so, the module
-	  will be called i2c-mv64xxx.
+	  will be called i2c-nforce2.
 
 config I2C_OCORES
 	tristate "OpenCores I2C Controller"
