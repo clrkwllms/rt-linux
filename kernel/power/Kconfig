@@ -94,6 +94,16 @@ config SUSPEND
 	  powered and thus its contents are preserved, such as the
 	  suspend-to-RAM state (e.g. the ACPI S3 state).
 
+config PM_TEST_SUSPEND
+	bool "Test suspend/resume and wakealarm during bootup"
+	depends on SUSPEND && PM_DEBUG && RTC_LIB=y
+	---help---
+	This option will suspend your machine during bootup, and make
+	it wake up a few seconds later using the RTC's wakeup alarm.
+
+	You probably want to have your system's RTC driver statically
+	linked, ensuring that it's available when this test runs.
+
 config SUSPEND_FREEZER
 	bool "Enable freezer for suspend to RAM/standby" \
 		if ARCH_WANTS_FREEZER_CONTROL || BROKEN
