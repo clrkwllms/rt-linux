@@ -9,7 +9,10 @@
 #define _SCSI_SCSI_H
 
 #include <linux/types.h>
-#include <scsi/scsi_cmnd.h>
+
+#ifdef CONFIG_BLOCK
+# include <scsi/scsi_cmnd.h>
+#endif
 
 /*
  * The maximum number of SG segments that we will put inside a
