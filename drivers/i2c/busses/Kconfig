@@ -56,6 +56,9 @@ config I2C_AMD756
 config I2C_AMD756_S4882
 	tristate "SMBus multiplexing on the Tyan S4882"
 	depends on I2C_AMD756 && X86 && EXPERIMENTAL
+	# broke an Athlon 64 X2 Asus A8N-E with:
+	# http://redhat.com/~mingo/misc/config-Thu_Jul_17_11_34_08_CEST_2008.bad
+	depends on 0
 	help
 	  Enabling this option will add specific SMBus support for the Tyan
 	  S4882 motherboard.  On this 4-CPU board, the SMBus is multiplexed
