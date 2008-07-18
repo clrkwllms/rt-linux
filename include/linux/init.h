@@ -189,11 +189,13 @@ extern void (*late_time_init)(void);
 #define fs_initcall_sync(fn)		__define_initcall("5s",fn,5s)
 #define rootfs_initcall(fn)		__define_initcall("rootfs",fn,rootfs)
 #define device_initcall(fn)		__define_initcall("6",fn,6)
+#define device_initcall_async(fn)	__define_initcall("6a", fn, 6a)
 #define device_initcall_sync(fn)	__define_initcall("6s",fn,6s)
 #define late_initcall(fn)		__define_initcall("7",fn,7)
 #define late_initcall_sync(fn)		__define_initcall("7s",fn,7s)
 
 #define __initcall(fn) device_initcall(fn)
+#define __initcall_async(fn) device_initcall_async(fn)
 
 #define __exitcall(fn) \
 	static exitcall_t __exitcall_##fn __exit_call = fn
@@ -249,6 +251,7 @@ void __init parse_early_param(void);
  * be one per module.
  */
 #define module_init(x)	__initcall(x);
+#define module_init_async(x)	__initcall_async(x);
 
 /**
  * module_exit() - driver exit entry point
@@ -271,9 +274,12 @@ void __init parse_early_param(void);
 #define subsys_initcall(fn)		module_init(fn)
 #define fs_initcall(fn)			module_init(fn)
 #define device_initcall(fn)		module_init(fn)
+#define device_initcall_async(fn)	module_init(fn)
 #define late_initcall(fn)		module_init(fn)
 
 #define security_initcall(fn)		module_init(fn)
+
+#define module_init_async(fn)		module_init(fn)
 
 /* These macros create a dummy inline: gcc 2.9x does not count alias
  as usage, hence the `unused function' warning when __init functions

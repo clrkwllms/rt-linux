@@ -738,16 +738,46 @@ static void __init do_one_initcall(initcall_t fn)
 
 
 extern initcall_t __initcall_start[], __initcall_end[];
+extern initcall_t __async_initcall_start[], __async_initcall_end[];
+
+static void __init do_async_initcalls(struct work_struct *dummy)
+{
+	initcall_t *call;
+
+	for (call = __async_initcall_start; call < __async_initcall_end; call++)
+		do_one_initcall(*call);
+}
+
+static struct workqueue_struct *async_init_wq;
+
+
 
 static void __init do_initcalls(void)
 {
 	initcall_t *call;
+	static DECLARE_WORK(async_work, do_async_initcalls);
+	int phase = 0; /* 0 = levels 0 - 6, 1 = level 6a, 2 = after level 6a */
 
-	for (call = __initcall_start; call < __initcall_end; call++)
-		do_one_initcall(*call);
+	async_init_wq = create_singlethread_workqueue("kasyncinit");
 
-	/* Make sure there is no pending stuff from the initcall sequence */
+	for (call = __initcall_start; call < __initcall_end; call++) {
+		if (phase == 0 && call >= __async_initcall_start) {
+			phase = 1;
+			queue_work(async_init_wq, &async_work);
+		}
+		if (phase == 1 && call >= __async_initcall_end)
+			phase = 2;
+		if (phase != 1)
+			do_one_initcall(*call);
+	}
+
+	/*
+	 * Make sure there is no pending stuff from the initcall sequence,
+	 * including the async initcalls
+	 */
 	flush_scheduled_work();
+	flush_workqueue(async_init_wq);
+	destroy_workqueue(async_init_wq);
 }
 
 /*
