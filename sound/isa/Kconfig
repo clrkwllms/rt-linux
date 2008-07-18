@@ -305,12 +305,6 @@ config SND_OPTI93X
 	select SND_OPL3_LIB
 	select SND_MPU401_UART
 	select SND_CS4231_LIB
-	#
-	# Crashes on bootup with this config:
-	#
-	# http://redhat.com/~mingo/misc/config-Thu_Jul_17_17_54_09_CEST_2008.bad
-	#
-	depends on 0
 	help
 	  Say Y here to include support for soundcards based on Opti
 	  82C93x chips.
