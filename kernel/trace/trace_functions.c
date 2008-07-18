@@ -28,15 +28,18 @@ static void function_reset(struct trace_array *tr)
 
 static void start_function_trace(struct trace_array *tr)
 {
+	tr->cpu = get_cpu();
 	function_reset(tr);
-	atomic_inc(&trace_record_cmdline_enabled);
+	put_cpu();
+
+	tracing_start_cmdline_record();
 	tracing_start_function_trace();
 }
 
 static void stop_function_trace(struct trace_array *tr)
 {
 	tracing_stop_function_trace();
-	atomic_dec(&trace_record_cmdline_enabled);
+	tracing_stop_cmdline_record();
 }
 
 static void function_trace_init(struct trace_array *tr)

@@ -1,6 +1,7 @@
 #ifndef _LINUX_LINKAGE_H
 #define _LINUX_LINKAGE_H
 
+#include <linux/compiler.h>
 #include <asm/linkage.h>
 
 #define notrace __attribute__((no_instrument_function))
@@ -18,6 +19,9 @@
 #ifndef asmregparm
 # define asmregparm
 #endif
+
+#define __page_aligned_data	__section(.data.page_aligned) __aligned(PAGE_SIZE)
+#define __page_aligned_bss	__section(.bss.page_aligned) __aligned(PAGE_SIZE)
 
 /*
  * This is used by architectures to keep arguments on the stack

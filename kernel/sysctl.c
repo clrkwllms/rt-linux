@@ -83,6 +83,9 @@ extern int maps_protect;
 extern int sysctl_stat_interval;
 extern int latencytop_enabled;
 extern int sysctl_nr_open_min, sysctl_nr_open_max;
+#ifdef CONFIG_RCU_TORTURE_TEST
+extern int rcutorture_runnable;
+#endif /* #ifdef CONFIG_RCU_TORTURE_TEST */
 
 /* Constants used for minimum and  maximum */
 #if defined(CONFIG_DETECT_SOFTLOCKUP) || defined(CONFIG_HIGHMEM)
@@ -132,8 +135,6 @@ extern int sysctl_ieee_emulation_warnings;
 extern int sysctl_userprocess_debug;
 extern int spin_retry;
 #endif
-
-extern int sysctl_hz_timer;
 
 #ifdef CONFIG_BSD_PROCESS_ACCT
 extern int acct_parm[];
@@ -264,6 +265,14 @@ static struct ctl_table kern_table[] = {
 		.strategy	= &sysctl_intvec,
 		.extra1		= &min_wakeup_granularity_ns,
 		.extra2		= &max_wakeup_granularity_ns,
+	},
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "sched_shares_ratelimit",
+		.data		= &sysctl_sched_shares_ratelimit,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
 	},
 	{
 		.ctl_name	= CTL_UNNUMBERED,
@@ -574,16 +583,6 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
-#ifdef CONFIG_NO_IDLE_HZ
-	{
-		.ctl_name       = KERN_HZ_TIMER,
-		.procname       = "hz_timer",
-		.data           = &sysctl_hz_timer,
-		.maxlen         = sizeof(int),
-		.mode           = 0644,
-		.proc_handler   = &proc_dointvec,
-	},
-#endif
 	{
 		.ctl_name	= KERN_S390_USER_DEBUG_LOGGING,
 		.procname	= "userprocess_debug",
@@ -822,6 +821,16 @@ static struct ctl_table kern_table[] = {
 		.procname	= "keys",
 		.mode		= 0555,
 		.child		= key_sysctls,
+	},
+#endif
+#ifdef CONFIG_RCU_TORTURE_TEST
+	{
+		.ctl_name       = CTL_UNNUMBERED,
+		.procname       = "rcutorture_runnable",
+		.data           = &rcutorture_runnable,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = &proc_dointvec,
 	},
 #endif
 /*

@@ -85,11 +85,6 @@ struct ppc64_caches ppc64_caches = {
 };
 EXPORT_SYMBOL_GPL(ppc64_caches);
 
-#ifdef CONFIG_FTRACE
-extern void _mcount(void);
-EXPORT_SYMBOL(_mcount);
-#endif
-
 /*
  * These are used in binfmt_elf.c to put aux entries on the stack
  * for each elf executable being started.
@@ -368,6 +363,8 @@ void __init setup_system(void)
 			  &__start___ftr_fixup, &__stop___ftr_fixup);
 	do_feature_fixups(powerpc_firmware_features,
 			  &__start___fw_ftr_fixup, &__stop___fw_ftr_fixup);
+	do_lwsync_fixups(cur_cpu_spec->cpu_features,
+			 &__start___lwsync_fixup, &__stop___lwsync_fixup);
 
 	/*
 	 * Unflatten the device-tree passed by prom_init or kexec

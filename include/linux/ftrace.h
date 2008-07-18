@@ -31,7 +31,6 @@ int unregister_ftrace_function(struct ftrace_ops *ops);
 void clear_ftrace_function(void);
 
 extern void ftrace_stub(unsigned long a0, unsigned long a1);
-extern void mcount(void);
 
 #else /* !CONFIG_FTRACE */
 # define register_ftrace_function(ops) do { } while (0)
@@ -48,11 +47,14 @@ enum {
 	FTRACE_FL_FAILED	= (1 << 1),
 	FTRACE_FL_FILTER	= (1 << 2),
 	FTRACE_FL_ENABLED	= (1 << 3),
+	FTRACE_FL_NOTRACE	= (1 << 4),
+	FTRACE_FL_CONVERTED	= (1 << 5),
+	FTRACE_FL_FROZEN	= (1 << 6),
 };
 
 struct dyn_ftrace {
 	struct hlist_node node;
-	unsigned long	  ip;
+	unsigned long	  ip; /* address of mcount call-site */
 	unsigned long	  flags;
 };
 
@@ -71,13 +73,23 @@ extern int ftrace_update_ftrace_func(ftrace_func_t func);
 extern void ftrace_caller(void);
 extern void ftrace_call(void);
 extern void mcount_call(void);
+
+extern int skip_trace(unsigned long ip);
+
+void ftrace_disable_daemon(void);
+void ftrace_enable_daemon(void);
+
 #else
+# define skip_trace(ip)				({ 0; })
 # define ftrace_force_update()			({ 0; })
 # define ftrace_set_filter(buf, len, reset)	do { } while (0)
-#endif
+# define ftrace_disable_daemon()		do { } while (0)
+# define ftrace_enable_daemon()			do { } while (0)
+#endif /* CONFIG_DYNAMIC_FTRACE */
 
 /* totally disable ftrace - can not re-enable after this */
 void ftrace_kill(void);
+void ftrace_kill_atomic(void);
 
 static inline void tracer_disable(void)
 {
@@ -121,7 +133,7 @@ static inline void tracer_disable(void)
 # define trace_preempt_off(a0, a1)		do { } while (0)
 #endif
 
-#ifdef CONFIG_CONTEXT_SWITCH_TRACER
+#ifdef CONFIG_TRACING
 extern void
 ftrace_special(unsigned long arg1, unsigned long arg2, unsigned long arg3);
 #else

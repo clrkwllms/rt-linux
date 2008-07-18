@@ -27,6 +27,7 @@
 #include <linux/poll.h>
 #include <linux/gfp.h>
 #include <linux/fs.h>
+#include <linux/kprobes.h>
 #include <linux/writeback.h>
 
 #include <linux/stacktrace.h>
@@ -41,11 +42,6 @@ static cpumask_t __read_mostly		tracing_buffer_mask;
 
 #define for_each_tracing_cpu(cpu)	\
 	for_each_cpu_mask(cpu, tracing_buffer_mask)
-
-/* dummy trace to disable tracing */
-static struct tracer no_tracer __read_mostly = {
-	.name		= "none",
-};
 
 static int trace_alloc_page(void);
 static int trace_free_page(void);
@@ -100,6 +96,9 @@ static DEFINE_PER_CPU(struct trace_array_cpu, max_data);
 /* tracer_enabled is used to toggle activation of a tracer */
 static int			tracer_enabled = 1;
 
+/* function tracing enabled */
+int				ftrace_function_enabled;
+
 /*
  * trace_nr_entries is the number of entries that is allocated
  * for a buffer. Note, the number of entries is always rounded
@@ -133,6 +132,24 @@ static DECLARE_WAIT_QUEUE_HEAD(trace_wait);
 
 /* trace_flags holds iter_ctrl options */
 unsigned long trace_flags = TRACE_ITER_PRINT_PARENT;
+
+static notrace void no_trace_init(struct trace_array *tr)
+{
+	int cpu;
+
+	ftrace_function_enabled = 0;
+	if(tr->ctrl)
+		for_each_online_cpu(cpu)
+			tracing_reset(tr->data[cpu]);
+	tracer_enabled = 0;
+}
+
+/* dummy trace to disable tracing */
+static struct tracer no_tracer __read_mostly = {
+	.name		= "none",
+	.init		= no_trace_init
+};
+
 
 /**
  * trace_wake_up - wake up tasks waiting for trace input
@@ -249,24 +266,32 @@ __update_max_tr(struct trace_array *tr, struct task_struct *tsk, int cpu)
 	tracing_record_cmdline(current);
 }
 
+#define CHECK_COND(cond)			\
+	if (unlikely(cond)) {			\
+		tracing_disabled = 1;		\
+		WARN_ON(1);			\
+		return -1;			\
+	}
+
 /**
  * check_pages - integrity check of trace buffers
  *
  * As a safty measure we check to make sure the data pages have not
- * been corrupted. TODO: configure to disable this because it adds
- * a bit of overhead.
+ * been corrupted.
  */
-void check_pages(struct trace_array_cpu *data)
+int check_pages(struct trace_array_cpu *data)
 {
 	struct page *page, *tmp;
 
-	BUG_ON(data->trace_pages.next->prev != &data->trace_pages);
-	BUG_ON(data->trace_pages.prev->next != &data->trace_pages);
+	CHECK_COND(data->trace_pages.next->prev != &data->trace_pages);
+	CHECK_COND(data->trace_pages.prev->next != &data->trace_pages);
 
 	list_for_each_entry_safe(page, tmp, &data->trace_pages, lru) {
-		BUG_ON(page->lru.next->prev != &page->lru);
-		BUG_ON(page->lru.prev->next != &page->lru);
+		CHECK_COND(page->lru.next->prev != &page->lru);
+		CHECK_COND(page->lru.prev->next != &page->lru);
 	}
+
+	return 0;
 }
 
 /**
@@ -280,7 +305,6 @@ void *head_page(struct trace_array_cpu *data)
 {
 	struct page *page;
 
-	check_pages(data);
 	if (list_empty(&data->trace_pages))
 		return NULL;
 
@@ -645,9 +669,6 @@ static char saved_cmdlines[SAVED_CMDLINES][TASK_COMM_LEN];
 static int cmdline_idx;
 static DEFINE_SPINLOCK(trace_cmdline_lock);
 
-/* trace in all context switches */
-atomic_t trace_record_cmdline_enabled __read_mostly;
-
 /* temporary disable recording */
 atomic_t trace_record_cmdline_disabled __read_mostly;
 
@@ -831,6 +852,48 @@ ftrace(struct trace_array *tr, struct trace_array_cpu *data,
 		trace_function(tr, data, ip, parent_ip, flags);
 }
 
+#ifdef CONFIG_MMIOTRACE
+void __trace_mmiotrace_rw(struct trace_array *tr, struct trace_array_cpu *data,
+						struct mmiotrace_rw *rw)
+{
+	struct trace_entry *entry;
+	unsigned long irq_flags;
+
+	raw_local_irq_save(irq_flags);
+	__raw_spin_lock(&data->lock);
+
+	entry			= tracing_get_trace_entry(tr, data);
+	tracing_generic_entry_update(entry, 0);
+	entry->type		= TRACE_MMIO_RW;
+	entry->mmiorw		= *rw;
+
+	__raw_spin_unlock(&data->lock);
+	raw_local_irq_restore(irq_flags);
+
+	trace_wake_up();
+}
+
+void __trace_mmiotrace_map(struct trace_array *tr, struct trace_array_cpu *data,
+						struct mmiotrace_map *map)
+{
+	struct trace_entry *entry;
+	unsigned long irq_flags;
+
+	raw_local_irq_save(irq_flags);
+	__raw_spin_lock(&data->lock);
+
+	entry			= tracing_get_trace_entry(tr, data);
+	tracing_generic_entry_update(entry, 0);
+	entry->type		= TRACE_MMIO_MAP;
+	entry->mmiomap		= *map;
+
+	__raw_spin_unlock(&data->lock);
+	raw_local_irq_restore(irq_flags);
+
+	trace_wake_up();
+}
+#endif
+
 void __trace_stack(struct trace_array *tr,
 		   struct trace_array_cpu *data,
 		   unsigned long flags,
@@ -934,6 +997,30 @@ tracing_sched_wakeup_trace(struct trace_array *tr,
 	trace_wake_up();
 }
 
+void
+ftrace_special(unsigned long arg1, unsigned long arg2, unsigned long arg3)
+{
+	struct trace_array *tr = &global_trace;
+	struct trace_array_cpu *data;
+	unsigned long flags;
+	long disabled;
+	int cpu;
+
+	if (tracing_disabled || current_trace == &no_tracer || !tr->ctrl)
+		return;
+
+	local_irq_save(flags);
+	cpu = raw_smp_processor_id();
+	data = tr->data[cpu];
+	disabled = atomic_inc_return(&data->disabled);
+
+	if (likely(disabled == 1))
+		__trace_special(tr, data, arg1, arg2, arg3);
+
+	atomic_dec(&data->disabled);
+	local_irq_restore(flags);
+}
+
 #ifdef CONFIG_FTRACE
 static void
 function_trace_call(unsigned long ip, unsigned long parent_ip)
@@ -944,7 +1031,10 @@ function_trace_call(unsigned long ip, unsigned long parent_ip)
 	long disabled;
 	int cpu;
 
-	if (unlikely(!tracer_enabled))
+	if (unlikely(!ftrace_function_enabled))
+		return;
+
+	if (skip_trace(ip))
 		return;
 
 	local_irq_save(flags);
@@ -966,11 +1056,15 @@ static struct ftrace_ops trace_ops __read_mostly =
 
 void tracing_start_function_trace(void)
 {
+	ftrace_function_enabled = 0;
 	register_ftrace_function(&trace_ops);
+	if (tracer_enabled)
+		ftrace_function_enabled = 1;
 }
 
 void tracing_stop_function_trace(void)
 {
+	ftrace_function_enabled = 0;
 	unregister_ftrace_function(&trace_ops);
 }
 #endif
@@ -1171,6 +1265,20 @@ static void s_stop(struct seq_file *m, void *p)
 	mutex_unlock(&trace_types_lock);
 }
 
+#define KRETPROBE_MSG "[unknown/kretprobe'd]"
+
+#ifdef CONFIG_KRETPROBES
+static inline int kretprobed(unsigned long addr)
+{
+	return addr == (unsigned long)kretprobe_trampoline;
+}
+#else
+static inline int kretprobed(unsigned long addr)
+{
+	return 0;
+}
+#endif /* CONFIG_KRETPROBES */
+
 static int
 seq_print_sym_short(struct trace_seq *s, const char *fmt, unsigned long address)
 {
@@ -1283,7 +1391,7 @@ print_trace_header(struct seq_file *m, struct trace_iterator *iter)
 		   "server",
 #elif defined(CONFIG_PREEMPT_VOLUNTARY)
 		   "desktop",
-#elif defined(CONFIG_PREEMPT_DESKTOP)
+#elif defined(CONFIG_PREEMPT)
 		   "preempt",
 #else
 		   "unknown",
@@ -1406,7 +1514,10 @@ print_lat_fmt(struct trace_iterator *iter, unsigned int trace_idx, int cpu)
 	case TRACE_FN:
 		seq_print_ip_sym(s, entry->fn.ip, sym_flags);
 		trace_seq_puts(s, " (");
-		seq_print_ip_sym(s, entry->fn.parent_ip, sym_flags);
+		if (kretprobed(entry->fn.parent_ip))
+			trace_seq_puts(s, KRETPROBE_MSG);
+		else
+			seq_print_ip_sym(s, entry->fn.parent_ip, sym_flags);
 		trace_seq_puts(s, ")\n");
 		break;
 	case TRACE_CTX:
@@ -1486,8 +1597,11 @@ static int print_trace_fmt(struct trace_iterator *iter)
 			ret = trace_seq_printf(s, " <-");
 			if (!ret)
 				return 0;
-			ret = seq_print_ip_sym(s, entry->fn.parent_ip,
-					       sym_flags);
+			if (kretprobed(entry->fn.parent_ip))
+				ret = trace_seq_puts(s, KRETPROBE_MSG);
+			else
+				ret = seq_print_ip_sym(s, entry->fn.parent_ip,
+						       sym_flags);
 			if (!ret)
 				return 0;
 		}
@@ -1786,8 +1900,10 @@ __tracing_open(struct inode *inode, struct file *file, int *ret)
 		m->private = iter;
 
 		/* stop the trace while dumping */
-		if (iter->tr->ctrl)
+		if (iter->tr->ctrl) {
 			tracer_enabled = 0;
+			ftrace_function_enabled = 0;
+		}
 
 		if (iter->trace && iter->trace->open)
 			iter->trace->open(iter);
@@ -1820,8 +1936,14 @@ int tracing_release(struct inode *inode, struct file *file)
 		iter->trace->close(iter);
 
 	/* reenable tracing if it was previously enabled */
-	if (iter->tr->ctrl)
+	if (iter->tr->ctrl) {
 		tracer_enabled = 1;
+		/*
+		 * It is safe to enable function tracing even if it
+		 * isn't used
+		 */
+		ftrace_function_enabled = 1;
+	}
 	mutex_unlock(&trace_types_lock);
 
 	seq_release(inode, file);
@@ -2566,7 +2688,7 @@ tracing_entries_write(struct file *filp, const char __user *ubuf,
 {
 	unsigned long val;
 	char buf[64];
-	int ret;
+	int i, ret;
 
 	if (cnt >= sizeof(buf))
 		return -EINVAL;
@@ -2635,8 +2757,15 @@ tracing_entries_write(struct file *filp, const char __user *ubuf,
 			trace_free_page();
 	}
 
+	/* check integrity */
+	for_each_tracing_cpu(i)
+		check_pages(global_trace.data[i]);
+
 	filp->f_pos += cnt;
 
+	/* If check pages failed, return ENOMEM */
+	if (tracing_disabled)
+		cnt = -ENOMEM;
  out:
 	max_tr.entries = global_trace.entries;
 	mutex_unlock(&trace_types_lock);
@@ -2800,6 +2929,9 @@ static __init void tracer_init_debugfs(void)
 		pr_warning("Could not create debugfs "
 			   "'dyn_ftrace_total_info' entry\n");
 #endif
+#ifdef CONFIG_SYSPROF_TRACER
+	init_tracer_sysprof_debugfs(d_tracer);
+#endif
 }
 
 static int trace_alloc_page(void)
@@ -2927,8 +3059,6 @@ __init static int tracer_alloc_buffers(void)
 	int ret = -ENOMEM;
 	int i;
 
-	global_trace.ctrl = tracer_enabled;
-
 	/* TODO: make the number of buffers hot pluggable with CPUS */
 	tracing_nr_buffers = num_possible_cpus();
 	tracing_buffer_mask = cpu_possible_map;
@@ -2985,9 +3115,8 @@ __init static int tracer_alloc_buffers(void)
 	}
 	max_tr.entries = global_trace.entries;
 
-	pr_info("tracer: %d pages allocated for %ld",
-		pages, trace_nr_entries);
-	pr_info(" entries of %ld bytes\n", (long)TRACE_ENTRY_SIZE);
+	pr_info("tracer: %d pages allocated for %ld entries of %ld bytes\n",
+		pages, trace_nr_entries, (long)TRACE_ENTRY_SIZE);
 	pr_info("   actual entries %ld\n", global_trace.entries);
 
 	tracer_init_debugfs();
@@ -2998,6 +3127,7 @@ __init static int tracer_alloc_buffers(void)
 	current_trace = &no_tracer;
 
 	/* All seems OK, enable tracing */
+	global_trace.ctrl = tracer_enabled;
 	tracing_disabled = 0;
 
 	return 0;

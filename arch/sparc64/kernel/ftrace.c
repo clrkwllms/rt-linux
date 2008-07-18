@@ -5,14 +5,9 @@
 #include <linux/init.h>
 #include <linux/list.h>
 
+#include <asm/ftrace.h>
+
 static const u32 ftrace_nop = 0x01000000;
-
-notrace int ftrace_ip_converted(unsigned long ip)
-{
-	u32 insn = *(u32 *) ip;
-
-	return (insn == ftrace_nop);
-}
 
 notrace unsigned char *ftrace_nop_replace(void)
 {
@@ -67,9 +62,9 @@ ftrace_modify_code(unsigned long ip, unsigned char *old_code,
 notrace int ftrace_update_ftrace_func(ftrace_func_t func)
 {
 	unsigned long ip = (unsigned long)(&ftrace_call);
-	unsigned char old[4], *new;
+	unsigned char old[MCOUNT_INSN_SIZE], *new;
 
-	memcpy(old, &ftrace_call, 4);
+	memcpy(old, &ftrace_call, MCOUNT_INSN_SIZE);
 	new = ftrace_call_replace(ip, (unsigned long)func);
 	return ftrace_modify_code(ip, old, new);
 }
@@ -78,13 +73,13 @@ notrace int ftrace_mcount_set(unsigned long *data)
 {
 	unsigned long ip = (long)(&mcount_call);
 	unsigned long *addr = data;
-	unsigned char old[4], *new;
+	unsigned char old[MCOUNT_INSN_SIZE], *new;
 
 	/*
 	 * Replace the mcount stub with a pointer to the
 	 * ip recorder function.
 	 */
-	memcpy(old, &mcount_call, 4);
+	memcpy(old, &mcount_call, MCOUNT_INSN_SIZE);
 	new = ftrace_call_replace(ip, *addr);
 	*addr = ftrace_modify_code(ip, old, new);
 

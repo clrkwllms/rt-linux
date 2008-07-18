@@ -5,6 +5,7 @@
 #include <asm/atomic.h>
 #include <linux/sched.h>
 #include <linux/clocksource.h>
+#include <linux/mmiotrace.h>
 
 enum trace_type {
 	__TRACE_FIRST_TYPE = 0,
@@ -14,6 +15,8 @@ enum trace_type {
 	TRACE_WAKE,
 	TRACE_STACK,
 	TRACE_SPECIAL,
+	TRACE_MMIO_RW,
+	TRACE_MMIO_MAP,
 
 	__TRACE_LAST_TYPE
 };
@@ -75,6 +78,8 @@ struct trace_entry {
 		struct ctx_switch_entry		ctx;
 		struct special_entry		special;
 		struct stack_entry		stack;
+		struct mmiotrace_rw		mmiorw;
+		struct mmiotrace_map		mmiomap;
 	};
 };
 
@@ -188,6 +193,8 @@ struct trace_iterator {
 void tracing_reset(struct trace_array_cpu *data);
 int tracing_open_generic(struct inode *inode, struct file *filp);
 struct dentry *tracing_init_dentry(void);
+void init_tracer_sysprof_debugfs(struct dentry *d_tracer);
+
 void ftrace(struct trace_array *tr,
 			    struct trace_array_cpu *data,
 			    unsigned long ip,
@@ -216,8 +223,8 @@ void trace_function(struct trace_array *tr,
 		    unsigned long parent_ip,
 		    unsigned long flags);
 
-void tracing_start_function_trace(void);
-void tracing_stop_function_trace(void);
+void tracing_start_cmdline_record(void);
+void tracing_stop_cmdline_record(void);
 int register_tracer(struct tracer *type);
 void unregister_tracer(struct tracer *type);
 
@@ -226,13 +233,19 @@ extern unsigned long nsecs_to_usecs(unsigned long nsecs);
 extern unsigned long tracing_max_latency;
 extern unsigned long tracing_thresh;
 
-extern atomic_t trace_record_cmdline_enabled;
-
 void update_max_tr(struct trace_array *tr, struct task_struct *tsk, int cpu);
 void update_max_tr_single(struct trace_array *tr,
 			  struct task_struct *tsk, int cpu);
 
 extern cycle_t ftrace_now(int cpu);
+
+#ifdef CONFIG_FTRACE
+void tracing_start_function_trace(void);
+void tracing_stop_function_trace(void);
+#else
+# define tracing_start_function_trace()		do { } while (0)
+# define tracing_stop_function_trace()		do { } while (0)
+#endif
 
 #ifdef CONFIG_CONTEXT_SWITCH_TRACER
 typedef void
@@ -253,6 +266,15 @@ struct tracer_switch_ops {
 extern unsigned long ftrace_update_tot_cnt;
 #define DYN_FTRACE_TEST_NAME trace_selftest_dynamic_test_func
 extern int DYN_FTRACE_TEST_NAME(void);
+#endif
+
+#ifdef CONFIG_MMIOTRACE
+extern void __trace_mmiotrace_rw(struct trace_array *tr,
+				struct trace_array_cpu *data,
+				struct mmiotrace_rw *rw);
+extern void __trace_mmiotrace_map(struct trace_array *tr,
+				struct trace_array_cpu *data,
+				struct mmiotrace_map *map);
 #endif
 
 #ifdef CONFIG_FTRACE_STARTUP_TEST
@@ -278,6 +300,10 @@ extern int trace_selftest_startup_wakeup(struct tracer *trace,
 #endif
 #ifdef CONFIG_CONTEXT_SWITCH_TRACER
 extern int trace_selftest_startup_sched_switch(struct tracer *trace,
+					       struct trace_array *tr);
+#endif
+#ifdef CONFIG_SYSPROF_TRACER
+extern int trace_selftest_startup_sysprof(struct tracer *trace,
 					       struct trace_array *tr);
 #endif
 #endif /* CONFIG_FTRACE_STARTUP_TEST */
