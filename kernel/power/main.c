@@ -274,6 +274,7 @@ static int suspend_enter(suspend_state_t state)
 {
 	int error = 0;
 
+	device_pm_lock();
 	arch_suspend_disable_irqs();
 	BUG_ON(!irqs_disabled());
 
@@ -285,10 +286,11 @@ static int suspend_enter(suspend_state_t state)
 	if (!suspend_test(TEST_CORE))
 		error = suspend_ops->enter(state);
 
-	device_power_up();
+	device_power_up(PMSG_RESUME);
  Done:
 	arch_suspend_enable_irqs();
 	BUG_ON(irqs_disabled());
+	device_pm_unlock();
 	return error;
 }
 
@@ -315,12 +317,12 @@ int suspend_devices_and_enter(suspend_state_t state)
 	error = device_suspend(PMSG_SUSPEND);
 	if (error) {
 		printk(KERN_ERR "PM: Some devices failed to suspend\n");
-		goto Resume_console;
+		goto Recover_platform;
 	}
 	suspend_test_finish("suspend devices");
 
 	if (suspend_test(TEST_DEVICES))
-		goto Resume_devices;
+		goto Recover_platform;
 
 	if (suspend_ops->prepare) {
 		error = suspend_ops->prepare();
@@ -341,14 +343,18 @@ int suspend_devices_and_enter(suspend_state_t state)
 		suspend_ops->finish();
  Resume_devices:
 	suspend_test_start();
-	device_resume();
+	device_resume(PMSG_RESUME);
 	suspend_test_finish("resume devices");
- Resume_console:
 	resume_console();
  Close:
 	if (suspend_ops->end)
 		suspend_ops->end();
 	return error;
+
+ Recover_platform:
+	if (suspend_ops->recover)
+		suspend_ops->recover();
+	goto Resume_devices;
 }
 
 /**
