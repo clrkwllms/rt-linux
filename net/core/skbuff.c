@@ -419,6 +419,14 @@ void kfree_skb(struct sk_buff *skb)
 {
 	if (unlikely(!skb))
 		return;
+
+	{
+		u8 *ptr = (u8 *)(&skb->users);
+
+		if (*ptr == POISON_FREE || *ptr == POISON_INUSE || *ptr == POISON_END)
+			BUG();
+	}
+
 	if (likely(atomic_read(&skb->users) == 1))
 		smp_rmb();
 	else if (likely(!atomic_dec_and_test(&skb->users)))
