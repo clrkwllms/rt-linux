@@ -764,7 +764,7 @@ retint_signal:
 	/* Returning to kernel space from exception. */
 	/* rcx:	 threadinfo. interrupts off. */
 ENTRY(retexc_kernel)
-	testl $HARDNMI_MASK,threadinfo_preempt_count(%rcx)
+	testl $HARDNMI_MASK,TI_preempt_count(%rcx)
 	jz retint_kernel		/* Not nested over NMI ? */
 	testw $X86_EFLAGS_TF,EFLAGS-ARGOFFSET(%rsp)	/* trap flag? */
 	jnz retint_kernel		/*
@@ -950,7 +950,7 @@ paranoid_restore_no_nmi\trace:
 	jmp irq_return
 paranoid_restore\trace:
 	GET_THREAD_INFO(%rcx)
-	testl $HARDNMI_MASK,threadinfo_preempt_count(%rcx)
+	testl $HARDNMI_MASK,TI_preempt_count(%rcx)
 	jz paranoid_restore_no_nmi\trace	/* Nested over NMI ? */
 	testw $X86_EFLAGS_TF,EFLAGS-0(%rsp)	/* trap flag? */
 	jnz paranoid_restore_no_nmi\trace
