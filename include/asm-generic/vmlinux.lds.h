@@ -372,11 +372,12 @@
   	*(.initcall5.init)						\
   	*(.initcall5s.init)						\
 	*(.initcallrootfs.init)						\
+	*(.initcall6s.init)						\
 	__async_initcall_start = .;					\
 	*(.initcall6a.init)						\
 	__async_initcall_end = .;					\
   	*(.initcall6.init)						\
-  	*(.initcall6s.init)						\
+	__device_initcall_end = .;					\
   	*(.initcall7.init)						\
   	*(.initcall7s.init)
 

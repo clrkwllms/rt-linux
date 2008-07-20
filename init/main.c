@@ -739,6 +739,7 @@ static void __init do_one_initcall(initcall_t fn)
 
 extern initcall_t __initcall_start[], __initcall_end[];
 extern initcall_t __async_initcall_start[], __async_initcall_end[];
+extern initcall_t __device_initcall_end[];
 
 static void __init do_async_initcalls(struct work_struct *dummy)
 {
@@ -762,7 +763,13 @@ static void __init do_initcalls(void)
 {
 	initcall_t *call;
 	static DECLARE_WORK(async_work, do_async_initcalls);
-	int phase = 0; /* 0 = levels 0 - 6, 1 = level 6a, 2 = after level 6a */
+	/*
+	 * 0 = levels 0 - 6,
+	 * 1 = level 6a,
+	 * 2 = after level 6a,
+	 * 3 = after level 6
+	 */
+	int phase = 0;
 
 	async_init_wq = create_singlethread_workqueue("kasyncinit");
 
@@ -773,6 +780,11 @@ static void __init do_initcalls(void)
 		}
 		if (phase == 1 && call >= __async_initcall_end)
 			phase = 2;
+		if (phase == 2 && call >= __device_initcall_end) {
+			phase = 3;
+			/* make sure all async work is done before level 7 */
+			flush_workqueue(async_init_wq);
+		}
 		if (phase != 1)
 			do_one_initcall(*call);
 	}
