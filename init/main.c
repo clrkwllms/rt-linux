@@ -776,7 +776,11 @@ static void __init do_initcalls(void)
 	for (call = __initcall_start; call < __initcall_end; call++) {
 		if (phase == 0 && call >= __async_initcall_start) {
 			phase = 1;
+#ifdef CONFIG_FASTBOOT
 			queue_work(async_init_wq, &async_work);
+#else
+			do_async_initcalls(NULL);
+#endif
 		}
 		if (phase == 1 && call >= __async_initcall_end)
 			phase = 2;

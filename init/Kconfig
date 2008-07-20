@@ -524,6 +524,17 @@ config CC_OPTIMIZE_FOR_SIZE
 
 	  If unsure, say N.
 
+config FASTBOOT
+	bool "Fast boot support"
+	help
+	  The fastboot option will cause the kernel to try to optimize
+	  for faster boot. 
+
+	  This includes doing some of the device initialization asynchronous
+	  as well as opportunistically trying to mount the root fs early.
+
+	  If unsure, say N.
+
 config SYSCTL
 	bool
 
