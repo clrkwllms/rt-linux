@@ -744,8 +744,14 @@ static void __init do_async_initcalls(struct work_struct *dummy)
 {
 	initcall_t *call;
 
+	/*
+	 * For compatibility with normal init calls... take the BKL
+	 * not pretty, not desirable, but compatibility first
+	 */
+	lock_kernel();
 	for (call = __async_initcall_start; call < __async_initcall_end; call++)
 		do_one_initcall(*call);
+	unlock_kernel();
 }
 
 static struct workqueue_struct *async_init_wq;
