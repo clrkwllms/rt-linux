@@ -1165,7 +1165,7 @@ static int __init ohci_hcd_mod_init(void)
 
 	return retval;
 }
-module_init(ohci_hcd_mod_init);
+module_init_async(ohci_hcd_mod_init);
 
 static void __exit ohci_hcd_mod_exit(void)
 {
