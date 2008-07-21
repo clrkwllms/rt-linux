@@ -364,6 +364,8 @@ config STALLION
 config ISTALLION
 	tristate "Stallion EC8/64, ONboard, Brumby support"
 	depends on STALDRV && BROKEN_ON_SMP && (ISA || EISA || PCI)
+	# broken build, see config-Mon_Jul_21_12_01_29_CEST_2008.bad
+	depends on 0
 	help
 	  If you have an EasyConnection 8/64, ONboard, Brumby or Stallion
 	  serial multiport card, say Y here. Make sure to read

@@ -666,6 +666,4 @@ config CRYPTO_LZO
 	help
 	  This is the LZO algorithm.
 
-source "drivers/crypto/Kconfig"
-
 endif	# if CRYPTO
