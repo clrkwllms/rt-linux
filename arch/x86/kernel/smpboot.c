@@ -1379,7 +1379,8 @@ static int __init parse_maxcpus(char *arg)
 {
 	extern unsigned int maxcpus;
 
-	maxcpus = simple_strtoul(arg, NULL, 0);
+	if (arg)
+		maxcpus = simple_strtoul(arg, NULL, 0);
 	return 0;
 }
 early_param("maxcpus", parse_maxcpus);
