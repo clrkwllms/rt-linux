@@ -6,6 +6,7 @@
  * documentation.
  */
 
+#include <linux/kmemcheck.h>
 #include <linux/scatterlist.h>
 #include <asm/io.h>
 #include <asm/swiotlb.h>
@@ -84,6 +85,7 @@ dma_map_single(struct device *hwdev, void *ptr, size_t size,
 	       int direction)
 {
 	BUG_ON(!valid_dma_direction(direction));
+	kmemcheck_mark_initialized(ptr, size);
 	return dma_ops->map_single(hwdev, virt_to_phys(ptr), size, direction);
 }
 
