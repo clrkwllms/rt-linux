@@ -108,6 +108,11 @@ do {							\
 		    : "+m" (var)			\
 		    : "ri" ((T__)val));			\
 		break;					\
+	case 8:						\
+		asm(op "q %1,"__percpu_seg"%0"		\
+		    : "+m" (var)			\
+		    : "ri" ((T__)val));			\
+		break;					\
 	default: __bad_percpu_size();			\
 	}						\
 } while (0)
@@ -131,16 +136,84 @@ do {							\
 		    : "=r" (ret__)			\
 		    : "m" (var));			\
 		break;					\
+	case 8:						\
+		asm(op "q "__percpu_seg"%1,%0"		\
+		    : "=r" (ret__)			\
+		    : "m" (var));			\
+		break;					\
 	default: __bad_percpu_size();			\
 	}						\
 	ret__;						\
 })
 
-#define x86_read_percpu(var) percpu_from_op("mov", per_cpu__##var)
-#define x86_write_percpu(var, val) percpu_to_op("mov", per_cpu__##var, val)
-#define x86_add_percpu(var, val) percpu_to_op("add", per_cpu__##var, val)
-#define x86_sub_percpu(var, val) percpu_to_op("sub", per_cpu__##var, val)
-#define x86_or_percpu(var, val) percpu_to_op("or", per_cpu__##var, val)
+#define percpu_addr_op(op, var)				\
+({							\
+	switch (sizeof(var)) {				\
+	case 1:						\
+		asm(op "b "__percpu_seg"%0"		\
+				: : "m"(var));		\
+		break;					\
+	case 2:						\
+		asm(op "w "__percpu_seg"%0"		\
+				: : "m"(var));		\
+		break;					\
+	case 4:						\
+		asm(op "l "__percpu_seg"%0"		\
+				: : "m"(var));		\
+		break;					\
+	case 8:						\
+		asm(op "q "__percpu_seg"%0"		\
+				: : "m"(var));		\
+		break;					\
+	default: __bad_percpu_size();			\
+	}						\
+})
+
+#define percpu_cmpxchg_op(var, old, new)				\
+({									\
+	typeof(var) prev;						\
+	switch (sizeof(var)) {						\
+	case 1:								\
+		asm("cmpxchgb %b1, "__percpu_seg"%2"			\
+				     : "=a"(prev)			\
+				     : "q"(new), "m"(var), "0"(old)	\
+				     : "memory");			\
+		break;							\
+	case 2:								\
+		asm("cmpxchgw %w1, "__percpu_seg"%2"			\
+				     : "=a"(prev)			\
+				     : "r"(new), "m"(var), "0"(old)	\
+				     : "memory");			\
+		break;							\
+	case 4:								\
+		asm("cmpxchgl %k1, "__percpu_seg"%2"			\
+				     : "=a"(prev)			\
+				     : "r"(new), "m"(var), "0"(old)	\
+				     : "memory");			\
+		break;							\
+	case 8:								\
+		asm("cmpxchgq %1, "__percpu_seg"%2"			\
+				     : "=a"(prev)			\
+				     : "r"(new), "m"(var), "0"(old)	\
+				     : "memory");			\
+		break;							\
+	default:							\
+		__bad_percpu_size();					\
+	}								\
+	return prev;							\
+})
+
+#define x86_read_percpu(var) percpu_from_op("mov", per_cpu_var(var))
+#define x86_write_percpu(var, val) percpu_to_op("mov", per_cpu_var(var), val)
+#define x86_add_percpu(var, val) percpu_to_op("add", per_cpu_var(var), val)
+#define x86_sub_percpu(var, val) percpu_to_op("sub", per_cpu_var(var), val)
+#define x86_inc_percpu(var) percpu_addr_op("inc", per_cpu_var(var))
+#define x86_dec_percpu(var) percpu_addr_op("dec", per_cpu_var(var))
+#define x86_or_percpu(var, val) percpu_to_op("or", per_cpu_var(var), val)
+#define x86_xchg_percpu(var, val) percpu_to_op("xchg", per_cpu_var(var), val)
+#define x86_cmpxchg_percpu(var, old, new) \
+				percpu_cmpxchg_op(per_cpu_var(var), old, new)
+
 #endif /* !__ASSEMBLY__ */
 #endif /* !CONFIG_X86_64 */
 
