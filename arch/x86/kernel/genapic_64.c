@@ -16,6 +16,7 @@
 #include <linux/ctype.h>
 #include <linux/init.h>
 #include <linux/hardirq.h>
+#include <linux/dmar.h>
 
 #include <asm/smp.h>
 #include <asm/ipi.h>
@@ -29,6 +30,15 @@ DEFINE_PER_CPU(int, x2apic_extra_bits);
 
 struct genapic __read_mostly *genapic = &apic_flat;
 
+static int x2apic_phys = 0;
+
+static int set_x2apic_phys_mode(char *arg)
+{
+	x2apic_phys = 1;
+	return 0;
+}
+early_param("x2apic_phys", set_x2apic_phys_mode);
+
 static enum uv_system_type uv_system_type;
 
 /*
@@ -38,7 +48,12 @@ void __init setup_apic_routing(void)
 {
 	if (uv_system_type == UV_NON_UNIQUE_APIC)
 		genapic = &apic_x2apic_uv_x;
-	else
+	else if (cpu_has_x2apic && intr_remapping_enabled) {
+		if (x2apic_phys)
+			genapic = &apic_x2apic_phys;
+		else
+			genapic = &apic_x2apic_cluster;
+	} else
 #ifdef CONFIG_ACPI
 	/*
 	 * Quirk: some x86_64 machines can only use physical APIC mode
@@ -61,7 +76,7 @@ void __init setup_apic_routing(void)
 
 /* Same for both flat and physical. */
 
-void send_IPI_self(int vector)
+void apic_send_IPI_self(int vector)
 {
 	__send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
 }
@@ -77,17 +92,6 @@ int __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 			uv_system_type = UV_NON_UNIQUE_APIC;
 	}
 	return 0;
-}
-
-unsigned int read_apic_id(void)
-{
-	unsigned int id;
-
-	WARN_ON(preemptible() && num_online_cpus() > 1);
-	id = apic_read(APIC_ID);
-	if (uv_system_type >= UV_X2APIC)
-		id  |= __get_cpu_var(x2apic_extra_bits);
-	return id;
 }
 
 enum uv_system_type get_uv_system_type(void)

@@ -66,9 +66,9 @@ static inline void init_apic_ldr(void)
 	unsigned long val;
 	int cpu = smp_processor_id();
 
-	apic_write_around(APIC_DFR, APIC_DFR_VALUE);
+	apic_write(APIC_DFR, APIC_DFR_VALUE);
 	val = calculate_ldr(cpu);
-	apic_write_around(APIC_LDR, val);
+	apic_write(APIC_LDR, val);
 }
 
 #ifndef CONFIG_X86_GENERICARCH
@@ -141,7 +141,7 @@ static inline void setup_portio_remap(void)
 extern unsigned int boot_cpu_physical_apicid;
 static inline int check_phys_apicid_present(int cpu_physical_apicid)
 {
-	boot_cpu_physical_apicid = GET_APIC_ID(read_apic_id());
+	boot_cpu_physical_apicid = read_apic_id();
 	return (1);
 }
 
