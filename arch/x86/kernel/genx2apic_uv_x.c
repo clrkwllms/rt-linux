@@ -18,6 +18,7 @@
 #include <linux/sched.h>
 #include <linux/bootmem.h>
 #include <linux/module.h>
+#include <linux/hardirq.h>
 #include <asm/smp.h>
 #include <asm/ipi.h>
 #include <asm/genapic.h>
@@ -123,6 +124,10 @@ static int uv_apic_id_registered(void)
 	return 1;
 }
 
+static void uv_init_apic_ldr(void)
+{
+}
+
 static unsigned int uv_cpu_mask_to_apicid(cpumask_t cpumask)
 {
 	int cpu;
@@ -138,9 +143,34 @@ static unsigned int uv_cpu_mask_to_apicid(cpumask_t cpumask)
 		return BAD_APICID;
 }
 
+static unsigned int get_apic_id(unsigned long x)
+{
+	unsigned int id;
+
+	WARN_ON(preemptible() && num_online_cpus() > 1);
+	id = x | __get_cpu_var(x2apic_extra_bits);
+
+	return id;
+}
+
+static long set_apic_id(unsigned int id)
+{
+	unsigned long x;
+
+	/* maskout x2apic_extra_bits ? */
+	x = id;
+	return x;
+}
+
+static unsigned int uv_read_apic_id(void)
+{
+
+	return get_apic_id(apic_read(APIC_ID));
+}
+
 static unsigned int phys_pkg_id(int index_msb)
 {
-	return GET_APIC_ID(read_apic_id()) >> index_msb;
+	return uv_read_apic_id() >> index_msb;
 }
 
 #ifdef ZZZ		/* Needs x2apic patch */
@@ -157,12 +187,16 @@ struct genapic apic_x2apic_uv_x = {
 	.target_cpus = uv_target_cpus,
 	.vector_allocation_domain = uv_vector_allocation_domain,/* Fixme ZZZ */
 	.apic_id_registered = uv_apic_id_registered,
+	.init_apic_ldr = uv_init_apic_ldr,
 	.send_IPI_all = uv_send_IPI_all,
 	.send_IPI_allbutself = uv_send_IPI_allbutself,
 	.send_IPI_mask = uv_send_IPI_mask,
 	/* ZZZ.send_IPI_self = uv_send_IPI_self, */
 	.cpu_mask_to_apicid = uv_cpu_mask_to_apicid,
 	.phys_pkg_id = phys_pkg_id,	/* Fixme ZZZ */
+	.get_apic_id = get_apic_id,
+	.set_apic_id = set_apic_id,
+	.apic_id_mask = (0xFFFFFFFFu),
 };
 
 static __cpuinit void set_x2apic_extra_bits(int pnode)
