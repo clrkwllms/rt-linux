@@ -1130,6 +1130,8 @@ config EEXPRESS_PRO
 config HPLAN_PLUS
 	tristate "HP PCLAN+ (27247B and 27252A) support"
 	depends on NET_ISA
+	# broken build with config-Mon_Jul_21_20_21_08_CEST_2008.bad
+	depends on 0
 	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
