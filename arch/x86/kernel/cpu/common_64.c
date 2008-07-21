@@ -305,7 +305,6 @@ static void __cpuinit early_identify_cpu(struct cpuinfo_x86 *c)
 			c->x86_capability[2] = cpuid_edx(0x80860001);
 	}
 
-	c->extended_cpuid_level = cpuid_eax(0x80000000);
 	if (c->extended_cpuid_level >= 0x80000007)
 		c->x86_power = cpuid_edx(0x80000007);
 
@@ -324,10 +323,6 @@ static void __cpuinit early_identify_cpu(struct cpuinfo_x86 *c)
 		cpu_devs[c->x86_vendor]->c_early_init(c);
 
 	validate_pat_support(c);
-
-	/* early_param could clear that, but recall get it set again */
-	if (disable_apic)
-		clear_cpu_cap(c, X86_FEATURE_APIC);
 }
 
 /*
