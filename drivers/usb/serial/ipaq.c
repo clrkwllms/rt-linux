@@ -570,7 +570,12 @@ static struct usb_serial_driver ipaq_device = {
 	.description =		"PocketPC PDA",
 	.usb_driver = 		&ipaq_driver,
 	.id_table =		ipaq_id_table,
-	.num_ports =		2,
+	/*
+	 * some devices have an extra endpoint, which
+	 * must be ignored as it would make the core
+	 * create a second port which oopses when used
+	 */
+	.num_ports =		1,
 	.open =			ipaq_open,
 	.close =		ipaq_close,
 	.attach =		ipaq_startup,
@@ -641,12 +646,13 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 	 */
 
 	kfree(port->bulk_in_buffer);
-	kfree(port->bulk_out_buffer);
 	port->bulk_in_buffer = kmalloc(URBDATA_SIZE, GFP_KERNEL);
 	if (port->bulk_in_buffer == NULL) {
 		port->bulk_out_buffer = NULL; /* prevent double free */
 		goto enomem;
 	}
+
+	kfree(port->bulk_out_buffer);
 	port->bulk_out_buffer = kmalloc(URBDATA_SIZE, GFP_KERNEL);
 	if (port->bulk_out_buffer == NULL) {
 		kfree(port->bulk_in_buffer);
