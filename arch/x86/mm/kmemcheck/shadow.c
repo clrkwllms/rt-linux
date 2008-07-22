@@ -1,4 +1,5 @@
 #include <linux/kmemcheck.h>
+#include <linux/module.h>
 #include <linux/mm.h>
 
 #include <asm/page.h>
@@ -61,6 +62,7 @@ void kmemcheck_mark_initialized(void *address, unsigned int n)
 {
 	mark_shadow(address, n, KMEMCHECK_SHADOW_INITIALIZED);
 }
+EXPORT_SYMBOL_GPL(kmemcheck_mark_initialized);
 
 void kmemcheck_mark_freed(void *address, unsigned int n)
 {
