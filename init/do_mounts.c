@@ -364,9 +364,11 @@ void __init prepare_namespace(void)
 		ssleep(root_delay);
 	}
 
+#ifndef CONFIG_FASTBOOT
 	/* wait for the known devices to complete their probing */
 	while (driver_probe_done() != 0)
 		msleep(100);
+#endif
 
 	md_run_setup();
 
