@@ -668,7 +668,7 @@ static int __init test_suspend(void)
 	char			*pony = NULL;
 	struct rtc_device	*rtc = NULL;
 
-	class_find_device(rtc_class, &pony, has_wakealarm);
+	class_find_device(rtc_class, NULL, &pony, has_wakealarm);
 	if (pony)
 		rtc = rtc_class_open(pony);
 
