@@ -2,6 +2,13 @@ config DVB_USB
 	tristate "Support for various USB DVB devices"
 	depends on DVB_CORE && USB && I2C && INPUT
 	depends on HOTPLUG	# due to FW_LOADER
+	#
+	# breaks modular build with:
+	# http://redhat.com/~mingo/misc/config-Tue_Jul_15_13_35_45_CEST_2008.bad
+	# ERROR: "dibusb_dib3000mc_frontend_attach" [drivers/media/dvb/dvb-usb/dvb-usb-dibusb-mc.ko] undefined!
+	# ERROR: "dibusb_dib3000mc_tuner_attach" [drivers/media/dvb/dvb-usb/dvb-usb-dibusb-mc.ko] undefined!
+	#
+	depends on 0
 	select FW_LOADER
 	help
 	  By enabling this you will be able to choose the various supported
@@ -233,6 +240,7 @@ config DVB_USB_OPERA1
 config DVB_USB_AF9005
 	tristate "Afatech AF9005 DVB-T USB1.1 support"
 	depends on DVB_USB && EXPERIMENTAL
+	depends on 0
 	select MEDIA_TUNER_MT2060 if !DVB_FE_CUSTOMISE
 	select MEDIA_TUNER_QT1010 if !DVB_FE_CUSTOMISE
 	help

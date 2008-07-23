@@ -44,15 +44,15 @@
 #include "iwl-io.h"
 #include "iwl-helpers.h"
 
-#ifdef CONFIG_IWLWIFI_DEBUG
 static const char *led_type_str[] = {
+#ifdef CONFIG_IWLWIFI_DEBUG
 	__stringify(IWL_LED_TRG_TX),
 	__stringify(IWL_LED_TRG_RX),
 	__stringify(IWL_LED_TRG_ASSOC),
 	__stringify(IWL_LED_TRG_RADIO),
 	NULL
-};
 #endif /* CONFIG_IWLWIFI_DEBUG */
+};
 
 
 static const struct {
