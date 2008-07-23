@@ -160,6 +160,8 @@ END(mcount)
 #endif /* CONFIG_DYNAMIC_FTRACE */
 #endif /* CONFIG_FTRACE */
 
+#define HARDNMI_MASK 0x40000000
+
 #ifndef CONFIG_PREEMPT
 #define retint_kernel retint_restore_args
 #endif	
@@ -706,6 +708,9 @@ ENTRY(native_iret)
 	.section __ex_table,"a"
 	.quad native_iret, bad_iret
 	.previous
+
+ENTRY(native_nmi_return)
+	NATIVE_INTERRUPT_RETURN_NMI_SAFE
 #endif
 
 	.section .fixup,"ax"
@@ -759,6 +764,23 @@ retint_signal:
 	TRACE_IRQS_OFF
 	GET_THREAD_INFO(%rcx)
 	jmp retint_with_reschedule
+
+	/* Returning to kernel space from exception. */
+	/* rcx:	 threadinfo. interrupts off. */
+ENTRY(retexc_kernel)
+	testl $HARDNMI_MASK,TI_preempt_count(%rcx)
+	jz retint_kernel		/* Not nested over NMI ? */
+	testw $X86_EFLAGS_TF,EFLAGS-ARGOFFSET(%rsp)	/* trap flag? */
+	jnz retint_kernel		/*
+					 * If single-stepping an NMI handler,
+					 * use the normal iret path instead of
+					 * the popf/lret because lret would be
+					 * single-stepped. It should not
+					 * happen : it will reactivate NMIs
+					 * prematurely.
+					 */
+	RESTORE_ARGS 0,8,0
+	INTERRUPT_RETURN_NMI_SAFE
 
 #ifdef CONFIG_PREEMPT
 	/* Returning to kernel space. Check if we need preemption */
@@ -927,9 +949,17 @@ paranoid_swapgs\trace:
 	TRACE_IRQS_IRETQ 0
 	.endif
 	SWAPGS_UNSAFE_STACK
-paranoid_restore\trace:
+paranoid_restore_no_nmi\trace:
 	RESTORE_ALL 8
 	jmp irq_return
+paranoid_restore\trace:
+	GET_THREAD_INFO(%rcx)
+	testl $HARDNMI_MASK,TI_preempt_count(%rcx)
+	jz paranoid_restore_no_nmi\trace	/* Nested over NMI ? */
+	testw $X86_EFLAGS_TF,EFLAGS-0(%rsp)	/* trap flag? */
+	jnz paranoid_restore_no_nmi\trace
+	RESTORE_ALL 8
+	INTERRUPT_RETURN_NMI_SAFE
 paranoid_userspace\trace:
 	GET_THREAD_INFO(%rcx)
 	movl TI_flags(%rcx),%ebx
@@ -1028,7 +1058,7 @@ error_exit:
 	TRACE_IRQS_OFF
 	GET_THREAD_INFO(%rcx)	
 	testl %eax,%eax
-	jne  retint_kernel
+	jne  retexc_kernel
 	LOCKDEP_SYS_EXIT_IRQ
 	movl  TI_flags(%rcx),%edx
 	movl  $_TIF_WORK_MASK,%edi

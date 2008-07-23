@@ -403,6 +403,9 @@ void __kprobes oops_end(unsigned long flags, struct pt_regs *regs, int signr)
 	if (kexec_should_crash(current))
 		crash_kexec(regs);
 
+	if (in_nmi())
+		panic("Fatal exception in non-maskable interrupt");
+
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
