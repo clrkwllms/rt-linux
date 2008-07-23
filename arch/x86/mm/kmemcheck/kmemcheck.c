@@ -285,16 +285,8 @@ void kmemcheck_hide_pages(struct page *p, unsigned int n)
 static bool check_page_boundary(struct pt_regs *regs,
 	unsigned long addr, unsigned int size)
 {
-	if (size == 8)
+	if (addr & PAGE_MASK == (addr + size - 1) & PAGE_MASK)
 		return false;
-	if (size == 16 && (addr & PAGE_MASK) == ((addr + 1) & PAGE_MASK))
-		return false;
-	if (size == 32 && (addr & PAGE_MASK) == ((addr + 3) & PAGE_MASK))
-		return false;
-#ifdef CONFIG_X86_64
-	if (size == 64 && (addr & PAGE_MASK) == ((addr + 7) & PAGE_MASK))
-		return false;
-#endif
 
 	/*
 	 * XXX: The addr/size data is also really interesting if this

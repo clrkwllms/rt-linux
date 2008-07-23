@@ -30,19 +30,19 @@ static bool opcode_is_rex_prefix(uint8_t b)
 unsigned int kmemcheck_opcode_get_size(const uint8_t *op)
 {
 	/* Default operand size */
-	int operand_size_override = 32;
+	int operand_size_override = 4;
 
 	/* prefixes */
 	for (; opcode_is_prefix(*op); ++op) {
 		if (*op == 0x66)
-			operand_size_override = 16;
+			operand_size_override = 2;
 	}
 
 #ifdef CONFIG_X86_64
 	/* REX prefix */
 	if (opcode_is_rex_prefix(*op)) {
 		if (*op & 0x08)
-			return 64;
+			return 8;
 		++op;
 	}
 #endif
@@ -52,12 +52,12 @@ unsigned int kmemcheck_opcode_get_size(const uint8_t *op)
 		++op;
 
 		if (*op == 0xb6)
-			return 8;
+			return 1;
 		if (*op == 0xb7)
-			return 16;
+			return 2;
 	}
 
-	return (*op & 1) ? operand_size_override : 8;
+	return (*op & 1) ? operand_size_override : 1;
 }
 
 const uint8_t *kmemcheck_opcode_get_primary(const uint8_t *op)

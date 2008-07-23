@@ -89,6 +89,7 @@ void kmemcheck_mark_uninitialized_pages(struct page *p, unsigned int n)
 enum kmemcheck_shadow kmemcheck_shadow_test(void *shadow, unsigned int size)
 {
 	uint8_t *x;
+	unsigned int i;
 
 	x = shadow;
 
@@ -97,54 +98,15 @@ enum kmemcheck_shadow kmemcheck_shadow_test(void *shadow, unsigned int size)
 	 * Make sure _some_ bytes are initialized. Gcc frequently generates
 	 * code to access neighboring bytes.
 	 */
-	switch (size) {
-#ifdef CONFIG_X86_64
-	case 64:
-		if (x[7] == KMEMCHECK_SHADOW_INITIALIZED)
-			return x[7];
-		if (x[6] == KMEMCHECK_SHADOW_INITIALIZED)
-			return x[6];
-		if (x[5] == KMEMCHECK_SHADOW_INITIALIZED)
-			return x[5];
-		if (x[4] == KMEMCHECK_SHADOW_INITIALIZED)
-			return x[4];
-#endif
-	case 32:
-		if (x[3] == KMEMCHECK_SHADOW_INITIALIZED)
-			return x[3];
-		if (x[2] == KMEMCHECK_SHADOW_INITIALIZED)
-			return x[2];
-	case 16:
-		if (x[1] == KMEMCHECK_SHADOW_INITIALIZED)
-			return x[1];
-	case 8:
-		if (x[0] == KMEMCHECK_SHADOW_INITIALIZED)
-			return x[0];
+	for (i = 0; i < size; ++i) {
+		if (x[i] == KMEMCHECK_SHADOW_INITIALIZED)
+			return x[i];
 	}
 #else
-	switch (size) {
-#ifdef CONFIG_X86_64
-	case 64:
-		if (x[7] != KMEMCHECK_SHADOW_INITIALIZED)
-			return x[7];
-		if (x[6] != KMEMCHECK_SHADOW_INITIALIZED)
-			return x[6];
-		if (x[5] != KMEMCHECK_SHADOW_INITIALIZED)
-			return x[5];
-		if (x[4] != KMEMCHECK_SHADOW_INITIALIZED)
-			return x[4];
-#endif
-	case 32:
-		if (x[3] != KMEMCHECK_SHADOW_INITIALIZED)
-			return x[3];
-		if (x[2] != KMEMCHECK_SHADOW_INITIALIZED)
-			return x[2];
-	case 16:
-		if (x[1] != KMEMCHECK_SHADOW_INITIALIZED)
-			return x[1];
-	case 8:
-		if (x[0] != KMEMCHECK_SHADOW_INITIALIZED)
-			return x[0];
+	/* All bytes must be initialized. */
+	for (i = 0; i < size; ++i) {
+		if (x[i] != KMEMCHECK_SHADOW_INITIALIZED)
+			return x[i];
 	}
 #endif
 
@@ -154,25 +116,9 @@ enum kmemcheck_shadow kmemcheck_shadow_test(void *shadow, unsigned int size)
 void kmemcheck_shadow_set(void *shadow, unsigned int size)
 {
 	uint8_t *x;
+	unsigned int i;
 
 	x = shadow;
-
-	switch (size) {
-#ifdef CONFIG_X86_64
-	case 64:
-		x[7] = KMEMCHECK_SHADOW_INITIALIZED;
-		x[6] = KMEMCHECK_SHADOW_INITIALIZED;
-		x[5] = KMEMCHECK_SHADOW_INITIALIZED;
-		x[4] = KMEMCHECK_SHADOW_INITIALIZED;
-#endif
-	case 32:
-		x[3] = KMEMCHECK_SHADOW_INITIALIZED;
-		x[2] = KMEMCHECK_SHADOW_INITIALIZED;
-	case 16:
-		x[1] = KMEMCHECK_SHADOW_INITIALIZED;
-	case 8:
-		x[0] = KMEMCHECK_SHADOW_INITIALIZED;
-	}
-
-	return;
+	for (i = 0; i < size; ++i)
+		x[i] = KMEMCHECK_SHADOW_INITIALIZED;
 }

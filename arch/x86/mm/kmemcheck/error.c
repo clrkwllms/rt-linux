@@ -179,7 +179,7 @@ void kmemcheck_error_recall(void)
 	case KMEMCHECK_ERROR_INVALID_ACCESS:
 		printk(KERN_ERR  "kmemcheck: Caught %d-bit read "
 			"from %s memory (%p)\n",
-			e->size, e->state < ARRAY_SIZE(desc) ?
+			8 * e->size, e->state < ARRAY_SIZE(desc) ?
 				desc[e->state] : "(invalid shadow state)",
 			(void *) e->address);
 
