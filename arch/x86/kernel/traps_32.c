@@ -59,6 +59,7 @@
 #include <asm/smp.h>
 #include <asm/io.h>
 #include <asm/traps.h>
+#include <asm/kmemcheck.h>
 
 #include "mach_traps.h"
 
@@ -311,7 +312,7 @@ void show_registers(struct pt_regs *regs)
 	int i;
 
 	print_modules();
-	__show_registers(regs, 0);
+	__show_regs(regs, 0);
 
 	printk(KERN_EMERG "Process %.*s (pid: %d, ti=%p task=%p task.ti=%p)",
 		TASK_COMM_LEN, current->comm, task_pid_nr(current),
@@ -895,6 +896,14 @@ void __kprobes do_debug(struct pt_regs *regs, long error_code)
 	trace_hardirqs_fixup();
 
 	get_debugreg(condition, 6);
+
+	/* Catch kmemcheck conditions first of all! */
+	if (condition & DR_STEP) {
+		if (kmemcheck_active(regs)) {
+			kmemcheck_hide(regs);
+			return;
+		}
+	}
 
 	/*
 	 * The processor cleared BTF, so don't mark that we need it set.
