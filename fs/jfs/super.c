@@ -22,6 +22,7 @@
 #include <linux/parser.h>
 #include <linux/completion.h>
 #include <linux/vfs.h>
+#include <linux/quotaops.h>
 #include <linux/mount.h>
 #include <linux/moduleparam.h>
 #include <linux/kthread.h>
@@ -499,7 +500,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	inode = jfs_iget(sb, ROOT_I);
 	if (IS_ERR(inode)) {
 		ret = PTR_ERR(inode);
-		goto out_no_root;
+		goto out_no_rw;
 	}
 	sb->s_root = d_alloc_root(inode);
 	if (!sb->s_root)
@@ -521,9 +522,8 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	return 0;
 
 out_no_root:
-	jfs_err("jfs_read_super: get root inode failed");
-	if (inode)
-		iput(inode);
+	jfs_err("jfs_read_super: get root dentry failed");
+	iput(inode);
 
 out_no_rw:
 	rc = jfs_umount(sb);
