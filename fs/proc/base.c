@@ -127,6 +127,25 @@ struct pid_entry {
 		NULL, &proc_single_file_operations,	\
 		{ .proc_show = &proc_##OTYPE } )
 
+/*
+ * Count the number of hardlinks for the pid_entry table, excluding the .
+ * and .. links.
+ */
+static unsigned int pid_entry_count_dirs(const struct pid_entry *entries,
+	unsigned int n)
+{
+	unsigned int i;
+	unsigned int count;
+
+	count = 0;
+	for (i = 0; i < n; ++i) {
+		if (S_ISDIR(entries[i].mode))
+			++count;
+	}
+
+	return count;
+}
+
 int maps_protect;
 EXPORT_SYMBOL(maps_protect);
 
@@ -214,7 +233,7 @@ static int check_mem_permission(struct task_struct *task)
 	 */
 	if (task->parent == current && (task->ptrace & PT_PTRACED) &&
 	    task_is_stopped_or_traced(task) &&
-	    ptrace_may_attach(task))
+	    ptrace_may_access(task, PTRACE_MODE_ATTACH))
 		return 0;
 
 	/*
@@ -232,7 +251,8 @@ struct mm_struct *mm_for_maps(struct task_struct *task)
 	task_lock(task);
 	if (task->mm != mm)
 		goto out;
-	if (task->mm != current->mm && __ptrace_may_attach(task) < 0)
+	if (task->mm != current->mm &&
+	    __ptrace_may_access(task, PTRACE_MODE_READ) < 0)
 		goto out;
 	task_unlock(task);
 	return mm;
@@ -499,7 +519,7 @@ static int proc_fd_access_allowed(struct inode *inode)
 	 */
 	task = get_proc_task(inode);
 	if (task) {
-		allowed = ptrace_may_attach(task);
+		allowed = ptrace_may_access(task, PTRACE_MODE_READ);
 		put_task_struct(task);
 	}
 	return allowed;
@@ -885,7 +905,7 @@ static ssize_t environ_read(struct file *file, char __user *buf,
 	if (!task)
 		goto out_no_task;
 
-	if (!ptrace_may_attach(task))
+	if (!ptrace_may_access(task, PTRACE_MODE_READ))
 		goto out;
 
 	ret = -ENOMEM;
@@ -2356,29 +2376,82 @@ static int proc_base_fill_cache(struct file *filp, void *dirent,
 }
 
 #ifdef CONFIG_TASK_IO_ACCOUNTING
-static int proc_pid_io_accounting(struct task_struct *task, char *buffer)
+static int do_io_accounting(struct task_struct *task, char *buffer, int whole)
 {
+	u64 rchar, wchar, syscr, syscw;
+	struct task_io_accounting ioac;
+
+	if (!whole) {
+		rchar = task->rchar;
+		wchar = task->wchar;
+		syscr = task->syscr;
+		syscw = task->syscw;
+		memcpy(&ioac, &task->ioac, sizeof(ioac));
+	} else {
+		unsigned long flags;
+		struct task_struct *t = task;
+		rchar = wchar = syscr = syscw = 0;
+		memset(&ioac, 0, sizeof(ioac));
+
+		rcu_read_lock();
+		do {
+			rchar += t->rchar;
+			wchar += t->wchar;
+			syscr += t->syscr;
+			syscw += t->syscw;
+
+			ioac.read_bytes += t->ioac.read_bytes;
+			ioac.write_bytes += t->ioac.write_bytes;
+			ioac.cancelled_write_bytes +=
+					t->ioac.cancelled_write_bytes;
+			t = next_thread(t);
+		} while (t != task);
+		rcu_read_unlock();
+
+		if (lock_task_sighand(task, &flags)) {
+			struct signal_struct *sig = task->signal;
+
+			rchar += sig->rchar;
+			wchar += sig->wchar;
+			syscr += sig->syscr;
+			syscw += sig->syscw;
+
+			ioac.read_bytes += sig->ioac.read_bytes;
+			ioac.write_bytes += sig->ioac.write_bytes;
+			ioac.cancelled_write_bytes +=
+					sig->ioac.cancelled_write_bytes;
+
+			unlock_task_sighand(task, &flags);
+		}
+	}
+
 	return sprintf(buffer,
-#ifdef CONFIG_TASK_XACCT
 			"rchar: %llu\n"
 			"wchar: %llu\n"
 			"syscr: %llu\n"
 			"syscw: %llu\n"
-#endif
 			"read_bytes: %llu\n"
 			"write_bytes: %llu\n"
 			"cancelled_write_bytes: %llu\n",
-#ifdef CONFIG_TASK_XACCT
-			(unsigned long long)task->rchar,
-			(unsigned long long)task->wchar,
-			(unsigned long long)task->syscr,
-			(unsigned long long)task->syscw,
-#endif
-			(unsigned long long)task->ioac.read_bytes,
-			(unsigned long long)task->ioac.write_bytes,
-			(unsigned long long)task->ioac.cancelled_write_bytes);
+			(unsigned long long)rchar,
+			(unsigned long long)wchar,
+			(unsigned long long)syscr,
+			(unsigned long long)syscw,
+			(unsigned long long)ioac.read_bytes,
+			(unsigned long long)ioac.write_bytes,
+			(unsigned long long)ioac.cancelled_write_bytes);
 }
-#endif
+
+static int proc_tid_io_accounting(struct task_struct *task, char *buffer)
+{
+	return do_io_accounting(task, buffer, 0);
+}
+
+static int proc_tgid_io_accounting(struct task_struct *task, char *buffer)
+{
+	return do_io_accounting(task, buffer, 1);
+}
+#endif /* CONFIG_TASK_IO_ACCOUNTING */
 
 /*
  * Thread groups
@@ -2450,7 +2523,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 	REG("coredump_filter", S_IRUGO|S_IWUSR, coredump_filter),
 #endif
 #ifdef CONFIG_TASK_IO_ACCOUNTING
-	INF("io",	S_IRUGO, pid_io_accounting),
+	INF("io",	S_IRUGO, tgid_io_accounting),
 #endif
 };
 
@@ -2585,10 +2658,9 @@ static struct dentry *proc_pid_instantiate(struct inode *dir,
 	inode->i_op = &proc_tgid_base_inode_operations;
 	inode->i_fop = &proc_tgid_base_operations;
 	inode->i_flags|=S_IMMUTABLE;
-	inode->i_nlink = 5;
-#ifdef CONFIG_SECURITY
-	inode->i_nlink += 1;
-#endif
+
+	inode->i_nlink = 2 + pid_entry_count_dirs(tgid_base_stuff,
+		ARRAY_SIZE(tgid_base_stuff));
 
 	dentry->d_op = &pid_dentry_operations;
 
@@ -2778,6 +2850,9 @@ static const struct pid_entry tid_base_stuff[] = {
 #ifdef CONFIG_FAULT_INJECTION
 	REG("make-it-fail", S_IRUGO|S_IWUSR, fault_inject),
 #endif
+#ifdef CONFIG_TASK_IO_ACCOUNTING
+	INF("io",	S_IRUGO, tid_io_accounting),
+#endif
 };
 
 static int proc_tid_base_readdir(struct file * filp,
@@ -2816,10 +2891,9 @@ static struct dentry *proc_task_instantiate(struct inode *dir,
 	inode->i_op = &proc_tid_base_inode_operations;
 	inode->i_fop = &proc_tid_base_operations;
 	inode->i_flags|=S_IMMUTABLE;
-	inode->i_nlink = 4;
-#ifdef CONFIG_SECURITY
-	inode->i_nlink += 1;
-#endif
+
+	inode->i_nlink = 2 + pid_entry_count_dirs(tid_base_stuff,
+		ARRAY_SIZE(tid_base_stuff));
 
 	dentry->d_op = &pid_dentry_operations;
 

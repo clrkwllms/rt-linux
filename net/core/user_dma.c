@@ -34,6 +34,7 @@
 #define NET_DMA_DEFAULT_COPYBREAK 4096
 
 int sysctl_tcp_dma_copybreak = NET_DMA_DEFAULT_COPYBREAK;
+EXPORT_SYMBOL(sysctl_tcp_dma_copybreak);
 
 /**
  *	dma_skb_copy_datagram_iovec - Copy a datagram to an iovec.
@@ -75,7 +76,7 @@ int dma_skb_copy_datagram_iovec(struct dma_chan *chan,
 
 		end = start + skb_shinfo(skb)->frags[i].size;
 		copy = end - offset;
-		if ((copy = end - offset) > 0) {
+		if (copy > 0) {
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 			struct page *page = frag->page;
 

@@ -38,6 +38,7 @@
 #include <linux/kthread.h>
 #include <linux/freezer.h>
 #include <linux/memcontrol.h>
+#include <linux/delayacct.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -1307,7 +1308,7 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 					struct scan_control *sc)
 {
 	int priority;
-	int ret = 0;
+	unsigned long ret = 0;
 	unsigned long total_scanned = 0;
 	unsigned long nr_reclaimed = 0;
 	struct reclaim_state *reclaim_state = current->reclaim_state;
@@ -1315,6 +1316,8 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 	struct zoneref *z;
 	struct zone *zone;
 	enum zone_type high_zoneidx = gfp_zone(sc->gfp_mask);
+
+	delayacct_freepages_start();
 
 	if (scan_global_lru(sc))
 		count_vm_event(ALLOCSTALL);
@@ -1395,6 +1398,8 @@ out:
 		}
 	} else
 		mem_cgroup_record_reclaim_priority(sc->mem_cgroup, priority);
+
+	delayacct_freepages_end();
 
 	return ret;
 }

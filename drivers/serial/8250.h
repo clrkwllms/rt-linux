@@ -11,8 +11,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- *  $Id: 8250.h,v 1.8 2002/07/21 21:32:30 rmk Exp $
  */
 
 #include <linux/serial_8250.h>
@@ -78,8 +76,3 @@ struct serial8250_config {
 #else
 #define ALPHA_KLUDGE_MCR 0
 #endif
-
-#ifndef SERIAL_EXTRA_IRQ_FLAGS
-#define SERIAL_EXTRA_IRQ_FLAGS 0
-#endif
-
