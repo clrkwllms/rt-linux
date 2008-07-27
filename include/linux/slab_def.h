@@ -50,7 +50,7 @@ struct kmem_cache {
 	unsigned int dflags;		/* dynamic flags */
 
 	/* constructor func */
-	void (*ctor)(struct kmem_cache *, void *);
+	void (*ctor)(void *obj);
 
 /* 5) cache creation/removal */
 	const char *name;

@@ -744,13 +744,13 @@ static void __init do_one_initcall(initcall_t fn)
 }
 
 
-extern initcall_t __initcall_start[], __initcall_end[];
+extern initcall_t __initcall_start[], __initcall_end[], __early_initcall_end[];
 
 static void __init do_initcalls(void)
 {
 	initcall_t *call;
 
-	for (call = __initcall_start; call < __initcall_end; call++)
+	for (call = __early_initcall_end; call < __initcall_end; call++)
 		do_one_initcall(*call);
 
 	/* Make sure there is no pending stuff from the initcall sequence */
@@ -775,26 +775,15 @@ static void __init do_basic_setup(void)
 	do_initcalls();
 }
 
-static int __initdata nosoftlockup;
-
-static int __init nosoftlockup_setup(char *str)
-{
-	nosoftlockup = 1;
-	return 1;
-}
-__setup("nosoftlockup", nosoftlockup_setup);
-
 static void __init do_pre_smp_initcalls(void)
 {
-	extern int spawn_ksoftirqd(void);
+	initcall_t *call;
 
+	/* kmemcheck must initialize before all early initcalls: */
 	kmemcheck_init();
-	init_call_single_data();
 
-	migration_init();
-	spawn_ksoftirqd();
-	if (!nosoftlockup)
-		spawn_softlockup_task();
+	for (call = __initcall_start; call < __early_initcall_end; call++)
+		do_one_initcall(*call);
 }
 
 static void run_init_process(char *init_filename)
