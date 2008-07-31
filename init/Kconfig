@@ -530,7 +530,7 @@ config FASTBOOT
 	  The fastboot option will cause the kernel to try to optimize
 	  for faster boot. 
 
-	  This includes doing some of the device initialization asynchronous
+	  This includes doing some of the device initialization asynchronously
 	  as well as opportunistically trying to mount the root fs early.
 
 	  If unsure, say N.
