@@ -769,6 +769,8 @@ config NET_VENDOR_SMC
 config WD80x3
 	tristate "WD80*3 support"
 	depends on NET_VENDOR_SMC && ISA
+	# broken build
+	depends on 0
 	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
