@@ -15,6 +15,9 @@
 
 menuconfig USB_GADGET
 	tristate "USB Gadget Support"
+	# crashes on titan with:
+	# http://redhat.com/~mingo/misc/config-Tue_Jul_22_13_44_45_CEST_2008.bad
+	depends on 0
 	help
 	   USB is a master/slave protocol, organized with one master
 	   host (such as a PC) controlling up to 127 peripheral devices.
