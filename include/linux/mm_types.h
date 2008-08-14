@@ -95,6 +95,10 @@ struct page {
 #ifdef CONFIG_CGROUP_MEM_RES_CTLR
 	unsigned long page_cgroup;
 #endif
+
+#ifdef CONFIG_KMEMCHECK
+	void *shadow;
+#endif
 };
 
 /*
