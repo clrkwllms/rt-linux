@@ -79,6 +79,8 @@
 
 #define nr_syscalls ((syscall_table_size)/4)
 
+#define HARDNMI_MASK 0x40000000
+
 #ifdef CONFIG_PREEMPT
 #define preempt_stop(clobbers)	DISABLE_INTERRUPTS(clobbers); TRACE_IRQS_OFF
 #else
@@ -243,8 +245,32 @@ END(ret_from_fork)
 	# userspace resumption stub bypassing syscall exit tracing
 	ALIGN
 	RING0_PTREGS_FRAME
+
 ret_from_exception:
 	preempt_stop(CLBR_ANY)
+	GET_THREAD_INFO(%ebp)
+	movl PT_EFLAGS(%esp), %eax	# mix EFLAGS and CS
+	movb PT_CS(%esp), %al
+	andl $(X86_EFLAGS_VM | SEGMENT_RPL_MASK), %eax
+	cmpl $USER_RPL, %eax
+	jae resume_userspace	# returning to v8086 or userspace
+	testl $HARDNMI_MASK,TI_preempt_count(%ebp)
+	jz resume_kernel		/* Not nested over NMI ? */
+	testw $X86_EFLAGS_TF, PT_EFLAGS(%esp)
+	jnz resume_kernel		/*
+					 * If single-stepping an NMI handler,
+					 * use the normal iret path instead of
+					 * the popf/lret because lret would be
+					 * single-stepped. It should not
+					 * happen : it will reactivate NMIs
+					 * prematurely.
+					 */
+	TRACE_IRQS_IRET
+	RESTORE_REGS
+	addl $4, %esp			# skip orig_eax/error_code
+	CFI_ADJUST_CFA_OFFSET -4
+	INTERRUPT_RETURN_NMI_SAFE
+
 ret_from_intr:
 	GET_THREAD_INFO(%ebp)
 check_userspace:
@@ -916,6 +942,10 @@ ENTRY(native_iret)
 	.long native_iret, iret_exc
 .previous
 END(native_iret)
+
+ENTRY(native_nmi_return)
+	NATIVE_INTERRUPT_RETURN_NMI_SAFE # Should we deal with popf exception ?
+END(native_nmi_return)
 
 ENTRY(native_irq_enable_sysexit)
 	sti
