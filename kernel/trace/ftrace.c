@@ -340,6 +340,13 @@ ftrace_record_ip(unsigned long ip)
 	int resched;
 	int atomic;
 	int cpu;
+	static int once;
+
+	if (!once && in_nmi()) {
+		once++;
+		ftrace_disabled = 1;
+		WARN_ON(1);
+	}
 
 	if (!ftrace_enabled || ftrace_disabled)
 		return;
