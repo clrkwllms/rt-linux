@@ -47,6 +47,7 @@
 #include <asm/unwind.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
+#include <asm/kmemcheck.h>
 #include <asm/pgalloc.h>
 #include <asm/proto.h>
 #include <asm/pda.h>
@@ -428,7 +429,7 @@ void show_registers(struct pt_regs *regs)
 
 	sp = regs->sp;
 	printk("CPU %d ", cpu);
-	__show_regs(regs);
+	__show_regs(regs, 1);
 	printk("Process %s (pid: %d, threadinfo %p, task %p)\n",
 		cur->comm, cur->pid, task_thread_info(cur), cur);
 
@@ -904,6 +905,14 @@ asmlinkage void __kprobes do_debug(struct pt_regs *regs,
 	trace_hardirqs_fixup();
 
 	get_debugreg(condition, 6);
+
+	/* Catch kmemcheck conditions first of all! */
+	if (condition & DR_STEP) {
+		if (kmemcheck_active(regs)) {
+			kmemcheck_hide(regs);
+			return;
+		}
+	}
 
 	/*
 	 * The processor cleared BTF, so don't mark that we need it set.
