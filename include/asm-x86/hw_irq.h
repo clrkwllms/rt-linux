@@ -1,5 +1,5 @@
-#ifndef _ASM_HW_IRQ_H
-#define _ASM_HW_IRQ_H
+#ifndef ASM_X86__HW_IRQ_H
+#define ASM_X86__HW_IRQ_H
 
 /*
  * (C) 1992, 1993 Linus Torvalds, (C) 1997 Ingo Molnar
@@ -73,7 +73,9 @@ extern void enable_IO_APIC(void);
 #endif
 
 /* IPI functions */
+#ifdef CONFIG_X86_32
 extern void send_IPI_self(int vector);
+#endif
 extern void send_IPI(int dest, int vector);
 
 /* Statistics */
@@ -112,4 +114,4 @@ static inline void __setup_vector_irq(int cpu) {}
 
 #endif /* !ASSEMBLY_ */
 
-#endif
+#endif /* ASM_X86__HW_IRQ_H */
