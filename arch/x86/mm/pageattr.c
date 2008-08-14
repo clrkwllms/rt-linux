@@ -78,7 +78,7 @@ static inline unsigned long highmap_start_pfn(void)
 
 static inline unsigned long highmap_end_pfn(void)
 {
-	return __pa(round_up((unsigned long)_end, PMD_SIZE)) >> PAGE_SHIFT;
+	return __pa(roundup((unsigned long)_end, PMD_SIZE)) >> PAGE_SHIFT;
 }
 
 #endif
@@ -592,10 +592,9 @@ repeat:
 	if (!pte_val(old_pte)) {
 		if (!primary)
 			return 0;
-		printk(KERN_WARNING "CPA: called for zero pte. "
+		WARN(1, KERN_WARNING "CPA: called for zero pte. "
 		       "vaddr = %lx cpa->vaddr = %lx\n", address,
 		       cpa->vaddr);
-		WARN_ON(1);
 		return -EINVAL;
 	}
 

@@ -445,7 +445,7 @@ static void __init reserve_early_setup_data(void)
  * @size: Size of the crashkernel memory to reserve.
  * Returns the base address on success, and -1ULL on failure.
  */
-unsigned long long find_and_reserve_crashkernel(unsigned long long size)
+unsigned long long __init find_and_reserve_crashkernel(unsigned long long size)
 {
 	const unsigned long long alignment = 16<<20; 	/* 16M */
 	unsigned long long start = 0LL;
@@ -739,6 +739,8 @@ void __init setup_arch(char **cmdline_p)
 	num_physpages = max_pfn;
 
 	check_efer();
+ 	if (cpu_has_x2apic)
+ 		check_x2apic();
 
 	/* How many end-of-memory variables you have, grandma! */
 	/* need this before calling reserve_initrd */

@@ -1,5 +1,5 @@
-#ifndef _ASM_X86_PTRACE_H
-#define _ASM_X86_PTRACE_H
+#ifndef ASM_X86__PTRACE_H
+#define ASM_X86__PTRACE_H
 
 #include <linux/compiler.h>	/* For __user */
 #include <asm/ptrace-abi.h>
@@ -213,6 +213,11 @@ static inline unsigned long frame_pointer(struct pt_regs *regs)
 	return regs->bp;
 }
 
+static inline unsigned long user_stack_pointer(struct pt_regs *regs)
+{
+	return regs->sp;
+}
+
 /*
  * These are defined as per linux/ptrace.h, which see.
  */
@@ -239,4 +244,4 @@ extern int do_set_thread_area(struct task_struct *p, int idx,
 
 #endif /* !__ASSEMBLY__ */
 
-#endif
+#endif /* ASM_X86__PTRACE_H */
