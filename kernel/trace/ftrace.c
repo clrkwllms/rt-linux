@@ -340,6 +340,13 @@ ftrace_record_ip(unsigned long ip)
 	int resched;
 	int atomic;
 	int cpu;
+	static int once;
+
+	if (!once && in_nmi()) {
+		once++;
+		ftrace_disabled = 1;
+		WARN_ON(1);
+	}
 
 	if (!ftrace_enabled || ftrace_disabled)
 		return;
@@ -587,7 +594,7 @@ static int __ftrace_modify_code(void *data)
 
 static void ftrace_run_update_code(int command)
 {
-	stop_machine_run(__ftrace_modify_code, &command, NR_CPUS);
+	stop_machine(__ftrace_modify_code, &command, NULL);
 }
 
 void ftrace_disable_daemon(void)
@@ -787,7 +794,7 @@ static int ftrace_update_code(void)
 	    !ftrace_enabled || !ftraced_trigger)
 		return 0;
 
-	stop_machine_run(__ftrace_update_code, NULL, NR_CPUS);
+	stop_machine(__ftrace_update_code, NULL, NULL);
 
 	return 1;
 }
@@ -1564,7 +1571,7 @@ static int __init ftrace_dynamic_init(void)
 
 	addr = (unsigned long)ftrace_record_ip;
 
-	stop_machine_run(ftrace_dyn_arch_init, &addr, NR_CPUS);
+	stop_machine(ftrace_dyn_arch_init, &addr, NULL);
 
 	/* ftrace_dyn_arch_init places the return code in addr */
 	if (addr) {
