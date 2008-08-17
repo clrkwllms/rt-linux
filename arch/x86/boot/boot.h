@@ -27,9 +27,6 @@
 #include "bitops.h"
 #include <asm/cpufeature.h>
 
-/* Useful macros */
-#define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
-
 extern struct setup_header hdr;
 extern struct boot_params boot_params;
 

@@ -194,4 +194,34 @@ extern void __chk_io_ptr(const volatile void __iomem *);
  */
 #define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
 
+/*
+ * Force a compilation error if condition is true [array index becomes
+ * negative], and a linker error if condition is not constant [non-defined
+ * variable is used as an array index]:
+ *
+ * ( The linker trick relies on gcc optimizing out a multiplication with
+ *   constant zero - which should be reasonable enough. )
+ */
+#ifndef __ASSEMBLY__
+extern unsigned int __BUILD_BUG_ON_non_constant;
+#endif
+
+#define BUILD_BUG_ON(condition)					\
+do {								\
+	(void)sizeof(char[1 - 2*!!(condition)]);		\
+	if (!__builtin_constant_p(condition))			\
+		__BUILD_BUG_ON_non_constant++;			\
+} while (0)
+
+/*
+ * Force a compilation error if condition is true, but also produce a
+ * result (of value 0 and type size_t), so the expression can be used
+ * e.g. in a structure initializer (or where-ever else comma expressions
+ * aren't permitted):
+ */
+#define BUILD_BUG_ON_ZERO(e) (sizeof(char[1 - 2 * !!(e)]) - 1)
+
+/* Trap pasters of __FUNCTION__ at compile-time */
+#define __FUNCTION__ (__func__)
+
 #endif /* __LINUX_COMPILER_H */
