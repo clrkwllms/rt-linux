@@ -467,8 +467,22 @@ struct sysinfo {
 	char _f[20-2*sizeof(long)-sizeof(int)];	/* Padding: libc5 uses this.. */
 };
 
-/* Force a compilation error if condition is true */
-#define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
+/*
+ * Force a compilation error if condition is true [array index becomes
+ * negative], and a linker error if condition is not constant [non-defined
+ * variable is used as an array index]:
+ *
+ * ( The linker trick relies on gcc optimizing out a multiplication with
+ *   constant zero - which should be reasonable enough. )
+ */
+extern unsigned int __BUILD_BUG_ON_non_constant;
+
+#define BUILD_BUG_ON(condition)					\
+do {								\
+	(void)sizeof(char[1 - 2*!!(condition)]);		\
+	if (!__builtin_constant_p(condition))			\
+		__BUILD_BUG_ON_non_constant++;			\
+} while (0)
 
 /* Force a compilation error if condition is true, but also produce a
    result (of value 0 and type size_t), so the expression can be used
