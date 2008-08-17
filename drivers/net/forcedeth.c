@@ -5988,7 +5988,7 @@ static void nv_shutdown(struct pci_dev *pdev)
 	pci_enable_wake(pdev, PCI_D3hot, np->wolenabled);
 	pci_enable_wake(pdev, PCI_D3cold, np->wolenabled);
 	pci_disable_device(pdev);
-	pci_set_power_state(pdev, PCI_D3hot);
+	pci_set_power_state(pdev, pci_choose_state(pdev, PMSG_SUSPEND));
 }
 #else
 #define nv_suspend NULL
