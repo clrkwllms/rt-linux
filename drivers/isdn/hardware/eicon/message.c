@@ -2682,7 +2682,7 @@ byte connect_b3_req(dword Id, word Number, DIVA_CAPI_ADAPTER   * a, PLCI   * plc
           if (!(fax_control_bits & T30_CONTROL_BIT_MORE_DOCUMENTS)
            || (fax_feature_bits & T30_FEATURE_BIT_MORE_DOCUMENTS))
           {
-            len = (byte)(&(((T30_INFO *) 0)->universal_6));
+            len = (byte)(offsetof(T30_INFO, universal_6));
             fax_info_change = false;
             if (ncpi->length >= 4)
             {
@@ -2744,7 +2744,7 @@ byte connect_b3_req(dword Id, word Number, DIVA_CAPI_ADAPTER   * a, PLCI   * plc
                     for (i = 0; i < w; i++)
                       ((T30_INFO   *)(plci->fax_connect_info_buffer))->station_id[i] = fax_parms[4].info[1+i];
                     ((T30_INFO   *)(plci->fax_connect_info_buffer))->head_line_len = 0;
-                    len = (byte)(((T30_INFO *) 0)->station_id + 20);
+                    len = (byte)(offsetof(T30_INFO, station_id) + 20);
                     w = fax_parms[5].length;
                     if (w > 20)
                       w = 20;
@@ -2778,7 +2778,7 @@ byte connect_b3_req(dword Id, word Number, DIVA_CAPI_ADAPTER   * a, PLCI   * plc
                 }
                 else
                 {
-                  len = (byte)(&(((T30_INFO *) 0)->universal_6));
+                  len = (byte)(offsetof(T30_INFO, universal_6));
                 }
                 fax_info_change = true;
 
@@ -2881,7 +2881,7 @@ byte connect_b3_res(dword Id, word Number, DIVA_CAPI_ADAPTER   * a, PLCI   * plc
     && (plci->nsf_control_bits & T30_NSF_CONTROL_BIT_ENABLE_NSF)
     && (plci->nsf_control_bits & T30_NSF_CONTROL_BIT_NEGOTIATE_RESP))
    {
-            len = ((byte)(((T30_INFO *) 0)->station_id + 20));
+            len = (byte)(offsetof(T30_INFO, station_id) + 20);
             if (plci->fax_connect_info_length < len)
             {
               ((T30_INFO *)(plci->fax_connect_info_buffer))->station_id_len = 0;
@@ -3780,7 +3780,7 @@ byte manufacturer_res(dword Id, word Number, DIVA_CAPI_ADAPTER   * a, PLCI   * p
       break;
     }
     ncpi = &m_parms[1];
-    len = ((byte)(((T30_INFO *) 0)->station_id + 20));
+    len = (byte)(offsetof(T30_INFO, station_id) + 20);
     if (plci->fax_connect_info_length < len)
     {
       ((T30_INFO *)(plci->fax_connect_info_buffer))->station_id_len = 0;
@@ -6481,7 +6481,7 @@ void nl_ind(PLCI   * plci)
   word info = 0;
   word fax_feature_bits;
   byte fax_send_edata_ack;
-  static byte v120_header_buffer[2 + 3];
+  static byte v120_header_buffer[2 + 3] __attribute__ ((aligned(8)));
   static word fax_info[] = {
     0,                     /* T30_SUCCESS                        */
     _FAX_NO_CONNECTION,    /* T30_ERR_NO_DIS_RECEIVED            */
@@ -6820,7 +6820,7 @@ void nl_ind(PLCI   * plci)
         if ((plci->requested_options_conn | plci->requested_options | a->requested_options_table[plci->appl->Id-1])
           & ((1L << PRIVATE_FAX_SUB_SEP_PWD) | (1L << PRIVATE_FAX_NONSTANDARD)))
         {
-          i = ((word)(((T30_INFO *) 0)->station_id + 20)) + ((T30_INFO   *)plci->NL.RBuffer->P)->head_line_len;
+          i = ((word)(offsetof(T30_INFO, station_id) + 20)) + ((T30_INFO   *)plci->NL.RBuffer->P)->head_line_len;
           while (i < plci->NL.RBuffer->length)
             plci->ncpi_buffer[++len] = plci->NL.RBuffer->P[i++];
         }
@@ -7212,7 +7212,7 @@ void nl_ind(PLCI   * plci)
     {
       plci->RData[1].P = plci->RData[0].P;
       plci->RData[1].PLength = plci->RData[0].PLength;
-      plci->RData[0].P = v120_header_buffer + (-((int) v120_header_buffer) & 3);
+      plci->RData[0].P = v120_header_buffer;
       if ((plci->NL.RBuffer->P[0] & V120_HEADER_EXTEND_BIT) || (plci->NL.RLength == 1))
         plci->RData[0].PLength = 1;
       else
@@ -8390,6 +8390,7 @@ word add_b23(PLCI   * plci, API_PARSE * bp)
       /* copy head line to NLC */
       if(b3_config_parms[3].length)
       {
+        byte *head_line = (void *) ((T30_INFO *)&nlc[1] + 1);
 
         pos = (byte)(fax_head_line_time (&(((T30_INFO *)&nlc[1])->station_id[20])));
         if (pos != 0)
@@ -8398,17 +8399,17 @@ word add_b23(PLCI   * plci, API_PARSE * bp)
             pos = 0;
           else
           {
-            ((T30_INFO *)&nlc[1])->station_id[20 + pos++] = ' ';
-            ((T30_INFO *)&nlc[1])->station_id[20 + pos++] = ' ';
+            head_line[pos++] = ' ';
+            head_line[pos++] = ' ';
             len = (byte)b3_config_parms[2].length;
             if (len > 20)
               len = 20;
             if (CAPI_MAX_DATE_TIME_LENGTH + 2 + len + 2 + b3_config_parms[3].length <= CAPI_MAX_HEAD_LINE_SPACE)
             {
               for (i = 0; i < len; i++)
-                ((T30_INFO *)&nlc[1])->station_id[20 + pos++] = ((byte   *)b3_config_parms[2].info)[1+i];
-              ((T30_INFO *)&nlc[1])->station_id[20 + pos++] = ' ';
-              ((T30_INFO *)&nlc[1])->station_id[20 + pos++] = ' ';
+                head_line[pos++] = ((byte   *)b3_config_parms[2].info)[1+i];
+              head_line[pos++] = ' ';
+              head_line[pos++] = ' ';
             }
           }
         }
@@ -8419,7 +8420,7 @@ word add_b23(PLCI   * plci, API_PARSE * bp)
         ((T30_INFO *)&nlc[1])->head_line_len = (byte)(pos + len);
         nlc[0] += (byte)(pos + len);
         for (i = 0; i < len; i++)
-          ((T30_INFO *)&nlc[1])->station_id[20 + pos++] = ((byte   *)b3_config_parms[3].info)[1+i];
+          head_line[pos++] = ((byte   *)b3_config_parms[3].info)[1+i];
         }
       else
         ((T30_INFO *)&nlc[1])->head_line_len = 0;
@@ -8448,7 +8449,7 @@ word add_b23(PLCI   * plci, API_PARSE * bp)
             fax_control_bits |= T30_CONTROL_BIT_ACCEPT_SEL_POLLING;
           }
             len = nlc[0];
-          pos = ((byte)(((T30_INFO *) 0)->station_id + 20));
+          pos = (byte)(offsetof(T30_INFO, station_id) + 20);
    if (pos < plci->fax_connect_info_length)
    {
      for (i = 1 + plci->fax_connect_info_buffer[pos]; i != 0; i--)
@@ -8500,7 +8501,7 @@ word add_b23(PLCI   * plci, API_PARSE * bp)
       }
 
       PUT_WORD(&(((T30_INFO *)&nlc[1])->control_bits_low), fax_control_bits);
-      len = ((byte)(((T30_INFO *) 0)->station_id + 20));
+      len = (byte)(offsetof(T30_INFO, station_id) + 20);
       for (i = 0; i < len; i++)
         plci->fax_connect_info_buffer[i] = nlc[1+i];
       ((T30_INFO   *) plci->fax_connect_info_buffer)->head_line_len = 0;
@@ -15043,3 +15044,4 @@ static void diva_free_dma_descriptor (PLCI   *plci, int nr) {
 }
 
 /*------------------------------------------------------------------*/
+
