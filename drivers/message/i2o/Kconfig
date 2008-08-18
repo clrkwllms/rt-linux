@@ -54,7 +54,7 @@ config I2O_EXT_ADAPTEC_DMA64
 
 config I2O_CONFIG
 	tristate "I2O Configuration support"
-	depends on VIRT_TO_BUS
+	depends on VIRT_TO_BUS && (BROKEN || !64BIT)
 	---help---
 	  Say Y for support of the configuration interface for the I2O adapters.
 	  If you have a RAID controller from Adaptec and you want to use the
@@ -65,6 +65,8 @@ config I2O_CONFIG
 
 	  Note: If you want to use the new API you have to download the
 	  i2o_config patch from http://i2o.shadowconnect.com/
+
+	  Note: This is broken on 64-bit architectures.
 
 config I2O_CONFIG_OLD_IOCTL
 	bool "Enable ioctls (OBSOLETE)"
