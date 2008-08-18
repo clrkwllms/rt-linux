@@ -136,7 +136,7 @@ static struct pci_device_id i91u_pci_devices[] = {
 	{ PCI_VENDOR_ID_DOMEX, I920_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ }
 };
-MODULE_DEVICE_TABLE(pci, i91u_pci_devices);
+MODULE_STATIC_DEVICE_TABLE(pci, i91u_pci_devices);
 
 #define DEBUG_INTERRUPT 0
 #define DEBUG_QUEUE     0

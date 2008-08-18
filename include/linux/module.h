@@ -78,16 +78,32 @@ void sort_extable(struct exception_table_entry *start,
 		  struct exception_table_entry *finish);
 void sort_main_extable(void);
 
+/*
+ * Return a pointer to the current module, but only if within a module
+ */
+#ifdef MODULE
+extern struct module __this_module;
+#define THIS_MODULE (&__this_module)
+#else  /* !MODULE */
+#define THIS_MODULE ((struct module *)0)
+#endif
+
+/*
+ * Declare a module table
+ * - this suppresses "'name' defined but not used" warnings from the compiler
+ *   as the table may not actually be used by the code within the module
+ */
 #ifdef MODULE
 #define MODULE_GENERIC_TABLE(gtype,name)			\
 extern const struct gtype##_id __mod_##gtype##_table		\
   __attribute__ ((unused, alias(__stringify(name))))
-
-extern struct module __this_module;
-#define THIS_MODULE (&__this_module)
-#else  /* !MODULE */
+#define MODULE_STATIC_GENERIC_TABLE(gtype,name)			\
+extern const struct gtype##_id __mod_##gtype##_table		\
+  __attribute__ ((unused, alias(__stringify(name))))
+#else
 #define MODULE_GENERIC_TABLE(gtype,name)
-#define THIS_MODULE ((struct module *)0)
+#define MODULE_STATIC_GENERIC_TABLE(gtype,name) \
+static __typeof__((name)) name __attribute__((unused));
 #endif
 
 /* Generic info of form tag = "info" */
@@ -139,6 +155,8 @@ extern struct module __this_module;
 
 #define MODULE_DEVICE_TABLE(type,name)		\
   MODULE_GENERIC_TABLE(type##_device,name)
+#define MODULE_STATIC_DEVICE_TABLE(type,name)		\
+  MODULE_STATIC_GENERIC_TABLE(type##_device,name)
 
 /* Version of form [<epoch>:]<version>[-<extra-version>].
    Or for CVS/RCS ID version, everything but the number is stripped.

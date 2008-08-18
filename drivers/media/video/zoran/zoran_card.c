@@ -158,7 +158,7 @@ static struct pci_device_id zr36067_pci_tbl[] = {
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0}
 };
-MODULE_DEVICE_TABLE(pci, zr36067_pci_tbl);
+MODULE_STATIC_DEVICE_TABLE(pci, zr36067_pci_tbl);
 
 int zoran_num;			/* number of Buzs in use */
 struct zoran *zoran[BUZ_MAX];

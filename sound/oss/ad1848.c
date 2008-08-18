@@ -2879,7 +2879,7 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 	{0}
 };
 
-MODULE_DEVICE_TABLE(isapnp, id_table);
+MODULE_STATIC_DEVICE_TABLE(isapnp, id_table);
 
 static struct pnp_dev *activate_dev(char *devname, char *resname, struct pnp_dev *dev)
 {
