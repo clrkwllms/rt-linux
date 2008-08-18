@@ -541,7 +541,7 @@ KBUILD_CFLAGS	+= -pg
 endif
 
 ifndef CONFIG_ALLOW_WARNINGS
-KBUILD_CFLAGS	+= -Werror
+KBUILD_CFLAGS	+= -Werror ${WERROR}
 endif
 
 # We trigger additional mismatches with less inlining
