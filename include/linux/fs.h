@@ -1597,9 +1597,9 @@ void unnamed_dev_init(void);
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
 #define fops_get(fops) \
-	(((fops) && try_module_get((fops)->owner) ? (fops) : NULL))
+	(((fops != NULL) && try_module_get((fops)->owner) ? (fops) : NULL))
 #define fops_put(fops) \
-	do { if (fops) module_put((fops)->owner); } while(0)
+	do { if (fops != NULL) module_put((fops)->owner); } while(0)
 
 extern int register_filesystem(struct file_system_type *);
 extern int unregister_filesystem(struct file_system_type *);
