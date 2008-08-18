@@ -1872,7 +1872,7 @@ xfs_growfs_rt(
 	xfs_extlen_t	rsumblocks;	/* current number of rt summary blks */
 	xfs_sb_t	*sbp;		/* old superblock */
 	xfs_fsblock_t	sumbno;		/* summary block number */
-	xfs_trans_t	*tp;		/* transaction pointer */
+	xfs_trans_t	*uninitialized_var(tp);	/* transaction pointer */
 
 	sbp = &mp->m_sb;
 	cancelflags = 0;
