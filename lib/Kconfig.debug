@@ -25,6 +25,14 @@ config ENABLE_MUST_CHECK
 	  suppress the "warning: ignoring return value of 'foo', declared with
 	  attribute warn_unused_result" messages.
 
+config ENABLE_WERROR
+	bool "Enable -Werror"
+	default n
+	depends on !ENABLE_WARN_DEPRECATED && !ENABLE_MUST_CHECK
+	help
+	  Enable -Werror on building C files.  This causes all warnings to
+	  abort the compilation, just as errors do.
+
 config FRAME_WARN
 	int "Warn for stack frames larger than (needs gcc 4.4)"
 	range 0 8192
