@@ -1156,6 +1156,7 @@ ext4_ext_search_right(struct inode *inode, struct ext4_ext_path *path,
 		return 0;
 	}
 
+	ix = NULL; /* avoid gcc false positive warning */
 	/* go up and search for index to the right */
 	while (--depth >= 0) {
 		ix = path[depth].p_idx;
