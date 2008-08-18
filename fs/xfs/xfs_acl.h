@@ -59,6 +59,7 @@ extern struct kmem_zone *xfs_acl_zone;
 		(zone) = kmem_zone_init(sizeof(xfs_acl_t), (name))
 #define xfs_acl_zone_destroy(zone)	kmem_zone_destroy(zone)
 
+extern int xfs_decode_acl(const char *);
 extern int xfs_acl_inherit(struct inode *, mode_t mode, xfs_acl_t *);
 extern int xfs_acl_iaccess(struct xfs_inode *, mode_t, cred_t *);
 extern int xfs_acl_vtoacl(struct inode *, xfs_acl_t *, xfs_acl_t *);
@@ -80,6 +81,7 @@ extern int xfs_acl_vremove(struct inode *, int);
 #define _ACL_FREE(a)		((a)? kmem_zone_free(xfs_acl_zone, (a)):(void)0)
 
 #else
+#define xfs_decode_acl(name)	(-EINVAL)
 #define xfs_acl_zone_init(zone,name)
 #define xfs_acl_zone_destroy(zone)
 #define xfs_acl_vset(v,p,sz,t)	(-EOPNOTSUPP)

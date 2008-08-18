@@ -51,6 +51,19 @@ kmem_zone_t *xfs_acl_zone;
 
 
 /*
+ * ACL handling.
+ */
+int
+xfs_decode_acl(const char *name)
+{
+	if (strcmp(name, "posix_acl_access") == 0)
+		return _ACL_TYPE_ACCESS;
+	else if (strcmp(name, "posix_acl_default") == 0)
+		return _ACL_TYPE_DEFAULT;
+	return -EINVAL;
+}
+
+/*
  * Test for existence of access ACL attribute as efficiently as possible.
  */
 int
