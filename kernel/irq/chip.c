@@ -27,7 +27,8 @@ void dynamic_irq_init(unsigned int irq)
 	struct irq_desc *desc;
 	unsigned long flags;
 
-	desc = irq_to_desc(irq);
+	/* first time to use this irq_desc */
+	desc = irq_to_desc_alloc(irq);
 	if (!desc) {
 		WARN(1, KERN_ERR "Trying to initialize invalid IRQ%d\n", irq);
 		return;
@@ -60,7 +61,7 @@ void dynamic_irq_cleanup(unsigned int irq)
 	struct irq_desc *desc;
 	unsigned long flags;
 
-	desc = __irq_to_desc(irq);
+	desc = irq_to_desc(irq);
 	if (!desc) {
 		WARN(1, KERN_ERR "Trying to cleanup invalid IRQ%d\n", irq);
 		return;
@@ -92,7 +93,7 @@ int set_irq_chip(unsigned int irq, struct irq_chip *chip)
 	struct irq_desc *desc;
 	unsigned long flags;
 
-	desc = __irq_to_desc(irq);
+	desc = irq_to_desc(irq);
 	if (!desc) {
 		WARN(1, KERN_ERR "Trying to install chip for IRQ%d\n", irq);
 		return -EINVAL;
@@ -122,7 +123,7 @@ int set_irq_type(unsigned int irq, unsigned int type)
 	unsigned long flags;
 	int ret = -ENXIO;
 
-	desc = __irq_to_desc(irq);
+	desc = irq_to_desc(irq);
 	if (!desc) {
 		printk(KERN_ERR "Trying to set irq type for IRQ%d\n", irq);
 		return -ENODEV;
@@ -149,7 +150,7 @@ int set_irq_data(unsigned int irq, void *data)
 	struct irq_desc *desc;
 	unsigned long flags;
 
-	desc = __irq_to_desc(irq);
+	desc = irq_to_desc(irq);
 	if (!desc) {
 		printk(KERN_ERR
 		       "Trying to install controller data for IRQ%d\n", irq);
@@ -175,7 +176,7 @@ int set_irq_msi(unsigned int irq, struct msi_desc *entry)
 	struct irq_desc *desc;
 	unsigned long flags;
 
-	desc = __irq_to_desc(irq);
+	desc = irq_to_desc(irq);
 	if (!desc) {
 		printk(KERN_ERR
 		       "Trying to install msi data for IRQ%d\n", irq);
@@ -202,7 +203,7 @@ int set_irq_chip_data(unsigned int irq, void *data)
 	struct irq_desc *desc;
 	unsigned long flags;
 
-	desc = __irq_to_desc(irq);
+	desc = irq_to_desc(irq);
 	if (!desc) {
 		printk(KERN_ERR
 		       "Trying to install chip data for IRQ%d\n", irq);
@@ -553,7 +554,7 @@ __set_irq_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
 	struct irq_desc *desc;
 	unsigned long flags;
 
-	desc = __irq_to_desc(irq);
+	desc = irq_to_desc(irq);
 	if (!desc) {
 		printk(KERN_ERR
 		       "Trying to install type control for IRQ%d\n", irq);
@@ -617,7 +618,7 @@ void __init set_irq_noprobe(unsigned int irq)
 	struct irq_desc *desc;
 	unsigned long flags;
 
-	desc = __irq_to_desc(irq);
+	desc = irq_to_desc(irq);
 	if (!desc) {
 		printk(KERN_ERR "Trying to mark IRQ%d non-probeable\n", irq);
 
@@ -634,7 +635,7 @@ void __init set_irq_probe(unsigned int irq)
 	struct irq_desc *desc;
 	unsigned long flags;
 
-	desc = __irq_to_desc(irq);
+	desc = irq_to_desc(irq);
 	if (!desc) {
 		printk(KERN_ERR "Trying to mark IRQ%d probeable\n", irq);
 
