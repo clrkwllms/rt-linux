@@ -1330,21 +1330,21 @@ seq_print_ip_sym(struct trace_seq *s, unsigned long ip, unsigned long sym_flags)
 
 static void print_lat_help_header(struct seq_file *m)
 {
-	seq_puts(m, "#                _------=> CPU#            \n");
-	seq_puts(m, "#               / _-----=> irqs-off        \n");
-	seq_puts(m, "#              | / _----=> need-resched    \n");
-	seq_puts(m, "#              || / _---=> hardirq/softirq \n");
-	seq_puts(m, "#              ||| / _--=> preempt-depth   \n");
-	seq_puts(m, "#              |||| /                      \n");
-	seq_puts(m, "#              |||||     delay             \n");
-	seq_puts(m, "#  cmd     pid ||||| time  |   caller      \n");
-	seq_puts(m, "#     \\   /    |||||   \\   |   /           \n");
+	seq_puts(m, "#                  _------=> CPU#            \n");
+	seq_puts(m, "#                 / _-----=> irqs-off        \n");
+	seq_puts(m, "#                | / _----=> need-resched    \n");
+	seq_puts(m, "#                || / _---=> hardirq/softirq \n");
+	seq_puts(m, "#                ||| / _--=> preempt-depth   \n");
+	seq_puts(m, "#                |||| /                      \n");
+	seq_puts(m, "#                |||||     delay             \n");
+	seq_puts(m, "#  cmd     pid   ||||| time  |   caller      \n");
+	seq_puts(m, "#     \\   /      |||||   \\   |   /           \n");
 }
 
 static void print_func_help_header(struct seq_file *m)
 {
-	seq_puts(m, "#           TASK-PID   CPU#    TIMESTAMP  FUNCTION\n");
-	seq_puts(m, "#              | |      |          |         |\n");
+	seq_puts(m, "#           TASK-PID    CPU#    TIMESTAMP  FUNCTION\n");
+	seq_puts(m, "#              | |       |          |         |\n");
 }
 
 
@@ -1428,7 +1428,7 @@ lat_print_generic(struct trace_seq *s, struct trace_entry *entry, int cpu)
 	comm = trace_find_cmdline(entry->pid);
 
 	trace_seq_printf(s, "%8.8s-%-5d ", comm, entry->pid);
-	trace_seq_printf(s, "%d", cpu);
+	trace_seq_printf(s, "%3d", cpu);
 	trace_seq_printf(s, "%c%c",
 			(entry->flags & TRACE_FLAG_IRQS_OFF) ? 'd' : '.',
 			((entry->flags & TRACE_FLAG_NEED_RESCHED) ? 'N' : '.'));
@@ -1493,7 +1493,7 @@ print_lat_fmt(struct trace_iterator *iter, unsigned int trace_idx, int cpu)
 
 	if (verbose) {
 		comm = trace_find_cmdline(entry->pid);
-		trace_seq_printf(s, "%16s %5d %d %d %08x %08x [%08lx]"
+		trace_seq_printf(s, "%16s %5d %3d %d %08x %08x [%08lx]"
 				 " %ld.%03ldms (+%ld.%03ldms): ",
 				 comm,
 				 entry->pid, cpu, entry->flags,
@@ -1576,7 +1576,7 @@ static int print_trace_fmt(struct trace_iterator *iter)
 	ret = trace_seq_printf(s, "%16s-%-5d ", comm, entry->pid);
 	if (!ret)
 		return 0;
-	ret = trace_seq_printf(s, "[%02d] ", iter->cpu);
+	ret = trace_seq_printf(s, "[%03d] ", iter->cpu);
 	if (!ret)
 		return 0;
 	ret = trace_seq_printf(s, "%5lu.%06lu: ", secs, usec_rem);
