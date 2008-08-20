@@ -1542,7 +1542,6 @@ static int __init apic_set_verbosity(char *str)
 {
 	if (str == NULL)  {
 		skip_ioapic_setup = 0;
-		ioapic_force = 1;
 		return 0;
 	}
 	if (strcmp("debug", str) == 0)
