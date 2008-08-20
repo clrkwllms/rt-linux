@@ -87,7 +87,7 @@ static noinline int xen_spin_lock_slow(struct raw_spinlock *lock)
 
 	/* block until irq becomes pending */
 	xen_poll_irq(irq);
-	kstat_this_cpu.irqs[irq]++;
+	kstat_irqs_this_cpu(irq_to_desc(irq))++;
 
 out:
 	unspinning_lock(xl);
