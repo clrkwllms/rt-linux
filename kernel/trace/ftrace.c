@@ -796,7 +796,12 @@ static int ftraced(void *ignore)
 {
 	unsigned long usecs;
 
+	set_freezable();
+
 	while (!kthread_should_stop()) {
+
+		if (try_to_freeze())
+			continue;
 
 		set_current_state(TASK_INTERRUPTIBLE);
 
