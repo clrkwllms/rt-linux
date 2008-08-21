@@ -118,6 +118,14 @@ static inline void account_system_vtime(struct task_struct *tsk)
 }
 #endif
 
+#ifdef CONFIG_SMP
+extern void sched_irq_enter(void);
+extern void sched_irq_exit(void);
+#else
+# define sched_irq_enter() do { } while (0)
+# define sched_irq_exit() do { } while (0)
+#endif
+
 #if defined(CONFIG_PREEMPT_RCU) && defined(CONFIG_NO_HZ)
 extern void rcu_irq_enter(void);
 extern void rcu_irq_exit(void);
@@ -134,6 +142,7 @@ extern void rcu_irq_exit(void);
  */
 #define __irq_enter()					\
 	do {						\
+		sched_irq_enter();			\
 		rcu_irq_enter();			\
 		account_system_vtime(current);		\
 		add_preempt_count(HARDIRQ_OFFSET);	\
@@ -154,6 +163,7 @@ extern void irq_enter(void);
 		account_system_vtime(current);		\
 		sub_preempt_count(HARDIRQ_OFFSET);	\
 		rcu_irq_exit();				\
+		sched_irq_exit();			\
 	} while (0)
 
 /*
