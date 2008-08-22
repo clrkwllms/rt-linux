@@ -14,6 +14,7 @@
 #include <linux/utsrelease.h>
 #include <linux/kallsyms.h>
 #include <linux/seq_file.h>
+#include <linux/notifier.h>
 #include <linux/debugfs.h>
 #include <linux/pagemap.h>
 #include <linux/hardirq.h>
@@ -22,6 +23,7 @@
 #include <linux/ftrace.h>
 #include <linux/module.h>
 #include <linux/percpu.h>
+#include <linux/kdebug.h>
 #include <linux/ctype.h>
 #include <linux/init.h>
 #include <linux/poll.h>
@@ -103,8 +105,15 @@ int				ftrace_function_enabled;
  * trace_nr_entries is the number of entries that is allocated
  * for a buffer. Note, the number of entries is always rounded
  * to ENTRIES_PER_PAGE.
+ *
+ * This number is purposely set to a low number of 16384.
+ * If the dump on oops happens, it will be much appreciated
+ * to not have to wait for all that output. Anyway this can be
+ * boot time and run time configurable.
  */
-static unsigned long		trace_nr_entries = 65536UL;
+#define TRACE_ENTRIES_DEFAULT	16384UL
+
+static unsigned long		trace_nr_entries = TRACE_ENTRIES_DEFAULT;
 
 /* trace_types holds a link list of available tracers. */
 static struct tracer		*trace_types __read_mostly;
@@ -197,12 +206,14 @@ unsigned long nsecs_to_usecs(unsigned long nsecs)
  *  NEED_RESCED - reschedule is requested
  *  HARDIRQ	- inside an interrupt handler
  *  SOFTIRQ	- inside a softirq handler
+ *  CONT	- multiple entries hold the trace item
  */
 enum trace_flag_type {
 	TRACE_FLAG_IRQS_OFF		= 0x01,
 	TRACE_FLAG_NEED_RESCHED		= 0x02,
 	TRACE_FLAG_HARDIRQ		= 0x04,
 	TRACE_FLAG_SOFTIRQ		= 0x08,
+	TRACE_FLAG_CONT			= 0x10,
 };
 
 /*
@@ -817,10 +828,11 @@ tracing_generic_entry_update(struct trace_entry *entry, unsigned long flags)
 
 	pc = preempt_count();
 
-	entry->preempt_count	= pc & 0xff;
-	entry->pid		= (tsk) ? tsk->pid : 0;
-	entry->t		= ftrace_now(raw_smp_processor_id());
-	entry->flags = (irqs_disabled_flags(flags) ? TRACE_FLAG_IRQS_OFF : 0) |
+	entry->field.preempt_count	= pc & 0xff;
+	entry->field.pid		= (tsk) ? tsk->pid : 0;
+	entry->field.t			= ftrace_now(raw_smp_processor_id());
+	entry->field.flags =
+		(irqs_disabled_flags(flags) ? TRACE_FLAG_IRQS_OFF : 0) |
 		((pc & HARDIRQ_MASK) ? TRACE_FLAG_HARDIRQ : 0) |
 		((pc & SOFTIRQ_MASK) ? TRACE_FLAG_SOFTIRQ : 0) |
 		(need_resched() ? TRACE_FLAG_NEED_RESCHED : 0);
@@ -835,11 +847,11 @@ trace_function(struct trace_array *tr, struct trace_array_cpu *data,
 
 	raw_local_irq_save(irq_flags);
 	__raw_spin_lock(&data->lock);
-	entry			= tracing_get_trace_entry(tr, data);
+	entry				= tracing_get_trace_entry(tr, data);
 	tracing_generic_entry_update(entry, flags);
-	entry->type		= TRACE_FN;
-	entry->fn.ip		= ip;
-	entry->fn.parent_ip	= parent_ip;
+	entry->type			= TRACE_FN;
+	entry->field.fn.ip		= ip;
+	entry->field.fn.parent_ip	= parent_ip;
 	__raw_spin_unlock(&data->lock);
 	raw_local_irq_restore(irq_flags);
 }
@@ -862,10 +874,10 @@ void __trace_mmiotrace_rw(struct trace_array *tr, struct trace_array_cpu *data,
 	raw_local_irq_save(irq_flags);
 	__raw_spin_lock(&data->lock);
 
-	entry			= tracing_get_trace_entry(tr, data);
+	entry				= tracing_get_trace_entry(tr, data);
 	tracing_generic_entry_update(entry, 0);
-	entry->type		= TRACE_MMIO_RW;
-	entry->mmiorw		= *rw;
+	entry->type			= TRACE_MMIO_RW;
+	entry->field.mmiorw		= *rw;
 
 	__raw_spin_unlock(&data->lock);
 	raw_local_irq_restore(irq_flags);
@@ -882,10 +894,10 @@ void __trace_mmiotrace_map(struct trace_array *tr, struct trace_array_cpu *data,
 	raw_local_irq_save(irq_flags);
 	__raw_spin_lock(&data->lock);
 
-	entry			= tracing_get_trace_entry(tr, data);
+	entry				= tracing_get_trace_entry(tr, data);
 	tracing_generic_entry_update(entry, 0);
-	entry->type		= TRACE_MMIO_MAP;
-	entry->mmiomap		= *map;
+	entry->type			= TRACE_MMIO_MAP;
+	entry->field.mmiomap		= *map;
 
 	__raw_spin_unlock(&data->lock);
 	raw_local_irq_restore(irq_flags);
@@ -909,12 +921,12 @@ void __trace_stack(struct trace_array *tr,
 	tracing_generic_entry_update(entry, flags);
 	entry->type		= TRACE_STACK;
 
-	memset(&entry->stack, 0, sizeof(entry->stack));
+	memset(&entry->field.stack, 0, sizeof(entry->field.stack));
 
 	trace.nr_entries	= 0;
 	trace.max_entries	= FTRACE_STACK_ENTRIES;
 	trace.skip		= skip;
-	trace.entries		= entry->stack.caller;
+	trace.entries		= entry->field.stack.caller;
 
 	save_stack_trace(&trace);
 }
@@ -930,12 +942,12 @@ __trace_special(void *__tr, void *__data,
 
 	raw_local_irq_save(irq_flags);
 	__raw_spin_lock(&data->lock);
-	entry			= tracing_get_trace_entry(tr, data);
+	entry				= tracing_get_trace_entry(tr, data);
 	tracing_generic_entry_update(entry, 0);
-	entry->type		= TRACE_SPECIAL;
-	entry->special.arg1	= arg1;
-	entry->special.arg2	= arg2;
-	entry->special.arg3	= arg3;
+	entry->type			= TRACE_SPECIAL;
+	entry->field.special.arg1	= arg1;
+	entry->field.special.arg2	= arg2;
+	entry->field.special.arg3	= arg3;
 	__trace_stack(tr, data, irq_flags, 4);
 	__raw_spin_unlock(&data->lock);
 	raw_local_irq_restore(irq_flags);
@@ -955,15 +967,15 @@ tracing_sched_switch_trace(struct trace_array *tr,
 
 	raw_local_irq_save(irq_flags);
 	__raw_spin_lock(&data->lock);
-	entry			= tracing_get_trace_entry(tr, data);
+	entry				= tracing_get_trace_entry(tr, data);
 	tracing_generic_entry_update(entry, flags);
-	entry->type		= TRACE_CTX;
-	entry->ctx.prev_pid	= prev->pid;
-	entry->ctx.prev_prio	= prev->prio;
-	entry->ctx.prev_state	= prev->state;
-	entry->ctx.next_pid	= next->pid;
-	entry->ctx.next_prio	= next->prio;
-	entry->ctx.next_state	= next->state;
+	entry->type			= TRACE_CTX;
+	entry->field.ctx.prev_pid	= prev->pid;
+	entry->field.ctx.prev_prio	= prev->prio;
+	entry->field.ctx.prev_state	= prev->state;
+	entry->field.ctx.next_pid	= next->pid;
+	entry->field.ctx.next_prio	= next->prio;
+	entry->field.ctx.next_state	= next->state;
 	__trace_stack(tr, data, flags, 5);
 	__raw_spin_unlock(&data->lock);
 	raw_local_irq_restore(irq_flags);
@@ -984,12 +996,12 @@ tracing_sched_wakeup_trace(struct trace_array *tr,
 	entry			= tracing_get_trace_entry(tr, data);
 	tracing_generic_entry_update(entry, flags);
 	entry->type		= TRACE_WAKE;
-	entry->ctx.prev_pid	= curr->pid;
-	entry->ctx.prev_prio	= curr->prio;
-	entry->ctx.prev_state	= curr->state;
-	entry->ctx.next_pid	= wakee->pid;
-	entry->ctx.next_prio	= wakee->prio;
-	entry->ctx.next_state	= wakee->state;
+	entry->field.ctx.prev_pid	= curr->pid;
+	entry->field.ctx.prev_prio	= curr->prio;
+	entry->field.ctx.prev_state	= curr->state;
+	entry->field.ctx.next_pid	= wakee->pid;
+	entry->field.ctx.next_prio	= wakee->prio;
+	entry->field.ctx.next_state	= wakee->state;
 	__trace_stack(tr, data, flags, 6);
 	__raw_spin_unlock(&data->lock);
 	raw_local_irq_restore(irq_flags);
@@ -1073,6 +1085,7 @@ enum trace_file_type {
 	TRACE_FILE_LAT_FMT	= 1,
 };
 
+/* Return the current entry.  */
 static struct trace_entry *
 trace_entry_idx(struct trace_array *tr, struct trace_array_cpu *data,
 		struct trace_iterator *iter, int cpu)
@@ -1103,8 +1116,58 @@ trace_entry_idx(struct trace_array *tr, struct trace_array_cpu *data,
 	return &array[iter->next_page_idx[cpu]];
 }
 
+/* Increment the index counter of an iterator by one */
+static void trace_iterator_increment(struct trace_iterator *iter, int cpu)
+{
+	iter->idx++;
+	iter->next_idx[cpu]++;
+	iter->next_page_idx[cpu]++;
+
+	if (iter->next_page_idx[cpu] >= ENTRIES_PER_PAGE) {
+		struct trace_array_cpu *data = iter->tr->data[cpu];
+
+		iter->next_page_idx[cpu] = 0;
+		iter->next_page[cpu] =
+			trace_next_list(data, iter->next_page[cpu]);
+	}
+}
+
 static struct trace_entry *
-find_next_entry(struct trace_iterator *iter, int *ent_cpu)
+trace_entry_next(struct trace_array *tr, struct trace_array_cpu *data,
+		 struct trace_iterator *iter, int cpu)
+{
+	struct list_head *next_page;
+	struct trace_entry *ent;
+	int idx, next_idx, next_page_idx;
+
+	ent = trace_entry_idx(tr, tr->data[cpu], iter, cpu);
+
+	if (likely(!ent || ent->type != TRACE_CONT))
+		return ent;
+
+	/* save the iterator details */
+	idx		= iter->idx;
+	next_idx	= iter->next_idx[cpu];
+	next_page_idx	= iter->next_page_idx[cpu];
+	next_page	= iter->next_page[cpu];
+
+	/* find a real entry */
+	do {
+		trace_iterator_increment(iter, cpu);
+		ent = trace_entry_idx(tr, tr->data[cpu], iter, cpu);
+	} while (ent && ent->type != TRACE_CONT);
+
+	/* reset the iterator */
+	iter->idx			= idx;
+	iter->next_idx[cpu]		= next_idx;
+	iter->next_page_idx[cpu]	= next_page_idx;
+	iter->next_page[cpu]		= next_page;
+
+	return ent;
+}
+
+static struct trace_entry *
+__find_next_entry(struct trace_iterator *iter, int *ent_cpu, int inc)
 {
 	struct trace_array *tr = iter->tr;
 	struct trace_entry *ent, *next = NULL;
@@ -1114,11 +1177,27 @@ find_next_entry(struct trace_iterator *iter, int *ent_cpu)
 	for_each_tracing_cpu(cpu) {
 		if (!head_page(tr->data[cpu]))
 			continue;
+
 		ent = trace_entry_idx(tr, tr->data[cpu], iter, cpu);
+
+		if (ent && ent->type == TRACE_CONT) {
+			struct trace_array_cpu *data = tr->data[cpu];
+
+			if (!inc)
+				ent = trace_entry_next(tr, data, iter, cpu);
+			else {
+				while (ent && ent->type == TRACE_CONT) {
+					trace_iterator_increment(iter, cpu);
+					ent = trace_entry_idx(tr, tr->data[cpu],
+							      iter, cpu);
+				}
+			}
+		}
+
 		/*
 		 * Pick the entry with the smallest timestamp:
 		 */
-		if (ent && (!next || ent->t < next->t)) {
+		if (ent && (!next || ent->field.t < next->field.t)) {
 			next = ent;
 			next_cpu = cpu;
 		}
@@ -1130,25 +1209,39 @@ find_next_entry(struct trace_iterator *iter, int *ent_cpu)
 	return next;
 }
 
-static void trace_iterator_increment(struct trace_iterator *iter)
+/* Find the next real entry, without updating the iterator itself */
+static struct trace_entry *
+find_next_entry(struct trace_iterator *iter, int *ent_cpu)
 {
-	iter->idx++;
-	iter->next_idx[iter->cpu]++;
-	iter->next_page_idx[iter->cpu]++;
+	return __find_next_entry(iter, ent_cpu, 0);
+}
 
-	if (iter->next_page_idx[iter->cpu] >= ENTRIES_PER_PAGE) {
-		struct trace_array_cpu *data = iter->tr->data[iter->cpu];
+/* Find the next real entry, and increment the iterator to the next entry */
+static void *find_next_entry_inc(struct trace_iterator *iter)
+{
+	struct trace_entry *next;
+	int next_cpu = -1;
 
-		iter->next_page_idx[iter->cpu] = 0;
-		iter->next_page[iter->cpu] =
-			trace_next_list(data, iter->next_page[iter->cpu]);
-	}
+	next = __find_next_entry(iter, &next_cpu, 1);
+
+	iter->prev_ent = iter->ent;
+	iter->prev_cpu = iter->cpu;
+
+	iter->ent = next;
+	iter->cpu = next_cpu;
+
+	if (next)
+		trace_iterator_increment(iter, iter->cpu);
+
+	return next ? iter : NULL;
 }
 
 static void trace_consume(struct trace_iterator *iter)
 {
 	struct trace_array_cpu *data = iter->tr->data[iter->cpu];
+	struct trace_entry *ent;
 
+ again:
 	data->trace_tail_idx++;
 	if (data->trace_tail_idx >= ENTRIES_PER_PAGE) {
 		data->trace_tail = trace_next_page(data, data->trace_tail);
@@ -1159,25 +1252,11 @@ static void trace_consume(struct trace_iterator *iter)
 	if (data->trace_head == data->trace_tail &&
 	    data->trace_head_idx == data->trace_tail_idx)
 		data->trace_idx = 0;
-}
 
-static void *find_next_entry_inc(struct trace_iterator *iter)
-{
-	struct trace_entry *next;
-	int next_cpu = -1;
-
-	next = find_next_entry(iter, &next_cpu);
-
-	iter->prev_ent = iter->ent;
-	iter->prev_cpu = iter->cpu;
-
-	iter->ent = next;
-	iter->cpu = next_cpu;
-
-	if (next)
-		trace_iterator_increment(iter);
-
-	return next ? iter : NULL;
+	ent = trace_entry_idx(iter->tr, iter->tr->data[iter->cpu],
+			      iter, iter->cpu);
+	if (ent && ent->type == TRACE_CONT)
+		goto again;
 }
 
 static void *s_next(struct seq_file *m, void *v, loff_t *pos)
@@ -1330,21 +1409,21 @@ seq_print_ip_sym(struct trace_seq *s, unsigned long ip, unsigned long sym_flags)
 
 static void print_lat_help_header(struct seq_file *m)
 {
-	seq_puts(m, "#                _------=> CPU#            \n");
-	seq_puts(m, "#               / _-----=> irqs-off        \n");
-	seq_puts(m, "#              | / _----=> need-resched    \n");
-	seq_puts(m, "#              || / _---=> hardirq/softirq \n");
-	seq_puts(m, "#              ||| / _--=> preempt-depth   \n");
-	seq_puts(m, "#              |||| /                      \n");
-	seq_puts(m, "#              |||||     delay             \n");
-	seq_puts(m, "#  cmd     pid ||||| time  |   caller      \n");
-	seq_puts(m, "#     \\   /    |||||   \\   |   /           \n");
+	seq_puts(m, "#                  _------=> CPU#            \n");
+	seq_puts(m, "#                 / _-----=> irqs-off        \n");
+	seq_puts(m, "#                | / _----=> need-resched    \n");
+	seq_puts(m, "#                || / _---=> hardirq/softirq \n");
+	seq_puts(m, "#                ||| / _--=> preempt-depth   \n");
+	seq_puts(m, "#                |||| /                      \n");
+	seq_puts(m, "#                |||||     delay             \n");
+	seq_puts(m, "#  cmd     pid   ||||| time  |   caller      \n");
+	seq_puts(m, "#     \\   /      |||||   \\   |   /           \n");
 }
 
 static void print_func_help_header(struct seq_file *m)
 {
-	seq_puts(m, "#           TASK-PID   CPU#    TIMESTAMP  FUNCTION\n");
-	seq_puts(m, "#              | |      |          |         |\n");
+	seq_puts(m, "#           TASK-PID    CPU#    TIMESTAMP  FUNCTION\n");
+	seq_puts(m, "#              | |       |          |         |\n");
 }
 
 
@@ -1422,19 +1501,20 @@ print_trace_header(struct seq_file *m, struct trace_iterator *iter)
 static void
 lat_print_generic(struct trace_seq *s, struct trace_entry *entry, int cpu)
 {
+	struct trace_field *field = &entry->field;
 	int hardirq, softirq;
 	char *comm;
 
-	comm = trace_find_cmdline(entry->pid);
+	comm = trace_find_cmdline(field->pid);
 
-	trace_seq_printf(s, "%8.8s-%-5d ", comm, entry->pid);
-	trace_seq_printf(s, "%d", cpu);
+	trace_seq_printf(s, "%8.8s-%-5d ", comm, field->pid);
+	trace_seq_printf(s, "%3d", cpu);
 	trace_seq_printf(s, "%c%c",
-			(entry->flags & TRACE_FLAG_IRQS_OFF) ? 'd' : '.',
-			((entry->flags & TRACE_FLAG_NEED_RESCHED) ? 'N' : '.'));
+			(field->flags & TRACE_FLAG_IRQS_OFF) ? 'd' : '.',
+			((field->flags & TRACE_FLAG_NEED_RESCHED) ? 'N' : '.'));
 
-	hardirq = entry->flags & TRACE_FLAG_HARDIRQ;
-	softirq = entry->flags & TRACE_FLAG_SOFTIRQ;
+	hardirq = field->flags & TRACE_FLAG_HARDIRQ;
+	softirq = field->flags & TRACE_FLAG_SOFTIRQ;
 	if (hardirq && softirq) {
 		trace_seq_putc(s, 'H');
 	} else {
@@ -1448,8 +1528,8 @@ lat_print_generic(struct trace_seq *s, struct trace_entry *entry, int cpu)
 		}
 	}
 
-	if (entry->preempt_count)
-		trace_seq_printf(s, "%x", entry->preempt_count);
+	if (field->preempt_count)
+		trace_seq_printf(s, "%x", field->preempt_count);
 	else
 		trace_seq_puts(s, ".");
 }
@@ -1471,6 +1551,26 @@ lat_print_timestamp(struct trace_seq *s, unsigned long long abs_usecs,
 
 static const char state_to_char[] = TASK_STATE_TO_CHAR_STR;
 
+static void
+trace_seq_print_cont(struct trace_seq *s, struct trace_iterator *iter)
+{
+	struct trace_array *tr = iter->tr;
+	struct trace_array_cpu *data = tr->data[iter->cpu];
+	struct trace_entry *ent;
+
+	ent = trace_entry_idx(tr, data, iter, iter->cpu);
+	if (!ent || ent->type != TRACE_CONT) {
+		trace_seq_putc(s, '\n');
+		return;
+	}
+
+	do {
+		trace_seq_printf(s, "%s", ent->cont.buf);
+		trace_iterator_increment(iter, iter->cpu);
+		ent = trace_entry_idx(tr, data, iter, iter->cpu);
+	} while (ent && ent->type == TRACE_CONT);
+}
+
 static int
 print_lat_fmt(struct trace_iterator *iter, unsigned int trace_idx, int cpu)
 {
@@ -1479,6 +1579,7 @@ print_lat_fmt(struct trace_iterator *iter, unsigned int trace_idx, int cpu)
 	struct trace_entry *next_entry = find_next_entry(iter, NULL);
 	unsigned long verbose = (trace_flags & TRACE_ITER_VERBOSE);
 	struct trace_entry *entry = iter->ent;
+	struct trace_field *field = &entry->field;
 	unsigned long abs_usecs;
 	unsigned long rel_usecs;
 	char *comm;
@@ -1488,17 +1589,21 @@ print_lat_fmt(struct trace_iterator *iter, unsigned int trace_idx, int cpu)
 
 	if (!next_entry)
 		next_entry = entry;
-	rel_usecs = ns2usecs(next_entry->t - entry->t);
-	abs_usecs = ns2usecs(entry->t - iter->tr->time_start);
+
+	if (entry->type == TRACE_CONT)
+		return 1;
+
+	rel_usecs = ns2usecs(next_entry->field.t - entry->field.t);
+	abs_usecs = ns2usecs(entry->field.t - iter->tr->time_start);
 
 	if (verbose) {
-		comm = trace_find_cmdline(entry->pid);
-		trace_seq_printf(s, "%16s %5d %d %d %08x %08x [%08lx]"
+		comm = trace_find_cmdline(field->pid);
+		trace_seq_printf(s, "%16s %5d %3d %d %08x %08x [%08lx]"
 				 " %ld.%03ldms (+%ld.%03ldms): ",
 				 comm,
-				 entry->pid, cpu, entry->flags,
-				 entry->preempt_count, trace_idx,
-				 ns2usecs(entry->t),
+				 field->pid, cpu, field->flags,
+				 field->preempt_count, trace_idx,
+				 ns2usecs(field->t),
 				 abs_usecs/1000,
 				 abs_usecs % 1000, rel_usecs/1000,
 				 rel_usecs % 1000);
@@ -1508,43 +1613,50 @@ print_lat_fmt(struct trace_iterator *iter, unsigned int trace_idx, int cpu)
 	}
 	switch (entry->type) {
 	case TRACE_FN:
-		seq_print_ip_sym(s, entry->fn.ip, sym_flags);
+		seq_print_ip_sym(s, field->fn.ip, sym_flags);
 		trace_seq_puts(s, " (");
-		if (kretprobed(entry->fn.parent_ip))
+		if (kretprobed(field->fn.parent_ip))
 			trace_seq_puts(s, KRETPROBE_MSG);
 		else
-			seq_print_ip_sym(s, entry->fn.parent_ip, sym_flags);
+			seq_print_ip_sym(s, field->fn.parent_ip, sym_flags);
 		trace_seq_puts(s, ")\n");
 		break;
 	case TRACE_CTX:
 	case TRACE_WAKE:
-		T = entry->ctx.next_state < sizeof(state_to_char) ?
-			state_to_char[entry->ctx.next_state] : 'X';
+		T = field->ctx.next_state < sizeof(state_to_char) ?
+			state_to_char[field->ctx.next_state] : 'X';
 
-		state = entry->ctx.prev_state ? __ffs(entry->ctx.prev_state) + 1 : 0;
+		state = field->ctx.prev_state ?
+			__ffs(field->ctx.prev_state) + 1 : 0;
 		S = state < sizeof(state_to_char) - 1 ? state_to_char[state] : 'X';
-		comm = trace_find_cmdline(entry->ctx.next_pid);
+		comm = trace_find_cmdline(field->ctx.next_pid);
 		trace_seq_printf(s, " %5d:%3d:%c %s %5d:%3d:%c %s\n",
-				 entry->ctx.prev_pid,
-				 entry->ctx.prev_prio,
+				 field->ctx.prev_pid,
+				 field->ctx.prev_prio,
 				 S, entry->type == TRACE_CTX ? "==>" : "  +",
-				 entry->ctx.next_pid,
-				 entry->ctx.next_prio,
+				 field->ctx.next_pid,
+				 field->ctx.next_prio,
 				 T, comm);
 		break;
 	case TRACE_SPECIAL:
 		trace_seq_printf(s, "# %ld %ld %ld\n",
-				 entry->special.arg1,
-				 entry->special.arg2,
-				 entry->special.arg3);
+				 field->special.arg1,
+				 field->special.arg2,
+				 field->special.arg3);
 		break;
 	case TRACE_STACK:
 		for (i = 0; i < FTRACE_STACK_ENTRIES; i++) {
 			if (i)
 				trace_seq_puts(s, " <= ");
-			seq_print_ip_sym(s, entry->stack.caller[i], sym_flags);
+			seq_print_ip_sym(s, field->stack.caller[i], sym_flags);
 		}
 		trace_seq_puts(s, "\n");
+		break;
+	case TRACE_PRINT:
+		seq_print_ip_sym(s, field->print.ip, sym_flags);
+		trace_seq_printf(s, ": %s", field->print.buf);
+		if (field->flags && TRACE_FLAG_CONT)
+			trace_seq_print_cont(s, iter);
 		break;
 	default:
 		trace_seq_printf(s, "Unknown type %d\n", entry->type);
@@ -1557,6 +1669,7 @@ static int print_trace_fmt(struct trace_iterator *iter)
 	struct trace_seq *s = &iter->seq;
 	unsigned long sym_flags = (trace_flags & TRACE_ITER_SYM_MASK);
 	struct trace_entry *entry;
+	struct trace_field *field;
 	unsigned long usec_rem;
 	unsigned long long t;
 	unsigned long secs;
@@ -1567,16 +1680,21 @@ static int print_trace_fmt(struct trace_iterator *iter)
 
 	entry = iter->ent;
 
-	comm = trace_find_cmdline(iter->ent->pid);
+	if (entry->type == TRACE_CONT)
+		return 1;
 
-	t = ns2usecs(entry->t);
+	field = &entry->field;
+
+	comm = trace_find_cmdline(iter->ent->field.pid);
+
+	t = ns2usecs(field->t);
 	usec_rem = do_div(t, 1000000ULL);
 	secs = (unsigned long)t;
 
-	ret = trace_seq_printf(s, "%16s-%-5d ", comm, entry->pid);
+	ret = trace_seq_printf(s, "%16s-%-5d ", comm, field->pid);
 	if (!ret)
 		return 0;
-	ret = trace_seq_printf(s, "[%02d] ", iter->cpu);
+	ret = trace_seq_printf(s, "[%03d] ", iter->cpu);
 	if (!ret)
 		return 0;
 	ret = trace_seq_printf(s, "%5lu.%06lu: ", secs, usec_rem);
@@ -1585,18 +1703,19 @@ static int print_trace_fmt(struct trace_iterator *iter)
 
 	switch (entry->type) {
 	case TRACE_FN:
-		ret = seq_print_ip_sym(s, entry->fn.ip, sym_flags);
+		ret = seq_print_ip_sym(s, field->fn.ip, sym_flags);
 		if (!ret)
 			return 0;
 		if ((sym_flags & TRACE_ITER_PRINT_PARENT) &&
-						entry->fn.parent_ip) {
+						field->fn.parent_ip) {
 			ret = trace_seq_printf(s, " <-");
 			if (!ret)
 				return 0;
-			if (kretprobed(entry->fn.parent_ip))
+			if (kretprobed(field->fn.parent_ip))
 				ret = trace_seq_puts(s, KRETPROBE_MSG);
 			else
-				ret = seq_print_ip_sym(s, entry->fn.parent_ip,
+				ret = seq_print_ip_sym(s,
+						       field->fn.parent_ip,
 						       sym_flags);
 			if (!ret)
 				return 0;
@@ -1607,26 +1726,26 @@ static int print_trace_fmt(struct trace_iterator *iter)
 		break;
 	case TRACE_CTX:
 	case TRACE_WAKE:
-		S = entry->ctx.prev_state < sizeof(state_to_char) ?
-			state_to_char[entry->ctx.prev_state] : 'X';
-		T = entry->ctx.next_state < sizeof(state_to_char) ?
-			state_to_char[entry->ctx.next_state] : 'X';
+		S = field->ctx.prev_state < sizeof(state_to_char) ?
+			state_to_char[field->ctx.prev_state] : 'X';
+		T = field->ctx.next_state < sizeof(state_to_char) ?
+			state_to_char[field->ctx.next_state] : 'X';
 		ret = trace_seq_printf(s, " %5d:%3d:%c %s %5d:%3d:%c\n",
-				       entry->ctx.prev_pid,
-				       entry->ctx.prev_prio,
+				       field->ctx.prev_pid,
+				       field->ctx.prev_prio,
 				       S,
 				       entry->type == TRACE_CTX ? "==>" : "  +",
-				       entry->ctx.next_pid,
-				       entry->ctx.next_prio,
+				       field->ctx.next_pid,
+				       field->ctx.next_prio,
 				       T);
 		if (!ret)
 			return 0;
 		break;
 	case TRACE_SPECIAL:
 		ret = trace_seq_printf(s, "# %ld %ld %ld\n",
-				 entry->special.arg1,
-				 entry->special.arg2,
-				 entry->special.arg3);
+				 field->special.arg1,
+				 field->special.arg2,
+				 field->special.arg3);
 		if (!ret)
 			return 0;
 		break;
@@ -1637,7 +1756,7 @@ static int print_trace_fmt(struct trace_iterator *iter)
 				if (!ret)
 					return 0;
 			}
-			ret = seq_print_ip_sym(s, entry->stack.caller[i],
+			ret = seq_print_ip_sym(s, field->stack.caller[i],
 					       sym_flags);
 			if (!ret)
 				return 0;
@@ -1645,6 +1764,12 @@ static int print_trace_fmt(struct trace_iterator *iter)
 		ret = trace_seq_puts(s, "\n");
 		if (!ret)
 			return 0;
+		break;
+	case TRACE_PRINT:
+		seq_print_ip_sym(s, field->print.ip, sym_flags);
+		trace_seq_printf(s, ": %s", field->print.buf);
+		if (field->flags && TRACE_FLAG_CONT)
+			trace_seq_print_cont(s, iter);
 		break;
 	}
 	return 1;
@@ -1654,37 +1779,44 @@ static int print_raw_fmt(struct trace_iterator *iter)
 {
 	struct trace_seq *s = &iter->seq;
 	struct trace_entry *entry;
+	struct trace_field *field;
 	int ret;
 	int S, T;
 
 	entry = iter->ent;
 
+	if (entry->type == TRACE_CONT)
+		return 1;
+
+	field = &entry->field;
+
 	ret = trace_seq_printf(s, "%d %d %llu ",
-		entry->pid, iter->cpu, entry->t);
+		field->pid, iter->cpu, field->t);
 	if (!ret)
 		return 0;
 
 	switch (entry->type) {
 	case TRACE_FN:
 		ret = trace_seq_printf(s, "%x %x\n",
-					entry->fn.ip, entry->fn.parent_ip);
+					field->fn.ip,
+					field->fn.parent_ip);
 		if (!ret)
 			return 0;
 		break;
 	case TRACE_CTX:
 	case TRACE_WAKE:
-		S = entry->ctx.prev_state < sizeof(state_to_char) ?
-			state_to_char[entry->ctx.prev_state] : 'X';
-		T = entry->ctx.next_state < sizeof(state_to_char) ?
-			state_to_char[entry->ctx.next_state] : 'X';
+		S = field->ctx.prev_state < sizeof(state_to_char) ?
+			state_to_char[field->ctx.prev_state] : 'X';
+		T = field->ctx.next_state < sizeof(state_to_char) ?
+			state_to_char[field->ctx.next_state] : 'X';
 		if (entry->type == TRACE_WAKE)
 			S = '+';
 		ret = trace_seq_printf(s, "%d %d %c %d %d %c\n",
-				       entry->ctx.prev_pid,
-				       entry->ctx.prev_prio,
+				       field->ctx.prev_pid,
+				       field->ctx.prev_prio,
 				       S,
-				       entry->ctx.next_pid,
-				       entry->ctx.next_prio,
+				       field->ctx.next_pid,
+				       field->ctx.next_prio,
 				       T);
 		if (!ret)
 			return 0;
@@ -1692,11 +1824,17 @@ static int print_raw_fmt(struct trace_iterator *iter)
 	case TRACE_SPECIAL:
 	case TRACE_STACK:
 		ret = trace_seq_printf(s, "# %ld %ld %ld\n",
-				 entry->special.arg1,
-				 entry->special.arg2,
-				 entry->special.arg3);
+				 field->special.arg1,
+				 field->special.arg2,
+				 field->special.arg3);
 		if (!ret)
 			return 0;
+		break;
+	case TRACE_PRINT:
+		trace_seq_printf(s, "# %lx %s",
+				 field->print.ip, field->print.buf);
+		if (field->flags && TRACE_FLAG_CONT)
+			trace_seq_print_cont(s, iter);
 		break;
 	}
 	return 1;
@@ -1719,40 +1857,45 @@ static int print_hex_fmt(struct trace_iterator *iter)
 	struct trace_seq *s = &iter->seq;
 	unsigned char newline = '\n';
 	struct trace_entry *entry;
+	struct trace_field *field;
 	int S, T;
 
 	entry = iter->ent;
 
-	SEQ_PUT_HEX_FIELD_RET(s, entry->pid);
+	if (entry->type == TRACE_CONT)
+		return 1;
+
+	field = &entry->field;
+
+	SEQ_PUT_HEX_FIELD_RET(s, field->pid);
 	SEQ_PUT_HEX_FIELD_RET(s, iter->cpu);
-	SEQ_PUT_HEX_FIELD_RET(s, entry->t);
+	SEQ_PUT_HEX_FIELD_RET(s, field->t);
 
 	switch (entry->type) {
 	case TRACE_FN:
-		SEQ_PUT_HEX_FIELD_RET(s, entry->fn.ip);
-		SEQ_PUT_HEX_FIELD_RET(s, entry->fn.parent_ip);
+		SEQ_PUT_HEX_FIELD_RET(s, field->fn.ip);
+		SEQ_PUT_HEX_FIELD_RET(s, field->fn.parent_ip);
 		break;
 	case TRACE_CTX:
 	case TRACE_WAKE:
-		S = entry->ctx.prev_state < sizeof(state_to_char) ?
-			state_to_char[entry->ctx.prev_state] : 'X';
-		T = entry->ctx.next_state < sizeof(state_to_char) ?
-			state_to_char[entry->ctx.next_state] : 'X';
+		S = field->ctx.prev_state < sizeof(state_to_char) ?
+			state_to_char[field->ctx.prev_state] : 'X';
+		T = field->ctx.next_state < sizeof(state_to_char) ?
+			state_to_char[field->ctx.next_state] : 'X';
 		if (entry->type == TRACE_WAKE)
 			S = '+';
-		SEQ_PUT_HEX_FIELD_RET(s, entry->ctx.prev_pid);
-		SEQ_PUT_HEX_FIELD_RET(s, entry->ctx.prev_prio);
+		SEQ_PUT_HEX_FIELD_RET(s, field->ctx.prev_pid);
+		SEQ_PUT_HEX_FIELD_RET(s, field->ctx.prev_prio);
 		SEQ_PUT_HEX_FIELD_RET(s, S);
-		SEQ_PUT_HEX_FIELD_RET(s, entry->ctx.next_pid);
-		SEQ_PUT_HEX_FIELD_RET(s, entry->ctx.next_prio);
-		SEQ_PUT_HEX_FIELD_RET(s, entry->fn.parent_ip);
+		SEQ_PUT_HEX_FIELD_RET(s, field->ctx.next_pid);
+		SEQ_PUT_HEX_FIELD_RET(s, field->ctx.next_prio);
 		SEQ_PUT_HEX_FIELD_RET(s, T);
 		break;
 	case TRACE_SPECIAL:
 	case TRACE_STACK:
-		SEQ_PUT_HEX_FIELD_RET(s, entry->special.arg1);
-		SEQ_PUT_HEX_FIELD_RET(s, entry->special.arg2);
-		SEQ_PUT_HEX_FIELD_RET(s, entry->special.arg3);
+		SEQ_PUT_HEX_FIELD_RET(s, field->special.arg1);
+		SEQ_PUT_HEX_FIELD_RET(s, field->special.arg2);
+		SEQ_PUT_HEX_FIELD_RET(s, field->special.arg3);
 		break;
 	}
 	SEQ_PUT_FIELD_RET(s, newline);
@@ -1764,31 +1907,37 @@ static int print_bin_fmt(struct trace_iterator *iter)
 {
 	struct trace_seq *s = &iter->seq;
 	struct trace_entry *entry;
+	struct trace_field *field;
 
 	entry = iter->ent;
 
-	SEQ_PUT_FIELD_RET(s, entry->pid);
-	SEQ_PUT_FIELD_RET(s, entry->cpu);
-	SEQ_PUT_FIELD_RET(s, entry->t);
+	if (entry->type == TRACE_CONT)
+		return 1;
+
+	field = &entry->field;
+
+	SEQ_PUT_FIELD_RET(s, field->pid);
+	SEQ_PUT_FIELD_RET(s, field->cpu);
+	SEQ_PUT_FIELD_RET(s, field->t);
 
 	switch (entry->type) {
 	case TRACE_FN:
-		SEQ_PUT_FIELD_RET(s, entry->fn.ip);
-		SEQ_PUT_FIELD_RET(s, entry->fn.parent_ip);
+		SEQ_PUT_FIELD_RET(s, field->fn.ip);
+		SEQ_PUT_FIELD_RET(s, field->fn.parent_ip);
 		break;
 	case TRACE_CTX:
-		SEQ_PUT_FIELD_RET(s, entry->ctx.prev_pid);
-		SEQ_PUT_FIELD_RET(s, entry->ctx.prev_prio);
-		SEQ_PUT_FIELD_RET(s, entry->ctx.prev_state);
-		SEQ_PUT_FIELD_RET(s, entry->ctx.next_pid);
-		SEQ_PUT_FIELD_RET(s, entry->ctx.next_prio);
-		SEQ_PUT_FIELD_RET(s, entry->ctx.next_state);
+		SEQ_PUT_FIELD_RET(s, field->ctx.prev_pid);
+		SEQ_PUT_FIELD_RET(s, field->ctx.prev_prio);
+		SEQ_PUT_FIELD_RET(s, field->ctx.prev_state);
+		SEQ_PUT_FIELD_RET(s, field->ctx.next_pid);
+		SEQ_PUT_FIELD_RET(s, field->ctx.next_prio);
+		SEQ_PUT_FIELD_RET(s, field->ctx.next_state);
 		break;
 	case TRACE_SPECIAL:
 	case TRACE_STACK:
-		SEQ_PUT_FIELD_RET(s, entry->special.arg1);
-		SEQ_PUT_FIELD_RET(s, entry->special.arg2);
-		SEQ_PUT_FIELD_RET(s, entry->special.arg3);
+		SEQ_PUT_FIELD_RET(s, field->special.arg1);
+		SEQ_PUT_FIELD_RET(s, field->special.arg2);
+		SEQ_PUT_FIELD_RET(s, field->special.arg3);
 		break;
 	}
 	return 1;
@@ -2881,12 +3030,12 @@ static __init void tracer_init_debugfs(void)
 	entry = debugfs_create_file("available_tracers", 0444, d_tracer,
 				    &global_trace, &show_traces_fops);
 	if (!entry)
-		pr_warning("Could not create debugfs 'trace' entry\n");
+		pr_warning("Could not create debugfs 'available_tracers' entry\n");
 
 	entry = debugfs_create_file("current_tracer", 0444, d_tracer,
 				    &global_trace, &set_tracer_fops);
 	if (!entry)
-		pr_warning("Could not create debugfs 'trace' entry\n");
+		pr_warning("Could not create debugfs 'current_tracer' entry\n");
 
 	entry = debugfs_create_file("tracing_max_latency", 0644, d_tracer,
 				    &tracing_max_latency,
@@ -2899,7 +3048,7 @@ static __init void tracer_init_debugfs(void)
 				    &tracing_thresh, &tracing_max_lat_fops);
 	if (!entry)
 		pr_warning("Could not create debugfs "
-			   "'tracing_threash' entry\n");
+			   "'tracing_thresh' entry\n");
 	entry = debugfs_create_file("README", 0644, d_tracer,
 				    NULL, &tracing_readme_fops);
 	if (!entry)
@@ -2909,13 +3058,13 @@ static __init void tracer_init_debugfs(void)
 				    NULL, &tracing_pipe_fops);
 	if (!entry)
 		pr_warning("Could not create debugfs "
-			   "'tracing_threash' entry\n");
+			   "'trace_pipe' entry\n");
 
 	entry = debugfs_create_file("trace_entries", 0644, d_tracer,
 				    &global_trace, &tracing_entries_fops);
 	if (!entry)
 		pr_warning("Could not create debugfs "
-			   "'tracing_threash' entry\n");
+			   "'trace_entries' entry\n");
 
 #ifdef CONFIG_DYNAMIC_FTRACE
 	entry = debugfs_create_file("dyn_ftrace_total_info", 0444, d_tracer,
@@ -2928,6 +3077,237 @@ static __init void tracer_init_debugfs(void)
 #ifdef CONFIG_SYSPROF_TRACER
 	init_tracer_sysprof_debugfs(d_tracer);
 #endif
+}
+
+#define TRACE_BUF_SIZE 1024
+#define TRACE_PRINT_BUF_SIZE \
+	(sizeof(struct trace_field) - offsetof(struct trace_field, print.buf))
+#define TRACE_CONT_BUF_SIZE sizeof(struct trace_field)
+
+int __ftrace_printk(unsigned long ip, const char *fmt, ...)
+{
+	struct trace_array *tr = &global_trace;
+	static DEFINE_SPINLOCK(trace_buf_lock);
+	static char trace_buf[TRACE_BUF_SIZE];
+	struct trace_array_cpu *data;
+	struct trace_entry *entry;
+	unsigned long flags;
+	long disabled;
+	va_list ap;
+	int cpu, len = 0, write, written = 0;
+
+	if (likely(!ftrace_function_enabled))
+		return 0;
+
+	local_irq_save(flags);
+	cpu = raw_smp_processor_id();
+	data = tr->data[cpu];
+	disabled = atomic_inc_return(&data->disabled);
+
+	if (unlikely(disabled != 1 || !ftrace_function_enabled))
+		goto out;
+
+	spin_lock(&trace_buf_lock);
+	va_start(ap, fmt);
+	len = vsnprintf(trace_buf, TRACE_BUF_SIZE, fmt, ap);
+	va_end(ap);
+
+	len = min(len, TRACE_BUF_SIZE-1);
+	trace_buf[len] = 0;
+
+	__raw_spin_lock(&data->lock);
+	entry				= tracing_get_trace_entry(tr, data);
+	tracing_generic_entry_update(entry, flags);
+	entry->type			= TRACE_PRINT;
+	entry->field.print.ip		= ip;
+
+	write = min(len, (int)(TRACE_PRINT_BUF_SIZE-1));
+
+	memcpy(&entry->field.print.buf, trace_buf, write);
+	entry->field.print.buf[write] = 0;
+	written = write;
+
+	if (written != len)
+		entry->field.flags |= TRACE_FLAG_CONT;
+
+	while (written != len) {
+		entry = tracing_get_trace_entry(tr, data);
+
+		entry->type = TRACE_CONT;
+		write = min(len - written, (int)(TRACE_CONT_BUF_SIZE-1));
+		memcpy(&entry->cont.buf, trace_buf+written, write);
+		entry->cont.buf[write] = 0;
+		written += write;
+	}
+	__raw_spin_unlock(&data->lock);
+
+	spin_unlock(&trace_buf_lock);
+
+ out:
+	atomic_dec(&data->disabled);
+	local_irq_restore(flags);
+
+	return len;
+}
+EXPORT_SYMBOL_GPL(__ftrace_printk);
+
+static int trace_panic_handler(struct notifier_block *this,
+			       unsigned long event, void *unused)
+{
+	ftrace_dump();
+	return NOTIFY_OK;
+}
+
+static struct notifier_block trace_panic_notifier = {
+	.notifier_call  = trace_panic_handler,
+	.next           = NULL,
+	.priority       = 150   /* priority: INT_MAX >= x >= 0 */
+};
+
+static int trace_die_handler(struct notifier_block *self,
+			     unsigned long val,
+			     void *data)
+{
+	switch (val) {
+	case DIE_OOPS:
+		ftrace_dump();
+		break;
+	default:
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block trace_die_notifier = {
+	.notifier_call = trace_die_handler,
+	.priority = 200
+};
+
+/*
+ * printk is set to max of 1024, we really don't need it that big.
+ * Nothing should be printing 1000 characters anyway.
+ */
+#define TRACE_MAX_PRINT		1000
+
+/*
+ * Define here KERN_TRACE so that we have one place to modify
+ * it if we decide to change what log level the ftrace dump
+ * should be at.
+ */
+#define KERN_TRACE		KERN_INFO
+
+static void
+trace_printk_seq(struct trace_seq *s)
+{
+	/* Probably should print a warning here. */
+	if (s->len >= 1000)
+		s->len = 1000;
+
+	/* should be zero ended, but we are paranoid. */
+	s->buffer[s->len] = 0;
+
+	printk(KERN_TRACE "%s", s->buffer);
+
+	trace_seq_reset(s);
+}
+
+
+void ftrace_dump(void)
+{
+	static DEFINE_SPINLOCK(ftrace_dump_lock);
+	/* use static because iter can be a bit big for the stack */
+	static struct trace_iterator iter;
+	struct trace_array_cpu *data;
+	static cpumask_t mask;
+	static int dump_ran;
+	unsigned long flags;
+	int cnt = 0;
+	int cpu;
+
+	/* only one dump */
+	spin_lock_irqsave(&ftrace_dump_lock, flags);
+	if (dump_ran)
+		goto out;
+
+	dump_ran = 1;
+
+	/* No turning back! */
+	ftrace_kill_atomic();
+
+	printk(KERN_TRACE "Dumping ftrace buffer:\n");
+
+	iter.tr = &global_trace;
+	iter.trace = current_trace;
+
+	/*
+	 * We need to stop all tracing on all CPUS to read the
+	 * the next buffer. This is a bit expensive, but is
+	 * not done often. We fill all what we can read,
+	 * and then release the locks again.
+	 */
+
+	cpus_clear(mask);
+
+	for_each_tracing_cpu(cpu) {
+		data = iter.tr->data[cpu];
+
+		if (!head_page(data) || !data->trace_idx)
+			continue;
+
+		atomic_inc(&data->disabled);
+		cpu_set(cpu, mask);
+	}
+
+	for_each_cpu_mask(cpu, mask) {
+		data = iter.tr->data[cpu];
+		__raw_spin_lock(&data->lock);
+
+		if (data->overrun > iter.last_overrun[cpu])
+			iter.overrun[cpu] +=
+				data->overrun - iter.last_overrun[cpu];
+		iter.last_overrun[cpu] = data->overrun;
+	}
+
+	while (!trace_empty(&iter)) {
+
+		if (!cnt)
+			printk(KERN_TRACE "---------------------------------\n");
+
+		cnt++;
+
+		/* reset all but tr, trace, and overruns */
+		memset(&iter.seq, 0,
+		       sizeof(struct trace_iterator) -
+		       offsetof(struct trace_iterator, seq));
+		iter.iter_flags |= TRACE_FILE_LAT_FMT;
+		iter.pos = -1;
+
+		if (find_next_entry_inc(&iter) != NULL) {
+			print_trace_line(&iter);
+			trace_consume(&iter);
+		}
+
+		trace_printk_seq(&iter.seq);
+	}
+
+	if (!cnt)
+		printk(KERN_TRACE "   (ftrace buffer empty)\n");
+	else
+		printk(KERN_TRACE "---------------------------------\n");
+
+	for_each_cpu_mask(cpu, mask) {
+		data = iter.tr->data[cpu];
+		__raw_spin_unlock(&data->lock);
+	}
+
+	for_each_cpu_mask(cpu, mask) {
+		data = iter.tr->data[cpu];
+		atomic_dec(&data->disabled);
+	}
+
+
+ out:
+	spin_unlock_irqrestore(&ftrace_dump_lock, flags);
 }
 
 static int trace_alloc_page(void)
@@ -3125,6 +3505,11 @@ __init static int tracer_alloc_buffers(void)
 	/* All seems OK, enable tracing */
 	global_trace.ctrl = tracer_enabled;
 	tracing_disabled = 0;
+
+	atomic_notifier_chain_register(&panic_notifier_list,
+				       &trace_panic_notifier);
+
+	register_die_notifier(&trace_die_notifier);
 
 	return 0;
 
