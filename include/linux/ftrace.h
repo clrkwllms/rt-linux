@@ -36,6 +36,7 @@ extern void ftrace_stub(unsigned long a0, unsigned long a1);
 # define register_ftrace_function(ops) do { } while (0)
 # define unregister_ftrace_function(ops) do { } while (0)
 # define clear_ftrace_function(ops) do { } while (0)
+static inline void ftrace_kill_atomic(void) { }
 #endif /* CONFIG_FTRACE */
 
 #ifdef CONFIG_DYNAMIC_FTRACE
@@ -98,9 +99,11 @@ static inline void tracer_disable(void)
 #endif
 }
 
-/* Ftrace disable/restore without lock. Some synchronization mechanism
+/*
+ * Ftrace disable/restore without lock. Some synchronization mechanism
  * must be used to prevent ftrace_enabled to be changed between
- * disable/restore. */
+ * disable/restore.
+ */
 static inline int __ftrace_enabled_save(void)
 {
 #ifdef CONFIG_FTRACE
@@ -157,9 +160,52 @@ static inline void __ftrace_enabled_restore(int enabled)
 #ifdef CONFIG_TRACING
 extern void
 ftrace_special(unsigned long arg1, unsigned long arg2, unsigned long arg3);
+
+/**
+ * ftrace_printk - printf formatting in the ftrace buffer
+ * @fmt: the printf format for printing
+ *
+ * Note: __ftrace_printk is an internal function for ftrace_printk and
+ *       the @ip is passed in via the ftrace_printk macro.
+ *
+ * This function allows a kernel developer to debug fast path sections
+ * that printk is not appropriate for. By scattering in various
+ * printk like tracing in the code, a developer can quickly see
+ * where problems are occurring.
+ *
+ * This is intended as a debugging tool for the developer only.
+ * Please refrain from leaving ftrace_printks scattered around in
+ * your code.
+ */
+# define ftrace_printk(fmt...) __ftrace_printk(_THIS_IP_, fmt)
+extern int
+__ftrace_printk(unsigned long ip, const char *fmt, ...)
+	__attribute__ ((format (printf, 2, 3)));
+extern void ftrace_dump(void);
 #else
 static inline void
 ftrace_special(unsigned long arg1, unsigned long arg2, unsigned long arg3) { }
+static inline int
+ftrace_printk(const char *fmt, ...) __attribute__ ((format (printf, 1, 0)));
+
+static inline int
+ftrace_printk(const char *fmt, ...)
+{
+	return 0;
+}
+static inline void ftrace_dump(void) { }
 #endif
+
+#ifdef CONFIG_FTRACE_MCOUNT_RECORD
+extern void ftrace_init(void);
+extern void ftrace_init_module(unsigned long *start, unsigned long *end);
+extern void ftrace_release(void *start, unsigned long size);
+#else
+static inline void ftrace_init(void) { }
+static inline void
+ftrace_init_module(unsigned long *start, unsigned long *end) { }
+static inline void ftrace_release(void *start, unsigned long size) { }
+#endif
+
 
 #endif /* _LINUX_FTRACE_H */
