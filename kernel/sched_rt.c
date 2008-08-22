@@ -481,6 +481,14 @@ static void update_curr_rt(struct rq *rq)
 	if (unlikely((s64)delta_exec < 0))
 		delta_exec = 0;
 
+#ifdef CONFIG_SMP
+	/*
+	 * Account the time spend running RT tasks on this rq. Used to inflate
+	 * this rq's load values.
+	 */
+	rq->rt_time += delta_exec;
+#endif
+
 	schedstat_set(curr->se.exec_max, max(curr->se.exec_max, delta_exec));
 
 	curr->se.sum_exec_runtime += delta_exec;

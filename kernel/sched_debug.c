@@ -245,6 +245,10 @@ static void print_cpu(struct seq_file *m, int cpu)
 	P(nr_running);
 	SEQ_printf(m, "  .%-30s: %lu\n", "load",
 		   rq->load.weight);
+#ifdef CONFIG_SMP
+	SEQ_printf(m, "  .%-30s: %ld\n", "scaled_load",
+			sched_scale_load(rq, rq->load.weight));
+#endif
 	P(nr_switches);
 	P(nr_load_updates);
 	P(nr_uninterruptible);
