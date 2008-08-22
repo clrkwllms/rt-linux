@@ -646,6 +646,9 @@ int setup_profiling_timer(unsigned int multiplier)
  *
  * Vector mappings are hard coded. On K8 only offset 0 (APIC500) and
  * MCE interrupts are supported. Thus MCE offset must be set to 0.
+ *
+ * If mask=1, the LVT entry does not generate interrupts while mask=0
+ * enables the vector. See also the BKDGs.
  */
 
 #define APIC_EILVT_LVTOFF_MCE 0
@@ -669,6 +672,7 @@ u8 setup_APIC_eilvt_ibs(u8 vector, u8 msg_type, u8 mask)
 	setup_APIC_eilvt(APIC_EILVT_LVTOFF_IBS, vector, msg_type, mask);
 	return APIC_EILVT_LVTOFF_IBS;
 }
+EXPORT_SYMBOL_GPL(setup_APIC_eilvt_ibs);
 
 /*
  * Local APIC start and shutdown
