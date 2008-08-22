@@ -1,5 +1,5 @@
-#ifndef _ASM_X86_CACHEFLUSH_H
-#define _ASM_X86_CACHEFLUSH_H
+#ifndef ASM_X86__CACHEFLUSH_H
+#define ASM_X86__CACHEFLUSH_H
 
 /* Keep includes the same across arches.  */
 #include <linux/mm.h>
@@ -66,6 +66,9 @@ int set_memory_rw(unsigned long addr, int numpages);
 int set_memory_np(unsigned long addr, int numpages);
 int set_memory_4k(unsigned long addr, int numpages);
 
+int set_memory_array_uc(unsigned long *addr, int addrinarray);
+int set_memory_array_wb(unsigned long *addr, int addrinarray);
+
 /*
  * For legacy compatibility with the old APIs, a few functions
  * are provided that work on a "struct page".
@@ -112,4 +115,4 @@ static inline int rodata_test(void)
 }
 #endif
 
-#endif
+#endif /* ASM_X86__CACHEFLUSH_H */

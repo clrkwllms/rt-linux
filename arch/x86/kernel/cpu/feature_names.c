@@ -39,13 +39,14 @@ const char * const x86_cap_flags[NCAPINTS*32] = {
 	NULL, NULL, NULL, NULL,
 	"constant_tsc", "up", NULL, "arch_perfmon",
 	"pebs", "bts", NULL, NULL,
-	"rep_good", NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	"rep_good", NULL, NULL, NULL,
+	"nopl", NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
 	/* Intel-defined (#2) */
 	"pni", NULL, NULL, "monitor", "ds_cpl", "vmx", "smx", "est",
 	"tm2", "ssse3", "cid", NULL, NULL, "cx16", "xtpr", NULL,
-	NULL, NULL, "dca", "sse4_1", "sse4_2", NULL, NULL, "popcnt",
+	NULL, NULL, "dca", "sse4_1", "sse4_2", "x2apic", NULL, "popcnt",
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
 	/* VIA/Cyrix/Centaur-defined */

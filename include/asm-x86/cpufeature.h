@@ -1,8 +1,8 @@
 /*
  * Defines x86 CPU feature bits
  */
-#ifndef _ASM_X86_CPUFEATURE_H
-#define _ASM_X86_CPUFEATURE_H
+#ifndef ASM_X86__CPUFEATURE_H
+#define ASM_X86__CPUFEATURE_H
 
 #include <asm/required-features.h>
 
@@ -72,14 +72,16 @@
 #define X86_FEATURE_UP		(3*32+ 9) /* smp kernel running on up */
 #define X86_FEATURE_FXSAVE_LEAK (3*32+10) /* FXSAVE leaks FOP/FIP/FOP */
 #define X86_FEATURE_ARCH_PERFMON (3*32+11) /* Intel Architectural PerfMon */
-#define X86_FEATURE_PEBS	(3*32+12)  /* Precise-Event Based Sampling */
-#define X86_FEATURE_BTS		(3*32+13)  /* Branch Trace Store */
-#define X86_FEATURE_SYSCALL32	(3*32+14)  /* syscall in ia32 userspace */
-#define X86_FEATURE_SYSENTER32	(3*32+15)  /* sysenter in ia32 userspace */
+#define X86_FEATURE_PEBS	(3*32+12) /* Precise-Event Based Sampling */
+#define X86_FEATURE_BTS		(3*32+13) /* Branch Trace Store */
+#define X86_FEATURE_SYSCALL32	(3*32+14) /* syscall in ia32 userspace */
+#define X86_FEATURE_SYSENTER32	(3*32+15) /* sysenter in ia32 userspace */
 #define X86_FEATURE_REP_GOOD	(3*32+16) /* rep microcode works well on this CPU */
 #define X86_FEATURE_MFENCE_RDTSC (3*32+17) /* Mfence synchronizes RDTSC */
 #define X86_FEATURE_LFENCE_RDTSC (3*32+18) /* Lfence synchronizes RDTSC */
-#define X86_FEATURE_11AP	(3*32+19)  /* Bad local APIC aka 11AP */
+#define X86_FEATURE_XTOPOLOGY    (3*32+20) /* cpu topology enum extensions */
+#define X86_FEATURE_11AP	(3*32+19) /* Bad local APIC aka 11AP */
+#define X86_FEATURE_NOPL	(3*32+20) /* The NOPL (0F 1F) instructions */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
 #define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
@@ -91,6 +93,7 @@
 #define X86_FEATURE_CX16	(4*32+13) /* CMPXCHG16B */
 #define X86_FEATURE_XTPR	(4*32+14) /* Send Task Priority Messages */
 #define X86_FEATURE_DCA		(4*32+18) /* Direct Cache Access */
+#define X86_FEATURE_X2APIC	(4*32+21) /* x2APIC */
 
 /* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
 #define X86_FEATURE_XSTORE	(5*32+ 2) /* on-CPU RNG present (xstore insn) */
@@ -189,6 +192,7 @@ extern const char * const x86_power_flags[32];
 #define cpu_has_gbpages		boot_cpu_has(X86_FEATURE_GBPAGES)
 #define cpu_has_arch_perfmon	boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
 #define cpu_has_pat		boot_cpu_has(X86_FEATURE_PAT)
+#define cpu_has_x2apic		boot_cpu_has(X86_FEATURE_X2APIC)
 
 #if defined(CONFIG_X86_INVLPG) || defined(CONFIG_X86_64)
 # define cpu_has_invlpg		1
@@ -220,4 +224,4 @@ extern const char * const x86_power_flags[32];
 
 #endif /* defined(__KERNEL__) && !defined(__ASSEMBLY__) */
 
-#endif /* _ASM_X86_CPUFEATURE_H */
+#endif /* ASM_X86__CPUFEATURE_H */

@@ -1,5 +1,5 @@
-#ifndef _X86_SPINLOCK_H_
-#define _X86_SPINLOCK_H_
+#ifndef ASM_X86__SPINLOCK_H
+#define ASM_X86__SPINLOCK_H
 
 #include <asm/atomic.h>
 #include <asm/rwlock.h>
@@ -182,8 +182,6 @@ static __always_inline void __ticket_spin_unlock(raw_spinlock_t *lock)
 }
 #endif
 
-#define __raw_spin_lock_flags(lock, flags) __raw_spin_lock(lock)
-
 #ifdef CONFIG_PARAVIRT
 /*
  * Define virtualization-friendly old-style lock byte lock, for use in
@@ -272,6 +270,13 @@ static __always_inline void __raw_spin_unlock(raw_spinlock_t *lock)
 {
 	__ticket_spin_unlock(lock);
 }
+
+static __always_inline void __raw_spin_lock_flags(raw_spinlock_t *lock,
+						  unsigned long flags)
+{
+	__raw_spin_lock(lock);
+}
+
 #endif	/* CONFIG_PARAVIRT */
 
 static inline void __raw_spin_unlock_wait(raw_spinlock_t *lock)
@@ -366,4 +371,4 @@ static inline void __raw_write_unlock(raw_rwlock_t *rw)
 #define _raw_read_relax(lock)	cpu_relax()
 #define _raw_write_relax(lock)	cpu_relax()
 
-#endif
+#endif /* ASM_X86__SPINLOCK_H */
