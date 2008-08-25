@@ -326,7 +326,11 @@ handle_simple_irq(unsigned int irq, struct irq_desc *desc)
 	if (unlikely(desc->status & IRQ_INPROGRESS))
 		goto out_unlock;
 	desc->status &= ~(IRQ_REPLAY | IRQ_WAITING);
+#ifdef CONFIG_HAVE_DYN_ARRAY
 	kstat_irqs_this_cpu(desc)++;
+#else
+	kstat_irqs_this_cpu(irq)++;
+#endif
 
 	action = desc->action;
 	if (unlikely(!action || (desc->status & IRQ_DISABLED)))
@@ -367,7 +371,11 @@ handle_level_irq(unsigned int irq, struct irq_desc *desc)
 	if (unlikely(desc->status & IRQ_INPROGRESS))
 		goto out_unlock;
 	desc->status &= ~(IRQ_REPLAY | IRQ_WAITING);
+#ifdef CONFIG_HAVE_DYN_ARRAY
 	kstat_irqs_this_cpu(desc)++;
+#else
+	kstat_irqs_this_cpu(irq)++;
+#endif
 
 	/*
 	 * If its disabled or no action available
@@ -414,7 +422,11 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
 		goto out;
 
 	desc->status &= ~(IRQ_REPLAY | IRQ_WAITING);
+#ifdef CONFIG_HAVE_DYN_ARRAY
 	kstat_irqs_this_cpu(desc)++;
+#else
+	kstat_irqs_this_cpu(irq)++;
+#endif
 
 	/*
 	 * If its disabled or no action available
@@ -478,8 +490,11 @@ handle_edge_irq(unsigned int irq, struct irq_desc *desc)
 		mask_ack_irq(desc, irq);
 		goto out_unlock;
 	}
-
+#ifdef CONFIG_HAVE_DYN_ARRAY
 	kstat_irqs_this_cpu(desc)++;
+#else
+	kstat_irqs_this_cpu(irq)++;
+#endif
 
 	/* Start handling the irq */
 	desc->chip->ack(irq);
@@ -534,7 +549,11 @@ handle_percpu_irq(unsigned int irq, struct irq_desc *desc)
 {
 	irqreturn_t action_ret;
 
+#ifdef CONFIG_HAVE_DYN_ARRAY
 	kstat_irqs_this_cpu(desc)++;
+#else
+	kstat_irqs_this_cpu(irq)++;
+#endif
 
 	if (desc->chip->ack)
 		desc->chip->ack(irq);
