@@ -107,8 +107,13 @@ struct kmemcheck_context {
 	bool busy;
 	int balance;
 
-	unsigned long addr1;
-	unsigned long addr2;
+	/*
+	 * There can be at most two memory operands to an instruction, but
+	 * each address can cross a page boundary -- so we may need up to
+	 * four addresses that must be hidden/revealed for each fault.
+	 */
+	unsigned long addr[4];
+	unsigned long n_addrs;
 	unsigned long flags;
 };
 
@@ -121,36 +126,66 @@ bool kmemcheck_active(struct pt_regs *regs)
 	return data->balance > 0;
 }
 
+/* Save an address that needs to be shown/hidden */
+static void kmemcheck_save_addr(unsigned long addr)
+{
+	struct kmemcheck_context *data = &__get_cpu_var(kmemcheck_context);
+
+	data->addr[data->n_addrs++] = addr;
+
+	BUG_ON(data->n_addrs >= ARRAY_SIZE(data->addr));
+}
+
+static unsigned int kmemcheck_show_all(void)
+{
+	struct kmemcheck_context *data = &__get_cpu_var(kmemcheck_context);
+	unsigned int i;
+	unsigned int n;
+
+	n = 0;
+	for (i = 0; i < data->n_addrs; ++i)
+		n += kmemcheck_show_addr(data->addr[i]);
+
+	return n;
+}
+
+static unsigned int kmemcheck_hide_all(void)
+{
+	struct kmemcheck_context *data = &__get_cpu_var(kmemcheck_context);
+	unsigned int i;
+	unsigned int n;
+
+	n = 0;
+	for (i = 0; i < data->n_addrs; ++i)
+		n += kmemcheck_hide_addr(data->addr[i]);
+
+	return n;
+}
+
 /*
  * Called from the #PF handler.
  */
 void kmemcheck_show(struct pt_regs *regs)
 {
 	struct kmemcheck_context *data = &__get_cpu_var(kmemcheck_context);
-	int n;
 
 	BUG_ON(!irqs_disabled());
 
 	kmemcheck_pause_allbutself();
 
 	if (unlikely(data->balance != 0)) {
-		kmemcheck_show_addr(data->addr1);
-		kmemcheck_show_addr(data->addr2);
+		kmemcheck_show_all();
 		kmemcheck_error_save_bug(regs);
 		data->balance = 0;
 		kmemcheck_resume();
 		return;
 	}
 
-	n = 0;
-	n += kmemcheck_show_addr(data->addr1);
-	n += kmemcheck_show_addr(data->addr2);
-
 	/*
 	 * None of the addresses actually belonged to kmemcheck. Note that
 	 * this is not an error.
 	 */
-	if (n == 0) {
+	if (kmemcheck_show_all() == 0) {
 		kmemcheck_resume();
 		return;
 	}
@@ -189,11 +224,9 @@ void kmemcheck_hide(struct pt_regs *regs)
 	}
 
 	if (unlikely(data->balance != 1)) {
-		kmemcheck_show_addr(data->addr1);
-		kmemcheck_show_addr(data->addr2);
+		kmemcheck_show_all();
 		kmemcheck_error_save_bug(regs);
-		data->addr1 = 0;
-		data->addr2 = 0;
+		data->n_addrs = 0;
 		data->balance = 0;
 
 		if (!(data->flags & X86_EFLAGS_TF))
@@ -204,14 +237,10 @@ void kmemcheck_hide(struct pt_regs *regs)
 		return;
 	}
 
-	n = 0;
-	if (kmemcheck_enabled) {
-		n += kmemcheck_hide_addr(data->addr1);
-		n += kmemcheck_hide_addr(data->addr2);
-	} else {
-		n += kmemcheck_show_addr(data->addr1);
-		n += kmemcheck_show_addr(data->addr2);
-	}
+	if (kmemcheck_enabled)
+		n = kmemcheck_hide_all();
+	else
+		n = kmemcheck_show_all();
 
 	if (n == 0) {
 		kmemcheck_resume();
@@ -220,8 +249,7 @@ void kmemcheck_hide(struct pt_regs *regs)
 
 	--data->balance;
 
-	data->addr1 = 0;
-	data->addr2 = 0;
+	data->n_addrs = 0;
 
 	if (!(data->flags & X86_EFLAGS_TF))
 		regs->flags &= ~X86_EFLAGS_TF;
@@ -278,44 +306,24 @@ void kmemcheck_hide_pages(struct page *p, unsigned int n)
 	}
 }
 
-/*
- * Check that an access does not span across two different pages, because
- * that will mess up our shadow lookup.
- */
-static bool check_page_boundary(struct pt_regs *regs,
+/* Access may NOT cross page boundary */
+static void kmemcheck_read_strict(struct pt_regs *regs,
 	unsigned long addr, unsigned int size)
-{
-	if (addr & PAGE_MASK == (addr + size - 1) & PAGE_MASK)
-		return false;
-
-	/*
-	 * XXX: The addr/size data is also really interesting if this
-	 * case ever triggers. We should make a separate class of errors
-	 * for this case. -Vegard
-	 */
-	kmemcheck_error_save_bug(regs);
-	return true;
-}
-
-static void kmemcheck_read(struct pt_regs *regs,
-	unsigned long address, unsigned int size)
 {
 	void *shadow;
 	enum kmemcheck_shadow status;
 
-	shadow = kmemcheck_shadow_lookup(address);
+	shadow = kmemcheck_shadow_lookup(addr);
 	if (!shadow)
 		return;
 
-	if (check_page_boundary(regs, address, size))
-		return;
-
+	kmemcheck_save_addr(addr);
 	status = kmemcheck_shadow_test(shadow, size);
 	if (status == KMEMCHECK_SHADOW_INITIALIZED)
 		return;
 
 	if (kmemcheck_enabled)
-		kmemcheck_error_save(status, address, size, regs);
+		kmemcheck_error_save(status, addr, size, regs);
 
 	if (kmemcheck_enabled == 2)
 		kmemcheck_enabled = 0;
@@ -324,19 +332,58 @@ static void kmemcheck_read(struct pt_regs *regs,
 	kmemcheck_shadow_set(shadow, size);
 }
 
-static void kmemcheck_write(struct pt_regs *regs,
-	unsigned long address, unsigned int size)
+/* Access may cross page boundary */
+static void kmemcheck_read(struct pt_regs *regs,
+	unsigned long addr, unsigned int size)
+{
+	unsigned long page = addr & PAGE_MASK;
+	unsigned long next_addr = addr + size - 1;
+	unsigned long next_page = next_addr & PAGE_MASK;
+
+	if (likely(page == next_page)) {
+		kmemcheck_read_strict(regs, addr, size);
+		return;
+	}
+
+	/*
+	 * What we do is basically to split the access across the
+	 * two pages and handle each part separately. Yes, this means
+	 * that we may now see reads that are 3 + 5 bytes, for
+	 * example (and if both are uninitialized, there will be two
+	 * reports), but it makes the code a lot simpler.
+	 */
+	kmemcheck_read_strict(regs, addr, next_page - addr);
+	kmemcheck_read_strict(regs, next_page, next_addr - next_page);
+}
+
+static void kmemcheck_write_strict(struct pt_regs *regs,
+	unsigned long addr, unsigned int size)
 {
 	void *shadow;
 
-	shadow = kmemcheck_shadow_lookup(address);
+	shadow = kmemcheck_shadow_lookup(addr);
 	if (!shadow)
 		return;
 
-	if (check_page_boundary(regs, address, size))
-		return;
-
+	kmemcheck_save_addr(addr);
 	kmemcheck_shadow_set(shadow, size);
+}
+
+static void kmemcheck_write(struct pt_regs *regs,
+	unsigned long addr, unsigned int size)
+{
+	unsigned long page = addr & PAGE_MASK;
+	unsigned long next_addr = addr + size - 1;
+	unsigned long next_page = next_addr & PAGE_MASK;
+
+	if (likely(page == next_page)) {
+		kmemcheck_write_strict(regs, addr, size);
+		return;
+	}
+
+	/* See comment in kmemcheck_read(). */
+	kmemcheck_write_strict(regs, addr, next_page - addr);
+	kmemcheck_write_strict(regs, next_page, next_addr - next_page);
 }
 
 enum kmemcheck_method {
@@ -387,10 +434,7 @@ static void kmemcheck_access(struct pt_regs *regs,
 			/* XOR */
 		case 6:
 			kmemcheck_write(regs, fallback_address, size);
-			data->addr1 = fallback_address;
-			data->addr2 = 0;
-			data->busy = false;
-			return;
+			goto out;
 
 			/* ADD */
 		case 0:
@@ -416,20 +460,14 @@ static void kmemcheck_access(struct pt_regs *regs,
 		 */
 		kmemcheck_read(regs, regs->si, size);
 		kmemcheck_write(regs, regs->di, size);
-		data->addr1 = regs->si;
-		data->addr2 = regs->di;
-		data->busy = false;
-		return;
+		goto out;
 
 		/* CMPS, CMPSB, CMPSW, CMPSD */
 	case 0xa6:
 	case 0xa7:
 		kmemcheck_read(regs, regs->si, size);
 		kmemcheck_read(regs, regs->di, size);
-		data->addr1 = regs->si;
-		data->addr2 = regs->di;
-		data->busy = false;
-		return;
+		goto out;
 	}
 
 	/*
@@ -440,17 +478,14 @@ static void kmemcheck_access(struct pt_regs *regs,
 	switch (fallback_method) {
 	case KMEMCHECK_READ:
 		kmemcheck_read(regs, fallback_address, size);
-		data->addr1 = fallback_address;
-		data->addr2 = 0;
-		data->busy = false;
-		return;
+		goto out;
 	case KMEMCHECK_WRITE:
 		kmemcheck_write(regs, fallback_address, size);
-		data->addr1 = fallback_address;
-		data->addr2 = 0;
-		data->busy = false;
-		return;
+		goto out;
 	}
+
+out:
+	data->busy = false;
 }
 
 bool kmemcheck_fault(struct pt_regs *regs, unsigned long address,
