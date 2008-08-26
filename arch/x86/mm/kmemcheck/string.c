@@ -48,6 +48,10 @@ static void memset_one_page(void *s, int c, size_t n)
  * A faster implementation of memset() when tracking is enabled. We cannot
  * assume that all pages within the range are tracked, so copying has to be
  * split into page-sized (or smaller, for the ends) chunks.
+ *
+ * This function is NOT supposed to be used directly by modules; instead,
+ * when kmemcheck is enabled, memset() is defined as a macro which will call
+ * kmemcheck_memset(); for that reason is the function exported.
  */
 void *kmemcheck_memset(void *s, int c, size_t n)
 {
