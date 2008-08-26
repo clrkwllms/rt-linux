@@ -115,6 +115,21 @@ struct kmemcheck_context {
 	unsigned long addr[4];
 	unsigned long n_addrs;
 	unsigned long flags;
+
+	/*
+	 * The address of the REP prefix if we are currently emulating a
+	 * REP instruction; otherwise 0.
+	 */
+	const uint8_t *rep;
+
+	/* The address of the REX prefix. */
+	const uint8_t *rex;
+
+	/* Address of the primary instruction opcode. */
+	const uint8_t *insn;
+
+	/* Data size of the instruction that caused a fault. */
+	unsigned int size;
 };
 
 static DEFINE_PER_CPU(struct kmemcheck_context, kmemcheck_context);
@@ -235,6 +250,12 @@ void kmemcheck_hide(struct pt_regs *regs)
 			regs->flags |= X86_EFLAGS_IF;
 		kmemcheck_resume();
 		return;
+	}
+
+	if (data->rep) {
+		/* Save state and take it up later. */
+		regs->ip = (unsigned long) data->rep;
+		data->rep = NULL;
 	}
 
 	if (kmemcheck_enabled)
@@ -394,6 +415,8 @@ enum kmemcheck_method {
 static void kmemcheck_access(struct pt_regs *regs,
 	unsigned long fallback_address, enum kmemcheck_method fallback_method)
 {
+	const uint8_t *rep_prefix;
+	const uint8_t *rex_prefix;
 	const uint8_t *insn;
 	const uint8_t *insn_primary;
 	unsigned int size;
@@ -412,7 +435,56 @@ static void kmemcheck_access(struct pt_regs *regs,
 	insn = (const uint8_t *) regs->ip;
 	insn_primary = kmemcheck_opcode_get_primary(insn);
 
-	size = kmemcheck_opcode_get_size(insn);
+	kmemcheck_opcode_decode(insn, &rep_prefix, &rex_prefix, &size);
+
+	if (rep_prefix && *rep_prefix == 0xf3) {
+		/*
+		 * Due to an incredibly silly Intel bug, REP MOVS and
+		 * REP STOS instructions may generate just one single-
+		 * stepping trap on Pentium 4 CPUs. Other CPUs, including
+		 * AMDs, seem to generate traps after each repetition.
+		 *
+		 * What we do is really a very ugly hack; we increment the
+		 * instruction pointer before returning so that the next
+		 * time around we'll hit an ordinary MOVS or STOS
+		 * instruction. Now, in the debug exception, we know that
+		 * the instruction is really a REP MOVS/STOS, so instead
+		 * of clearing the single-stepping flag, we just continue
+		 * single-stepping the instruction until we're done.
+		 *
+		 * We currently don't handle REP MOVS/STOS instructions
+		 * which have other (additional) instruction prefixes in
+		 * front of REP, so we BUG on those.
+		 */
+		switch (insn_primary[0]) {
+			/* REP MOVS */
+		case 0xa4:
+		case 0xa5:
+			BUG_ON(regs->ip != (unsigned long) rep_prefix);
+
+			kmemcheck_read(regs, regs->si, size);
+			kmemcheck_write(regs, regs->di, size);
+			data->rep = rep_prefix;
+			data->rex = rex_prefix;
+			data->insn = insn_primary;
+			data->size = size;
+			regs->ip = (unsigned long) data->rep + 1;
+			goto out;
+
+			/* REP STOS */
+		case 0xaa:
+		case 0xab:
+			BUG_ON(regs->ip != (unsigned long) rep_prefix);
+
+			kmemcheck_write(regs, regs->di, size);
+			data->rep = rep_prefix;
+			data->rex = rex_prefix;
+			data->insn = insn_primary;
+			data->size = size;
+			regs->ip = (unsigned long) data->rep + 1;
+			goto out;
+		}
+	}
 
 	switch (insn_primary[0]) {
 #ifdef CONFIG_KMEMCHECK_BITOPS_OK
@@ -508,5 +580,64 @@ bool kmemcheck_fault(struct pt_regs *regs, unsigned long address,
 		kmemcheck_access(regs, address, KMEMCHECK_READ);
 
 	kmemcheck_show(regs);
+	return true;
+}
+
+bool kmemcheck_trap(struct pt_regs *regs)
+{
+	struct kmemcheck_context *data = &__get_cpu_var(kmemcheck_context);
+	unsigned long cx;
+#ifdef CONFIG_X86_64
+	uint32_t ecx;
+#endif
+
+	if (!kmemcheck_active(regs))
+		return false;
+
+	if (!data->rep) {
+		kmemcheck_hide(regs);
+		return true;
+	}
+
+	/*
+	 * We're emulating a REP MOVS/STOS instruction. Are we done yet?
+	 * Of course, 64-bit needs to handle CX/ECX/RCX differently...
+	 */
+#ifdef CONFIG_X86_64
+	if (data->rex && data->rex[0] & 0x08) {
+		cx = regs->cx - 1;
+		regs->cx = cx;
+	} else {
+		/* Without REX, 64-bit wants to use %ecx by default. */
+		ecx = regs->cx - 1;
+		cx = ecx;
+		regs->cx = (regs->cx & ~((1UL << 32) - 1)) | ecx;
+	}
+#else
+	cx = regs->cx - 1;
+	regs->cx = cx;
+#endif
+	if (cx) {
+		data->n_addrs = 0;
+
+		switch (data->insn[0]) {
+		case 0xa4:
+		case 0xa5:
+			kmemcheck_read(regs, regs->si, data->size);
+			kmemcheck_write(regs, regs->di, data->size);
+			break;
+		case 0xaa:
+		case 0xab:
+			kmemcheck_write(regs, regs->di, data->size);
+			break;
+		}
+
+		/* Without the REP prefix, we have to do this ourselves... */
+		regs->ip = (unsigned long) data->rep + 1;
+		return true;
+	}
+
+	/* We're done. */
+	kmemcheck_hide(regs);
 	return true;
 }

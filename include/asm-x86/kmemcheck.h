@@ -12,6 +12,7 @@ void kmemcheck_hide(struct pt_regs *regs);
 
 bool kmemcheck_fault(struct pt_regs *regs,
 	unsigned long address, unsigned long error_code);
+bool kmemcheck_trap(struct pt_regs *regs);
 #else
 static inline bool kmemcheck_active(struct pt_regs *regs)
 {
@@ -28,6 +29,11 @@ static inline void kmemcheck_hide(struct pt_regs *regs)
 
 static inline bool kmemcheck_fault(struct pt_regs *regs,
 	unsigned long address, unsigned long error_code)
+{
+	return false;
+}
+
+static inline bool kmemcheck_trap(struct pt_regs *regs)
 {
 	return false;
 }

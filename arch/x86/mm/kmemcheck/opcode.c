@@ -27,22 +27,35 @@ static bool opcode_is_rex_prefix(uint8_t b)
  * that we care about. Moreover, the ones who invented this instruction set
  * should be shot.
  */
-unsigned int kmemcheck_opcode_get_size(const uint8_t *op)
+void kmemcheck_opcode_decode(const uint8_t *op,
+	const uint8_t **rep_prefix, const uint8_t **rex_prefix,
+	unsigned int *size)
 {
 	/* Default operand size */
 	int operand_size_override = 4;
 
+	*rep_prefix = NULL;
+
 	/* prefixes */
 	for (; opcode_is_prefix(*op); ++op) {
+		if (*op == 0xf2 || *op == 0xf3)
+			*rep_prefix = op;
 		if (*op == 0x66)
 			operand_size_override = 2;
 	}
 
+	*rex_prefix = NULL;
+
 #ifdef CONFIG_X86_64
 	/* REX prefix */
 	if (opcode_is_rex_prefix(*op)) {
-		if (*op & 0x08)
-			return 8;
+		*rex_prefix = op;
+
+		if (*op & 0x08) {
+			*size = 8;
+			return;
+		}
+
 		++op;
 	}
 #endif
@@ -51,13 +64,18 @@ unsigned int kmemcheck_opcode_get_size(const uint8_t *op)
 	if (*op == 0x0f) {
 		++op;
 
-		if (*op == 0xb6)
-			return 1;
-		if (*op == 0xb7)
-			return 2;
+		if (*op == 0xb6) {
+			*size = 1;
+			return;
+		}
+
+		if (*op == 0xb7) {
+			*size = 2;
+			return;
+		}
 	}
 
-	return (*op & 1) ? operand_size_override : 1;
+	*size = (*op & 1) ? operand_size_override : 1;
 }
 
 const uint8_t *kmemcheck_opcode_get_primary(const uint8_t *op)
