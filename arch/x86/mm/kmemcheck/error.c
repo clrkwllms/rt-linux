@@ -1,5 +1,6 @@
 #include <linux/interrupt.h>
 #include <linux/kdebug.h>
+#include <linux/kmemcheck.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/ptrace.h>
@@ -36,6 +37,7 @@ struct kmemcheck_error {
 
 	/* We compress it to a char. */
 	unsigned char		shadow_copy[SHADOW_COPY_SIZE];
+	unsigned char		memory_copy[SHADOW_COPY_SIZE];
 };
 
 /*
@@ -91,7 +93,8 @@ void kmemcheck_error_save(enum kmemcheck_shadow state,
 	static unsigned long prev_ip;
 
 	struct kmemcheck_error *e;
-	enum shadow *shadow_copy;
+	void *shadow_copy;
+	void *memory_copy;
 
 	/* Don't report several adjacent errors from the same EIP. */
 	if (regs->ip == prev_ip)
@@ -124,6 +127,11 @@ void kmemcheck_error_save(enum kmemcheck_shadow state,
 	BUG_ON(!shadow_copy);
 
 	memcpy(e->shadow_copy, shadow_copy, SHADOW_COPY_SIZE);
+
+	kmemcheck_show_addr(address);
+	memory_copy = (void *) (address & ~(SHADOW_COPY_SIZE - 1));
+	memcpy(e->memory_copy, memory_copy, SHADOW_COPY_SIZE);
+	kmemcheck_hide_addr(address);
 
 	tasklet_hi_schedule_first(&kmemcheck_tasklet);
 }
@@ -184,15 +192,20 @@ void kmemcheck_error_recall(void)
 			(void *) e->address);
 
 		printk(KERN_INFO);
+		for (i = 0; i < SHADOW_COPY_SIZE; ++i)
+			printk("%02x", e->memory_copy[i]);
+		printk("\n");
+
+		printk(KERN_INFO);
 		for (i = 0; i < SHADOW_COPY_SIZE; ++i) {
 			if (e->shadow_copy[i] < ARRAY_SIZE(short_desc))
-				printk("%c", short_desc[e->shadow_copy[i]]);
+				printk(" %c", short_desc[e->shadow_copy[i]]);
 			else
-				printk("?");
+				printk(" ?");
 		}
 		printk("\n");
-		printk(KERN_INFO "%*c\n",
-			1 + (int) (e->address & (SHADOW_COPY_SIZE - 1)), '^');
+		printk(KERN_INFO "%*c\n", 2 + 2
+			* (int) (e->address & (SHADOW_COPY_SIZE - 1)), '^');
 		break;
 	case KMEMCHECK_ERROR_BUG:
 		printk(KERN_EMERG "kmemcheck: Fatal error\n");

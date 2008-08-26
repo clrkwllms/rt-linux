@@ -357,7 +357,7 @@ config KMEMCHECK_SHADOW_COPY_SHIFT
 	int "kmemcheck: shadow copy size (5 => 32 bytes, 6 => 64 bytes)"
 	depends on KMEMCHECK
 	range 2 8
-	default 6
+	default 5
 	help
 	  Select the number of shadow bytes to save along with each entry of
 	  the queue. These bytes indicate what parts of an allocation are
