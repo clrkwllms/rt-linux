@@ -65,8 +65,14 @@ void kmemcheck_free_shadow(struct kmem_cache *s, struct page *page, int order)
 void kmemcheck_slab_alloc(struct kmem_cache *s, gfp_t gfpflags, void *object,
 			  size_t size)
 {
+	/*
+	 * Has already been memset(), which initializes the shadow for us
+	 * as well.
+	 */
 	if (gfpflags & __GFP_ZERO)
 		return;
+
+	/* No need to initialize the shadow of a non-tracked slab. */
 	if (s->flags & SLAB_NOTRACK)
 		return;
 
