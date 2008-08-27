@@ -578,13 +578,13 @@ err_out:
 	return retval;
 }
 
+#ifdef MODULE
 static void cleanup_card(struct net_device *dev)
 {
 	mca_set_adapter_procfn(((struct priv *) (dev->priv))->slot, NULL, NULL);
 	release_region(dev->base_addr, ELMC_IO_EXTENT);
 }
-
-#ifndef MODULE
+#else
 struct net_device * __init elmc_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(struct priv));
