@@ -355,20 +355,6 @@ static struct notifier_block esb_notifier = {
 };
 
 /*
- * Data for PCI driver interface
- *
- * This data only exists for exporting the supported
- * PCI ids via MODULE_DEVICE_TABLE.  We do not actually
- * register a pci_driver, because someone else might one day
- * want to register another driver on the same PCI id.
- */
-static struct pci_device_id esb_pci_tbl[] = {
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ESB_9), },
-	{ 0, },                 /* End of list */
-};
-MODULE_DEVICE_TABLE(pci, esb_pci_tbl);
-
-/*
  *      Init & exit routines
  */
 
