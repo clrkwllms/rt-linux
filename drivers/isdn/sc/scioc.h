@@ -86,7 +86,7 @@ typedef struct {
 	char load_ver[11];
 	char proc_ver[11];
 	int iobase;
-	long rambase;
+	u8 __iomem *rambase;
 	char irq;
 	long ramsize;
 	char interface;
