@@ -82,7 +82,7 @@ typedef struct {
 	int ioport[MAX_IO_REGS];	/* Index to I/O ports */
 	int shmem_pgport;		/* port for the exp mem page reg. */
 	int shmem_magic;		/* adapter magic number */
-	unsigned int rambase;		/* Shared RAM base address */
+	u8 __iomem *rambase;		/* Shared RAM base address */
 	unsigned int ramsize;		/* Size of shared memory */
 	RspMessage async_msg;		/* Async response message */
 	int want_async_messages;	/* Snoop the Q ? */

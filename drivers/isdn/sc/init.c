@@ -27,7 +27,7 @@ static const char *boardname[] = { "DataCommute/BRI", "DataCommute/PRI", "TeleCo
 /* insmod set parameters */
 static unsigned int io[] = {0,0,0,0};
 static unsigned char irq[] = {0,0,0,0};
-static unsigned long ram[] = {0,0,0,0};
+static u8 __iomem * ram[] = {0,0,0,0};
 static int do_reset = 0;
 
 module_param_array(io, int, NULL, 0);
@@ -35,7 +35,7 @@ module_param_array(irq, int, NULL, 0);
 module_param_array(ram, int, NULL, 0);
 module_param(do_reset, bool, 0);
 
-static int identify_board(unsigned long, unsigned int);
+static int identify_board(u8 __iomem *rambase, unsigned int iobase);
 
 static int __init sc_init(void)
 {
@@ -153,7 +153,7 @@ static int __init sc_init(void)
 			outb(0xFF, io[b] + RESET_OFFSET);
 			msleep_interruptible(10000);
 		}
-		pr_debug("RAM Base for board %d is 0x%lx, %s probe\n", b,
+		pr_debug("RAM Base for board %d is %p, %s probe\n", b,
 			ram[b], ram[b] == 0 ? "will" : "won't");
 
 		if(ram[b]) {
@@ -162,10 +162,10 @@ static int __init sc_init(void)
 			 * Just look for a signature and ID the
 			 * board model
 			 */
-			if(request_region(ram[b], SRAM_PAGESIZE, "sc test")) {
-				pr_debug("request_region for RAM base 0x%lx succeeded\n", ram[b]);
+			if (request_region((unsigned long)ram[b], SRAM_PAGESIZE, "sc test")) {
+				pr_debug("request_region for RAM base %p succeeded\n", ram[b]);
 			 	model = identify_board(ram[b], io[b]);
-				release_region(ram[b], SRAM_PAGESIZE);
+				release_region((unsigned long)ram[b], SRAM_PAGESIZE);
 			}
 		}
 		else {
@@ -177,12 +177,12 @@ static int __init sc_init(void)
 				pr_debug("Checking RAM address 0x%x...\n", i);
 				if(request_region(i, SRAM_PAGESIZE, "sc test")) {
 					pr_debug("  request_region succeeded\n");
-					model = identify_board(i, io[b]);
+					model = identify_board((u8 __iomem *)i, io[b]);
 					release_region(i, SRAM_PAGESIZE);
 					if (model >= 0) {
 						pr_debug("  Identified a %s\n",
 							boardname[model]);
-						ram[b] = i;
+						ram[b] = (u8 __iomem *)i;
 						break;
 					}
 					pr_debug("  Unidentifed or inaccessible\n");
@@ -199,7 +199,7 @@ static int __init sc_init(void)
 			 * Nope, there was no place in RAM for the
 			 * board, or it couldn't be identified
 			 */
-			 pr_debug("Failed to find an adapter at 0x%lx\n", ram[b]);
+			 pr_debug("Failed to find an adapter at %p\n", ram[b]);
 			 continue;
 		}
 
@@ -222,7 +222,7 @@ static int __init sc_init(void)
 			features = BRI_FEATURES;
 			break;
 		}
-		switch(ram[b] >> 12 & 0x0F) {
+		switch((unsigned long)ram[b] >> 12 & 0x0F) {
 		case 0x0:
 			pr_debug("RAM Page register set to EXP_PAGE0\n");
 			pgport = EXP_PAGE0;
@@ -358,10 +358,10 @@ static int __init sc_init(void)
 		pr_debug("Requesting I/O Port %#x\n",
 				sc_adapter[cinst]->ioport[IRQ_SELECT]);
 		sc_adapter[cinst]->rambase = ram[b];
-		request_region(sc_adapter[cinst]->rambase, SRAM_PAGESIZE,
-				interface->id);
+		request_region((unsigned long)sc_adapter[cinst]->rambase,
+				SRAM_PAGESIZE, interface->id);
 
-		pr_info("  %s (%d) - %s %d channels IRQ %d, I/O Base 0x%x, RAM Base 0x%lx\n", 
+		pr_info("  %s (%d) - %s %d channels IRQ %d, I/O Base 0x%x, RAM Base %p\n", 
 			sc_adapter[cinst]->devicename,
 			sc_adapter[cinst]->driverId,
 			boardname[model], channels, irq[b], io[b], ram[b]);
@@ -400,7 +400,7 @@ static void __exit sc_exit(void)
 		/*
 		 * Release shared RAM
 		 */
-		release_region(sc_adapter[i]->rambase, SRAM_PAGESIZE);
+		release_region((unsigned long)sc_adapter[i]->rambase, SRAM_PAGESIZE);
 
 		/*
 		 * Release the IRQ
@@ -434,7 +434,7 @@ static void __exit sc_exit(void)
 	pr_info("SpellCaster ISA ISDN Adapter Driver Unloaded.\n");
 }
 
-static int identify_board(unsigned long rambase, unsigned int iobase)
+static int identify_board(u8 __iomem *rambase, unsigned int iobase)
 {
 	unsigned int pgport;
 	unsigned long sig;
@@ -444,15 +444,15 @@ static int identify_board(unsigned long rambase, unsigned int iobase)
 	HWConfig_pl hwci;
 	int x;
 
-	pr_debug("Attempting to identify adapter @ 0x%lx io 0x%x\n",
+	pr_debug("Attempting to identify adapter @ %p io 0x%x\n",
 		rambase, iobase);
 
 	/*
 	 * Enable the base pointer
 	 */
-	outb(rambase >> 12, iobase + 0x2c00);
+	outb((unsigned long)rambase >> 12, iobase + 0x2c00);
 
-	switch(rambase >> 12 & 0x0F) {
+	switch((unsigned long)rambase >> 12 & 0x0F) {
 	case 0x0:
 		pgport = iobase + PG0_OFFSET;
 		pr_debug("Page Register offset is 0x%x\n", PG0_OFFSET);
@@ -473,7 +473,7 @@ static int identify_board(unsigned long rambase, unsigned int iobase)
 		pr_debug("Page Register offset is 0x%x\n", PG3_OFFSET);
 		break;
 	default:
-		pr_debug("Invalid rambase 0x%lx\n", rambase);
+		pr_debug("Invalid rambase %p\n", rambase);
 		return -1;
 	}
 
