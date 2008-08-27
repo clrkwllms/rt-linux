@@ -938,18 +938,6 @@ module_param(ncr_53c400a, int, 0);
 module_param(dtc_3181e, int, 0);
 MODULE_LICENSE("GPL");
 
-
-static struct isapnp_device_id id_table[] __devinitdata = {
-	{
-	 ISAPNP_ANY_ID, ISAPNP_ANY_ID,
-	 ISAPNP_VENDOR('D', 'T', 'C'), ISAPNP_FUNCTION(0x436e),
-	 0},
-	{0}
-};
-
-MODULE_DEVICE_TABLE(isapnp, id_table);
-
-
 __setup("ncr5380=", do_NCR5380_setup);
 __setup("ncr53c400=", do_NCR53C400_setup);
 __setup("ncr53c400a=", do_NCR53C400A_setup);
