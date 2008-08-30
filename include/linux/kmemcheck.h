@@ -4,6 +4,38 @@
 #include <linux/mm_types.h>
 #include <linux/types.h>
 
+/*
+ * How to use: If you have a struct using bitfields, for example
+ *
+ *     struct a {
+ *             int x:8, y:8;
+ *     };
+ *
+ * then this should be rewritten as
+ *
+ *     struct a {
+ *             kmemcheck_define_bitfield(flags, {
+ *                     int x:8, y:8;
+ *             });
+ *     };
+ *
+ * Now the "flags" member may be used to refer to the bitfield (and things
+ * like &x.flags is allowed). As soon as the struct is allocated, the bit-
+ * fields should be annotated:
+ *
+ *     struct a *a = kmalloc(sizeof(struct a), GFP_KERNEL);
+ *     if (a)
+ *             kmemcheck_annotate_bitfield(a->flags);
+ *
+ * Note: We provide the same definitions for both kmemcheck and non-
+ * kmemcheck kernels. This makes it harder to introduce accidental errors.
+ */
+#define kmemcheck_define_bitfield(name, fields...)	\
+	union {						\
+		struct fields name;			\
+		struct fields;				\
+	};
+
 #ifdef CONFIG_KMEMCHECK
 extern int kmemcheck_enabled;
 
@@ -32,6 +64,11 @@ void kmemcheck_mark_uninitialized_pages(struct page *p, unsigned int n);
 
 int kmemcheck_show_addr(unsigned long address);
 int kmemcheck_hide_addr(unsigned long address);
+
+#define kmemcheck_annotate_bitfield(field)		\
+	do {						\
+		memset(&(field), 0, sizeof(field));	\
+	} while (0)
 #else
 #define kmemcheck_enabled 0
 
@@ -81,6 +118,8 @@ static inline void kmemcheck_mark_initialized(void *address, unsigned int n)
 static inline void kmemcheck_mark_freed(void *address, unsigned int n)
 {
 }
+
+#define kmemcheck_annotate_bitfield(field) do { } while (0)
 #endif /* CONFIG_KMEMCHECK */
 
 #endif /* LINUX_KMEMCHECK_H */
