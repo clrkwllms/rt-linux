@@ -1,8 +1,6 @@
 /* Driver for USB Mass Storage compliant devices
  * Unusual Devices File
  *
- * $Id: unusual_devs.h,v 1.32 2002/02/25 02:41:24 mdharm Exp $
- *
  * Current development and maintenance by:
  *   (c) 2000-2002 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
  *
@@ -227,6 +225,13 @@ UNUSUAL_DEV(  0x0421, 0x0495, 0x0370, 0x0370,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MAX_SECTORS_64 ),
 
+/* Reported by Cedric Godin <cedric@belbone.be> */
+UNUSUAL_DEV(  0x0421, 0x04b9, 0x0551, 0x0551,
+		"Nokia",
+		"5300",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
+
 /* Reported by Olaf Hering <olh@suse.de> from novell bug #105878 */
 UNUSUAL_DEV(  0x0424, 0x0fdc, 0x0210, 0x0210,
 		"SMSC",
@@ -358,14 +363,14 @@ UNUSUAL_DEV(  0x04b0, 0x040f, 0x0100, 0x0200,
 		US_FL_FIX_CAPACITY),
 
 /* Reported by Emil Larsson <emil@swip.net> */
-UNUSUAL_DEV(  0x04b0, 0x0411, 0x0100, 0x0110,
+UNUSUAL_DEV(  0x04b0, 0x0411, 0x0100, 0x0111,
 		"NIKON",
 		"NIKON DSC D80",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY),
 
 /* Reported by Ortwin Glueck <odi@odi.ch> */
-UNUSUAL_DEV(  0x04b0, 0x0413, 0x0110, 0x0110,
+UNUSUAL_DEV(  0x04b0, 0x0413, 0x0110, 0x0111,
 		"NIKON",
 		"NIKON DSC D40",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
@@ -402,10 +407,18 @@ UNUSUAL_DEV(  0x04a5, 0x3010, 0x0100, 0x0100,
 		US_FL_IGNORE_RESIDUE ),
 
 #ifdef CONFIG_USB_STORAGE_CYPRESS_ATACB
+/* CY7C68300 : support atacb */
 UNUSUAL_DEV(  0x04b4, 0x6830, 0x0000, 0x9999,
 		"Cypress",
 		"Cypress AT2LP",
-		US_SC_CYP_ATACB, US_PR_BULK, NULL,
+		US_SC_CYP_ATACB, US_PR_DEVICE, NULL,
+		0),
+
+/* CY7C68310 : support atacb and atacb2 */
+UNUSUAL_DEV(  0x04b4, 0x6831, 0x0000, 0x9999,
+		"Cypress",
+		"Cypress ISD-300LP",
+		US_SC_CYP_ATACB, US_PR_DEVICE, NULL,
 		0),
 #endif
 
@@ -1179,6 +1192,13 @@ UNUSUAL_DEV(  0x07c4, 0xa400, 0x0000, 0xffff,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
+/* Reported by Rauch Wolke <rauchwolke@gmx.net> */
+UNUSUAL_DEV(  0x07c4, 0xa4a5, 0x0000, 0xffff,
+		"Simple Tech/Datafab",
+		"CF+SM Reader",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* Casio QV 2x00/3x00/4000/8000 digital still cameras are not conformant
  * to the USB storage specification in two ways:
  * - They tell us they are using transport protocol CBI. In reality they
@@ -1214,6 +1234,17 @@ UNUSUAL_DEV(  0x084d, 0x0011, 0x0110, 0x0110,
 		"DC2MEGA",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_BULK32),
+
+/* Andrew Lunn <andrew@lunn.ch>
+ * PanDigital Digital Picture Frame. Does not like ALLOW_MEDIUM_REMOVAL
+ * on LUN 4.
+ * Note: Vend:Prod clash with "Ltd Maxell WS30 Slim Digital Camera"
+*/
+UNUSUAL_DEV(  0x0851, 0x1543, 0x0200, 0x0200,
+		"PanDigital",
+		"Photo Frame",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_NOT_LOCKABLE),
 
 /* Andrew Lunn <andrew@lunn.ch>
  * PanDigital Digital Picture Frame. Does not like ALLOW_MEDIUM_REMOVAL
@@ -1522,7 +1553,7 @@ UNUSUAL_DEV(  0x0fce, 0xe031, 0x0000, 0x0000,
 		"Sony Ericsson",
 		"M600i",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
+		US_FL_IGNORE_RESIDUE | US_FL_FIX_CAPACITY ),
 
 /* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
  * Tested on hardware version 1.10.
@@ -1545,6 +1576,7 @@ UNUSUAL_DEV(  0x10d6, 0x2200, 0x0100, 0x0100,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		0),
 
+#ifdef CONFIG_USB_STORAGE_SIERRA
 /* Reported by Kevin Lloyd <linux@sierrawireless.com>
  * Entry is needed for the initializer function override,
  * which instructs the device to load as a modem
@@ -1553,8 +1585,9 @@ UNUSUAL_DEV(  0x10d6, 0x2200, 0x0100, 0x0100,
 UNUSUAL_DEV(  0x1199, 0x0fff, 0x0000, 0x9999,
 		"Sierra Wireless",
 		"USB MMC Storage",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_IGNORE_DEVICE),
+		US_SC_DEVICE, US_PR_DEVICE, sierra_ms_init,
+		0),
+#endif
 
 /* Reported by Jaco Kroon <jaco@kroon.co.za>
  * The usb-storage module found on the Digitech GNX4 (and supposedly other
@@ -1716,10 +1749,21 @@ UNUSUAL_DEV(  0x22b8, 0x3010, 0x0001, 0x0001,
 /*
  * Patch by Pete Zaitcev <zaitcev@redhat.com>
  * Report by Mark Patton. Red Hat bz#208928.
+ * Added support for rev 0x0002 (Motorola ROKR W5)
+ * by Javier Smaldone <javier@smaldone.com.ar>
  */
-UNUSUAL_DEV(  0x22b8, 0x4810, 0x0001, 0x0001,
+UNUSUAL_DEV(  0x22b8, 0x4810, 0x0001, 0x0002,
 		"Motorola",
-		"RAZR V3i",
+		"RAZR V3i/ROKR W5",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY),
+
+/*
+ * Patch by Jost Diederichs <jost@qdusa.com>
+ */
+UNUSUAL_DEV(0x22b8, 0x6410, 0x0001, 0x9999,
+		"Motorola Inc.",
+		"Motorola Phone (RAZRV3xx)",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY),
 
@@ -1747,6 +1791,13 @@ UNUSUAL_DEV(  0x2770, 0x915d, 0x0010, 0x0010,
 		"Pixtreme",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY ),
+
+/* Reported by Andrey Rahmatullin <wrar@altlinux.org> */
+UNUSUAL_DEV(  0x4102, 0x1020, 0x0100,  0x0100,
+		"iRiver",
+		"MP3 T10",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
 
 /*
  * David Härdeman <david@2gen.com>

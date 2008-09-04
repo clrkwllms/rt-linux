@@ -22,8 +22,8 @@
 #include <linux/irq.h>
 #include <asm/dma.h>
 
-#include <asm/arch/pxa-regs.h>
-#include <asm/arch/pxa3xx_nand.h>
+#include <mach/pxa-regs.h>
+#include <mach/pxa3xx_nand.h>
 
 #define	CHIP_DELAY_TIMEOUT	(2 * HZ/10)
 
@@ -1216,7 +1216,7 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
 
 	clk_enable(info->clk);
 
-	return pxa3xx_nand_config_flash(info);
+	return pxa3xx_nand_config_flash(info, info->flash_info);
 }
 #else
 #define pxa3xx_nand_suspend	NULL

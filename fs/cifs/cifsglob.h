@@ -27,7 +27,7 @@
 #define MAX_SES_INFO 2
 #define MAX_TCON_INFO 4
 
-#define MAX_TREE_SIZE 2 + MAX_SERVER_SIZE + 1 + MAX_SHARE_SIZE + 1
+#define MAX_TREE_SIZE (2 + MAX_SERVER_SIZE + 1 + MAX_SHARE_SIZE + 1)
 #define MAX_SERVER_SIZE 15
 #define MAX_SHARE_SIZE  64	/* used to be 20, this should still be enough */
 #define MAX_USERNAME_SIZE 32	/* 32 is to allow for 15 char names + null
@@ -80,7 +80,8 @@ enum securityEnum {
 	NTLMv2,			/* Legacy NTLM auth with NTLMv2 hash */
 	RawNTLMSSP,		/* NTLMSSP without SPNEGO */
 	NTLMSSP,		/* NTLMSSP via SPNEGO */
-	Kerberos		/* Kerberos via SPNEGO */
+	Kerberos,		/* Kerberos via SPNEGO */
+	MSKerberos,		/* MS Kerberos via SPNEGO */
 };
 
 enum protocolEnum {
@@ -333,7 +334,6 @@ struct cifsFileInfo {
 	bool messageMode:1;	/* for pipes: message vs byte mode */
 	atomic_t wrtPending;   /* handle in use - defer close */
 	struct semaphore fh_sem; /* prevents reopen race after dead ses*/
-	char *search_resume_name; /* BB removeme BB */
 	struct cifs_search_info srch_inf;
 };
 
@@ -538,8 +538,8 @@ require use of the stronger protocol */
 #endif /* WEAK_PW_HASH */
 #define   CIFSSEC_MUST_SEAL	0x40040 /* not supported yet */
 
-#define   CIFSSEC_DEF  CIFSSEC_MAY_SIGN | CIFSSEC_MAY_NTLM | CIFSSEC_MAY_NTLMV2
-#define   CIFSSEC_MAX  CIFSSEC_MUST_SIGN | CIFSSEC_MUST_NTLMV2
+#define   CIFSSEC_DEF (CIFSSEC_MAY_SIGN | CIFSSEC_MAY_NTLM | CIFSSEC_MAY_NTLMV2)
+#define   CIFSSEC_MAX (CIFSSEC_MUST_SIGN | CIFSSEC_MUST_NTLMV2)
 #define   CIFSSEC_AUTH_MASK (CIFSSEC_MAY_NTLM | CIFSSEC_MAY_NTLMV2 | CIFSSEC_MAY_LANMAN | CIFSSEC_MAY_PLNTXT | CIFSSEC_MAY_KRB5)
 /*
  *****************************************************************
@@ -626,7 +626,7 @@ GLOBAL_EXTERN atomic_t tcpSesAllocCount;
 GLOBAL_EXTERN atomic_t tcpSesReconnectCount;
 GLOBAL_EXTERN atomic_t tconInfoReconnectCount;
 
-/* Various Debug counters to remove someday (BB) */
+/* Various Debug counters */
 GLOBAL_EXTERN atomic_t bufAllocCount;    /* current number allocated  */
 #ifdef CONFIG_CIFS_STATS2
 GLOBAL_EXTERN atomic_t totBufAllocCount; /* total allocated over all time */

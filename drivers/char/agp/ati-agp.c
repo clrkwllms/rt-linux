@@ -287,10 +287,10 @@ static int ati_insert_memory(struct agp_memory * mem,
 		j++;
 	}
 
-	if (mem->is_flushed == FALSE) {
+	if (!mem->is_flushed) {
 		/*CACHE_FLUSH(); */
 		global_cache_flush();
-		mem->is_flushed = TRUE;
+		mem->is_flushed = true;
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
@@ -458,6 +458,10 @@ static struct agp_device_ids ati_agp_device_ids[] __devinitdata =
 		.chipset_name	= "IGP9100/M",
 	},
 	{
+		.device_id	= PCI_DEVICE_ID_ATI_RS350_133,
+		.chipset_name	= "IGP9000/M",
+	},
+	{
 		.device_id	= PCI_DEVICE_ID_ATI_RS350_200,
 		.chipset_name	= "IGP9100/M",
 	},
@@ -482,8 +486,8 @@ static int __devinit agp_ati_probe(struct pci_dev *pdev,
 			goto found;
 	}
 
-	printk(KERN_ERR PFX
-	     "Unsupported Ati chipset (device id: %04x)\n", pdev->device);
+	dev_err(&pdev->dev, "unsupported Ati chipset [%04x/%04x])\n",
+		pdev->vendor, pdev->device);
 	return -ENODEV;
 
 found:
@@ -496,8 +500,7 @@ found:
 
 	bridge->driver = &ati_generic_bridge;
 
-	printk(KERN_INFO PFX "Detected Ati %s chipset\n",
-			devs[j].chipset_name);
+	dev_info(&pdev->dev, "Ati %s chipset\n", devs[j].chipset_name);
 
 	/* Fill in the mode register */
 	pci_read_config_dword(pdev,

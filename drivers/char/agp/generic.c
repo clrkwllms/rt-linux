@@ -96,13 +96,13 @@ EXPORT_SYMBOL(agp_flush_chipset);
 void agp_alloc_page_array(size_t size, struct agp_memory *mem)
 {
 	mem->memory = NULL;
-	mem->vmalloc_flag = 0;
+	mem->vmalloc_flag = false;
 
 	if (size <= 2*PAGE_SIZE)
 		mem->memory = kmalloc(size, GFP_KERNEL | __GFP_NORETRY);
 	if (mem->memory == NULL) {
 		mem->memory = vmalloc(size);
-		mem->vmalloc_flag = 1;
+		mem->vmalloc_flag = true;
 	}
 }
 EXPORT_SYMBOL(agp_alloc_page_array);
@@ -188,7 +188,7 @@ void agp_free_memory(struct agp_memory *curr)
 	if (curr == NULL)
 		return;
 
-	if (curr->is_bound == TRUE)
+	if (curr->is_bound)
 		agp_unbind_memory(curr);
 
 	if (curr->type >= AGP_USER_TYPES) {
@@ -202,10 +202,13 @@ void agp_free_memory(struct agp_memory *curr)
 	}
 	if (curr->page_count != 0) {
 		for (i = 0; i < curr->page_count; i++) {
-			curr->bridge->driver->agp_destroy_page(gart_to_virt(curr->memory[i]), AGP_PAGE_DESTROY_UNMAP);
+			curr->memory[i] = (unsigned long)gart_to_virt(curr->memory[i]);
+			curr->bridge->driver->agp_destroy_page((void *)curr->memory[i],
+							       AGP_PAGE_DESTROY_UNMAP);
 		}
 		for (i = 0; i < curr->page_count; i++) {
-			curr->bridge->driver->agp_destroy_page(gart_to_virt(curr->memory[i]), AGP_PAGE_DESTROY_FREE);
+			curr->bridge->driver->agp_destroy_page((void *)curr->memory[i],
+							       AGP_PAGE_DESTROY_FREE);
 		}
 	}
 	agp_free_key(curr->key);
@@ -411,21 +414,25 @@ int agp_bind_memory(struct agp_memory *curr, off_t pg_start)
 	if (curr == NULL)
 		return -EINVAL;
 
-	if (curr->is_bound == TRUE) {
+	if (curr->is_bound) {
 		printk(KERN_INFO PFX "memory %p is already bound!\n", curr);
 		return -EINVAL;
 	}
-	if (curr->is_flushed == FALSE) {
+	if (!curr->is_flushed) {
 		curr->bridge->driver->cache_flush();
-		curr->is_flushed = TRUE;
+		curr->is_flushed = true;
 	}
 	ret_val = curr->bridge->driver->insert_memory(curr, pg_start, curr->type);
 
 	if (ret_val != 0)
 		return ret_val;
 
-	curr->is_bound = TRUE;
+	curr->is_bound = true;
 	curr->pg_start = pg_start;
+	spin_lock(&agp_bridge->mapped_lock);
+	list_add(&curr->mapped_list, &agp_bridge->mapped_list);
+	spin_unlock(&agp_bridge->mapped_lock);
+
 	return 0;
 }
 EXPORT_SYMBOL(agp_bind_memory);
@@ -446,7 +453,7 @@ int agp_unbind_memory(struct agp_memory *curr)
 	if (curr == NULL)
 		return -EINVAL;
 
-	if (curr->is_bound != TRUE) {
+	if (!curr->is_bound) {
 		printk(KERN_INFO PFX "memory %p was not bound!\n", curr);
 		return -EINVAL;
 	}
@@ -456,11 +463,35 @@ int agp_unbind_memory(struct agp_memory *curr)
 	if (ret_val != 0)
 		return ret_val;
 
-	curr->is_bound = FALSE;
+	curr->is_bound = false;
 	curr->pg_start = 0;
+	spin_lock(&curr->bridge->mapped_lock);
+	list_del(&curr->mapped_list);
+	spin_unlock(&curr->bridge->mapped_lock);
 	return 0;
 }
 EXPORT_SYMBOL(agp_unbind_memory);
+
+/**
+ *	agp_rebind_emmory  -  Rewrite the entire GATT, useful on resume
+ */
+int agp_rebind_memory(void)
+{
+	struct agp_memory *curr;
+	int ret_val = 0;
+
+	spin_lock(&agp_bridge->mapped_lock);
+	list_for_each_entry(curr, &agp_bridge->mapped_list, mapped_list) {
+		ret_val = curr->bridge->driver->insert_memory(curr,
+							      curr->pg_start,
+							      curr->type);
+		if (ret_val != 0)
+			break;
+	}
+	spin_unlock(&agp_bridge->mapped_lock);
+	return ret_val;
+}
+EXPORT_SYMBOL(agp_rebind_memory);
 
 /* End - Routines for handling swapping of agp_memory into the GATT */
 
@@ -754,7 +785,7 @@ u32 agp_collect_device_status(struct agp_bridge_data *bridge, u32 requested_mode
 EXPORT_SYMBOL(agp_collect_device_status);
 
 
-void agp_device_command(u32 bridge_agpstat, int agp_v3)
+void agp_device_command(u32 bridge_agpstat, bool agp_v3)
 {
 	struct pci_dev *device = NULL;
 	int mode;
@@ -768,8 +799,8 @@ void agp_device_command(u32 bridge_agpstat, int agp_v3)
 		if (!agp)
 			continue;
 
-		printk(KERN_INFO PFX "Putting AGP V%d device at %s into %dx mode\n",
-				agp_v3 ? 3 : 2, pci_name(device), mode);
+		dev_info(&device->dev, "putting AGP V%d device into %dx mode\n",
+			 agp_v3 ? 3 : 2, mode);
 		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, bridge_agpstat);
 	}
 }
@@ -797,10 +828,8 @@ void agp_generic_enable(struct agp_bridge_data *bridge, u32 requested_mode)
 
 	get_agp_version(agp_bridge);
 
-	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device at %s.\n",
-				agp_bridge->major_version,
-				agp_bridge->minor_version,
-				pci_name(agp_bridge->dev));
+	dev_info(&agp_bridge->dev->dev, "AGP %d.%d bridge\n",
+		 agp_bridge->major_version, agp_bridge->minor_version);
 
 	pci_read_config_dword(agp_bridge->dev,
 		      agp_bridge->capndx + PCI_AGP_STATUS, &bridge_agpstat);
@@ -818,7 +847,7 @@ void agp_generic_enable(struct agp_bridge_data *bridge, u32 requested_mode)
 			/* If we have 3.5, we can do the isoch stuff. */
 			if (bridge->minor_version >= 5)
 				agp_3_5_enable(bridge);
-			agp_device_command(bridge_agpstat, TRUE);
+			agp_device_command(bridge_agpstat, true);
 			return;
 		} else {
 		    /* Disable calibration cycle in RX91<1> when not in AGP3.0 mode of operation.*/
@@ -829,13 +858,12 @@ void agp_generic_enable(struct agp_bridge_data *bridge, u32 requested_mode)
 		    pci_write_config_dword(bridge->dev,
 					bridge->capndx+AGPCTRL, temp);
 
-		    printk(KERN_INFO PFX "Device is in legacy mode,"
-				" falling back to 2.x\n");
+		    dev_info(&bridge->dev->dev, "bridge is in legacy mode, falling back to 2.x\n");
 		}
 	}
 
 	/* AGP v<3 */
-	agp_device_command(bridge_agpstat, FALSE);
+	agp_device_command(bridge_agpstat, false);
 }
 EXPORT_SYMBOL(agp_generic_enable);
 
@@ -1083,9 +1111,9 @@ int agp_generic_insert_memory(struct agp_memory * mem, off_t pg_start, int type)
 		j++;
 	}
 
-	if (mem->is_flushed == FALSE) {
+	if (!mem->is_flushed) {
 		bridge->driver->cache_flush();
-		mem->is_flushed = TRUE;
+		mem->is_flushed = true;
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
@@ -1246,7 +1274,7 @@ static void ipi_handler(void *null)
 
 void global_cache_flush(void)
 {
-	if (on_each_cpu(ipi_handler, NULL, 1, 1) != 0)
+	if (on_each_cpu(ipi_handler, NULL, 1) != 0)
 		panic(PFX "timed out waiting for the other CPUs!\n");
 }
 EXPORT_SYMBOL(global_cache_flush);

@@ -58,8 +58,8 @@ static s32 ixgbe_reset_hw_82598(struct ixgbe_hw *hw);
 
 static s32 ixgbe_get_invariants_82598(struct ixgbe_hw *hw)
 {
-	hw->mac.num_rx_queues = IXGBE_82598_MAX_TX_QUEUES;
-	hw->mac.num_tx_queues = IXGBE_82598_MAX_RX_QUEUES;
+	hw->mac.num_rx_queues = IXGBE_82598_MAX_RX_QUEUES;
+	hw->mac.num_tx_queues = IXGBE_82598_MAX_TX_QUEUES;
 	hw->mac.num_rx_addrs = IXGBE_82598_RAR_ENTRIES;
 
 	/* PHY ops are filled in by default properly for Fiber only */
@@ -190,6 +190,7 @@ static enum ixgbe_media_type ixgbe_get_media_type_82598(struct ixgbe_hw *hw)
 	case IXGBE_DEV_ID_82598AF_DUAL_PORT:
 	case IXGBE_DEV_ID_82598AF_SINGLE_PORT:
 	case IXGBE_DEV_ID_82598EB_CX4:
+	case IXGBE_DEV_ID_82598_CX4_DUAL_PORT:
 		media_type = ixgbe_media_type_fiber;
 		break;
 	case IXGBE_DEV_ID_82598AT_DUAL_PORT:

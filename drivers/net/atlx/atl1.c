@@ -471,7 +471,6 @@ static int atl1_get_permanent_address(struct atl1_hw *hw)
 			memcpy(hw->perm_mac_addr, eth_addr, ETH_ALEN);
 			return 0;
 		}
-		return 1;
 	}
 
 	/* see if SPI FLAGS exist ? */
@@ -635,22 +634,6 @@ static s32 atl1_phy_leave_power_saving(struct atl1_hw *hw)
 		return ret;
 	return atl1_write_phy_reg(hw, 30, 0);
 }
-
-/*
- * Force the PHY into power saving mode using vendor magic.
- */
-#ifdef CONFIG_PM
-static void atl1_phy_enter_power_saving(struct atl1_hw *hw)
-{
-	atl1_write_phy_reg(hw, MII_DBG_ADDR, 0);
-	atl1_write_phy_reg(hw, MII_DBG_DATA, 0x124E);
-	atl1_write_phy_reg(hw, MII_DBG_ADDR, 2);
-	atl1_write_phy_reg(hw, MII_DBG_DATA, 0x3000);
-	atl1_write_phy_reg(hw, MII_DBG_ADDR, 3);
-	atl1_write_phy_reg(hw, MII_DBG_DATA, 0);
-
-}
-#endif
 
 /*
  * Resets the PHY and make all config validate
@@ -1325,7 +1308,6 @@ static u32 atl1_check_link(struct atl1_adapter *adapter)
 				dev_info(&adapter->pdev->dev, "link is down\n");
 			adapter->link_speed = SPEED_0;
 			netif_carrier_off(netdev);
-			netif_stop_queue(netdev);
 		}
 		return 0;
 	}
@@ -1375,7 +1357,6 @@ static u32 atl1_check_link(struct atl1_adapter *adapter)
 		if (!netif_carrier_ok(netdev)) {
 			/* Link down -> Up */
 			netif_carrier_on(netdev);
-			netif_wake_queue(netdev);
 		}
 		return 0;
 	}
@@ -1809,6 +1790,17 @@ static void atl1_rx_checksum(struct atl1_adapter *adapter,
 {
 	struct pci_dev *pdev = adapter->pdev;
 
+	/*
+	 * The L1 hardware contains a bug that erroneously sets the
+	 * PACKET_FLAG_ERR and ERR_FLAG_L4_CHKSUM bits whenever a
+	 * fragmented IP packet is received, even though the packet
+	 * is perfectly valid and its checksum is correct. There's
+	 * no way to distinguish between one of these good packets
+	 * and a packet that actually contains a TCP/UDP checksum
+	 * error, so all we can do is allow it to be handed up to
+	 * the higher layers and let it be sorted out there.
+	 */
+
 	skb->ip_summed = CHECKSUM_NONE;
 
 	if (unlikely(rrd->pkt_flg & PACKET_FLAG_ERR)) {
@@ -1835,14 +1827,6 @@ static void atl1_rx_checksum(struct atl1_adapter *adapter,
 		return;
 	}
 
-	/* IPv4, but hardware thinks its checksum is wrong */
-	if (netif_msg_rx_err(adapter))
-		dev_printk(KERN_DEBUG, &pdev->dev,
-			"hw csum wrong, pkt_flag:%x, err_flag:%x\n",
-			rrd->pkt_flg, rrd->err_flg);
-	skb->ip_summed = CHECKSUM_COMPLETE;
-	skb->csum = htons(rrd->xsz.xsum_sz.rx_chksum);
-	adapter->hw_csum_err++;
 	return;
 }
 
@@ -1876,7 +1860,8 @@ static u16 atl1_alloc_rx_buffers(struct atl1_adapter *adapter)
 
 		rfd_desc = ATL1_RFD_DESC(rfd_ring, rfd_next_to_use);
 
-		skb = dev_alloc_skb(adapter->rx_buffer_len + NET_IP_ALIGN);
+		skb = netdev_alloc_skb(adapter->netdev,
+				       adapter->rx_buffer_len + NET_IP_ALIGN);
 		if (unlikely(!skb)) {
 			/* Better luck next round */
 			adapter->net_stats.rx_dropped++;
@@ -2023,6 +2008,7 @@ rrd_ok:
 		/* Good Receive */
 		pci_unmap_page(adapter->pdev, buffer_info->dma,
 			       buffer_info->length, PCI_DMA_FROMDEVICE);
+		buffer_info->dma = 0;
 		skb = buffer_info->skb;
 		length = le16_to_cpu(rrd->xsz.xsum_sz.pkt_size);
 
@@ -2642,6 +2628,7 @@ static s32 atl1_up(struct atl1_adapter *adapter)
 	mod_timer(&adapter->watchdog_timer, jiffies);
 	atlx_irq_enable(adapter);
 	atl1_check_link(adapter);
+	netif_start_queue(netdev);
 	return 0;
 
 err_up:
@@ -2859,7 +2846,6 @@ disable_wol:
 	ctrl |= PCIE_PHYMISC_FORCE_RCV_DET;
 	iowrite32(ctrl, hw->hw_addr + REG_PCIE_PHYMISC);
 	ioread32(hw->hw_addr + REG_PCIE_PHYMISC);
-	atl1_phy_enter_power_saving(hw);
 	hw->phy_configured = false;
 	pci_enable_wake(pdev, pci_choose_state(pdev, state), 0);
 exit:
@@ -3036,7 +3022,6 @@ static int __devinit atl1_probe(struct pci_dev *pdev,
 	netdev->features = NETIF_F_HW_CSUM;
 	netdev->features |= NETIF_F_SG;
 	netdev->features |= (NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX);
-	netdev->features |= NETIF_F_TSO;
 	netdev->features |= NETIF_F_LLTX;
 
 	/*

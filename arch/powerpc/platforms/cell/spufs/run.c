@@ -27,7 +27,6 @@ void spufs_stop_callback(struct spu *spu, int irq)
 		switch(irq) {
 		case 0 :
 			ctx->csa.class_0_pending = spu->class_0_pending;
-			ctx->csa.class_0_dsisr = spu->class_0_dsisr;
 			ctx->csa.class_0_dar = spu->class_0_dar;
 			break;
 		case 1 :
@@ -51,18 +50,22 @@ int spu_stopped(struct spu_context *ctx, u32 *stat)
 	u64 dsisr;
 	u32 stopped;
 
-	*stat = ctx->ops->status_read(ctx);
-
-	if (test_bit(SPU_SCHED_NOTIFY_ACTIVE, &ctx->sched_flags))
-		return 1;
-
 	stopped = SPU_STATUS_INVALID_INSTR | SPU_STATUS_SINGLE_STEP |
 		SPU_STATUS_STOPPED_BY_HALT | SPU_STATUS_STOPPED_BY_STOP;
-	if (!(*stat & SPU_STATUS_RUNNING) && (*stat & stopped))
-		return 1;
 
-	dsisr = ctx->csa.class_0_dsisr;
-	if (dsisr & (MFC_DSISR_PTE_NOT_FOUND | MFC_DSISR_ACCESS_DENIED))
+top:
+	*stat = ctx->ops->status_read(ctx);
+	if (*stat & stopped) {
+		/*
+		 * If the spu hasn't finished stopping, we need to
+		 * re-read the register to get the stopped value.
+		 */
+		if (*stat & SPU_STATUS_RUNNING)
+			goto top;
+		return 1;
+	}
+
+	if (test_bit(SPU_SCHED_NOTIFY_ACTIVE, &ctx->sched_flags))
 		return 1;
 
 	dsisr = ctx->csa.class_1_dsisr;
@@ -203,11 +206,6 @@ static int spu_run_init(struct spu_context *ctx, u32 *npc)
 			(SPU_RUNCNTL_RUNNABLE | SPU_RUNCNTL_ISOLATE);
 		if (runcntl == 0)
 			runcntl = SPU_RUNCNTL_RUNNABLE;
-	}
-
-	if (ctx->flags & SPU_CREATE_NOSCHED) {
-		spuctx_switch_state(ctx, SPU_UTIL_USER);
-		ctx->ops->runcntl_write(ctx, runcntl);
 	} else {
 		unsigned long privcntl;
 
@@ -216,9 +214,15 @@ static int spu_run_init(struct spu_context *ctx, u32 *npc)
 		else
 			privcntl = SPU_PRIVCNTL_MODE_NORMAL;
 
-		ctx->ops->npc_write(ctx, *npc);
 		ctx->ops->privcntl_write(ctx, privcntl);
-		ctx->ops->runcntl_write(ctx, runcntl);
+		ctx->ops->npc_write(ctx, *npc);
+	}
+
+	ctx->ops->runcntl_write(ctx, runcntl);
+
+	if (ctx->flags & SPU_CREATE_NOSCHED) {
+		spuctx_switch_state(ctx, SPU_UTIL_USER);
+	} else {
 
 		if (ctx->state == SPU_STATE_SAVED) {
 			ret = spu_activate(ctx, 0);

@@ -512,9 +512,12 @@ static int ac97_switch_get(struct snd_kcontrol *ctl,
 
 static void mute_ac97_ctl(struct oxygen *chip, unsigned int control)
 {
-	unsigned int priv_idx = chip->controls[control]->private_value & 0xff;
+	unsigned int priv_idx;
 	u16 value;
 
+	if (!chip->controls[control])
+		return;
+	priv_idx = chip->controls[control]->private_value & 0xff;
 	value = oxygen_read_ac97(chip, 0, priv_idx);
 	if (!(value & 0x8000)) {
 		oxygen_write_ac97(chip, 0, priv_idx, value | 0x8000);
@@ -936,11 +939,13 @@ static int add_controls(struct oxygen *chip,
 
 	for (i = 0; i < count; ++i) {
 		template = controls[i];
-		err = chip->model->control_filter(&template);
-		if (err < 0)
-			return err;
-		if (err == 1)
-			continue;
+		if (chip->model->control_filter) {
+			err = chip->model->control_filter(&template);
+			if (err < 0)
+				return err;
+			if (err == 1)
+				continue;
+		}
 		if (!strcmp(template.name, "Master Playback Volume") &&
 		    chip->model->dac_tlv) {
 			template.tlv.p = chip->model->dac_tlv;

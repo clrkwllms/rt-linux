@@ -24,27 +24,26 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 #include <linux/spi/spi.h>
-#include <linux/spi/tsc2102.h>
 #include <linux/interrupt.h>
 #include <linux/apm-emulation.h>
 
-#include <asm/hardware.h>
+#include <mach/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/flash.h>
 
-#include <asm/arch/gpio.h>
-#include <asm/arch/mux.h>
-#include <asm/arch/usb.h>
-#include <asm/arch/tc.h>
-#include <asm/arch/dma.h>
-#include <asm/arch/board.h>
-#include <asm/arch/irda.h>
-#include <asm/arch/keypad.h>
-#include <asm/arch/common.h>
-#include <asm/arch/mcbsp.h>
-#include <asm/arch/omap-alsa.h>
+#include <mach/gpio.h>
+#include <mach/mux.h>
+#include <mach/usb.h>
+#include <mach/tc.h>
+#include <mach/dma.h>
+#include <mach/board.h>
+#include <mach/irda.h>
+#include <mach/keypad.h>
+#include <mach/common.h>
+#include <mach/mcbsp.h>
+#include <mach/omap-alsa.h>
 
 static void __init omap_palmte_init_irq(void)
 {
@@ -315,14 +314,6 @@ static void palmte_get_power_status(struct apm_power_info *info, int *battery)
 #define palmte_get_power_status	NULL
 #endif
 
-static struct tsc2102_config palmte_tsc2102_config = {
-	.use_internal	= 0,
-	.monitor	= TSC_BAT1 | TSC_AUX | TSC_TEMP,
-	.temp_at25c	= { 2200, 2615 },
-	.apm_report	= palmte_get_power_status,
-	.alsa_config	= &palmte_alsa_config,
-};
-
 static struct omap_board_config_kernel palmte_config[] __initdata = {
 	{ OMAP_TAG_USB,		&palmte_usb_config },
 	{ OMAP_TAG_MMC,		&palmte_mmc_config },
@@ -336,7 +327,6 @@ static struct spi_board_info palmte_spi_info[] __initdata = {
 		.bus_num	= 2,	/* uWire (officially) */
 		.chip_select	= 0,	/* As opposed to 3 */
 		.irq		= OMAP_GPIO_IRQ(PALMTE_PINTDAV_GPIO),
-		.platform_data	= &palmte_tsc2102_config,
 		.max_speed_hz	= 8000000,
 	},
 };

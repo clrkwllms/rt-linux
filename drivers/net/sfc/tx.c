@@ -172,7 +172,7 @@ static inline int efx_enqueue_skb(struct efx_tx_queue *tx_queue,
 
 	/* Process all fragments */
 	while (1) {
-		if (unlikely(pci_dma_mapping_error(dma_addr)))
+		if (unlikely(pci_dma_mapping_error(pci_dev, dma_addr)))
 			goto pci_err;
 
 		/* Store fields for marking in the per-fragment final
@@ -387,7 +387,7 @@ void efx_xmit_done(struct efx_tx_queue *tx_queue, unsigned int index)
 	if (unlikely(tx_queue->stopped)) {
 		fill_level = tx_queue->insert_count - tx_queue->read_count;
 		if (fill_level < EFX_NETDEV_TX_THRESHOLD(tx_queue)) {
-			EFX_BUG_ON_PARANOID(!NET_DEV_REGISTERED(efx));
+			EFX_BUG_ON_PARANOID(!efx_dev_registered(efx));
 
 			/* Do this under netif_tx_lock(), to avoid racing
 			 * with efx_xmit(). */
@@ -639,11 +639,12 @@ static void efx_tsoh_block_free(struct efx_tx_queue *tx_queue,
 	base_dma = tsoh->dma_addr & PAGE_MASK;
 
 	p = &tx_queue->tso_headers_free;
-	while (*p != NULL)
+	while (*p != NULL) {
 		if (((unsigned long)*p & PAGE_MASK) == base_kva)
 			*p = (*p)->next;
 		else
 			p = &(*p)->next;
+	}
 
 	pci_free_consistent(pci_dev, PAGE_SIZE, (void *)base_kva, base_dma);
 }
@@ -660,7 +661,8 @@ efx_tsoh_heap_alloc(struct efx_tx_queue *tx_queue, size_t header_len)
 	tsoh->dma_addr = pci_map_single(tx_queue->efx->pci_dev,
 					TSOH_BUFFER(tsoh), header_len,
 					PCI_DMA_TODEVICE);
-	if (unlikely(pci_dma_mapping_error(tsoh->dma_addr))) {
+	if (unlikely(pci_dma_mapping_error(tx_queue->efx->pci_dev,
+					   tsoh->dma_addr))) {
 		kfree(tsoh);
 		return NULL;
 	}
@@ -862,7 +864,7 @@ static inline int tso_get_fragment(struct tso_state *st, struct efx_nic *efx,
 
 	st->ifc.unmap_addr = pci_map_page(efx->pci_dev, page, page_off,
 					  len, PCI_DMA_TODEVICE);
-	if (likely(!pci_dma_mapping_error(st->ifc.unmap_addr))) {
+	if (likely(!pci_dma_mapping_error(efx->pci_dev, st->ifc.unmap_addr))) {
 		st->ifc.unmap_len = len;
 		st->ifc.len = len;
 		st->ifc.dma_addr = st->ifc.unmap_addr;
@@ -939,9 +941,10 @@ static inline int tso_start_new_packet(struct efx_tx_queue *tx_queue,
 
 	/* Allocate a DMA-mapped header buffer. */
 	if (likely(TSOH_SIZE(st->p.header_length) <= TSOH_STD_SIZE)) {
-		if (tx_queue->tso_headers_free == NULL)
+		if (tx_queue->tso_headers_free == NULL) {
 			if (efx_tsoh_block_alloc(tx_queue))
 				return -1;
+		}
 		EFX_BUG_ON_PARANOID(!tx_queue->tso_headers_free);
 		tsoh = tx_queue->tso_headers_free;
 		tx_queue->tso_headers_free = tsoh->next;
@@ -1106,9 +1109,10 @@ static void efx_fini_tso(struct efx_tx_queue *tx_queue)
 {
 	unsigned i;
 
-	if (tx_queue->buffer)
+	if (tx_queue->buffer) {
 		for (i = 0; i <= tx_queue->efx->type->txd_ring_mask; ++i)
 			efx_tsoh_free(tx_queue, &tx_queue->buffer[i]);
+	}
 
 	while (tx_queue->tso_headers_free != NULL)
 		efx_tsoh_block_free(tx_queue, tx_queue->tso_headers_free,

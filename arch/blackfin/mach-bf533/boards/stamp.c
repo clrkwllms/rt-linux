@@ -38,7 +38,6 @@
 #if defined(CONFIG_USB_ISP1362_HCD) || defined(CONFIG_USB_ISP1362_HCD_MODULE)
 #include <linux/usb/isp1362.h>
 #endif
-#include <linux/ata_platform.h>
 #include <linux/irq.h>
 #include <linux/i2c.h>
 #include <asm/dma.h>
@@ -114,15 +113,15 @@ static struct platform_device net2272_bfin_device = {
 #if defined(CONFIG_MTD_BFIN_ASYNC) || defined(CONFIG_MTD_BFIN_ASYNC_MODULE)
 static struct mtd_partition stamp_partitions[] = {
 	{
-		.name   = "Bootloader",
+		.name   = "bootloader(nor)",
 		.size   = 0x40000,
 		.offset = 0,
 	}, {
-		.name   = "Kernel",
+		.name   = "linux kernel(nor)",
 		.size   = 0xE0000,
 		.offset = MTDPART_OFS_APPEND,
 	}, {
-		.name   = "RootFS",
+		.name   = "file system(nor)",
 		.size   = MTDPART_SIZ_FULL,
 		.offset = MTDPART_OFS_APPEND,
 	}
@@ -161,22 +160,19 @@ static struct platform_device stamp_flash_device = {
 };
 #endif
 
-#if defined(CONFIG_SPI_BFIN) || defined(CONFIG_SPI_BFIN_MODULE)
-/* all SPI peripherals info goes here */
-
 #if defined(CONFIG_MTD_M25P80) || defined(CONFIG_MTD_M25P80_MODULE)
 static struct mtd_partition bfin_spi_flash_partitions[] = {
 	{
-		.name = "bootloader",
+		.name = "bootloader(spi)",
 		.size = 0x00040000,
 		.offset = 0,
 		.mask_flags = MTD_CAP_ROM
 	}, {
-		.name = "kernel",
+		.name = "linux kernel(spi)",
 		.size = 0xe0000,
 		.offset = MTDPART_OFS_APPEND,
 	}, {
-		.name = "file system",
+		.name = "file system(spi)",
 		.size = MTDPART_SIZ_FULL,
 		.offset = MTDPART_OFS_APPEND,
 	}
@@ -320,6 +316,7 @@ static struct spi_board_info bfin_spi_board_info[] __initdata = {
 #endif
 };
 
+#if defined(CONFIG_SPI_BFIN) || defined(CONFIG_SPI_BFIN_MODULE)
 /* SPI (0) */
 static struct resource bfin_spi0_resource[] = {
 	[0] = {
@@ -403,43 +400,6 @@ static struct platform_device bfin_sport0_uart_device = {
 static struct platform_device bfin_sport1_uart_device = {
 	.name = "bfin-sport-uart",
 	.id = 1,
-};
-#endif
-
-#if defined(CONFIG_PATA_PLATFORM) || defined(CONFIG_PATA_PLATFORM_MODULE)
-#define PATA_INT	55
-
-static struct pata_platform_info bfin_pata_platform_data = {
-	.ioport_shift = 1,
-	.irq_type = IRQF_TRIGGER_HIGH | IRQF_DISABLED,
-};
-
-static struct resource bfin_pata_resources[] = {
-	{
-		.start = 0x20314020,
-		.end = 0x2031403F,
-		.flags = IORESOURCE_MEM,
-	},
-	{
-		.start = 0x2031401C,
-		.end = 0x2031401F,
-		.flags = IORESOURCE_MEM,
-	},
-	{
-		.start = PATA_INT,
-		.end = PATA_INT,
-		.flags = IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device bfin_pata_device = {
-	.name = "pata_platform",
-	.id = -1,
-	.num_resources = ARRAY_SIZE(bfin_pata_resources),
-	.resource = bfin_pata_resources,
-	.dev = {
-		.platform_data = &bfin_pata_platform_data,
-	}
 };
 #endif
 
@@ -585,10 +545,6 @@ static struct platform_device *stamp_devices[] __initdata = {
 	&bfin_sport1_uart_device,
 #endif
 
-#if defined(CONFIG_PATA_PLATFORM) || defined(CONFIG_PATA_PLATFORM_MODULE)
-	&bfin_pata_device,
-#endif
-
 #if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
 	&bfin_device_gpiokeys,
 #endif
@@ -626,13 +582,7 @@ static int __init stamp_init(void)
 	SSYNC();
 #endif
 
-#if defined(CONFIG_SPI_BFIN) || defined(CONFIG_SPI_BFIN_MODULE)
-	spi_register_board_info(bfin_spi_board_info,
-				ARRAY_SIZE(bfin_spi_board_info));
-#endif
-#if defined(CONFIG_PATA_PLATFORM) || defined(CONFIG_PATA_PLATFORM_MODULE)
-	irq_desc[PATA_INT].status |= IRQ_NOAUTOEN;
-#endif
+	spi_register_board_info(bfin_spi_board_info, ARRAY_SIZE(bfin_spi_board_info));
 	return 0;
 }
 
