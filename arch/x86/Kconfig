@@ -580,10 +580,15 @@ config IOMMU_HELPER
 
 config MAXSMP
 	bool "Configure Maximum number of SMP Processors and NUMA Nodes"
-	depends on X86_64 && SMP && BROKEN
-	default n
+	depends on X86_64 && SMP && DEBUG_KERNEL && EXPERIMENTAL
 	help
-	  Configure maximum number of CPUS and NUMA Nodes for this architecture.
+	  Configure maximum number of CPUS and NUMA Nodes for this
+	  architecture (up to 4096!).
+
+	  This can increase memory usage, bigger stack footprint and can
+	  add some runtime overhead as well so unless you want a generic
+	  distro kernel you likely want to say N.
+
 	  If unsure, say N.
 
 config NR_CPUS
