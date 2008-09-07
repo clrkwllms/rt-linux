@@ -618,7 +618,7 @@ bool kmemcheck_trap(struct pt_regs *regs)
 	regs->cx = cx;
 #endif
 	if (cx) {
-		data->n_addrs = 0;
+		kmemcheck_hide(regs);
 
 		switch (data->insn[0]) {
 		case 0xa4:
@@ -632,8 +632,7 @@ bool kmemcheck_trap(struct pt_regs *regs)
 			break;
 		}
 
-		/* Without the REP prefix, we have to do this ourselves... */
-		regs->ip = (unsigned long) data->rep + 1;
+		kmemcheck_show(regs);
 		return true;
 	}
 
