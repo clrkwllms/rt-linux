@@ -320,28 +320,6 @@ config KMEMCHECK_ONESHOT_BY_DEFAULT
 
 endchoice
 
-config KMEMCHECK_USE_SMP
-	bool "kmemcheck: use multiple CPUs"
-	depends on KMEMCHECK
-	depends on SMP
-	depends on BROKEN
-	default n
-	help
-	  This option will prevent kmemcheck from disabling all but one CPU
-	  on boot. This means that whenever a page fault is taken, all the
-	  other CPUs in the system are halted. This is potentially extremely
-	  expensive, depending on the number of CPUs in the system (the more
-	  the worse).
-
-	  The upside is that kmemcheck can be compiled into the kernel with
-	  very little overhead by default if kmemcheck is disabled at run-
-	  time.
-
-	  If you want to compile a kernel specifically for the purpose of
-	  playing with kmemcheck, you should say N here. If you want a normal
-	  kernel with the possibility of enabling kmemcheck without
-	  recompiling, you should say Y here.
-
 config KMEMCHECK_QUEUE_SIZE
 	int "kmemcheck: error queue size"
 	depends on KMEMCHECK

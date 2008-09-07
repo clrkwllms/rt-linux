@@ -30,15 +30,11 @@
 #include "opcode.h"
 #include "pte.h"
 #include "shadow.h"
-#include "smp.h"
 
 void __init kmemcheck_init(void)
 {
 	printk(KERN_INFO "kmemcheck: \"Bugs, beware!\"\n");
 
-	kmemcheck_smp_init();
-
-#if defined(CONFIG_SMP) && !defined(CONFIG_KMEMCHECK_USE_SMP)
 	/*
 	 * Limit SMP to use a single CPU. We rely on the fact that this code
 	 * runs before SMP is set up.
@@ -48,7 +44,6 @@ void __init kmemcheck_init(void)
 			"kmemcheck: Limiting number of CPUs to 1.\n");
 		setup_max_cpus = 1;
 	}
-#endif
 }
 
 #ifdef CONFIG_KMEMCHECK_DISABLED_BY_DEFAULT
@@ -186,13 +181,10 @@ void kmemcheck_show(struct pt_regs *regs)
 
 	BUG_ON(!irqs_disabled());
 
-	kmemcheck_pause_allbutself();
-
 	if (unlikely(data->balance != 0)) {
 		kmemcheck_show_all();
 		kmemcheck_error_save_bug(regs);
 		data->balance = 0;
-		kmemcheck_resume();
 		return;
 	}
 
@@ -200,10 +192,8 @@ void kmemcheck_show(struct pt_regs *regs)
 	 * None of the addresses actually belonged to kmemcheck. Note that
 	 * this is not an error.
 	 */
-	if (kmemcheck_show_all() == 0) {
-		kmemcheck_resume();
+	if (kmemcheck_show_all() == 0)
 		return;
-	}
 
 	++data->balance;
 
@@ -233,10 +223,8 @@ void kmemcheck_hide(struct pt_regs *regs)
 
 	BUG_ON(!irqs_disabled());
 
-	if (data->balance == 0) {
-		kmemcheck_resume();
+	if (data->balance == 0)
 		return;
-	}
 
 	if (unlikely(data->balance != 1)) {
 		kmemcheck_show_all();
@@ -248,7 +236,6 @@ void kmemcheck_hide(struct pt_regs *regs)
 			regs->flags &= ~X86_EFLAGS_TF;
 		if (data->flags & X86_EFLAGS_IF)
 			regs->flags |= X86_EFLAGS_IF;
-		kmemcheck_resume();
 		return;
 	}
 
@@ -263,10 +250,8 @@ void kmemcheck_hide(struct pt_regs *regs)
 	else
 		n = kmemcheck_show_all();
 
-	if (n == 0) {
-		kmemcheck_resume();
+	if (n == 0)
 		return;
-	}
 
 	--data->balance;
 
@@ -276,7 +261,6 @@ void kmemcheck_hide(struct pt_regs *regs)
 		regs->flags &= ~X86_EFLAGS_TF;
 	if (data->flags & X86_EFLAGS_IF)
 		regs->flags |= X86_EFLAGS_IF;
-	kmemcheck_resume();
 }
 
 void kmemcheck_show_pages(struct page *p, unsigned int n)
