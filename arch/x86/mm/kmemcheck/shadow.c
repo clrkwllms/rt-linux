@@ -42,7 +42,7 @@ static void mark_shadow(void *address, unsigned int n,
 	shadow = kmemcheck_shadow_lookup((unsigned long) address);
 	if (!shadow)
 		return;
-	__memset(shadow, status, n);
+	memset(shadow, status, n);
 }
 
 void kmemcheck_mark_unallocated(void *address, unsigned int n)
