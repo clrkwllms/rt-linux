@@ -35,6 +35,7 @@ void __init kmemcheck_init(void)
 {
 	printk(KERN_INFO "kmemcheck: \"Bugs, beware!\"\n");
 
+#ifdef CONFIG_SMP
 	/*
 	 * Limit SMP to use a single CPU. We rely on the fact that this code
 	 * runs before SMP is set up.
@@ -44,6 +45,7 @@ void __init kmemcheck_init(void)
 			"kmemcheck: Limiting number of CPUs to 1.\n");
 		setup_max_cpus = 1;
 	}
+#endif
 }
 
 #ifdef CONFIG_KMEMCHECK_DISABLED_BY_DEFAULT
