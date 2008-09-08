@@ -87,7 +87,7 @@ enum {
 	CM_ASL_LID
 };
 
-const char *cm_getv[] = {
+static const char *cm_getv[] = {
 	"WLDG", NULL, NULL, NULL,
 	"CAMG", NULL, NULL, NULL,
 	NULL, "PBLG", NULL, NULL,
@@ -96,7 +96,7 @@ const char *cm_getv[] = {
 	"CRDG", "LIDG"
 };
 
-const char *cm_setv[] = {
+static const char *cm_setv[] = {
 	"WLDS", NULL, NULL, NULL,
 	"CAMS", NULL, NULL, NULL,
 	"SDSP", "PBLS", "HDPS", NULL,
@@ -553,9 +553,9 @@ static void eeepc_hwmon_exit(void)
 	hwmon = eeepc_hwmon_device;
 	if (!hwmon)
 		return ;
-	hwmon_device_unregister(hwmon);
 	sysfs_remove_group(&hwmon->kobj,
 			   &hwmon_attribute_group);
+	hwmon_device_unregister(hwmon);
 	eeepc_hwmon_device = NULL;
 }
 

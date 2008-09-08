@@ -1731,8 +1731,7 @@ restart:
 			 * We can't enlist stable bundles either.
 			 */
 			write_unlock_bh(&policy->lock);
-			if (dst)
-				dst_free(dst);
+			dst_free(dst);
 
 			if (pol_dead)
 				XFRM_INC_STATS(LINUX_MIB_XFRMOUTPOLDEAD);
@@ -1748,8 +1747,7 @@ restart:
 			err = xfrm_dst_update_origin(dst, fl);
 		if (unlikely(err)) {
 			write_unlock_bh(&policy->lock);
-			if (dst)
-				dst_free(dst);
+			dst_free(dst);
 			XFRM_INC_STATS(LINUX_MIB_XFRMOUTBUNDLECHECKERROR);
 			goto error;
 		}
@@ -2360,7 +2358,7 @@ static int xfrm_dev_event(struct notifier_block *this, unsigned long event, void
 {
 	struct net_device *dev = ptr;
 
-	if (dev_net(dev) != &init_net)
+	if (!net_eq(dev_net(dev), &init_net))
 		return NOTIFY_DONE;
 
 	switch (event) {

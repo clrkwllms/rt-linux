@@ -1134,30 +1134,16 @@ static int mv_qc_defer(struct ata_queued_cmd *qc)
 	if (ap->nr_active_links == 0)
 		return 0;
 
-	if (pp->pp_flags & MV_PP_FLAG_EDMA_EN) {
-		/*
-		 * The port is operating in host queuing mode (EDMA).
-		 * It can accomodate a new qc if the qc protocol
-		 * is compatible with the current host queue mode.
-		 */
-		if (pp->pp_flags & MV_PP_FLAG_NCQ_EN) {
-			/*
-			 * The host queue (EDMA) is in NCQ mode.
-			 * If the new qc is also an NCQ command,
-			 * then allow the new qc.
-			 */
-			if (qc->tf.protocol == ATA_PROT_NCQ)
-				return 0;
-		} else {
-			/*
-			 * The host queue (EDMA) is in non-NCQ, DMA mode.
-			 * If the new qc is also a non-NCQ, DMA command,
-			 * then allow the new qc.
-			 */
-			if (qc->tf.protocol == ATA_PROT_DMA)
-				return 0;
-		}
-	}
+	/*
+	 * The port is operating in host queuing mode (EDMA) with NCQ
+	 * enabled, allow multiple NCQ commands.  EDMA also allows
+	 * queueing multiple DMA commands but libata core currently
+	 * doesn't allow it.
+	 */
+	if ((pp->pp_flags & MV_PP_FLAG_EDMA_EN) &&
+	    (pp->pp_flags & MV_PP_FLAG_NCQ_EN) && ata_is_ncq(qc->tf.protocol))
+		return 0;
+
 	return ATA_DEFER_PORT;
 }
 
@@ -1607,7 +1593,7 @@ static unsigned int mv_qc_issue(struct ata_queued_cmd *qc)
 		 * Much of the time, this could just work regardless.
 		 * So for now, just log the incident, and allow the attempt.
 		 */
-		if (limit_warnings && (qc->nbytes / qc->sect_size) > 1) {
+		if (limit_warnings > 0 && (qc->nbytes / qc->sect_size) > 1) {
 			--limit_warnings;
 			ata_link_printk(qc->dev->link, KERN_WARNING, DRV_NAME
 					": attempting PIO w/multiple DRQ: "
@@ -3036,7 +3022,8 @@ static int mv_chip_id(struct ata_host *host, unsigned int board_idx)
 		break;
 	case chip_soc:
 		hpriv->ops = &mv_soc_ops;
-		hp_flags |= MV_HP_FLAG_SOC | MV_HP_ERRATA_60X1C0;
+		hp_flags |= MV_HP_FLAG_SOC | MV_HP_GEN_IIE |
+			MV_HP_ERRATA_60X1C0;
 		break;
 
 	default:

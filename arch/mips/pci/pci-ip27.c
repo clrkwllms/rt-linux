@@ -47,7 +47,6 @@ int __cpuinit bridge_probe(nasid_t nasid, int widget_id, int masterwid)
 	static int num_bridges = 0;
 	bridge_t *bridge;
 	int slot;
-	extern int pci_probe_only;
 
 	pci_probe_only = 1;
 
@@ -206,6 +205,7 @@ int pcibus_to_node(struct pci_bus *bus)
 
 	return bc->nasid;
 }
+EXPORT_SYMBOL(pcibus_to_node);
 
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_SGI, PCI_DEVICE_ID_SGI_IOC3,
 	pci_fixup_ioc3);

@@ -36,6 +36,11 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
+#define FIX_EFLAGS	(X86_EFLAGS_AC | X86_EFLAGS_OF | \
+			 X86_EFLAGS_DF | X86_EFLAGS_TF | X86_EFLAGS_SF | \
+			 X86_EFLAGS_ZF | X86_EFLAGS_AF | X86_EFLAGS_PF | \
+			 X86_EFLAGS_CF)
+
 asmlinkage int do_signal(struct pt_regs *regs, sigset_t *oldset);
 void signal_fault(struct pt_regs *regs, void __user *frame, char *where);
 
@@ -174,9 +179,10 @@ struct sigframe
 	u32 pretcode;
 	int sig;
 	struct sigcontext_ia32 sc;
-	struct _fpstate_ia32 fpstate;
+	struct _fpstate_ia32 fpstate_unused; /* look at kernel/sigframe.h */
 	unsigned int extramask[_COMPAT_NSIG_WORDS-1];
 	char retcode[8];
+	/* fp state follows here */
 };
 
 struct rt_sigframe
@@ -187,8 +193,8 @@ struct rt_sigframe
 	u32 puc;
 	compat_siginfo_t info;
 	struct ucontext_ia32 uc;
-	struct _fpstate_ia32 fpstate;
 	char retcode[8];
+	/* fp state follows here */
 };
 
 #define COPY(x)		{ 		\
@@ -210,7 +216,7 @@ static int ia32_restore_sigcontext(struct pt_regs *regs,
 				   unsigned int *peax)
 {
 	unsigned int tmpflags, gs, oldgs, err = 0;
-	struct _fpstate_ia32 __user *buf;
+	void __user *buf;
 	u32 tmp;
 
 	/* Always make any pending restarted system calls return -EINTR */
@@ -248,32 +254,18 @@ static int ia32_restore_sigcontext(struct pt_regs *regs,
 	regs->ss |= 3;
 
 	err |= __get_user(tmpflags, &sc->flags);
-	regs->flags = (regs->flags & ~0x40DD5) | (tmpflags & 0x40DD5);
+	regs->flags = (regs->flags & ~FIX_EFLAGS) | (tmpflags & FIX_EFLAGS);
 	/* disable syscall checks */
 	regs->orig_ax = -1;
 
 	err |= __get_user(tmp, &sc->fpstate);
 	buf = compat_ptr(tmp);
-	if (buf) {
-		if (!access_ok(VERIFY_READ, buf, sizeof(*buf)))
-			goto badframe;
-		err |= restore_i387_ia32(buf);
-	} else {
-		struct task_struct *me = current;
-
-		if (used_math()) {
-			clear_fpu(me);
-			clear_used_math();
-		}
-	}
+	err |= restore_i387_xstate_ia32(buf);
 
 	err |= __get_user(tmp, &sc->ax);
 	*peax = tmp;
 
 	return err;
-
-badframe:
-	return 1;
 }
 
 asmlinkage long sys32_sigreturn(struct pt_regs *regs)
@@ -345,7 +337,7 @@ badframe:
  */
 
 static int ia32_setup_sigcontext(struct sigcontext_ia32 __user *sc,
-				 struct _fpstate_ia32 __user *fpstate,
+				 void __user *fpstate,
 				 struct pt_regs *regs, unsigned int mask)
 {
 	int tmp, err = 0;
@@ -376,7 +368,7 @@ static int ia32_setup_sigcontext(struct sigcontext_ia32 __user *sc,
 	err |= __put_user((u32)regs->flags, &sc->flags);
 	err |= __put_user((u32)regs->sp, &sc->sp_at_signal);
 
-	tmp = save_i387_ia32(fpstate);
+	tmp = save_i387_xstate_ia32(fpstate);
 	if (tmp < 0)
 		err = -EFAULT;
 	else {
@@ -397,7 +389,8 @@ static int ia32_setup_sigcontext(struct sigcontext_ia32 __user *sc,
  * Determine which stack to use..
  */
 static void __user *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
-				 size_t frame_size)
+				 size_t frame_size,
+				 void **fpstate)
 {
 	unsigned long sp;
 
@@ -416,6 +409,11 @@ static void __user *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
 		 ka->sa.sa_restorer)
 		sp = (unsigned long) ka->sa.sa_restorer;
 
+	if (used_math()) {
+		sp = sp - sig_xstate_ia32_size;
+		*fpstate = (struct _fpstate_ia32 *) sp;
+	}
+
 	sp -= frame_size;
 	/* Align the stack pointer according to the i386 ABI,
 	 * i.e. so that on function entry ((sp + 4) & 15) == 0. */
@@ -429,6 +427,7 @@ int ia32_setup_frame(int sig, struct k_sigaction *ka,
 	struct sigframe __user *frame;
 	void __user *restorer;
 	int err = 0;
+	void __user *fpstate = NULL;
 
 	/* copy_to_user optimizes that into a single 8 byte store */
 	static const struct {
@@ -443,7 +442,7 @@ int ia32_setup_frame(int sig, struct k_sigaction *ka,
 		0,
 	};
 
-	frame = get_sigframe(ka, regs, sizeof(*frame));
+	frame = get_sigframe(ka, regs, sizeof(*frame), &fpstate);
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
@@ -452,8 +451,7 @@ int ia32_setup_frame(int sig, struct k_sigaction *ka,
 	if (err)
 		goto give_sigsegv;
 
-	err |= ia32_setup_sigcontext(&frame->sc, &frame->fpstate, regs,
-					set->sig[0]);
+	err |= ia32_setup_sigcontext(&frame->sc, fpstate, regs, set->sig[0]);
 	if (err)
 		goto give_sigsegv;
 
@@ -515,9 +513,9 @@ int ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 			compat_sigset_t *set, struct pt_regs *regs)
 {
 	struct rt_sigframe __user *frame;
-	struct exec_domain *ed = current_thread_info()->exec_domain;
 	void __user *restorer;
 	int err = 0;
+	void __user *fpstate = NULL;
 
 	/* __copy_to_user optimizes that into a single 8 byte store */
 	static const struct {
@@ -533,13 +531,12 @@ int ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		0,
 	};
 
-	frame = get_sigframe(ka, regs, sizeof(*frame));
+	frame = get_sigframe(ka, regs, sizeof(*frame), &fpstate);
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	err |= __put_user((ed && ed->signal_invmap && sig < 32
-			   ? ed->signal_invmap[sig] : sig), &frame->sig);
+	err |= __put_user(sig, &frame->sig);
 	err |= __put_user(ptr_to_compat(&frame->info), &frame->pinfo);
 	err |= __put_user(ptr_to_compat(&frame->uc), &frame->puc);
 	err |= copy_siginfo_to_user32(&frame->info, info);
@@ -547,13 +544,16 @@ int ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		goto give_sigsegv;
 
 	/* Create the ucontext.  */
-	err |= __put_user(0, &frame->uc.uc_flags);
+	if (cpu_has_xsave)
+		err |= __put_user(UC_FP_XSTATE, &frame->uc.uc_flags);
+	else
+		err |= __put_user(0, &frame->uc.uc_flags);
 	err |= __put_user(0, &frame->uc.uc_link);
 	err |= __put_user(current->sas_ss_sp, &frame->uc.uc_stack.ss_sp);
 	err |= __put_user(sas_ss_flags(regs->sp),
 			  &frame->uc.uc_stack.ss_flags);
 	err |= __put_user(current->sas_ss_size, &frame->uc.uc_stack.ss_size);
-	err |= ia32_setup_sigcontext(&frame->uc.uc_mcontext, &frame->fpstate,
+	err |= ia32_setup_sigcontext(&frame->uc.uc_mcontext, fpstate,
 				     regs, set->sig[0]);
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
 	if (err)

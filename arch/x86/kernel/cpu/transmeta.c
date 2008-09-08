@@ -12,7 +12,6 @@ static void __cpuinit init_transmeta(struct cpuinfo_x86 *c)
 	unsigned int cpu_rev, cpu_freq = 0, cpu_flags, new_cpu_rev;
 	char cpu_info[65];
 
-	get_model_name(c);	/* Same as AMD/Cyrix */
 	display_cacheinfo(c);
 
 	/* Print CMS and CPU revision */
@@ -102,6 +101,7 @@ static struct cpu_dev transmeta_cpu_dev __cpuinitdata = {
 	.c_ident	= { "GenuineTMx86", "TransmetaCPU" },
 	.c_init		= init_transmeta,
 	.c_identify	= transmeta_identify,
+	.c_x86_vendor	= X86_VENDOR_TRANSMETA,
 };
 
-cpu_vendor_dev_register(X86_VENDOR_TRANSMETA, &transmeta_cpu_dev);
+cpu_dev_register(transmeta_cpu_dev);
