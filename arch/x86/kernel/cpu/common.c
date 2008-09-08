@@ -472,14 +472,20 @@ static void __cpuinit get_cpu_cap(struct cpuinfo_x86 *c)
 		if (xlvl >= 0x80860001)
 			c->x86_capability[2] = cpuid_edx(0x80860001);
 	}
+#endif
 
 	if (c->extended_cpuid_level >= 0x80000008) {
 		u32 eax = cpuid_eax(0x80000008);
 
 		c->x86_virt_bits = (eax >> 8) & 0xff;
 		c->x86_phys_bits = eax & 0xff;
+		/* CPUID workaround for Intel 0F33/0F34 CPU */
+		if (c->x86_vendor == X86_VENDOR_INTEL
+		    && c->x86 == 0xF && c->x86_model == 0x3
+		    && (c->x86_mask == 0x3
+			|| c->x86_mask == 0x4))
+			c->x86_phys_bits = 36;
 	}
-#endif
 
 	if (c->extended_cpuid_level >= 0x80000007)
 		c->x86_power = cpuid_edx(0x80000007);
@@ -500,6 +506,8 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_clflush_size = 64;
 #else
 	c->x86_clflush_size = 32;
+	c->x86_phys_bits = 32;
+	c->x86_virt_bits = 32;
 #endif
 	c->x86_cache_alignment = c->x86_clflush_size;
 
@@ -511,6 +519,11 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	c->extended_cpuid_level = 0;
 
 	cpu_detect(c);
+
+#ifdef CONFIG_X86_32
+	if (cpu_has(c, X86_FEATURE_PAE) || cpu_has(c, X86_FEATURE_PSE36))
+		c->x86_phys_bits = 36;
+#endif
 
 	get_cpu_vendor(c);
 
@@ -635,6 +648,8 @@ static void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 #else
 	c->cpuid_level = -1;	/* CPUID not detected */
 	c->x86_clflush_size = 32;
+	c->x86_phys_bits = 32;
+	c->x86_virt_bits = 32;
 #endif
 	c->x86_cache_alignment = c->x86_clflush_size;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
@@ -651,6 +666,11 @@ static void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	}
 
 	generic_identify(c);
+
+#ifdef CONFIG_X86_32
+	if (cpu_has(c, X86_FEATURE_PAE) || cpu_has(c, X86_FEATURE_PSE36))
+		c->x86_phys_bits = 36;
+#endif
 
 	if (this_cpu->c_identify)
 		this_cpu->c_identify(c);
