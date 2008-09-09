@@ -439,6 +439,11 @@ void __cpuinit cpu_detect(struct cpuinfo_x86 *c)
 			c->x86_cache_alignment = c->x86_clflush_size;
 		}
 	}
+
+#ifdef CONFIG_X86_32
+	if (cpu_has(c, X86_FEATURE_PAE) || cpu_has(c, X86_FEATURE_PSE36))
+		c->x86_phys_bits = 36;
+#endif
 }
 
 static void __cpuinit get_cpu_cap(struct cpuinfo_x86 *c)
@@ -519,11 +524,6 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	c->extended_cpuid_level = 0;
 
 	cpu_detect(c);
-
-#ifdef CONFIG_X86_32
-	if (cpu_has(c, X86_FEATURE_PAE) || cpu_has(c, X86_FEATURE_PSE36))
-		c->x86_phys_bits = 36;
-#endif
 
 	get_cpu_vendor(c);
 
@@ -666,11 +666,6 @@ static void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	}
 
 	generic_identify(c);
-
-#ifdef CONFIG_X86_32
-	if (cpu_has(c, X86_FEATURE_PAE) || cpu_has(c, X86_FEATURE_PSE36))
-		c->x86_phys_bits = 36;
-#endif
 
 	if (this_cpu->c_identify)
 		this_cpu->c_identify(c);
