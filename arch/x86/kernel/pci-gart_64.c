@@ -261,20 +261,6 @@ static dma_addr_t dma_map_area(struct device *dev, dma_addr_t phys_mem,
 	return iommu_bus_base + iommu_page*PAGE_SIZE + (phys_mem & ~PAGE_MASK);
 }
 
-static dma_addr_t
-gart_map_simple(struct device *dev, phys_addr_t paddr, size_t size, int dir)
-{
-	dma_addr_t map;
-	unsigned long align_mask;
-
-	align_mask = (1UL << get_order(size)) - 1;
-	map = dma_map_area(dev, paddr, size, dir, align_mask);
-
-	flush_gart();
-
-	return map;
-}
-
 /* Map a single area into the IOMMU */
 static dma_addr_t
 gart_map_single(struct device *dev, phys_addr_t paddr, size_t size, int dir)
@@ -282,7 +268,7 @@ gart_map_single(struct device *dev, phys_addr_t paddr, size_t size, int dir)
 	unsigned long bus;
 
 	if (!dev)
-		dev = &fallback_dev;
+		dev = &x86_dma_fallback_dev;
 
 	if (!need_iommu(dev, paddr, size))
 		return paddr;
@@ -434,7 +420,7 @@ gart_map_sg(struct device *dev, struct scatterlist *sg, int nents, int dir)
 		return 0;
 
 	if (!dev)
-		dev = &fallback_dev;
+		dev = &x86_dma_fallback_dev;
 
 	out = 0;
 	start = 0;
@@ -504,6 +490,41 @@ error:
 	for_each_sg(sg, s, nents, i)
 		s->dma_address = bad_dma_address;
 	return 0;
+}
+
+/* allocate and map a coherent mapping */
+static void *
+gart_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_addr,
+		    gfp_t flag)
+{
+	void *vaddr;
+	unsigned long align_mask;
+
+	vaddr = (void *)__get_free_pages(flag | __GFP_ZERO, get_order(size));
+	if (!vaddr)
+		return NULL;
+
+	align_mask = (1UL << get_order(size)) - 1;
+
+	*dma_addr = dma_map_area(dev, __pa(vaddr), size, DMA_BIDIRECTIONAL,
+				 align_mask);
+	flush_gart();
+
+	if (*dma_addr != bad_dma_address)
+		return vaddr;
+
+	free_pages((unsigned long)vaddr, get_order(size));
+
+	return NULL;
+}
+
+/* free a coherent mapping */
+static void
+gart_free_coherent(struct device *dev, size_t size, void *vaddr,
+		   dma_addr_t dma_addr)
+{
+	gart_unmap_single(dev, dma_addr, size, DMA_BIDIRECTIONAL);
+	free_pages((unsigned long)vaddr, get_order(size));
 }
 
 static int no_agp;
@@ -698,7 +719,6 @@ extern int agp_amd64_init(void);
 
 static struct dma_mapping_ops gart_dma_ops = {
 	.map_single			= gart_map_single,
-	.map_simple			= gart_map_simple,
 	.unmap_single			= gart_unmap_single,
 	.sync_single_for_cpu		= NULL,
 	.sync_single_for_device		= NULL,
@@ -708,6 +728,8 @@ static struct dma_mapping_ops gart_dma_ops = {
 	.sync_sg_for_device		= NULL,
 	.map_sg				= gart_map_sg,
 	.unmap_sg			= gart_unmap_sg,
+	.alloc_coherent			= gart_alloc_coherent,
+	.free_coherent			= gart_free_coherent,
 };
 
 void gart_iommu_shutdown(void)
