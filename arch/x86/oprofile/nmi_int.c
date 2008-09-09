@@ -36,8 +36,6 @@ static void nmi_cpu_start(void *dummy);
 static void nmi_cpu_stop(void *dummy);
 static void nmi_cpu_save_mpx_registers(struct op_msrs *msrs);
 static void nmi_cpu_restore_mpx_registers(struct op_msrs *msrs);
-static void nmi_cpu_stop(void *dummy);
-static void nmi_cpu_start(void *dummy);
 
 /* 0 == registered but off, 1 == registered and on */
 static int nmi_enabled = 0;
