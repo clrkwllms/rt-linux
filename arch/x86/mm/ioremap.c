@@ -25,7 +25,7 @@
 static inline int phys_addr_valid(unsigned long addr)
 {
 #ifdef CONFIG_RESOURCES_64BIT
-	return !(addr >> boot_cpu_data.x86_phys_bits);
+	return addr < (1UL << boot_cpu_data.x86_phys_bits);
 #else
 	return 1;
 #endif
