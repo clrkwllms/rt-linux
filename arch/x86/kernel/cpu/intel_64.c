@@ -54,6 +54,8 @@ static void __cpuinit srat_detect_node(void)
 
 static void __cpuinit init_intel(struct cpuinfo_x86 *c)
 {
+	early_init_intel(c);
+
 	init_intel_cacheinfo(c);
 	if (c->cpuid_level > 9) {
 		unsigned eax = cpuid_eax(10);
@@ -69,18 +71,19 @@ static void __cpuinit init_intel(struct cpuinfo_x86 *c)
 			set_cpu_cap(c, X86_FEATURE_BTS);
 		if (!(l1 & (1<<12)))
 			set_cpu_cap(c, X86_FEATURE_PEBS);
-	}
-
-
-	if (cpu_has_bts)
 		ds_init_intel(c);
+	}
 
 	if (c->x86 == 15)
 		c->x86_cache_alignment = c->x86_clflush_size * 2;
 	if (c->x86 == 6)
 		set_cpu_cap(c, X86_FEATURE_REP_GOOD);
-	set_cpu_cap(c, X86_FEATURE_LFENCE_RDTSC);
-	c->x86_max_cores = intel_num_cpu_cores(c);
+	if (cpu_has_xmm2)
+		set_cpu_cap(c, X86_FEATURE_LFENCE_RDTSC);
+
+	detect_extended_topology(c);
+	if (!cpu_has(c, X86_FEATURE_XTOPOLOGY))
+		c->x86_max_cores = intel_num_cpu_cores(c);
 
 	srat_detect_node();
 }
@@ -90,6 +93,7 @@ static struct cpu_dev intel_cpu_dev __cpuinitdata = {
 	.c_ident	= { "GenuineIntel" },
 	.c_early_init   = early_init_intel,
 	.c_init		= init_intel,
+	.c_x86_vendor	= X86_VENDOR_INTEL,
 };
-cpu_vendor_dev_register(X86_VENDOR_INTEL, &intel_cpu_dev);
 
+cpu_dev_register(intel_cpu_dev);
