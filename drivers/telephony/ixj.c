@@ -7597,6 +7597,7 @@ static IXJ *new_ixj(unsigned long port)
 
 static int __init ixj_probe_isapnp(int *cnt)
 {               
+#ifdef CONFIG_PNP
 	int probe = 0;
 	int func = 0x110;
         struct pnp_dev *dev = NULL, *old_dev = NULL;
@@ -7673,6 +7674,9 @@ static int __init ixj_probe_isapnp(int *cnt)
 		dev = NULL;
 	}
 	return probe;
+#else
+	return 0;
+#endif
 }
                         
 static int __init ixj_probe_isa(int *cnt)
