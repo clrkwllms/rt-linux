@@ -7,6 +7,9 @@ config HAVE_FTRACE
 config HAVE_DYNAMIC_FTRACE
 	bool
 
+config HAVE_FTRACE_MCOUNT_RECORD
+	bool
+
 config TRACER_MAX_TRACE
 	bool
 
@@ -14,10 +17,12 @@ config TRACING
 	bool
 	select DEBUG_FS
 	select STACKTRACE
+	select TRACEPOINTS
 
 config FTRACE
 	bool "Kernel Function Tracer"
 	depends on HAVE_FTRACE
+	depends on DEBUG_KERNEL
 	select FRAME_POINTER
 	select TRACING
 	select CONTEXT_SWITCH_TRACER
@@ -36,6 +41,7 @@ config IRQSOFF_TRACER
 	depends on TRACE_IRQFLAGS_SUPPORT
 	depends on GENERIC_TIME
 	depends on HAVE_FTRACE
+	depends on DEBUG_KERNEL
 	select TRACE_IRQFLAGS
 	select TRACING
 	select TRACER_MAX_TRACE
@@ -59,6 +65,7 @@ config PREEMPT_TRACER
 	depends on GENERIC_TIME
 	depends on PREEMPT
 	depends on HAVE_FTRACE
+	depends on DEBUG_KERNEL
 	select TRACING
 	select TRACER_MAX_TRACE
 	help
@@ -86,6 +93,7 @@ config SYSPROF_TRACER
 config SCHED_TRACER
 	bool "Scheduling Latency Tracer"
 	depends on HAVE_FTRACE
+	depends on DEBUG_KERNEL
 	select TRACING
 	select CONTEXT_SWITCH_TRACER
 	select TRACER_MAX_TRACE
@@ -96,16 +104,28 @@ config SCHED_TRACER
 config CONTEXT_SWITCH_TRACER
 	bool "Trace process context switches"
 	depends on HAVE_FTRACE
+	depends on DEBUG_KERNEL
 	select TRACING
 	select MARKERS
 	help
 	  This tracer gets called from the context switch and records
 	  all switching of tasks.
 
+config STACK_TRACER
+	bool "Trace max stack"
+	depends on HAVE_FTRACE
+	depends on DEBUG_KERNEL
+	select FTRACE
+	select STACKTRACE
+	help
+	  This tracer records the max stack of the kernel, and displays
+	  it in debugfs/tracing/stack_trace
+
 config DYNAMIC_FTRACE
 	bool "enable/disable ftrace tracepoints dynamically"
 	depends on FTRACE
 	depends on HAVE_DYNAMIC_FTRACE
+	depends on DEBUG_KERNEL
 	default y
 	help
          This option will modify all the calls to ftrace dynamically
@@ -121,12 +141,18 @@ config DYNAMIC_FTRACE
 	 were made. If so, it runs stop_machine (stops all CPUS)
 	 and modifies the code to jump over the call to ftrace.
 
+config FTRACE_MCOUNT_RECORD
+	def_bool y
+	depends on DYNAMIC_FTRACE
+	depends on HAVE_FTRACE_MCOUNT_RECORD
+
 config FTRACE_SELFTEST
 	bool
 
 config FTRACE_STARTUP_TEST
 	bool "Perform a startup test on ftrace"
 	depends on TRACING
+	depends on DEBUG_KERNEL
 	select FTRACE_SELFTEST
 	help
 	  This option performs a series of startup tests on ftrace. On bootup
