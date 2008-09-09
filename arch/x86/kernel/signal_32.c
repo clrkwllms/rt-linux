@@ -27,6 +27,7 @@
 #include <asm/uaccess.h>
 #include <asm/i387.h>
 #include <asm/vdso.h>
+#include <asm/syscall.h>
 #include <asm/syscalls.h>
 
 #include "sigframe.h"
@@ -242,7 +243,7 @@ asmlinkage int sys_rt_sigreturn(unsigned long __unused)
 	return ax;
 
 badframe:
-	force_sig(SIGSEGV, current);
+	signal_fault(regs, frame, "rt sigreturn");
 	return 0;
 }
 
@@ -337,13 +338,12 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, size_t frame_size,
 }
 
 static int
-setup_frame(int sig, struct k_sigaction *ka, sigset_t *set,
-	    struct pt_regs *regs)
+__setup_frame(int sig, struct k_sigaction *ka, sigset_t *set,
+	      struct pt_regs *regs)
 {
 	struct sigframe __user *frame;
 	void __user *restorer;
 	int err = 0;
-	int usig;
 	void __user *fpstate = NULL;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame), &fpstate);
@@ -351,13 +351,7 @@ setup_frame(int sig, struct k_sigaction *ka, sigset_t *set,
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	usig = current_thread_info()->exec_domain
-		&& current_thread_info()->exec_domain->signal_invmap
-		&& sig < 32
-		? current_thread_info()->exec_domain->signal_invmap[sig]
-		: sig;
-
-	err = __put_user(usig, &frame->sig);
+	err = __put_user(sig, &frame->sig);
 	if (err)
 		goto give_sigsegv;
 
@@ -415,13 +409,12 @@ give_sigsegv:
 	return -EFAULT;
 }
 
-static int setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
-			  sigset_t *set, struct pt_regs *regs)
+static int __setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
+			    sigset_t *set, struct pt_regs *regs)
 {
 	struct rt_sigframe __user *frame;
 	void __user *restorer;
 	int err = 0;
-	int usig;
 	void __user *fpstate = NULL;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame), &fpstate);
@@ -429,13 +422,7 @@ static int setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	usig = current_thread_info()->exec_domain
-		&& current_thread_info()->exec_domain->signal_invmap
-		&& sig < 32
-		? current_thread_info()->exec_domain->signal_invmap[sig]
-		: sig;
-
-	err |= __put_user(usig, &frame->sig);
+	err |= __put_user(sig, &frame->sig);
 	err |= __put_user(&frame->info, &frame->pinfo);
 	err |= __put_user(&frame->uc, &frame->puc);
 	err |= copy_siginfo_to_user(&frame->info, info);
@@ -481,7 +468,7 @@ static int setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Set up registers for signal handler */
 	regs->sp = (unsigned long)frame;
 	regs->ip = (unsigned long)ka->sa.sa_handler;
-	regs->ax = (unsigned long)usig;
+	regs->ax = (unsigned long)sig;
 	regs->dx = (unsigned long)&frame->info;
 	regs->cx = (unsigned long)&frame->uc;
 
@@ -501,15 +488,37 @@ give_sigsegv:
  * OK, we're invoking a handler:
  */
 static int
+setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
+	       sigset_t *set, struct pt_regs *regs)
+{
+	int ret;
+	int usig;
+
+	usig = current_thread_info()->exec_domain
+		&& current_thread_info()->exec_domain->signal_invmap
+		&& sig < 32
+		? current_thread_info()->exec_domain->signal_invmap[sig]
+		: sig;
+
+	/* Set up the stack frame */
+	if (ka->sa.sa_flags & SA_SIGINFO)
+		ret = __setup_rt_frame(usig, ka, info, set, regs);
+	else
+		ret = __setup_frame(usig, ka, set, regs);
+
+	return ret;
+}
+
+static int
 handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 	      sigset_t *oldset, struct pt_regs *regs)
 {
 	int ret;
 
 	/* Are we from a system call? */
-	if ((long)regs->orig_ax >= 0) {
+	if (syscall_get_nr(current, regs) >= 0) {
 		/* If so, check system call restarting.. */
-		switch (regs->ax) {
+		switch (syscall_get_error(current, regs)) {
 		case -ERESTART_RESTARTBLOCK:
 		case -ERESTARTNOHAND:
 			regs->ax = -EINTR;
@@ -536,11 +545,7 @@ handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 	    likely(test_and_clear_thread_flag(TIF_FORCED_TF)))
 		regs->flags &= ~X86_EFLAGS_TF;
 
-	/* Set up the stack frame */
-	if (ka->sa.sa_flags & SA_SIGINFO)
-		ret = setup_rt_frame(sig, ka, info, oldset, regs);
-	else
-		ret = setup_frame(sig, ka, oldset, regs);
+	ret = setup_rt_frame(sig, ka, info, oldset, regs);
 
 	if (ret)
 		return ret;
@@ -571,6 +576,7 @@ handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 	return 0;
 }
 
+#define NR_restart_syscall	__NR_restart_syscall
 /*
  * Note that 'init' is a special process: it doesn't get signals it doesn't
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
@@ -623,9 +629,9 @@ static void do_signal(struct pt_regs *regs)
 	}
 
 	/* Did we come from a system call? */
-	if ((long)regs->orig_ax >= 0) {
+	if (syscall_get_nr(current, regs) >= 0) {
 		/* Restart the system call - no handlers present */
-		switch (regs->ax) {
+		switch (syscall_get_error(current, regs)) {
 		case -ERESTARTNOHAND:
 		case -ERESTARTSYS:
 		case -ERESTARTNOINTR:
@@ -634,7 +640,7 @@ static void do_signal(struct pt_regs *regs)
 			break;
 
 		case -ERESTART_RESTARTBLOCK:
-			regs->ax = __NR_restart_syscall;
+			regs->ax = NR_restart_syscall;
 			regs->ip -= 2;
 			break;
 		}
@@ -667,4 +673,20 @@ do_notify_resume(struct pt_regs *regs, void *unused, __u32 thread_info_flags)
 	}
 
 	clear_thread_flag(TIF_IRET);
+}
+
+void signal_fault(struct pt_regs *regs, void __user *frame, char *where)
+{
+	struct task_struct *me = current;
+
+	if (show_unhandled_signals && printk_ratelimit()) {
+		printk(KERN_INFO
+		       "%s[%d] bad frame in %s frame:%p ip:%lx sp:%lx orax:%lx",
+		       me->comm, me->pid, where, frame,
+		       regs->ip, regs->sp, regs->orig_ax);
+		print_vma_addr(" in ", regs->ip);
+		printk(KERN_CONT "\n");
+	}
+
+	force_sig(SIGSEGV, me);
 }

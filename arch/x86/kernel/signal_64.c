@@ -195,8 +195,8 @@ get_stack(struct k_sigaction *ka, struct pt_regs *regs, unsigned long size)
 	return (void __user *)round_down(sp - size, 64);
 }
 
-static int setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
-			   sigset_t *set, struct pt_regs *regs)
+static int __setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
+			    sigset_t *set, struct pt_regs *regs)
 {
 	struct rt_sigframe __user *frame;
 	void __user *fp = NULL;
@@ -280,6 +280,24 @@ give_sigsegv:
 /*
  * OK, we're invoking a handler
  */
+static int
+setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
+	       sigset_t *set, struct pt_regs *regs)
+{
+	int ret;
+
+#ifdef CONFIG_IA32_EMULATION
+	if (test_thread_flag(TIF_IA32)) {
+		if (ka->sa.sa_flags & SA_SIGINFO)
+			ret = ia32_setup_rt_frame(sig, ka, info, set, regs);
+		else
+			ret = ia32_setup_frame(sig, ka, set, regs);
+	} else
+#endif
+	ret = __setup_rt_frame(sig, ka, info, set, regs);
+
+	return ret;
+}
 
 static int
 handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
@@ -317,14 +335,6 @@ handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 	    likely(test_and_clear_thread_flag(TIF_FORCED_TF)))
 		regs->flags &= ~X86_EFLAGS_TF;
 
-#ifdef CONFIG_IA32_EMULATION
-	if (test_thread_flag(TIF_IA32)) {
-		if (ka->sa.sa_flags & SA_SIGINFO)
-			ret = ia32_setup_rt_frame(sig, ka, info, oldset, regs);
-		else
-			ret = ia32_setup_frame(sig, ka, oldset, regs);
-	} else
-#endif
 	ret = setup_rt_frame(sig, ka, info, oldset, regs);
 
 	if (ret == 0) {
@@ -362,6 +372,8 @@ handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 	return ret;
 }
 
+#define NR_restart_syscall	\
+	test_thread_flag(TIF_IA32) ? __NR_ia32_restart_syscall : __NR_restart_syscall
 /*
  * Note that 'init' is a special process: it doesn't get signals it doesn't
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
@@ -423,9 +435,7 @@ static void do_signal(struct pt_regs *regs)
 			regs->ip -= 2;
 			break;
 		case -ERESTART_RESTARTBLOCK:
-			regs->ax = test_thread_flag(TIF_IA32) ?
-					__NR_ia32_restart_syscall :
-					__NR_restart_syscall;
+			regs->ax = NR_restart_syscall;
 			regs->ip -= 2;
 			break;
 		}
