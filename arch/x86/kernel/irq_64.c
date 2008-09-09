@@ -70,9 +70,27 @@ static inline void stack_overflow_check(struct pt_regs *regs)
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i = *(loff_t *) v, j;
+	int i, j;
 	struct irqaction * action;
 	unsigned long flags;
+	unsigned int entries;
+	struct irq_desc *desc = NULL;
+	int tail = 0;
+
+#ifdef CONFIG_HAVE_SPARSE_IRQ
+	desc = (struct irq_desc *)v;
+	entries = -1U;
+	i = desc->irq;
+	if (!desc->next)
+		tail = 1;
+#else
+	entries = nr_irqs - 1;
+	i = *(loff_t *) v;
+	if (i == nr_irqs)
+		tail = 1;
+	else
+		desc = irq_to_desc(i);
+#endif
 
 	if (i == 0) {
 		seq_printf(p, "           ");
@@ -81,28 +99,28 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 	}
 
-	if (i < NR_IRQS) {
+	if (i <= entries) {
 		unsigned any_count = 0;
 
-		spin_lock_irqsave(&irq_desc[i].lock, flags);
+		spin_lock_irqsave(&desc->lock, flags);
 #ifndef CONFIG_SMP
 		any_count = kstat_irqs(i);
 #else
 		for_each_online_cpu(j)
-			any_count |= kstat_cpu(j).irqs[i];
+			any_count |= kstat_irqs_cpu(i, j);
 #endif
-		action = irq_desc[i].action;
+		action = desc->action;
 		if (!action && !any_count)
 			goto skip;
-		seq_printf(p, "%3d: ",i);
+		seq_printf(p, "%#x: ",i);
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
 		for_each_online_cpu(j)
-			seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
+			seq_printf(p, "%10u ", kstat_irqs_cpu(i, j));
 #endif
-		seq_printf(p, " %8s", irq_desc[i].chip->name);
-		seq_printf(p, "-%-8s", irq_desc[i].name);
+		seq_printf(p, " %8s", desc->chip->name);
+		seq_printf(p, "-%-8s", desc->name);
 
 		if (action) {
 			seq_printf(p, "  %s", action->name);
@@ -111,8 +129,10 @@ int show_interrupts(struct seq_file *p, void *v)
 		}
 		seq_putc(p, '\n');
 skip:
-		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
-	} else if (i == NR_IRQS) {
+		spin_unlock_irqrestore(&desc->lock, flags);
+	}
+
+	if (tail) {
 		seq_printf(p, "NMI: ");
 		for_each_online_cpu(j)
 			seq_printf(p, "%10u ", cpu_pda(j)->__nmi_count);
@@ -151,6 +171,7 @@ skip:
 		seq_printf(p, "  Spurious interrupts\n");
 		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
 	}
+
 	return 0;
 }
 
@@ -188,6 +209,7 @@ u64 arch_irq_stat(void)
 asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
+	struct irq_desc *desc;
 
 	/* high bit used in ret_from_ code  */
 	unsigned vector = ~regs->orig_ax;
@@ -201,8 +223,9 @@ asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 	stack_overflow_check(regs);
 #endif
 
-	if (likely(irq < NR_IRQS))
-		generic_handle_irq(irq);
+	desc = irq_to_desc(irq);
+	if (likely(desc))
+		generic_handle_irq_desc(irq, desc);
 	else {
 		if (!disable_apic)
 			ack_APIC_irq();
@@ -223,8 +246,9 @@ void fixup_irqs(cpumask_t map)
 {
 	unsigned int irq;
 	static int warned;
+	struct irq_desc *desc;
 
-	for (irq = 0; irq < NR_IRQS; irq++) {
+	for_each_irq_desc(irq, desc) {
 		cpumask_t mask;
 		int break_affinity = 0;
 		int set_affinity = 1;
@@ -233,32 +257,32 @@ void fixup_irqs(cpumask_t map)
 			continue;
 
 		/* interrupt's are disabled at this point */
-		spin_lock(&irq_desc[irq].lock);
+		spin_lock(&desc->lock);
 
 		if (!irq_has_action(irq) ||
-		    cpus_equal(irq_desc[irq].affinity, map)) {
-			spin_unlock(&irq_desc[irq].lock);
+		    cpus_equal(desc->affinity, map)) {
+			spin_unlock(&desc->lock);
 			continue;
 		}
 
-		cpus_and(mask, irq_desc[irq].affinity, map);
+		cpus_and(mask, desc->affinity, map);
 		if (cpus_empty(mask)) {
 			break_affinity = 1;
 			mask = map;
 		}
 
-		if (irq_desc[irq].chip->mask)
-			irq_desc[irq].chip->mask(irq);
+		if (desc->chip->mask)
+			desc->chip->mask(irq);
 
-		if (irq_desc[irq].chip->set_affinity)
-			irq_desc[irq].chip->set_affinity(irq, mask);
+		if (desc->chip->set_affinity)
+			desc->chip->set_affinity(irq, mask);
 		else if (!(warned++))
 			set_affinity = 0;
 
-		if (irq_desc[irq].chip->unmask)
-			irq_desc[irq].chip->unmask(irq);
+		if (desc->chip->unmask)
+			desc->chip->unmask(irq);
 
-		spin_unlock(&irq_desc[irq].lock);
+		spin_unlock(&desc->lock);
 
 		if (break_affinity && set_affinity)
 			printk("Broke affinity for irq %i\n", irq);
