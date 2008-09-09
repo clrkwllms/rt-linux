@@ -13,7 +13,9 @@ enum trace_type {
 	TRACE_FN,
 	TRACE_CTX,
 	TRACE_WAKE,
+	TRACE_CONT,
 	TRACE_STACK,
+	TRACE_PRINT,
 	TRACE_SPECIAL,
 	TRACE_MMIO_RW,
 	TRACE_MMIO_MAP,
@@ -39,6 +41,7 @@ struct ctx_switch_entry {
 	unsigned int		next_pid;
 	unsigned char		next_prio;
 	unsigned char		next_state;
+	unsigned int		next_cpu;
 };
 
 /*
@@ -61,13 +64,20 @@ struct stack_entry {
 };
 
 /*
- * The trace entry - the most basic unit of tracing. This is what
+ * ftrace_printk entry:
+ */
+struct print_entry {
+	unsigned long		ip;
+	char			buf[];
+};
+
+/*
+ * The trace field - the most basic unit of tracing. This is what
  * is printed in the end as a single line in the trace output, such as:
  *
  *     bash-15816 [01]   235.197585: idle_cpu <- irq_enter
  */
-struct trace_entry {
-	char			type;
+struct trace_field {
 	char			cpu;
 	char			flags;
 	char			preempt_count;
@@ -78,8 +88,21 @@ struct trace_entry {
 		struct ctx_switch_entry		ctx;
 		struct special_entry		special;
 		struct stack_entry		stack;
+		struct print_entry		print;
 		struct mmiotrace_rw		mmiorw;
 		struct mmiotrace_map		mmiomap;
+	};
+};
+
+struct trace_field_cont {
+	char				buf[sizeof(struct trace_field)];
+};
+
+struct trace_entry {
+	char 				type;
+	union {
+		struct trace_field	field;
+		struct trace_field_cont	cont;
 	};
 };
 
@@ -334,6 +357,7 @@ enum trace_iterator_flags {
 	TRACE_ITER_BLOCK		= 0x80,
 	TRACE_ITER_STACKTRACE		= 0x100,
 	TRACE_ITER_SCHED_TREE		= 0x200,
+	TRACE_ITER_PRINTK		= 0x400,
 };
 
 #endif /* _LINUX_KERNEL_TRACE_H */
