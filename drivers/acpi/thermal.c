@@ -1876,5 +1876,5 @@ static void __exit acpi_thermal_exit(void)
 	return;
 }
 
-module_init(acpi_thermal_init);
+module_init_async(acpi_thermal_init);
 module_exit(acpi_thermal_exit);
