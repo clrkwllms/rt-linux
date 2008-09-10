@@ -667,7 +667,8 @@ static const struct pci_device_id mv_pci_tbl[] = {
 	{ PCI_VDEVICE(MARVELL, 0x5041), chip_504x },
 	{ PCI_VDEVICE(MARVELL, 0x5080), chip_5080 },
 	{ PCI_VDEVICE(MARVELL, 0x5081), chip_508x },
-	/* RocketRAID 1740/174x have different identifiers */
+	/* RocketRAID 1720/174x have different identifiers */
+	{ PCI_VDEVICE(TTI, 0x1720), chip_6042 },
 	{ PCI_VDEVICE(TTI, 0x1740), chip_508x },
 	{ PCI_VDEVICE(TTI, 0x1742), chip_508x },
 
@@ -1134,30 +1135,16 @@ static int mv_qc_defer(struct ata_queued_cmd *qc)
 	if (ap->nr_active_links == 0)
 		return 0;
 
-	if (pp->pp_flags & MV_PP_FLAG_EDMA_EN) {
-		/*
-		 * The port is operating in host queuing mode (EDMA).
-		 * It can accomodate a new qc if the qc protocol
-		 * is compatible with the current host queue mode.
-		 */
-		if (pp->pp_flags & MV_PP_FLAG_NCQ_EN) {
-			/*
-			 * The host queue (EDMA) is in NCQ mode.
-			 * If the new qc is also an NCQ command,
-			 * then allow the new qc.
-			 */
-			if (qc->tf.protocol == ATA_PROT_NCQ)
-				return 0;
-		} else {
-			/*
-			 * The host queue (EDMA) is in non-NCQ, DMA mode.
-			 * If the new qc is also a non-NCQ, DMA command,
-			 * then allow the new qc.
-			 */
-			if (qc->tf.protocol == ATA_PROT_DMA)
-				return 0;
-		}
-	}
+	/*
+	 * The port is operating in host queuing mode (EDMA) with NCQ
+	 * enabled, allow multiple NCQ commands.  EDMA also allows
+	 * queueing multiple DMA commands but libata core currently
+	 * doesn't allow it.
+	 */
+	if ((pp->pp_flags & MV_PP_FLAG_EDMA_EN) &&
+	    (pp->pp_flags & MV_PP_FLAG_NCQ_EN) && ata_is_ncq(qc->tf.protocol))
+		return 0;
+
 	return ATA_DEFER_PORT;
 }
 
@@ -1322,6 +1309,9 @@ static int mv_port_start(struct ata_port *ap)
 		goto out_port_free_dma_mem;
 	memset(pp->crpb, 0, MV_CRPB_Q_SZ);
 
+	/* 6041/6081 Rev. "C0" (and newer) are okay with async notify */
+	if (hpriv->hp_flags & MV_HP_ERRATA_60X1C0)
+		ap->flags |= ATA_FLAG_AN;
 	/*
 	 * For GEN_I, there's no NCQ, so we only allocate a single sg_tbl.
 	 * For later hardware, we need one unique sg_tbl per NCQ tag.
@@ -1592,6 +1582,24 @@ static unsigned int mv_qc_issue(struct ata_queued_cmd *qc)
 
 	if ((qc->tf.protocol != ATA_PROT_DMA) &&
 	    (qc->tf.protocol != ATA_PROT_NCQ)) {
+		static int limit_warnings = 10;
+		/*
+		 * Errata SATA#16, SATA#24: warn if multiple DRQs expected.
+		 *
+		 * Someday, we might implement special polling workarounds
+		 * for these, but it all seems rather unnecessary since we
+		 * normally use only DMA for commands which transfer more
+		 * than a single block of data.
+		 *
+		 * Much of the time, this could just work regardless.
+		 * So for now, just log the incident, and allow the attempt.
+		 */
+		if (limit_warnings > 0 && (qc->nbytes / qc->sect_size) > 1) {
+			--limit_warnings;
+			ata_link_printk(qc->dev->link, KERN_WARNING, DRV_NAME
+					": attempting PIO w/multiple DRQ: "
+					"this may fail due to h/w errata\n");
+		}
 		/*
 		 * We're about to send a non-EDMA capable command to the
 		 * port.  Turn off EDMA so there won't be problems accessing
@@ -3015,7 +3023,8 @@ static int mv_chip_id(struct ata_host *host, unsigned int board_idx)
 		break;
 	case chip_soc:
 		hpriv->ops = &mv_soc_ops;
-		hp_flags |= MV_HP_FLAG_SOC | MV_HP_ERRATA_60X1C0;
+		hp_flags |= MV_HP_FLAG_SOC | MV_HP_GEN_IIE |
+			MV_HP_ERRATA_60X1C0;
 		break;
 
 	default:
