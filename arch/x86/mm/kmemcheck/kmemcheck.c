@@ -604,7 +604,11 @@ bool kmemcheck_trap(struct pt_regs *regs)
 	regs->cx = cx;
 #endif
 	if (cx) {
+		unsigned long rep = (unsigned long) data->rep;
 		kmemcheck_hide(regs);
+		/* Without the REP prefix, we have to do this ourselves... */
+		data->rep = (void *) rep;
+		regs->ip = rep + 1;
 
 		switch (data->insn[0]) {
 		case 0xa4:
