@@ -859,6 +859,8 @@ int _set_memory_uc(unsigned long addr, int numpages)
 
 int set_memory_uc(unsigned long addr, int numpages)
 {
+	int ret;
+
 	/*
 	 * for now UC MINUS. see comments in ioremap_nocache()
 	 */
@@ -866,13 +868,19 @@ int set_memory_uc(unsigned long addr, int numpages)
 			    _PAGE_CACHE_UC_MINUS, NULL))
 		return -EINVAL;
 
-	return _set_memory_uc(addr, numpages);
+	ret = _set_memory_uc(addr, numpages);
+	if (ret)
+		free_memtype(__pa(addr), __pa(addr) + numpages * PAGE_SIZE);
+
+	return ret;
 }
 EXPORT_SYMBOL(set_memory_uc);
 
 int set_memory_array_uc(unsigned long *addr, int addrinarray)
 {
-	unsigned long start;
+	int ret;
+	int reserve_fail = 0;
+	unsigned long start = 0;
 	unsigned long end;
 	int i;
 	/*
@@ -885,17 +893,24 @@ int set_memory_array_uc(unsigned long *addr, int addrinarray)
 				break;
 			i++;
 		}
-		if (reserve_memtype(start, end, _PAGE_CACHE_UC_MINUS, NULL))
+		if (reserve_memtype(start, end, _PAGE_CACHE_UC_MINUS, NULL)) {
+			ret = -EINVAL;
+			reserve_fail = 1;
 			goto out;
+		}
 	}
 
-	return change_page_attr_set(addr, addrinarray,
+	ret = change_page_attr_set(addr, addrinarray,
 				    __pgprot(_PAGE_CACHE_UC_MINUS), 1);
+
+	if (!ret)
+		return ret;
+
 out:
 	for (i = 0; i < addrinarray; i++) {
 		unsigned long tmp = __pa(addr[i]);
 
-		if (tmp == start)
+		if (reserve_fail && tmp == start)
 			break;
 		for (end = tmp + PAGE_SIZE; i < addrinarray - 1; end += PAGE_SIZE) {
 			if (end != __pa(addr[i + 1]))
@@ -904,7 +919,7 @@ out:
 		}
 		free_memtype(tmp, end);
 	}
-	return -EINVAL;
+	return ret;
 }
 EXPORT_SYMBOL(set_memory_array_uc);
 
@@ -916,6 +931,8 @@ int _set_memory_wc(unsigned long addr, int numpages)
 
 int set_memory_wc(unsigned long addr, int numpages)
 {
+	int ret;
+
 	if (!pat_enabled)
 		return set_memory_uc(addr, numpages);
 
@@ -923,7 +940,11 @@ int set_memory_wc(unsigned long addr, int numpages)
 		_PAGE_CACHE_WC, NULL))
 		return -EINVAL;
 
-	return _set_memory_wc(addr, numpages);
+	ret = _set_memory_wc(addr, numpages);
+	if (ret)
+		free_memtype(__pa(addr), __pa(addr) + numpages * PAGE_SIZE);
+
+	return ret;
 }
 EXPORT_SYMBOL(set_memory_wc);
 
