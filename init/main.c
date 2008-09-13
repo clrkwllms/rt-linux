@@ -708,7 +708,8 @@ int do_one_initcall(initcall_t fn)
 	int result;
 
 	if (initcall_debug) {
-		print_fn_descriptor_symbol("calling  %s\n", fn);
+		print_fn_descriptor_symbol("calling  %s", fn);
+		printk(" @ %i\n",  task_pid_nr(current));
 		t0 = ktime_get();
 	}
 
