@@ -318,7 +318,6 @@ static int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 		printk(KERN_DEBUG "PCI: %s reg %x %s: [%llx, %llx]\n", pci_name(dev),
 			 pos, (res->flags & IORESOURCE_IO) ? "io port":"32bit mmio",
 			 res->start, res->end);
-
 	}
 
  out:
