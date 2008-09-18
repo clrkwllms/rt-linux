@@ -465,14 +465,6 @@ static void __cpuinit get_cpu_cap(struct cpuinfo_x86 *c)
 	}
 
 #ifdef CONFIG_X86_64
-	/* Transmeta-defined flags: level 0x80860001 */
-	xlvl = cpuid_eax(0x80860000);
-	if ((xlvl & 0xffff0000) == 0x80860000) {
-		/* Don't set x86_cpuid_level here for now to not confuse. */
-		if (xlvl >= 0x80860001)
-			c->x86_capability[2] = cpuid_edx(0x80860001);
-	}
-
 	if (c->extended_cpuid_level >= 0x80000008) {
 		u32 eax = cpuid_eax(0x80000008);
 
@@ -485,6 +477,33 @@ static void __cpuinit get_cpu_cap(struct cpuinfo_x86 *c)
 		c->x86_power = cpuid_edx(0x80000007);
 
 }
+
+static void __cpuinit identify_cpu_without_cpuid(struct cpuinfo_x86 *c)
+{
+#ifdef CONFIG_X86_32
+	int i;
+
+	/*
+	 * First of all, decide if this is a 486 or higher
+	 * It's a 486 if we can modify the AC flag
+	 */
+	if (flag_is_changeable_p(X86_EFLAGS_AC))
+		c->x86 = 4;
+	else
+		c->x86 = 3;
+
+	for (i = 0; i < X86_VENDOR_NUM; i++)
+		if (cpu_devs[i] && cpu_devs[i]->c_identify) {
+			c->x86_vendor_id[0] = 0;
+			cpu_devs[i]->c_identify(c);
+			if (c->x86_vendor_id[0]) {
+				get_cpu_vendor(c);
+				break;
+			}
+		}
+#endif
+}
+
 /*
  * Do minimum CPU detection early.
  * Fields really needed: vendor, cpuid_level, family, model, mask,
@@ -503,12 +522,15 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 #endif
 	c->x86_cache_alignment = c->x86_clflush_size;
 
+	memset(&c->x86_capability, 0, sizeof c->x86_capability);
+	c->extended_cpuid_level = 0;
+
+	if (!have_cpuid_p())
+		identify_cpu_without_cpuid(c);
+
+	/* cyrix could have cpuid enabled via c_identify()*/
 	if (!have_cpuid_p())
 		return;
-
-	memset(&c->x86_capability, 0, sizeof c->x86_capability);
-
-	c->extended_cpuid_level = 0;
 
 	cpu_detect(c);
 
@@ -583,10 +605,14 @@ static void __cpuinit detect_nopl(struct cpuinfo_x86 *c)
 
 static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 {
+	c->extended_cpuid_level = 0;
+
+	if (!have_cpuid_p())
+		identify_cpu_without_cpuid(c);
+
+	/* cyrix could have cpuid enabled via c_identify()*/
 	if (!have_cpuid_p())
 		return;
-
-	c->extended_cpuid_level = 0;
 
 	cpu_detect(c);
 
@@ -638,17 +664,6 @@ static void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 #endif
 	c->x86_cache_alignment = c->x86_clflush_size;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
-
-	if (!have_cpuid_p()) {
-		/*
-		 * First of all, decide if this is a 486 or higher
-		 * It's a 486 if we can modify the AC flag
-		 */
-		if (flag_is_changeable_p(X86_EFLAGS_AC))
-			c->x86 = 4;
-		else
-			c->x86 = 3;
-	}
 
 	generic_identify(c);
 
