@@ -708,8 +708,7 @@ int do_one_initcall(initcall_t fn)
 	int result;
 
 	if (initcall_debug) {
-		print_fn_descriptor_symbol("calling  %s", fn);
-		printk(" @ %i\n",  task_pid_nr(current));
+		printk("calling  %pF @ %i\n", fn, task_pid_nr(current));
 		t0 = ktime_get();
 	}
 
@@ -719,9 +718,8 @@ int do_one_initcall(initcall_t fn)
 		t1 = ktime_get();
 		delta = ktime_sub(t1, t0);
 
-		print_fn_descriptor_symbol("initcall %s", fn);
-		printk(" returned %d after %Ld msecs\n", result,
-			(unsigned long long) delta.tv64 >> 20);
+		printk("initcall %pF returned %d after %Ld msecs\n", fn,
+			result, (unsigned long long) delta.tv64 >> 20);
 	}
 
 	msgbuf[0] = 0;
