@@ -709,9 +709,12 @@ int do_one_initcall(initcall_t fn)
 	ktime_t t0, t1, delta;
 	char msgbuf[64];
 	int result;
+	struct boot_trace it;
 
 	if (initcall_debug) {
-		printk("calling  %pF @ %i\n", fn, task_pid_nr(current));
+		it.caller = task_pid_nr(current);
+		it.func = fn;
+		printk("calling  %pF @ %i\n", fn, it.caller);
 		t0 = ktime_get();
 	}
 
@@ -720,9 +723,11 @@ int do_one_initcall(initcall_t fn)
 	if (initcall_debug) {
 		t1 = ktime_get();
 		delta = ktime_sub(t1, t0);
-
+		it.result = result;
+		it.duration = (unsigned long long) delta.tv64 >> 20;
 		printk("initcall %pF returned %d after %Ld msecs\n", fn,
-			result, (unsigned long long) delta.tv64 >> 20);
+			result, it.duration);
+		trace_boot(&it);
 	}
 
 	msgbuf[0] = 0;
@@ -929,6 +934,7 @@ static int __init kernel_init(void * unused)
 	smp_prepare_cpus(setup_max_cpus);
 
 	do_pre_smp_initcalls();
+	start_boot_trace();
 
 	smp_init();
 	sched_init_smp();
