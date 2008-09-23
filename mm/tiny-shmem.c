@@ -65,21 +65,21 @@ struct file *shmem_file_setup(char *name, loff_t size, unsigned long flags)
 	if (!dentry)
 		goto put_memory;
 
-        error = -ENFILE;
-        file = get_empty_filp();
-        if (!file)
-                goto put_dentry;
+	error = -ENFILE;
+	file = get_empty_filp();
+	if (!file)
+		goto put_dentry;
 
 	error = -ENOSPC;
 	inode = ramfs_get_inode(root->d_sb, S_IFREG | S_IRWXUGO, 0);
 	if (!inode)
 		goto close_file;
 
-        d_instantiate(dentry, inode);
-        inode->i_size = size;
-        inode->i_nlink = 0;     /* It is unlinked */
-        init_file(file, shm_mnt, dentry, FMODE_WRITE | FMODE_READ,
-                        &ramfs_file_operations);
+	d_instantiate(dentry, inode);
+	inode->i_size = size;
+	inode->i_nlink = 0;	/* It is unlinked */
+	init_file(file, shm_mnt, dentry, FMODE_WRITE | FMODE_READ,
+			&ramfs_file_operations);
 	return file;
 
 close_file:
