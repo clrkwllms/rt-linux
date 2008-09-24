@@ -43,10 +43,12 @@ static unsigned long direct_pages_count[PG_LEVEL_NUM];
 
 void update_page_count(int level, unsigned long pages)
 {
+	unsigned long flags;
+
 	/* Protect against CPA */
-	spin_lock(&pgd_lock);
+	spin_lock_irqsave(&pgd_lock, flags);
 	direct_pages_count[level] += pages;
-	spin_unlock(&pgd_lock);
+	spin_unlock_irqrestore(&pgd_lock, flags);
 }
 
 static void split_page_count(int level)
@@ -336,7 +338,7 @@ static int
 try_preserve_large_page(pte_t *kpte, unsigned long address,
 			struct cpa_data *cpa)
 {
-	unsigned long nextpage_addr, numpages, pmask, psize, addr, pfn;
+	unsigned long nextpage_addr, numpages, pmask, psize, flags, addr, pfn;
 	pte_t new_pte, old_pte, *tmp;
 	pgprot_t old_prot, new_prot;
 	int i, do_split = 1;
@@ -345,7 +347,7 @@ try_preserve_large_page(pte_t *kpte, unsigned long address,
 	if (cpa->force_split)
 		return 1;
 
-	spin_lock(&pgd_lock);
+	spin_lock_irqsave(&pgd_lock, flags);
 	/*
 	 * Check for races, another CPU might have split this page
 	 * up already:
@@ -440,7 +442,7 @@ try_preserve_large_page(pte_t *kpte, unsigned long address,
 	}
 
 out_unlock:
-	spin_unlock(&pgd_lock);
+	spin_unlock_irqrestore(&pgd_lock, flags);
 
 	return do_split;
 }
@@ -452,6 +454,7 @@ static unsigned long pool_used, pool_failed;
 static void cpa_fill_pool(struct page **ret)
 {
 	gfp_t gfp = GFP_KERNEL;
+	unsigned long flags;
 	struct page *p;
 
 	/*
@@ -481,10 +484,10 @@ static void cpa_fill_pool(struct page **ret)
 			*ret = p;
 			continue;
 		}
-		spin_lock(&pgd_lock);
+		spin_lock_irqsave(&pgd_lock, flags);
 		list_add(&p->lru, &page_pool);
 		pool_pages++;
-		spin_unlock(&pgd_lock);
+		spin_unlock_irqrestore(&pgd_lock, flags);
 	}
 
 	current->flags &= ~PF_MEMALLOC;
@@ -524,7 +527,7 @@ void __init cpa_init(void)
 
 static int split_large_page(pte_t *kpte, unsigned long address)
 {
-	unsigned long pfn, pfninc = 1;
+	unsigned long flags, pfn, pfninc = 1;
 	unsigned int i, level;
 	pte_t *pbase, *tmp;
 	pgprot_t ref_prot;
@@ -535,14 +538,14 @@ static int split_large_page(pte_t *kpte, unsigned long address)
 	 * pgd_lock, which we have to take anyway for the split
 	 * operation:
 	 */
-	spin_lock(&pgd_lock);
+	spin_lock_irqsave(&pgd_lock, flags);
 	if (list_empty(&page_pool)) {
-		spin_unlock(&pgd_lock);
+		spin_unlock_irqrestore(&pgd_lock, flags);
 		base = NULL;
 		cpa_fill_pool(&base);
 		if (!base)
 			return -ENOMEM;
-		spin_lock(&pgd_lock);
+		spin_lock_irqsave(&pgd_lock, flags);
 	} else {
 		base = list_first_entry(&page_pool, struct page, lru);
 		list_del(&base->lru);
@@ -613,7 +616,7 @@ out_unlock:
 		pool_pages++;
 	} else
 		pool_used++;
-	spin_unlock(&pgd_lock);
+	spin_unlock_irqrestore(&pgd_lock, flags);
 
 	return 0;
 }
@@ -672,10 +675,6 @@ repeat:
 		cpa->numpages = 1;
 		return 0;
 	}
-
-#ifdef CONFIG_DEBUG_PAGEALLOC
-	BUG_ON(irqs_disabled());
-#endif
 
 	/*
 	 * Check, whether we can keep the large page intact
