@@ -131,18 +131,6 @@ void clflush_cache_range(void *vaddr, unsigned int size)
 	mb();
 }
 
-static void __global_flush_tlb(void *arg)
-{
-	__flush_tlb_all();
-}
-
-static void global_flush_tlb(void)
-{
-	BUG_ON(irqs_disabled());
-
-	on_each_cpu(__global_flush_tlb, NULL, 1);
-}
-
 static void __cpa_flush_all(void *arg)
 {
 	unsigned long cache = (unsigned long)arg;
@@ -518,25 +506,6 @@ static int split_large_page(pte_t *kpte, unsigned long address)
 	ref_prot = pte_pgprot(pte_mkexec(pte_clrhuge(*kpte)));
 	pgprot_val(ref_prot) |= _PAGE_PRESENT;
 	__set_pmd_pte(kpte, address, mk_pte(base, ref_prot));
-
-	/*
-	 * Do a global flush tlb after splitting the large page
-	 * and before we do the actual change page attribute in the PTE.
-	 *
-	 * With out this, we violate the TLB application note, which says
-	 *  "The TLBs may contain both ordinary and large-page translations for
-	 *   a 4-KByte range of linear addresses. This may occur if software
-	 *   modifies the paging structures so that the page size used for the
-	 *   address range changes. If the two translations differ with respect
-	 *   to page frame or attributes (e.g., permissions), processor behavior
-	 *   is undefined and may be implementation-specific."
-	 *
-	 * We do this global tlb flush inside the pgd_lock, so that we don't
-	 * allow any other cpu, with stale tlb entries change the page table
-	 * attribute in parallel, that also falls into the just split large
-	 * page entry.
-	 */
-	global_flush_tlb();
 	base = NULL;
 
 out_unlock:
@@ -627,8 +596,10 @@ repeat:
 	 * We have to split the large page:
 	 */
 	err = split_large_page(kpte, address);
-	if (!err)
+	if (!err) {
+		cpa->flags |= CPA_FLUSHTLB;
 		goto repeat;
+	}
 
 	return err;
 }
