@@ -796,6 +796,8 @@ int mem_cgroup_shrink_usage(struct mm_struct *mm, gfp_t gfp_mask)
 
 	if (mem_cgroup_subsys.disabled)
 		return 0;
+	if (!mm)
+		return 0;
 
 	rcu_read_lock();
 	mem = mem_cgroup_from_task(rcu_dereference(mm->owner));
@@ -804,6 +806,7 @@ int mem_cgroup_shrink_usage(struct mm_struct *mm, gfp_t gfp_mask)
 
 	do {
 		progress = try_to_free_mem_cgroup_pages(mem, gfp_mask);
+		progress += res_counter_check_under_limit(&mem->res);
 	} while (!progress && --retry);
 
 	css_put(&mem->css);
@@ -1167,9 +1170,6 @@ static void mem_cgroup_move_task(struct cgroup_subsys *ss,
 
 	mem = mem_cgroup_from_cont(cont);
 	old_mem = mem_cgroup_from_cont(old_cont);
-
-	if (mem == old_mem)
-		goto out;
 
 	/*
 	 * Only thread group leaders are allowed to migrate, the mm_struct is
