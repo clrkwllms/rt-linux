@@ -799,6 +799,8 @@ static inline int pci_proc_domain(struct pci_bus *bus)
 }
 #endif /* CONFIG_PCI_DOMAINS */
 
+extern int pci_resource_enabled(struct pci_dev *dev, int bar);
+
 #else /* CONFIG_PCI is not enabled */
 
 /*
@@ -978,6 +980,9 @@ static inline struct pci_dev *pci_get_slot(struct pci_bus *bus,
 static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
 						unsigned int devfn)
 { return NULL; }
+
+static inline int pci_resource_enabled(struct pci_dev *dev, int bar)
+{ return 0; }
 
 #endif /* CONFIG_PCI */
 
