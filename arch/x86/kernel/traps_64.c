@@ -637,8 +637,8 @@ kernel_trap:
 	return;
 }
 
-#define DO_ERROR(trapnr, signr, str, name) \
-asmlinkage void do_##name(struct pt_regs * regs, long error_code)	\
+#define DO_ERROR(trapnr, signr, str, name)				\
+asmlinkage void do_##name(struct pt_regs *regs, long error_code)	\
 {									\
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr)	\
 							== NOTIFY_STOP)	\
@@ -648,7 +648,7 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code)	\
 }
 
 #define DO_ERROR_INFO(trapnr, signr, str, name, sicode, siaddr)		\
-asmlinkage void do_##name(struct pt_regs * regs, long error_code)	\
+asmlinkage void do_##name(struct pt_regs *regs, long error_code)	\
 {									\
 	siginfo_t info;							\
 	info.si_signo = signr;						\
