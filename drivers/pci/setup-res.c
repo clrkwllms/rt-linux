@@ -26,6 +26,28 @@
 #include "pci.h"
 
 
+int pci_resource_enabled(struct pci_dev *dev, int bar)
+{
+	u16 command = 0;
+	u32 addr = 0;
+
+	pci_read_config_word(dev, PCI_COMMAND, &command);
+
+	if (pci_resource_flags(dev, bar) & IORESOURCE_IO)
+		return command & PCI_COMMAND_IO;
+
+	if (command & PCI_COMMAND_MEMORY) {
+		if (bar == PCI_ROM_RESOURCE) {
+			pci_read_config_dword(dev, dev->rom_base_reg, &addr);
+			return addr & PCI_ROM_ADDRESS_ENABLE;
+		}
+
+		return 1;
+	}
+
+	return 0;
+}
+
 void pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
 {
 	struct pci_bus_region region;
