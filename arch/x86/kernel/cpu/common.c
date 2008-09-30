@@ -465,14 +465,6 @@ static void __cpuinit get_cpu_cap(struct cpuinfo_x86 *c)
 	}
 
 #ifdef CONFIG_X86_64
-	/* Transmeta-defined flags: level 0x80860001 */
-	xlvl = cpuid_eax(0x80860000);
-	if ((xlvl & 0xffff0000) == 0x80860000) {
-		/* Don't set x86_cpuid_level here for now to not confuse. */
-		if (xlvl >= 0x80860001)
-			c->x86_capability[2] = cpuid_edx(0x80860001);
-	}
-
 	if (c->extended_cpuid_level >= 0x80000008) {
 		u32 eax = cpuid_eax(0x80000008);
 
@@ -485,6 +477,33 @@ static void __cpuinit get_cpu_cap(struct cpuinfo_x86 *c)
 		c->x86_power = cpuid_edx(0x80000007);
 
 }
+
+static void __cpuinit identify_cpu_without_cpuid(struct cpuinfo_x86 *c)
+{
+#ifdef CONFIG_X86_32
+	int i;
+
+	/*
+	 * First of all, decide if this is a 486 or higher
+	 * It's a 486 if we can modify the AC flag
+	 */
+	if (flag_is_changeable_p(X86_EFLAGS_AC))
+		c->x86 = 4;
+	else
+		c->x86 = 3;
+
+	for (i = 0; i < X86_VENDOR_NUM; i++)
+		if (cpu_devs[i] && cpu_devs[i]->c_identify) {
+			c->x86_vendor_id[0] = 0;
+			cpu_devs[i]->c_identify(c);
+			if (c->x86_vendor_id[0]) {
+				get_cpu_vendor(c);
+				break;
+			}
+		}
+#endif
+}
+
 /*
  * Do minimum CPU detection early.
  * Fields really needed: vendor, cpuid_level, family, model, mask,
@@ -503,12 +522,15 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 #endif
 	c->x86_cache_alignment = c->x86_clflush_size;
 
+	memset(&c->x86_capability, 0, sizeof c->x86_capability);
+	c->extended_cpuid_level = 0;
+
+	if (!have_cpuid_p())
+		identify_cpu_without_cpuid(c);
+
+	/* cyrix could have cpuid enabled via c_identify()*/
 	if (!have_cpuid_p())
 		return;
-
-	memset(&c->x86_capability, 0, sizeof c->x86_capability);
-
-	c->extended_cpuid_level = 0;
 
 	cpu_detect(c);
 
@@ -552,6 +574,10 @@ void __init early_cpu_init(void)
  * The NOPL instruction is supposed to exist on all CPUs with
  * family >= 6; unfortunately, that's not true in practice because
  * of early VIA chips and (more importantly) broken virtualizers that
+ *
+ * Note: no 64-bit chip is known to lack these, but put the code here
+ * for consistency with 32 bits, and to make it utterly trivial to
+ * diagnose the problem should it ever surface.
  * are not easy to detect.  In the latter case it doesn't even *fail*
  * reliably, so probing for it doesn't even work.  Disable it completely
  * unless we can find a reliable way to detect all the broken cases.
@@ -563,10 +589,14 @@ static void __cpuinit detect_nopl(struct cpuinfo_x86 *c)
 
 static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 {
+	c->extended_cpuid_level = 0;
+
+	if (!have_cpuid_p())
+		identify_cpu_without_cpuid(c);
+
+	/* cyrix could have cpuid enabled via c_identify()*/
 	if (!have_cpuid_p())
 		return;
-
-	c->extended_cpuid_level = 0;
 
 	cpu_detect(c);
 
@@ -618,17 +648,6 @@ static void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 #endif
 	c->x86_cache_alignment = c->x86_clflush_size;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
-
-	if (!have_cpuid_p()) {
-		/*
-		 * First of all, decide if this is a 486 or higher
-		 * It's a 486 if we can modify the AC flag
-		 */
-		if (flag_is_changeable_p(X86_EFLAGS_AC))
-			c->x86 = 4;
-		else
-			c->x86 = 3;
-	}
 
 	generic_identify(c);
 
@@ -782,7 +801,7 @@ void __cpuinit print_cpu_info(struct cpuinfo_x86 *c)
 	else if (c->cpuid_level >= 0)
 		vendor = c->x86_vendor_id;
 
-	if (vendor && strncmp(c->x86_model_id, vendor, strlen(vendor)))
+	if (vendor && !strstr(c->x86_model_id, vendor))
 		printk(KERN_CONT "%s ", vendor);
 
 	if (c->x86_model_id[0])
@@ -1106,16 +1125,5 @@ void __cpuinit cpu_init(void)
 	xsave_init();
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-void __cpuinit cpu_uninit(void)
-{
-	int cpu = raw_smp_processor_id();
-	cpu_clear(cpu, cpu_initialized);
-
-	/* lazy TLB state */
-	per_cpu(cpu_tlbstate, cpu).state = 0;
-	per_cpu(cpu_tlbstate, cpu).active_mm = &init_mm;
-}
-#endif
 
 #endif
