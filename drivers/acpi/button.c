@@ -545,5 +545,5 @@ static void __exit acpi_button_exit(void)
 	remove_proc_entry(ACPI_BUTTON_CLASS, acpi_root_dir);
 }
 
-module_init(acpi_button_init);
+module_init_async(acpi_button_init);
 module_exit(acpi_button_exit);
