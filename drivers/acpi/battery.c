@@ -904,5 +904,5 @@ static void __exit acpi_battery_exit(void)
 #endif
 }
 
-module_init(acpi_battery_init);
+module_init_async(acpi_battery_init);
 module_exit(acpi_battery_exit);
