@@ -572,35 +572,19 @@ void __init early_cpu_init(void)
 
 /*
  * The NOPL instruction is supposed to exist on all CPUs with
- * family >= 6, unfortunately, that's not true in practice because
+ * family >= 6; unfortunately, that's not true in practice because
  * of early VIA chips and (more importantly) broken virtualizers that
- * are not easy to detect.  Hence, probe for it based on first
- * principles.
  *
  * Note: no 64-bit chip is known to lack these, but put the code here
  * for consistency with 32 bits, and to make it utterly trivial to
  * diagnose the problem should it ever surface.
+ * are not easy to detect.  In the latter case it doesn't even *fail*
+ * reliably, so probing for it doesn't even work.  Disable it completely
+ * unless we can find a reliable way to detect all the broken cases.
  */
 static void __cpuinit detect_nopl(struct cpuinfo_x86 *c)
 {
-	const u32 nopl_signature = 0x888c53b1; /* Random number */
-	u32 has_nopl = nopl_signature;
-
 	clear_cpu_cap(c, X86_FEATURE_NOPL);
-	if (c->x86 >= 6) {
-		asm volatile("\n"
-			     "1:      .byte 0x0f,0x1f,0xc0\n" /* nopl %eax */
-			     "2:\n"
-			     "        .section .fixup,\"ax\"\n"
-			     "3:      xor %0,%0\n"
-			     "        jmp 2b\n"
-			     "        .previous\n"
-			     _ASM_EXTABLE(1b,3b)
-			     : "+a" (has_nopl));
-
-		if (has_nopl == nopl_signature)
-			set_cpu_cap(c, X86_FEATURE_NOPL);
-	}
 }
 
 static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
@@ -1141,16 +1125,5 @@ void __cpuinit cpu_init(void)
 	xsave_init();
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-void __cpuinit cpu_uninit(void)
-{
-	int cpu = raw_smp_processor_id();
-	cpu_clear(cpu, cpu_initialized);
-
-	/* lazy TLB state */
-	per_cpu(cpu_tlbstate, cpu).state = 0;
-	per_cpu(cpu_tlbstate, cpu).active_mm = &init_mm;
-}
-#endif
 
 #endif
