@@ -13,7 +13,9 @@ enum trace_type {
 	TRACE_FN,
 	TRACE_CTX,
 	TRACE_WAKE,
+	TRACE_CONT,
 	TRACE_STACK,
+	TRACE_PRINT,
 	TRACE_SPECIAL,
 	TRACE_MMIO_RW,
 	TRACE_MMIO_MAP,
@@ -39,6 +41,7 @@ struct ctx_switch_entry {
 	unsigned int		next_pid;
 	unsigned char		next_prio;
 	unsigned char		next_state;
+	unsigned int		next_cpu;
 };
 
 /*
@@ -61,13 +64,37 @@ struct stack_entry {
 };
 
 /*
- * The trace entry - the most basic unit of tracing. This is what
+ * ftrace_printk entry:
+ */
+struct print_entry {
+	unsigned long		ip;
+	char			buf[];
+};
+
+/*
+ * trace_flag_type is an enumeration that holds different
+ * states when a trace occurs. These are:
+ *  IRQS_OFF	- interrupts were disabled
+ *  NEED_RESCED - reschedule is requested
+ *  HARDIRQ	- inside an interrupt handler
+ *  SOFTIRQ	- inside a softirq handler
+ *  CONT	- multiple entries hold the trace item
+ */
+enum trace_flag_type {
+	TRACE_FLAG_IRQS_OFF		= 0x01,
+	TRACE_FLAG_NEED_RESCHED		= 0x02,
+	TRACE_FLAG_HARDIRQ		= 0x04,
+	TRACE_FLAG_SOFTIRQ		= 0x08,
+	TRACE_FLAG_CONT			= 0x10,
+};
+
+/*
+ * The trace field - the most basic unit of tracing. This is what
  * is printed in the end as a single line in the trace output, such as:
  *
  *     bash-15816 [01]   235.197585: idle_cpu <- irq_enter
  */
-struct trace_entry {
-	char			type;
+struct trace_field {
 	char			cpu;
 	char			flags;
 	char			preempt_count;
@@ -78,12 +105,29 @@ struct trace_entry {
 		struct ctx_switch_entry		ctx;
 		struct special_entry		special;
 		struct stack_entry		stack;
+		struct print_entry		print;
 		struct mmiotrace_rw		mmiorw;
 		struct mmiotrace_map		mmiomap;
 	};
 };
 
+struct trace_field_cont {
+	char				buf[sizeof(struct trace_field)];
+};
+
+struct trace_entry {
+	char 				type;
+	union {
+		struct trace_field	field;
+		struct trace_field_cont	cont;
+	};
+};
+
 #define TRACE_ENTRY_SIZE	sizeof(struct trace_entry)
+#define TRACE_BUF_SIZE		1024
+#define TRACE_PRINT_BUF_SIZE \
+	(sizeof(struct trace_field) - offsetof(struct trace_field, print.buf))
+#define TRACE_CONT_BUF_SIZE	sizeof(struct trace_field)
 
 /*
  * The CPU trace array - it consists of thousands of trace entries
@@ -190,10 +234,16 @@ struct trace_iterator {
 	long			idx;
 };
 
+void trace_wake_up(void);
 void tracing_reset(struct trace_array_cpu *data);
 int tracing_open_generic(struct inode *inode, struct file *filp);
 struct dentry *tracing_init_dentry(void);
 void init_tracer_sysprof_debugfs(struct dentry *d_tracer);
+
+struct trace_entry *tracing_get_trace_entry(struct trace_array *tr,
+						struct trace_array_cpu *data);
+void tracing_generic_entry_update(struct trace_entry *entry,
+						unsigned long flags);
 
 void ftrace(struct trace_array *tr,
 			    struct trace_array_cpu *data,
@@ -268,51 +318,33 @@ extern unsigned long ftrace_update_tot_cnt;
 extern int DYN_FTRACE_TEST_NAME(void);
 #endif
 
-#ifdef CONFIG_MMIOTRACE
-extern void __trace_mmiotrace_rw(struct trace_array *tr,
-				struct trace_array_cpu *data,
-				struct mmiotrace_rw *rw);
-extern void __trace_mmiotrace_map(struct trace_array *tr,
-				struct trace_array_cpu *data,
-				struct mmiotrace_map *map);
-#endif
-
 #ifdef CONFIG_FTRACE_STARTUP_TEST
-#ifdef CONFIG_FTRACE
 extern int trace_selftest_startup_function(struct tracer *trace,
 					   struct trace_array *tr);
-#endif
-#ifdef CONFIG_IRQSOFF_TRACER
 extern int trace_selftest_startup_irqsoff(struct tracer *trace,
 					  struct trace_array *tr);
-#endif
-#ifdef CONFIG_PREEMPT_TRACER
 extern int trace_selftest_startup_preemptoff(struct tracer *trace,
 					     struct trace_array *tr);
-#endif
-#if defined(CONFIG_IRQSOFF_TRACER) && defined(CONFIG_PREEMPT_TRACER)
 extern int trace_selftest_startup_preemptirqsoff(struct tracer *trace,
 						 struct trace_array *tr);
-#endif
-#ifdef CONFIG_SCHED_TRACER
 extern int trace_selftest_startup_wakeup(struct tracer *trace,
 					 struct trace_array *tr);
-#endif
-#ifdef CONFIG_CONTEXT_SWITCH_TRACER
+extern int trace_selftest_startup_nop(struct tracer *trace,
+					 struct trace_array *tr);
 extern int trace_selftest_startup_sched_switch(struct tracer *trace,
 					       struct trace_array *tr);
-#endif
-#ifdef CONFIG_SYSPROF_TRACER
 extern int trace_selftest_startup_sysprof(struct tracer *trace,
 					       struct trace_array *tr);
-#endif
 #endif /* CONFIG_FTRACE_STARTUP_TEST */
 
 extern void *head_page(struct trace_array_cpu *data);
 extern int trace_seq_printf(struct trace_seq *s, const char *fmt, ...);
+extern void trace_seq_print_cont(struct trace_seq *s,
+				 struct trace_iterator *iter);
 extern ssize_t trace_seq_to_user(struct trace_seq *s, char __user *ubuf,
 				 size_t cnt);
 extern long ns2usecs(cycle_t nsec);
+extern int trace_vprintk(unsigned long ip, const char *fmt, va_list args);
 
 extern unsigned long trace_flags;
 
@@ -334,6 +366,9 @@ enum trace_iterator_flags {
 	TRACE_ITER_BLOCK		= 0x80,
 	TRACE_ITER_STACKTRACE		= 0x100,
 	TRACE_ITER_SCHED_TREE		= 0x200,
+	TRACE_ITER_PRINTK		= 0x400,
 };
+
+extern struct tracer nop_trace;
 
 #endif /* _LINUX_KERNEL_TRACE_H */
