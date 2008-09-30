@@ -6,7 +6,12 @@
  * converts to "bar".
  */
 
+#ifdef __STDC__
+#define __stringify_1(x...)	#x
+#define __stringify(x...)	__stringify_1(x)
+#else	/* Support gcc -traditional, without commas. */
 #define __stringify_1(x)	#x
 #define __stringify(x)		__stringify_1(x)
+#endif
 
 #endif	/* !__LINUX_STRINGIFY_H */
