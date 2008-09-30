@@ -178,9 +178,9 @@ convert_ip_to_linear(struct task_struct *child, struct pt_regs *regs);
 #ifdef CONFIG_X86_32
 extern void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
 			 int error_code);
-#else
-void signal_fault(struct pt_regs *regs, void __user *frame, char *where);
 #endif
+
+void signal_fault(struct pt_regs *regs, void __user *frame, char *where);
 
 extern long syscall_trace_enter(struct pt_regs *);
 extern void syscall_trace_leave(struct pt_regs *);
@@ -248,6 +248,11 @@ static inline unsigned long instruction_pointer(struct pt_regs *regs)
 static inline unsigned long frame_pointer(struct pt_regs *regs)
 {
 	return regs->bp;
+}
+
+static inline unsigned long user_stack_pointer(struct pt_regs *regs)
+{
+	return regs->sp;
 }
 
 /*
