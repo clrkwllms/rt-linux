@@ -5,6 +5,7 @@
 
 #include <linux/linkage.h>
 #include <linux/fs.h>
+#include <linux/ktime.h>
 #include <linux/init.h>
 #include <linux/types.h>
 
