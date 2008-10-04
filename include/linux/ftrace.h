@@ -1,12 +1,14 @@
 #ifndef _LINUX_FTRACE_H
 #define _LINUX_FTRACE_H
 
-#ifdef CONFIG_FTRACE
-
 #include <linux/linkage.h>
 #include <linux/fs.h>
+#include <linux/ktime.h>
 #include <linux/init.h>
 #include <linux/types.h>
+#include <linux/kallsyms.h>
+
+#ifdef CONFIG_FTRACE
 
 extern int ftrace_enabled;
 extern int
@@ -213,17 +215,21 @@ ftrace_init_module(unsigned long *start, unsigned long *end) { }
 
 struct boot_trace {
 	pid_t			caller;
-	initcall_t		func;
+	char 			func[KSYM_NAME_LEN];
 	int			result;
 	unsigned long long	duration;
+	ktime_t			calltime;
+	ktime_t			rettime;
 };
 
 #ifdef CONFIG_BOOT_TRACER
-extern void trace_boot(struct boot_trace *it);
+extern void trace_boot(struct boot_trace *it, initcall_t fn);
 extern void start_boot_trace(void);
+extern void stop_boot_trace(void);
 #else
-static inline void trace_boot(struct boot_trace *it) { }
+static inline void trace_boot(struct boot_trace *it, initcall_t fn) { }
 static inline void start_boot_trace(void) { }
+static inline void stop_boot_trace(void) { }
 #endif
 
 
