@@ -736,8 +736,7 @@ int do_one_initcall(initcall_t fn)
 		local_irq_enable();
 	}
 	if (msgbuf[0]) {
-		print_fn_descriptor_symbol(KERN_WARNING "initcall %s", fn);
-		printk(" returned with %s\n", msgbuf);
+		printk("initcall %pF returned with %s\n", fn, msgbuf);
 	}
 
 	return result;
