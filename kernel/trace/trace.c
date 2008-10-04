@@ -2384,9 +2384,11 @@ tracing_set_trace_write(struct file *filp, const char __user *ubuf,
 	struct tracer *t;
 	char buf[max_tracer_type_len+1];
 	int i;
+	size_t ret;
 
 	if (cnt > max_tracer_type_len)
 		cnt = max_tracer_type_len;
+	ret = cnt;
 
 	if (copy_from_user(&buf, ubuf, cnt))
 		return -EFAULT;
@@ -2402,7 +2404,11 @@ tracing_set_trace_write(struct file *filp, const char __user *ubuf,
 		if (strcmp(t->name, buf) == 0)
 			break;
 	}
-	if (!t || t == current_trace)
+	if (!t) {
+		ret = -EINVAL;
+		goto out;
+	}
+	if (t == current_trace)
 		goto out;
 
 	if (current_trace && current_trace->reset)
@@ -2415,9 +2421,10 @@ tracing_set_trace_write(struct file *filp, const char __user *ubuf,
  out:
 	mutex_unlock(&trace_types_lock);
 
-	filp->f_pos += cnt;
+	if (ret == cnt)
+		filp->f_pos += cnt;
 
-	return cnt;
+	return ret;
 }
 
 static ssize_t
