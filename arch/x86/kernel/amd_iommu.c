@@ -65,7 +65,7 @@ static int __iommu_queue_command(struct amd_iommu *iommu, struct iommu_cmd *cmd)
 	u8 *target;
 
 	tail = readl(iommu->mmio_base + MMIO_CMD_TAIL_OFFSET);
-	target = (iommu->cmd_buf + tail);
+	target = iommu->cmd_buf + tail;
 	memcpy_toio(target, cmd, sizeof(*cmd));
 	tail = (tail + sizeof(*cmd)) % iommu->cmd_buf_size;
 	head = readl(iommu->mmio_base + MMIO_CMD_HEAD_OFFSET);
@@ -101,32 +101,39 @@ static int iommu_queue_command(struct amd_iommu *iommu, struct iommu_cmd *cmd)
  */
 static int iommu_completion_wait(struct amd_iommu *iommu)
 {
-	int ret;
+	int ret = 0, ready = 0;
+	unsigned status = 0;
 	struct iommu_cmd cmd;
-	volatile u64 ready = 0;
-	unsigned long ready_phys = virt_to_phys(&ready);
-	unsigned long i = 0;
+	unsigned long flags, i = 0;
 
 	memset(&cmd, 0, sizeof(cmd));
-	cmd.data[0] = LOW_U32(ready_phys) | CMD_COMPL_WAIT_STORE_MASK;
-	cmd.data[1] = upper_32_bits(ready_phys);
-	cmd.data[2] = 1; /* value written to 'ready' */
+	cmd.data[0] = CMD_COMPL_WAIT_INT_MASK;
 	CMD_SET_TYPE(&cmd, CMD_COMPL_WAIT);
 
 	iommu->need_sync = 0;
 
-	ret = iommu_queue_command(iommu, &cmd);
+	spin_lock_irqsave(&iommu->lock, flags);
+
+	ret = __iommu_queue_command(iommu, &cmd);
 
 	if (ret)
-		return ret;
+		goto out;
 
 	while (!ready && (i < EXIT_LOOP_COUNT)) {
 		++i;
-		cpu_relax();
+		/* wait for the bit to become one */
+		status = readl(iommu->mmio_base + MMIO_STATUS_OFFSET);
+		ready = status & MMIO_STATUS_COM_WAIT_INT_MASK;
 	}
+
+	/* set bit back to zero */
+	status &= ~MMIO_STATUS_COM_WAIT_INT_MASK;
+	writel(status, iommu->mmio_base + MMIO_STATUS_OFFSET);
 
 	if (unlikely((i == EXIT_LOOP_COUNT) && printk_ratelimit()))
 		printk(KERN_WARNING "AMD IOMMU: Completion wait loop failed\n");
+out:
+	spin_unlock_irqrestore(&iommu->lock, flags);
 
 	return 0;
 }
@@ -137,6 +144,7 @@ static int iommu_completion_wait(struct amd_iommu *iommu)
 static int iommu_queue_inv_dev_entry(struct amd_iommu *iommu, u16 devid)
 {
 	struct iommu_cmd cmd;
+	int ret;
 
 	BUG_ON(iommu == NULL);
 
@@ -144,9 +152,11 @@ static int iommu_queue_inv_dev_entry(struct amd_iommu *iommu, u16 devid)
 	CMD_SET_TYPE(&cmd, CMD_INV_DEV_ENTRY);
 	cmd.data[0] = devid;
 
+	ret = iommu_queue_command(iommu, &cmd);
+
 	iommu->need_sync = 1;
 
-	return iommu_queue_command(iommu, &cmd);
+	return ret;
 }
 
 /*
@@ -156,21 +166,24 @@ static int iommu_queue_inv_iommu_pages(struct amd_iommu *iommu,
 		u64 address, u16 domid, int pde, int s)
 {
 	struct iommu_cmd cmd;
+	int ret;
 
 	memset(&cmd, 0, sizeof(cmd));
 	address &= PAGE_MASK;
 	CMD_SET_TYPE(&cmd, CMD_INV_IOMMU_PAGES);
 	cmd.data[1] |= domid;
-	cmd.data[2] = LOW_U32(address);
+	cmd.data[2] = lower_32_bits(address);
 	cmd.data[3] = upper_32_bits(address);
 	if (s) /* size bit - we flush more than one 4kb page */
 		cmd.data[2] |= CMD_INV_IOMMU_PAGES_SIZE_MASK;
 	if (pde) /* PDE bit - we wan't flush everything not only the PTEs */
 		cmd.data[2] |= CMD_INV_IOMMU_PAGES_PDE_MASK;
 
+	ret = iommu_queue_command(iommu, &cmd);
+
 	iommu->need_sync = 1;
 
-	return iommu_queue_command(iommu, &cmd);
+	return ret;
 }
 
 /*

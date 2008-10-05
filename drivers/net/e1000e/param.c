@@ -133,6 +133,15 @@ E1000_PARAM(SmartPowerDownEnable, "Enable PHY smart power down");
  */
 E1000_PARAM(KumeranLockLoss, "Enable Kumeran lock loss workaround");
 
+/*
+ * Write Protect NVM
+ *
+ * Valid Range: 0, 1
+ *
+ * Default Value: 1 (enabled)
+ */
+E1000_PARAM(WriteProtectNVM, "Write-protect NVM [WARNING: disabling this can lead to corrupted NVM]");
+
 struct e1000_option {
 	enum { enable_option, range_option, list_option } type;
 	const char *name;
@@ -324,14 +333,27 @@ void __devinit e1000e_check_options(struct e1000_adapter *adapter)
 				adapter->itr = 20000;
 				break;
 			default:
-				e1000_validate_option(&adapter->itr, &opt,
-					adapter);
 				/*
-				 * save the setting, because the dynamic bits
-				 * change itr. clear the lower two bits
-				 * because they are used as control
+				 * Save the setting, because the dynamic bits
+				 * change itr.
 				 */
-				adapter->itr_setting = adapter->itr & ~3;
+				if (e1000_validate_option(&adapter->itr, &opt,
+							  adapter) &&
+				    (adapter->itr == 3)) {
+					/*
+					 * In case of invalid user value,
+					 * default to conservative mode.
+					 */
+					adapter->itr_setting = adapter->itr;
+					adapter->itr = 20000;
+				} else {
+					/*
+					 * Clear the lower two bits because
+					 * they are used as control.
+					 */
+					adapter->itr_setting =
+						adapter->itr & ~3;
+				}
 				break;
 			}
 		} else {
@@ -373,6 +395,27 @@ void __devinit e1000e_check_options(struct e1000_adapter *adapter)
 			if (hw->mac.type == e1000_ich8lan)
 				e1000e_set_kmrn_lock_loss_workaround_ich8lan(hw,
 								       opt.def);
+		}
+	}
+	{ /* Write-protect NVM */
+		const struct e1000_option opt = {
+			.type = enable_option,
+			.name = "Write-protect NVM",
+			.err  = "defaulting to Enabled",
+			.def  = OPTION_ENABLED
+		};
+
+		if (adapter->flags & FLAG_IS_ICH) {
+			if (num_WriteProtectNVM > bd) {
+				unsigned int write_protect_nvm = WriteProtectNVM[bd];
+				e1000_validate_option(&write_protect_nvm, &opt,
+						      adapter);
+				if (write_protect_nvm)
+					adapter->flags |= FLAG_READ_ONLY_NVM;
+			} else {
+				if (opt.def)
+					adapter->flags |= FLAG_READ_ONLY_NVM;
+			}
 		}
 	}
 }

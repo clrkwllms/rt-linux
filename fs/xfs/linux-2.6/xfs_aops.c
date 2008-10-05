@@ -73,7 +73,6 @@ xfs_page_trace(
 	unsigned long	pgoff)
 {
 	xfs_inode_t	*ip;
-	bhv_vnode_t	*vp = vn_from_inode(inode);
 	loff_t		isize = i_size_read(inode);
 	loff_t		offset = page_offset(page);
 	int		delalloc = -1, unmapped = -1, unwritten = -1;
@@ -81,7 +80,7 @@ xfs_page_trace(
 	if (page_has_buffers(page))
 		xfs_count_page_state(page, &delalloc, &unmapped, &unwritten);
 
-	ip = xfs_vtoi(vp);
+	ip = XFS_I(inode);
 	if (!ip->i_rwtrace)
 		return;
 
@@ -1339,6 +1338,10 @@ __xfs_get_blocks(
 	offset = (xfs_off_t)iblock << inode->i_blkbits;
 	ASSERT(bh_result->b_size >= (1 << inode->i_blkbits));
 	size = bh_result->b_size;
+
+	if (!create && direct && offset >= i_size_read(inode))
+		return 0;
+
 	error = xfs_iomap(XFS_I(inode), offset, size,
 			     create ? flags : BMAPI_READ, &iomap, &niomap);
 	if (error)

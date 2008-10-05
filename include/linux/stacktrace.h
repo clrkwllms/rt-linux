@@ -1,6 +1,8 @@
 #ifndef __LINUX_STACKTRACE_H
 #define __LINUX_STACKTRACE_H
 
+struct task_struct;
+
 #ifdef CONFIG_STACKTRACE
 struct task_struct;
 
