@@ -29,6 +29,7 @@ config X86
 	select HAVE_FTRACE
 	select HAVE_KVM if ((X86_32 && !X86_VOYAGER && !X86_VISWS && !X86_NUMAQ) || X86_64)
 	select HAVE_ARCH_KGDB if !X86_VOYAGER
+	select HAVE_ARCH_TRACEHOOK
 	select HAVE_GENERIC_DMA_COHERENT if X86_32
 	select HAVE_EFFICIENT_UNALIGNED_ACCESS
 	select HAVE_DYN_ARRAY
@@ -1367,6 +1368,24 @@ config HOTPLUG_CPU
 	  /sys/devices/system/cpu.
 	  Say N if you want to disable CPU hotplug and don't need to
 	  suspend.
+
+config HOTPLUG_RESTRICT_TO_BOOTUP_CPUS
+	def_bool n
+	prompt "Restrict CPU hotplugging to processors found during boot" if HOTPLUG_CPU
+	---help---
+	  Say no here to use the default, which allows as many CPUs as are marked
+	  "disabled" by ACPI or MPTABLES to be hotplugged after bootup.
+
+	  Say yes if you do not want to allow CPUs to be added after booting, for
+	  example if you only need CPU hotplugging enabled for suspend/resume.
+
+	  If CPU_HOTPLUG is enabled this value may be overridden at boot time
+	  with the "additional_cpus" kernel parameter.
+
+config HOTPLUG_ADDITIONAL_CPUS
+	int
+	default  0 if !HOTPLUG_CPU || HOTPLUG_RESTRICT_TO_BOOTUP_CPUS
+	default -1
 
 config COMPAT_VDSO
 	def_bool y
