@@ -1,5 +1,5 @@
-#ifndef _ASM_X86_ACPI_H
-#define _ASM_X86_ACPI_H
+#ifndef ASM_X86__ACPI_H
+#define ASM_X86__ACPI_H
 
 /*
  *  Copyright (C) 2001 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -102,9 +102,6 @@ static inline void disable_acpi(void)
 	acpi_noirq = 1;
 }
 
-/* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
-#define FIX_ACPI_PAGES 4
-
 extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
 
 static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
@@ -140,6 +137,8 @@ static inline unsigned int acpi_processor_cstate_check(unsigned int max_cstate)
 	    boot_cpu_data.x86_model <= 0x05 &&
 	    boot_cpu_data.x86_mask < 0x0A)
 		return 1;
+	else if (boot_cpu_has(X86_FEATURE_AMDC1E))
+		return 1;
 	else
 		return max_cstate;
 }
@@ -173,4 +172,4 @@ static inline void acpi_fake_nodes(const struct bootnode *fake_nodes,
 
 #define acpi_unlazy_tlb(x)	leave_mm(x)
 
-#endif /*__X86_ASM_ACPI_H*/
+#endif /* ASM_X86__ACPI_H */

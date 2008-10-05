@@ -12,12 +12,12 @@
 #include <linux/threads.h>
 #include <linux/cpumask.h>
 #include <linux/string.h>
-#include <linux/kernel.h>
 #include <linux/ctype.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/bootmem.h>
 #include <linux/module.h>
+#include <linux/hardirq.h>
 #include <asm/smp.h>
 #include <asm/ipi.h>
 #include <asm/genapic.h>
@@ -25,6 +25,36 @@
 #include <asm/uv/uv_mmrs.h>
 #include <asm/uv/uv_hub.h>
 #include <asm/uv/bios.h>
+
+DEFINE_PER_CPU(int, x2apic_extra_bits);
+
+static enum uv_system_type uv_system_type;
+
+static int __init uv_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
+{
+	if (!strcmp(oem_id, "SGI")) {
+		if (!strcmp(oem_table_id, "UVL"))
+			uv_system_type = UV_LEGACY_APIC;
+		else if (!strcmp(oem_table_id, "UVX"))
+			uv_system_type = UV_X2APIC;
+		else if (!strcmp(oem_table_id, "UVH")) {
+			uv_system_type = UV_NON_UNIQUE_APIC;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+enum uv_system_type get_uv_system_type(void)
+{
+	return uv_system_type;
+}
+
+int is_uv_system(void)
+{
+	return uv_system_type != UV_NONE;
+}
+EXPORT_SYMBOL_GPL(is_uv_system);
 
 DEFINE_PER_CPU(struct uv_hub_info_s, __uv_hub_info);
 EXPORT_PER_CPU_SYMBOL_GPL(__uv_hub_info);
@@ -84,7 +114,7 @@ static void uv_send_IPI_one(int cpu, int vector)
 	unsigned long val, apicid, lapicid;
 	int pnode;
 
-	apicid = per_cpu(x86_cpu_to_apicid, cpu); /* ZZZ - cache node-local ? */
+	apicid = per_cpu(x86_cpu_to_apicid, cpu);
 	lapicid = apicid & 0x3f;		/* ZZZ macro needed */
 	pnode = uv_apicid_to_pnode(apicid);
 	val =
@@ -123,6 +153,10 @@ static int uv_apic_id_registered(void)
 	return 1;
 }
 
+static void uv_init_apic_ldr(void)
+{
+}
+
 static unsigned int uv_cpu_mask_to_apicid(cpumask_t cpumask)
 {
 	int cpu;
@@ -138,31 +172,59 @@ static unsigned int uv_cpu_mask_to_apicid(cpumask_t cpumask)
 		return BAD_APICID;
 }
 
-static unsigned int phys_pkg_id(int index_msb)
+static unsigned int get_apic_id(unsigned long x)
 {
-	return GET_APIC_ID(read_apic_id()) >> index_msb;
+	unsigned int id;
+
+	WARN_ON(preemptible() && num_online_cpus() > 1);
+	id = x | __get_cpu_var(x2apic_extra_bits);
+
+	return id;
 }
 
-#ifdef ZZZ		/* Needs x2apic patch */
+static unsigned long set_apic_id(unsigned int id)
+{
+	unsigned long x;
+
+	/* maskout x2apic_extra_bits ? */
+	x = id;
+	return x;
+}
+
+static unsigned int uv_read_apic_id(void)
+{
+
+	return get_apic_id(apic_read(APIC_ID));
+}
+
+static unsigned int phys_pkg_id(int index_msb)
+{
+	return uv_read_apic_id() >> index_msb;
+}
+
 static void uv_send_IPI_self(int vector)
 {
 	apic_write(APIC_SELF_IPI, vector);
 }
-#endif
 
 struct genapic apic_x2apic_uv_x = {
 	.name = "UV large system",
+	.acpi_madt_oem_check = uv_acpi_madt_oem_check,
 	.int_delivery_mode = dest_Fixed,
 	.int_dest_mode = (APIC_DEST_PHYSICAL != 0),
 	.target_cpus = uv_target_cpus,
-	.vector_allocation_domain = uv_vector_allocation_domain,/* Fixme ZZZ */
+	.vector_allocation_domain = uv_vector_allocation_domain,
 	.apic_id_registered = uv_apic_id_registered,
+	.init_apic_ldr = uv_init_apic_ldr,
 	.send_IPI_all = uv_send_IPI_all,
 	.send_IPI_allbutself = uv_send_IPI_allbutself,
 	.send_IPI_mask = uv_send_IPI_mask,
-	/* ZZZ.send_IPI_self = uv_send_IPI_self, */
+	.send_IPI_self = uv_send_IPI_self,
 	.cpu_mask_to_apicid = uv_cpu_mask_to_apicid,
-	.phys_pkg_id = phys_pkg_id,	/* Fixme ZZZ */
+	.phys_pkg_id = phys_pkg_id,
+	.get_apic_id = get_apic_id,
+	.set_apic_id = set_apic_id,
+	.apic_id_mask = (0xFFFFFFFFu),
 };
 
 static __cpuinit void set_x2apic_extra_bits(int pnode)
@@ -294,7 +356,22 @@ static __init void uv_rtc_init(void)
 		sn_rtc_cycles_per_second = ticks_per_sec;
 }
 
-static bool uv_system_inited;
+/*
+ * Called on each cpu to initialize the per_cpu UV data area.
+ * 	ZZZ hotplug not supported yet
+ */
+void __cpuinit uv_cpu_init(void)
+{
+	/* CPU 0 initilization will be done via uv_system_init. */
+	if (!uv_blade_info)
+		return;
+
+	uv_blade_info[uv_numa_blade_id()].nr_online_cpus++;
+
+	if (get_uv_system_type() == UV_NON_UNIQUE_APIC)
+		set_x2apic_extra_bits(uv_hub_info->pnode);
+}
+
 
 void __init uv_system_init(void)
 {
@@ -386,19 +463,6 @@ void __init uv_system_init(void)
 	map_mmr_high(max_pnode);
 	map_config_high(max_pnode);
 	map_mmioh_high(max_pnode);
-	uv_system_inited = true;
-}
 
-/*
- * Called on each cpu to initialize the per_cpu UV data area.
- * 	ZZZ hotplug not supported yet
- */
-void __cpuinit uv_cpu_init(void)
-{
-	BUG_ON(!uv_system_inited);
-
-	uv_blade_info[uv_numa_blade_id()].nr_online_cpus++;
-
-	if (get_uv_system_type() == UV_NON_UNIQUE_APIC)
-		set_x2apic_extra_bits(uv_hub_info->pnode);
+	uv_cpu_init();
 }
