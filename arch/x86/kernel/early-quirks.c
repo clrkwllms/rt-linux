@@ -100,13 +100,11 @@ static void __init intel_g33_dmar(int num, int slot, int func)
 {
 	struct acpi_table_header *dmar_tbl;
 	acpi_status status;
-	acpi_size tbl_size;
 
-	status = acpi_get_table_with_size(ACPI_SIG_DMAR, 0, &dmar_tbl, &tbl_size);
+	status = acpi_get_table(ACPI_SIG_DMAR, 0, &dmar_tbl);
 	if (ACPI_SUCCESS(status)) {
 		printk(KERN_INFO "BIOS BUG: DMAR advertised on Intel G31/G33 chipset -- ignoring\n");
 		dmar_disabled = 1;
-		acpi_os_unmap_memory(dmar_tbl, tbl_size);
 	}
 }
 #endif
