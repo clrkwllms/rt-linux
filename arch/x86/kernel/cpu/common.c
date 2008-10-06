@@ -575,6 +575,13 @@ void __init early_cpu_init(void)
 	}
 
 	early_identify_cpu(&boot_cpu_data);
+
+#ifdef CONFIG_KMEMCHECK
+	/*
+	 * We need 4K granular PTEs for kmemcheck:
+	 */
+	setup_clear_cpu_cap(X86_FEATURE_PSE);
+#endif
 }
 
 /*
@@ -914,13 +921,6 @@ void syscall_init(void)
 	/* Flags to clear on syscall */
 	wrmsrl(MSR_SYSCALL_MASK,
 	       X86_EFLAGS_TF|X86_EFLAGS_DF|X86_EFLAGS_IF|X86_EFLAGS_IOPL);
-
-#ifdef CONFIG_KMEMCHECK
-	/*
-	 * We need 4K granular PTEs for kmemcheck:
-	 */
-	setup_clear_cpu_cap(X86_FEATURE_PSE);
-#endif
 }
 
 unsigned long kernel_eflags;
