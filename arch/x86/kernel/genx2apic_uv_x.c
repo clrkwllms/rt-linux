@@ -284,12 +284,13 @@ static __init void map_low_mmrs(void)
 
 enum map_type {map_wb, map_uc};
 
-static __init void map_high(char *id, unsigned long base, int shift, enum map_type map_type)
+static __init void map_high(char *id, unsigned long base, int shift,
+			    int max_pnode, enum map_type map_type)
 {
 	unsigned long bytes, paddr;
 
 	paddr = base << shift;
-	bytes = (1UL << shift);
+	bytes = (1UL << shift) * (max_pnode + 1);
 	printk(KERN_INFO "UV: Map %s_HI 0x%lx - 0x%lx\n", id, paddr,
 	       					paddr + bytes);
 	if (map_type == map_uc)
@@ -305,7 +306,7 @@ static __init void map_gru_high(int max_pnode)
 
 	gru.v = uv_read_local_mmr(UVH_RH_GAM_GRU_OVERLAY_CONFIG_MMR);
 	if (gru.s.enable)
-		map_high("GRU", gru.s.base, shift, map_wb);
+		map_high("GRU", gru.s.base, shift, max_pnode, map_wb);
 }
 
 static __init void map_config_high(int max_pnode)
@@ -315,7 +316,7 @@ static __init void map_config_high(int max_pnode)
 
 	cfg.v = uv_read_local_mmr(UVH_RH_GAM_CFG_OVERLAY_CONFIG_MMR);
 	if (cfg.s.enable)
-		map_high("CONFIG", cfg.s.base, shift, map_uc);
+		map_high("CONFIG", cfg.s.base, shift, max_pnode, map_uc);
 }
 
 static __init void map_mmr_high(int max_pnode)
@@ -325,7 +326,7 @@ static __init void map_mmr_high(int max_pnode)
 
 	mmr.v = uv_read_local_mmr(UVH_RH_GAM_MMR_OVERLAY_CONFIG_MMR);
 	if (mmr.s.enable)
-		map_high("MMR", mmr.s.base, shift, map_uc);
+		map_high("MMR", mmr.s.base, shift, max_pnode, map_uc);
 }
 
 static __init void map_mmioh_high(int max_pnode)
@@ -335,17 +336,17 @@ static __init void map_mmioh_high(int max_pnode)
 
 	mmioh.v = uv_read_local_mmr(UVH_RH_GAM_MMIOH_OVERLAY_CONFIG_MMR);
 	if (mmioh.s.enable)
-		map_high("MMIOH", mmioh.s.base, shift, map_uc);
+		map_high("MMIOH", mmioh.s.base, shift, max_pnode, map_uc);
 }
 
 static __init void uv_rtc_init(void)
 {
-	long status, ticks_per_sec, drift;
+	long status;
+	u64 ticks_per_sec;
 
-	status =
-	    x86_bios_freq_base(BIOS_FREQ_BASE_REALTIME_CLOCK, &ticks_per_sec,
-					&drift);
-	if (status != 0 || ticks_per_sec < 100000) {
+	status = uv_bios_freq_base(BIOS_FREQ_BASE_REALTIME_CLOCK,
+					&ticks_per_sec);
+	if (status != BIOS_STATUS_SUCCESS || ticks_per_sec < 100000) {
 		printk(KERN_WARNING
 			"unable to determine platform RTC clock frequency, "
 			"guessing.\n");
@@ -426,6 +427,9 @@ void __init uv_system_init(void)
 	gnode_upper = (((unsigned long)node_id.s.node_id) &
 		       ~((1 << n_val) - 1)) << m_val;
 
+	uv_bios_init();
+	uv_bios_get_sn_info(0, &uv_type, &sn_partition_id,
+			    &uv_coherency_id, &uv_region_size);
 	uv_rtc_init();
 
 	for_each_present_cpu(cpu) {
@@ -447,7 +451,7 @@ void __init uv_system_init(void)
 		uv_cpu_hub_info(cpu)->gpa_mask = (1 << (m_val + n_val)) - 1;
 		uv_cpu_hub_info(cpu)->gnode_upper = gnode_upper;
 		uv_cpu_hub_info(cpu)->global_mmr_base = mmr_base;
-		uv_cpu_hub_info(cpu)->coherency_domain_number = 0;/* ZZZ */
+		uv_cpu_hub_info(cpu)->coherency_domain_number = uv_coherency_id;
 		uv_node_to_blade[nid] = blade;
 		uv_cpu_to_blade[cpu] = blade;
 		max_pnode = max(pnode, max_pnode);
