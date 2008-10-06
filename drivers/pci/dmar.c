@@ -42,6 +42,7 @@
 LIST_HEAD(dmar_drhd_units);
 
 static struct acpi_table_header * __initdata dmar_tbl;
+static acpi_size __initdata dmar_tbl_size;
 
 static void __init dmar_register_drhd_unit(struct dmar_drhd_unit *drhd)
 {
@@ -193,7 +194,7 @@ dmar_parse_dev(struct dmar_drhd_unit *dmaru)
 {
 	struct acpi_dmar_hardware_unit *drhd;
 	static int include_all;
-	int ret;
+	int ret = 0;
 
 	drhd = (struct acpi_dmar_hardware_unit *) dmaru->hdr;
 
@@ -212,7 +213,7 @@ dmar_parse_dev(struct dmar_drhd_unit *dmaru)
 		include_all = 1;
 	}
 
-	if (ret || (dmaru->devices_cnt == 0 && !dmaru->include_all)) {
+	if (ret) {
 		list_del(&dmaru->list);
 		kfree(dmaru);
 	}
@@ -289,6 +290,25 @@ dmar_table_print_dmar_entry(struct acpi_dmar_header *header)
 	}
 }
 
+/**
+ * dmar_table_detect - checks to see if the platform supports DMAR devices
+ */
+static int __init dmar_table_detect(void)
+{
+	acpi_status status = AE_OK;
+
+	/* if we could find DMAR table, then there are DMAR devices */
+	status = acpi_get_table_with_size(ACPI_SIG_DMAR, 0,
+				(struct acpi_table_header **)&dmar_tbl,
+				&dmar_tbl_size);
+
+	if (ACPI_SUCCESS(status) && !dmar_tbl) {
+		printk (KERN_WARNING PREFIX "Unable to map DMAR\n");
+		status = AE_NOT_FOUND;
+	}
+
+	return (ACPI_SUCCESS(status) ? 1 : 0);
+}
 
 /**
  * parse_dmar_table - parses the DMA reporting table
@@ -299,6 +319,12 @@ parse_dmar_table(void)
 	struct acpi_table_dmar *dmar;
 	struct acpi_dmar_header *entry_header;
 	int ret = 0;
+
+	/*
+	 * Do it again, earlier dmar_tbl mapping could be mapped with
+	 * fixed map.
+	 */
+	dmar_table_detect();
 
 	dmar = (struct acpi_table_dmar *)dmar_tbl;
 	if (!dmar)
@@ -373,10 +399,10 @@ dmar_find_matched_drhd_unit(struct pci_dev *dev)
 
 int __init dmar_dev_scope_init(void)
 {
-	struct dmar_drhd_unit *drhd;
+	struct dmar_drhd_unit *drhd, *drhd_n;
 	int ret = -ENODEV;
 
-	for_each_drhd_unit(drhd) {
+	list_for_each_entry_safe(drhd, drhd_n, &dmar_drhd_units, list) {
 		ret = dmar_parse_dev(drhd);
 		if (ret)
 			return ret;
@@ -384,8 +410,8 @@ int __init dmar_dev_scope_init(void)
 
 #ifdef CONFIG_DMAR
 	{
-		struct dmar_rmrr_unit *rmrr;
-		for_each_rmrr_units(rmrr) {
+		struct dmar_rmrr_unit *rmrr, *rmrr_n;
+		list_for_each_entry_safe(rmrr, rmrr_n, &dmar_rmrr_units, list) {
 			ret = rmrr_parse_dev(rmrr);
 			if (ret)
 				return ret;
@@ -430,30 +456,11 @@ int __init dmar_table_init(void)
 	return 0;
 }
 
-/**
- * early_dmar_detect - checks to see if the platform supports DMAR devices
- */
-int __init early_dmar_detect(void)
-{
-	acpi_status status = AE_OK;
-
-	/* if we could find DMAR table, then there are DMAR devices */
-	status = acpi_get_table(ACPI_SIG_DMAR, 0,
-				(struct acpi_table_header **)&dmar_tbl);
-
-	if (ACPI_SUCCESS(status) && !dmar_tbl) {
-		printk (KERN_WARNING PREFIX "Unable to map DMAR\n");
-		status = AE_NOT_FOUND;
-	}
-
-	return (ACPI_SUCCESS(status) ? 1 : 0);
-}
-
 void __init detect_intel_iommu(void)
 {
 	int ret;
 
-	ret = early_dmar_detect();
+	ret = dmar_table_detect();
 
 #ifdef CONFIG_DMAR
 	{
@@ -479,14 +486,19 @@ void __init detect_intel_iommu(void)
 			       " x2apic support\n");
 
 			dmar_disabled = 1;
-			return;
+			goto end;
 		}
 
 		if (ret && !no_iommu && !iommu_detected && !swiotlb &&
 		    !dmar_disabled)
 			iommu_detected = 1;
 	}
+end:
 #endif
+	if (dmar_tbl)
+		early_acpi_os_unmap_memory(dmar_tbl, dmar_tbl_size);
+
+	dmar_tbl = NULL;
 }
 
 

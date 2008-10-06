@@ -808,6 +808,8 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	acpi_boot_table_init();
 
+	early_acpi_boot_init();
+
 #ifdef CONFIG_ACPI_NUMA
 	/*
 	 * Parse SRAT to discover nodes.
@@ -875,12 +877,16 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	prefill_possible_map();
+
 #ifdef CONFIG_X86_64
 	init_cpu_to_node();
 #endif
 
 	init_apic_mappings();
 	ioapic_init_mappings();
+
+	/* need to wait for io_apic is mapped */
+	nr_irqs = probe_nr_irqs();
 
 	kvm_guest_init();
 
