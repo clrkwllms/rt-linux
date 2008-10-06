@@ -124,18 +124,25 @@ static inline int flag_is_changeable_p(u32 flag)
 {
 	u32 f1, f2;
 
-	asm("pushfl\n\t"
-	    "pushfl\n\t"
-	    "popl %0\n\t"
-	    "movl %0,%1\n\t"
-	    "xorl %2,%0\n\t"
-	    "pushl %0\n\t"
-	    "popfl\n\t"
-	    "pushfl\n\t"
-	    "popl %0\n\t"
-	    "popfl\n\t"
-	    : "=&r" (f1), "=&r" (f2)
-	    : "ir" (flag));
+	/*
+	 * Cyrix and IDT cpus allow disabling of CPUID
+	 * so the code below may return different results
+	 * when it is executed before and after enabling
+	 * the CPUID. Add "volatile" to not allow gcc to
+	 * optimize the subsequent calls to this function.
+	 */
+	asm volatile ("pushfl\n\t"
+		      "pushfl\n\t"
+		      "popl %0\n\t"
+		      "movl %0,%1\n\t"
+		      "xorl %2,%0\n\t"
+		      "pushl %0\n\t"
+		      "popfl\n\t"
+		      "pushfl\n\t"
+		      "popl %0\n\t"
+		      "popfl\n\t"
+		      : "=&r" (f1), "=&r" (f2)
+		      : "ir" (flag));
 
 	return ((f1^f2) & flag) != 0;
 }
@@ -574,6 +581,10 @@ void __init early_cpu_init(void)
  * The NOPL instruction is supposed to exist on all CPUs with
  * family >= 6; unfortunately, that's not true in practice because
  * of early VIA chips and (more importantly) broken virtualizers that
+ *
+ * Note: no 64-bit chip is known to lack these, but put the code here
+ * for consistency with 32 bits, and to make it utterly trivial to
+ * diagnose the problem should it ever surface.
  * are not easy to detect.  In the latter case it doesn't even *fail*
  * reliably, so probing for it doesn't even work.  Disable it completely
  * unless we can find a reliable way to detect all the broken cases.
@@ -797,7 +808,7 @@ void __cpuinit print_cpu_info(struct cpuinfo_x86 *c)
 	else if (c->cpuid_level >= 0)
 		vendor = c->x86_vendor_id;
 
-	if (vendor && strncmp(c->x86_model_id, vendor, strlen(vendor)))
+	if (vendor && !strstr(c->x86_model_id, vendor))
 		printk(KERN_CONT "%s ", vendor);
 
 	if (c->x86_model_id[0])
@@ -1121,16 +1132,5 @@ void __cpuinit cpu_init(void)
 	xsave_init();
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-void __cpuinit cpu_uninit(void)
-{
-	int cpu = raw_smp_processor_id();
-	cpu_clear(cpu, cpu_initialized);
-
-	/* lazy TLB state */
-	per_cpu(cpu_tlbstate, cpu).state = 0;
-	per_cpu(cpu_tlbstate, cpu).active_mm = &init_mm;
-}
-#endif
 
 #endif

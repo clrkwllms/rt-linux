@@ -932,6 +932,9 @@ END(spurious_interrupt)
 	.if \ist
 	movq	%gs:pda_data_offset, %rbp
 	.endif
+	.if \irqtrace
+	TRACE_IRQS_OFF
+	.endif
 	movq %rsp,%rdi
 	movq ORIG_RAX(%rsp),%rsi
 	movq $-1,ORIG_RAX(%rsp)
@@ -1058,7 +1061,8 @@ KPROBE_ENTRY(error_entry)
 	je  error_kernelspace
 error_swapgs:	
 	SWAPGS
-error_sti:	
+error_sti:
+	TRACE_IRQS_OFF
 	movq %rdi,RDI(%rsp) 	
 	CFI_REL_OFFSET	rdi,RDI
 	movq %rsp,%rdi
@@ -1232,7 +1236,7 @@ ENTRY(simd_coprocessor_error)
 END(simd_coprocessor_error)
 
 ENTRY(device_not_available)
-	zeroentry math_state_restore
+	zeroentry do_device_not_available
 END(device_not_available)
 
 	/* runs on exception stack */
