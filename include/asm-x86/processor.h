@@ -20,6 +20,7 @@ struct mm_struct;
 #include <asm/msr.h>
 #include <asm/desc_defs.h>
 #include <asm/nops.h>
+#include <asm/ds.h>
 
 #include <linux/personality.h>
 #include <linux/cpumask.h>
@@ -411,9 +412,14 @@ struct thread_struct {
 	unsigned		io_bitmap_max;
 /* MSR_IA32_DEBUGCTLMSR value to switch in if TIF_DEBUGCTLMSR is set.  */
 	unsigned long	debugctlmsr;
-/* Debug Store - if not 0 points to a DS Save Area configuration;
- *               goes into MSR_IA32_DS_AREA */
-	unsigned long	ds_area_msr;
+#ifdef CONFIG_X86_DS
+/* Debug Store context; see include/asm-x86/ds.h; goes into MSR_IA32_DS_AREA */
+	struct ds_context	*ds_ctx;
+#endif /* CONFIG_X86_DS */
+#ifdef CONFIG_X86_PTRACE_BTS
+/* the signal to send on a bts buffer overflow */
+	unsigned int	bts_ovfl_signal;
+#endif /* CONFIG_X86_PTRACE_BTS */
 };
 
 static inline unsigned long native_get_debugreg(int regno)
@@ -560,41 +566,6 @@ static inline void clear_in_cr4(unsigned long mask)
 	cr4 &= ~mask;
 	write_cr4(cr4);
 }
-
-struct microcode_header {
-	unsigned int		hdrver;
-	unsigned int		rev;
-	unsigned int		date;
-	unsigned int		sig;
-	unsigned int		cksum;
-	unsigned int		ldrver;
-	unsigned int		pf;
-	unsigned int		datasize;
-	unsigned int		totalsize;
-	unsigned int		reserved[3];
-};
-
-struct microcode {
-	struct microcode_header	hdr;
-	unsigned int		bits[0];
-};
-
-typedef struct microcode	microcode_t;
-typedef struct microcode_header	microcode_header_t;
-
-/* microcode format is extended from prescott processors */
-struct extended_signature {
-	unsigned int		sig;
-	unsigned int		pf;
-	unsigned int		cksum;
-};
-
-struct extended_sigtable {
-	unsigned int		count;
-	unsigned int		cksum;
-	unsigned int		reserved[3];
-	struct extended_signature sigs[0];
-};
 
 typedef struct {
 	unsigned long		seg;
