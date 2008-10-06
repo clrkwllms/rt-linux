@@ -185,7 +185,7 @@ void kmemcheck_error_recall(void)
 
 	switch (e->type) {
 	case KMEMCHECK_ERROR_INVALID_ACCESS:
-		printk(KERN_ERR  "kmemcheck: Caught %d-bit read "
+		printk(KERN_ERR  "WARNING: kmemcheck: Caught %d-bit read "
 			"from %s memory (%p)\n",
 			8 * e->size, e->state < ARRAY_SIZE(desc) ?
 				desc[e->state] : "(invalid shadow state)",
@@ -208,7 +208,7 @@ void kmemcheck_error_recall(void)
 			* (int) (e->address & (SHADOW_COPY_SIZE - 1)), '^');
 		break;
 	case KMEMCHECK_ERROR_BUG:
-		printk(KERN_EMERG "kmemcheck: Fatal error\n");
+		printk(KERN_EMERG "ERROR: kmemcheck: Fatal error\n");
 		break;
 	}
 
