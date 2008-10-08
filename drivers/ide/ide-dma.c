@@ -211,7 +211,7 @@ int ide_build_dmatable (ide_drive_t *drive, struct request *rq)
 				xcount = bcount & 0xffff;
 				if (is_trm290)
 					xcount = ((xcount >> 2) - 1) << 16;
-				if (xcount == 0x0000) {
+				else if (xcount == 0x0000) {
 	/* 
 	 * Most chipsets correctly interpret a length of 0x0000 as 64KB,
 	 * but at least one (e.g. CS5530) misinterprets it as zero (!).
@@ -649,11 +649,7 @@ static unsigned int ide_get_mode_mask(ide_drive_t *drive, u8 base, u8 req_mode)
 		if (id->field_valid & 2) {
 			mask = id->dma_1word & hwif->swdma_mask;
 		} else if (id->tDMA) {
-			/*
-			 * ide_fix_driveid() doesn't convert ->tDMA to the
-			 * CPU endianness so we need to do it here
-			 */
-			u8 mode = le16_to_cpu(id->tDMA);
+			u8 mode = id->tDMA;
 
 			/*
 			 * if the mode is valid convert it to the mask

@@ -11,6 +11,8 @@
 #include <linux/clk.h>
 #include <linux/debugfs.h>
 #include <linux/device.h>
+#include <linux/err.h>
+#include <linux/gpio.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
@@ -26,8 +28,7 @@
 #include <asm/io.h>
 #include <asm/unaligned.h>
 
-#include <asm/arch/board.h>
-#include <asm/arch/gpio.h>
+#include <mach/board.h>
 
 #include "atmel-mci-regs.h"
 
@@ -194,7 +195,9 @@ static int atmci_regs_show(struct seq_file *s, void *v)
 
 	/* Grab a more or less consistent snapshot */
 	spin_lock_irq(&host->mmc->lock);
+	clk_enable(host->mck);
 	memcpy_fromio(buf, host->regs, MCI_REGS_SIZE);
+	clk_disable(host->mck);
 	spin_unlock_irq(&host->mmc->lock);
 
 	seq_printf(s, "MR:\t0x%08x%s%s CLKDIV=%u\n",
@@ -214,6 +217,8 @@ static int atmci_regs_show(struct seq_file *s, void *v)
 
 	atmci_show_status_reg(s, "SR", buf[MCI_SR / 4]);
 	atmci_show_status_reg(s, "IMR", buf[MCI_IMR / 4]);
+
+	kfree(buf);
 
 	return 0;
 }
@@ -236,7 +241,6 @@ static void atmci_init_debugfs(struct atmel_mci *host)
 	struct mmc_host	*mmc;
 	struct dentry	*root;
 	struct dentry	*node;
-	struct resource	*res;
 
 	mmc = host->mmc;
 	root = mmc->debugfs_root;
@@ -249,9 +253,6 @@ static void atmci_init_debugfs(struct atmel_mci *host)
 		return;
 	if (!node)
 		goto err;
-
-	res = platform_get_resource(host->pdev, IORESOURCE_MEM, 0);
-	node->d_inode->i_size = res->end - res->start + 1;
 
 	node = debugfs_create_file("req", S_IRUSR, root, host, &atmci_req_fops);
 	if (!node)
@@ -425,8 +426,6 @@ static u32 atmci_submit_data(struct mmc_host *mmc, struct mmc_data *data)
 	host->sg = NULL;
 	host->data = data;
 
-	mci_writel(host, BLKR, MCI_BCNT(data->blocks)
-			| MCI_BLKLEN(data->blksz));
 	dev_vdbg(&mmc->class_dev, "BLKR=0x%08x\n",
 			MCI_BCNT(data->blocks) | MCI_BLKLEN(data->blksz));
 
@@ -482,6 +481,10 @@ static void atmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		if (data->blocks > 1 && data->blksz & 3)
 			goto fail;
 		atmci_set_timeout(host, data);
+
+		/* Must set block count/size before sending command */
+		mci_writel(host, BLKR, MCI_BCNT(data->blocks)
+				| MCI_BLKLEN(data->blksz));
 	}
 
 	iflags = MCI_CMDRDY;
@@ -573,7 +576,7 @@ static int atmci_get_ro(struct mmc_host *mmc)
 	int			read_only = 0;
 	struct atmel_mci	*host = mmc_priv(mmc);
 
-	if (host->wp_pin >= 0) {
+	if (gpio_is_valid(host->wp_pin)) {
 		read_only = gpio_get_value(host->wp_pin);
 		dev_dbg(&mmc->class_dev, "card is %s\n",
 				read_only ? "read-only" : "read-write");
@@ -635,7 +638,7 @@ static void atmci_detect_change(unsigned long data)
 	 * been freed.
 	 */
 	smp_rmb();
-	if (host->detect_pin < 0)
+	if (!gpio_is_valid(host->detect_pin))
 		return;
 
 	enable_irq(gpio_to_irq(host->detect_pin));
@@ -1050,7 +1053,7 @@ static int __init atmci_probe(struct platform_device *pdev)
 
 	/* Assume card is present if we don't have a detect pin */
 	host->present = 1;
-	if (host->detect_pin >= 0) {
+	if (gpio_is_valid(host->detect_pin)) {
 		if (gpio_request(host->detect_pin, "mmc_detect")) {
 			dev_dbg(&mmc->class_dev, "no detect pin available\n");
 			host->detect_pin = -1;
@@ -1058,7 +1061,11 @@ static int __init atmci_probe(struct platform_device *pdev)
 			host->present = !gpio_get_value(host->detect_pin);
 		}
 	}
-	if (host->wp_pin >= 0) {
+
+	if (!gpio_is_valid(host->detect_pin))
+		mmc->caps |= MMC_CAP_NEEDS_POLL;
+
+	if (gpio_is_valid(host->wp_pin)) {
 		if (gpio_request(host->wp_pin, "mmc_wp")) {
 			dev_dbg(&mmc->class_dev, "no WP pin available\n");
 			host->wp_pin = -1;
@@ -1069,7 +1076,7 @@ static int __init atmci_probe(struct platform_device *pdev)
 
 	mmc_add_host(mmc);
 
-	if (host->detect_pin >= 0) {
+	if (gpio_is_valid(host->detect_pin)) {
 		setup_timer(&host->detect_timer, atmci_detect_change,
 				(unsigned long)host);
 
@@ -1112,7 +1119,7 @@ static int __exit atmci_remove(struct platform_device *pdev)
 	if (host) {
 		/* Debugfs stuff is cleaned up by mmc core */
 
-		if (host->detect_pin >= 0) {
+		if (gpio_is_valid(host->detect_pin)) {
 			int pin = host->detect_pin;
 
 			/* Make sure the timer doesn't enable the interrupt */
@@ -1132,7 +1139,7 @@ static int __exit atmci_remove(struct platform_device *pdev)
 		mci_readl(host, SR);
 		clk_disable(host->mck);
 
-		if (host->wp_pin >= 0)
+		if (gpio_is_valid(host->wp_pin))
 			gpio_free(host->wp_pin);
 
 		free_irq(platform_get_irq(pdev, 0), host->mmc);

@@ -67,9 +67,6 @@ static u32 gart_unmapped_entry;
 	(((x) & 0xfffff000) | (((x) >> 32) << 4) | GPTE_VALID | GPTE_COHERENT)
 #define GPTE_DECODE(x) (((x) & 0xfffff000) | (((u64)(x) & 0xff0) << 28))
 
-#define to_pages(addr, size) \
-	(round_up(((addr) & ~PAGE_MASK) + (size), PAGE_SIZE) >> PAGE_SHIFT)
-
 #define EMERGENCY_PAGES 32 /* = 128KB */
 
 #ifdef CONFIG_AGP
@@ -241,7 +238,7 @@ nonforced_iommu(struct device *dev, unsigned long addr, size_t size)
 static dma_addr_t dma_map_area(struct device *dev, dma_addr_t phys_mem,
 				size_t size, int dir)
 {
-	unsigned long npages = to_pages(phys_mem, size);
+	unsigned long npages = iommu_num_pages(phys_mem, size);
 	unsigned long iommu_page = alloc_iommu(dev, npages);
 	int i;
 
@@ -304,7 +301,7 @@ static void gart_unmap_single(struct device *dev, dma_addr_t dma_addr,
 		return;
 
 	iommu_page = (dma_addr - iommu_bus_base)>>PAGE_SHIFT;
-	npages = to_pages(dma_addr, size);
+	npages = iommu_num_pages(dma_addr, size);
 	for (i = 0; i < npages; i++) {
 		iommu_gatt_base[iommu_page + i] = gart_unmapped_entry;
 		CLEAR_LEAK(iommu_page + i);
@@ -387,7 +384,7 @@ static int __dma_map_cont(struct device *dev, struct scatterlist *start,
 		}
 
 		addr = phys_addr;
-		pages = to_pages(s->offset, s->length);
+		pages = iommu_num_pages(s->offset, s->length);
 		while (pages--) {
 			iommu_gatt_base[iommu_page] = GPTE_ENCODE(addr);
 			SET_LEAK(iommu_page);
@@ -470,7 +467,7 @@ gart_map_sg(struct device *dev, struct scatterlist *sg, int nents, int dir)
 
 		seg_size += s->length;
 		need = nextneed;
-		pages += to_pages(s->offset, s->length);
+		pages += iommu_num_pages(s->offset, s->length);
 		ps = s;
 	}
 	if (dma_map_cont(dev, start_sg, i - start, sgmap, pages, need) < 0)
@@ -629,7 +626,6 @@ static __init int init_k8_gatt(struct agp_kern_info *info)
 	struct pci_dev *dev;
 	void *gatt;
 	int i, error;
-	unsigned long start_pfn, end_pfn;
 
 	printk(KERN_INFO "PCI-DMA: Disabling AGP.\n");
 	aper_size = aper_base = info->aper_size = 0;
@@ -675,12 +671,6 @@ static __init int init_k8_gatt(struct agp_kern_info *info)
 	printk(KERN_INFO "PCI-DMA: aperture base @ %x size %u KB\n",
 	       aper_base, aper_size>>10);
 
-	/* need to map that range */
-	end_pfn = (aper_base>>PAGE_SHIFT) + (aper_size>>PAGE_SHIFT);
-	if (end_pfn > max_low_pfn_mapped) {
-		start_pfn = (aper_base>>PAGE_SHIFT);
-		init_memory_mapping(start_pfn<<PAGE_SHIFT, end_pfn<<PAGE_SHIFT);
-	}
 	return 0;
 
  nommu:
@@ -730,7 +720,8 @@ void __init gart_iommu_init(void)
 {
 	struct agp_kern_info info;
 	unsigned long iommu_start;
-	unsigned long aper_size;
+	unsigned long aper_base, aper_size;
+	unsigned long start_pfn, end_pfn;
 	unsigned long scratch;
 	long i;
 
@@ -768,8 +759,16 @@ void __init gart_iommu_init(void)
 		return;
 	}
 
+	/* need to map that range */
+	aper_size = info.aper_size << 20;
+	aper_base = info.aper_base;
+	end_pfn = (aper_base>>PAGE_SHIFT) + (aper_size>>PAGE_SHIFT);
+	if (end_pfn > max_low_pfn_mapped) {
+		start_pfn = (aper_base>>PAGE_SHIFT);
+		init_memory_mapping(start_pfn<<PAGE_SHIFT, end_pfn<<PAGE_SHIFT);
+	}
+
 	printk(KERN_INFO "PCI-DMA: using GART IOMMU.\n");
-	aper_size = info.aper_size * 1024 * 1024;
 	iommu_size = check_iommu_size(info.aper_base, aper_size);
 	iommu_pages = iommu_size >> PAGE_SHIFT;
 

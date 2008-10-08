@@ -169,6 +169,8 @@ void init_cpu_timer(void)
 
 static void clock_comparator_interrupt(__u16 code)
 {
+	if (S390_lowcore.clock_comparator == -1ULL)
+		set_clock_comparator(S390_lowcore.clock_comparator);
 }
 
 static void etr_timing_alert(struct etr_irq_parm *);
@@ -1348,7 +1350,7 @@ early_param("stp", early_parse_stp);
 /*
  * Reset STP attachment.
  */
-static void stp_reset(void)
+static void __init stp_reset(void)
 {
 	int rc;
 
