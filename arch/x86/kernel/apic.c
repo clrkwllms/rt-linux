@@ -538,14 +538,51 @@ static void __init lapic_cal_handler(struct clock_event_device *dev)
 	}
 }
 
+static int __init calibrate_by_pmtimer(long deltapm, long *delta)
+{
+	const long pm_100ms = PMTMR_TICKS_PER_SEC / 10;
+	const long pm_thresh = pm_100ms / 100;
+	unsigned long mult;
+	u64 res;
+
+#ifndef CONFIG_X86_PM_TIMER
+	return -1;
+#endif
+
+	apic_printk(APIC_VERBOSE, "... PM timer delta = %ld\n", deltapm);
+
+	/* Check, if the PM timer is available */
+	if (!deltapm)
+		return -1;
+
+	mult = clocksource_hz2mult(PMTMR_TICKS_PER_SEC, 22);
+
+	if (deltapm > (pm_100ms - pm_thresh) &&
+	    deltapm < (pm_100ms + pm_thresh)) {
+		apic_printk(APIC_VERBOSE, "... PM timer result ok\n");
+	} else {
+		res = (((u64)deltapm) *  mult) >> 22;
+		do_div(res, 1000000);
+		printk(KERN_WARNING "APIC calibration not consistent "
+			"with PM Timer: %ldms instead of 100ms\n",
+			(long)res);
+		/* Correct the lapic counter value */
+		res = (((u64)(*delta)) * pm_100ms);
+		do_div(res, deltapm);
+		printk(KERN_INFO "APIC delta adjusted to PM-Timer: "
+			"%lu (%ld)\n", (unsigned long)res, *delta);
+		*delta = (long)res;
+	}
+
+	return 0;
+}
+
 static int __init calibrate_APIC_clock(void)
 {
 	struct clock_event_device *levt = &__get_cpu_var(lapic_events);
-	const long pm_100ms = PMTMR_TICKS_PER_SEC/10;
-	const long pm_thresh = pm_100ms/100;
 	void (*real_handler)(struct clock_event_device *dev);
 	unsigned long deltaj;
-	long delta, deltapm;
+	long delta;
 	int pm_referenced = 0;
 
 	local_irq_disable();
@@ -575,36 +612,9 @@ static int __init calibrate_APIC_clock(void)
 	delta = lapic_cal_t1 - lapic_cal_t2;
 	apic_printk(APIC_VERBOSE, "... lapic delta = %ld\n", delta);
 
-#ifdef CONFIG_X86_PM_TIMER
-	/* Check, if the PM timer is available */
-	deltapm = lapic_cal_pm2 - lapic_cal_pm1;
-	apic_printk(APIC_VERBOSE, "... PM timer delta = %ld\n", deltapm);
-
-	if (deltapm) {
-		unsigned long mult;
-		u64 res;
-
-		mult = clocksource_hz2mult(PMTMR_TICKS_PER_SEC, 22);
-
-		if (deltapm > (pm_100ms - pm_thresh) &&
-		    deltapm < (pm_100ms + pm_thresh)) {
-			apic_printk(APIC_VERBOSE, "... PM timer result ok\n");
-		} else {
-			res = (((u64) deltapm) *  mult) >> 22;
-			do_div(res, 1000000);
-			printk(KERN_WARNING "APIC calibration not consistent "
-			       "with PM Timer: %ldms instead of 100ms\n",
-			       (long)res);
-			/* Correct the lapic counter value */
-			res = (((u64) delta) * pm_100ms);
-			do_div(res, deltapm);
-			printk(KERN_INFO "APIC delta adjusted to PM-Timer: "
-			       "%lu (%ld)\n", (unsigned long) res, delta);
-			delta = (long) res;
-		}
-		pm_referenced = 1;
-	}
-#endif
+	/* we trust the PM based calibration if possible */
+	pm_referenced = !calibrate_by_pmtimer(lapic_cal_pm2 - lapic_cal_pm1,
+					&delta);
 
 	/* Calculate the scaled math multiplication factor */
 	lapic_clockevent.mult = div_sc(delta, TICK_NSEC * LAPIC_CAL_LOOPS,
@@ -646,7 +656,10 @@ static int __init calibrate_APIC_clock(void)
 
 	levt->features &= ~CLOCK_EVT_FEAT_DUMMY;
 
-	/* We trust the pm timer based calibration */
+	/*
+	 * PM timer calibration failed or not turned on
+	 * so lets try APIC timer based calibration
+	 */
 	if (!pm_referenced) {
 		apic_printk(APIC_VERBOSE, "... verify APIC timer\n");
 
@@ -1081,40 +1094,43 @@ void __init init_bsp_APIC(void)
 
 static void __cpuinit lapic_setup_esr(void)
 {
-	unsigned long oldvalue, value, maxlvt;
-	if (lapic_is_integrated() && !esr_disable) {
-		if (esr_disable) {
-			/*
-			 * Something untraceable is creating bad interrupts on
-			 * secondary quads ... for the moment, just leave the
-			 * ESR disabled - we can't do anything useful with the
-			 * errors anyway - mbligh
-			 */
-			printk(KERN_INFO "Leaving ESR disabled.\n");
-			return;
-		}
-		/* !82489DX */
-		maxlvt = lapic_get_maxlvt();
-		if (maxlvt > 3)		/* Due to the Pentium erratum 3AP. */
-			apic_write(APIC_ESR, 0);
-		oldvalue = apic_read(APIC_ESR);
+	unsigned int oldvalue, value, maxlvt;
 
-		/* enables sending errors */
-		value = ERROR_APIC_VECTOR;
-		apic_write(APIC_LVTERR, value);
-		/*
-		 * spec says clear errors after enabling vector.
-		 */
-		if (maxlvt > 3)
-			apic_write(APIC_ESR, 0);
-		value = apic_read(APIC_ESR);
-		if (value != oldvalue)
-			apic_printk(APIC_VERBOSE, "ESR value before enabling "
-				"vector: 0x%08lx  after: 0x%08lx\n",
-				oldvalue, value);
-	} else {
+	if (!lapic_is_integrated()) {
 		printk(KERN_INFO "No ESR for 82489DX.\n");
+		return;
 	}
+
+	if (esr_disable) {
+		/*
+		 * Something untraceable is creating bad interrupts on
+		 * secondary quads ... for the moment, just leave the
+		 * ESR disabled - we can't do anything useful with the
+		 * errors anyway - mbligh
+		 */
+		printk(KERN_INFO "Leaving ESR disabled.\n");
+		return;
+	}
+
+	maxlvt = lapic_get_maxlvt();
+	if (maxlvt > 3)		/* Due to the Pentium erratum 3AP. */
+		apic_write(APIC_ESR, 0);
+	oldvalue = apic_read(APIC_ESR);
+
+	/* enables sending errors */
+	value = ERROR_APIC_VECTOR;
+	apic_write(APIC_LVTERR, value);
+
+	/*
+	 * spec says clear errors after enabling vector.
+	 */
+	if (maxlvt > 3)
+		apic_write(APIC_ESR, 0);
+	value = apic_read(APIC_ESR);
+	if (value != oldvalue)
+		apic_printk(APIC_VERBOSE, "ESR value before enabling "
+			"vector: 0x%08x  after: 0x%08x\n",
+			oldvalue, value);
 }
 
 
@@ -1128,7 +1144,7 @@ void __cpuinit setup_local_APIC(void)
 
 #ifdef CONFIG_X86_32
 	/* Pound the ESR really hard over the head with a big hammer - mbligh */
-	if (esr_disable) {
+	if (lapic_is_integrated() && esr_disable) {
 		apic_write(APIC_ESR, 0);
 		apic_write(APIC_ESR, 0);
 		apic_write(APIC_ESR, 0);
@@ -1344,7 +1360,12 @@ void enable_IR_x2apic(void)
 
 	local_irq_save(flags);
 	mask_8259A();
-	save_mask_IO_APIC_setup();
+
+	ret = save_mask_IO_APIC_setup();
+	if (ret) {
+		printk(KERN_INFO "Saving IO-APIC state failed: %d\n", ret);
+		goto end;
+	}
 
 	ret = enable_intr_remapping(1);
 
@@ -1354,14 +1375,15 @@ void enable_IR_x2apic(void)
 	}
 
 	if (ret)
-		goto end;
+		goto end_restore;
 
 	if (!x2apic) {
 		x2apic = 1;
 		apic_ops = &x2apic_ops;
 		enable_x2apic();
 	}
-end:
+
+end_restore:
 	if (ret)
 		/*
 		 * IR enabling failed
@@ -1370,6 +1392,7 @@ end:
 	else
 		reinit_intr_remapped_IO_APIC(x2apic_preenabled);
 
+end:
 	unmask_8259A();
 	local_irq_restore(flags);
 
@@ -1548,7 +1571,7 @@ void __init init_apic_mappings(void)
 		apic_phys = mp_lapic_addr;
 
 	set_fixmap_nocache(FIX_APIC_BASE, apic_phys);
-	apic_printk(APIC_VERBOSE, "mapped APIC to %16lx (%16lx)\n",
+	apic_printk(APIC_VERBOSE, "mapped APIC to %08lx (%08lx)\n",
 				APIC_BASE, apic_phys);
 
 	/*
@@ -1586,7 +1609,7 @@ int __init APIC_init_uniprocessor(void)
 	 */
 	if (!cpu_has_apic &&
 	    APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
-		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
+		printk(KERN_ERR "BIOS bug, local APIC 0x%x not detected!...\n",
 		       boot_cpu_physical_apicid);
 		clear_cpu_cap(&boot_cpu_data, X86_FEATURE_APIC);
 		return -1;

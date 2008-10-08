@@ -58,6 +58,8 @@
 #include <asm/setup.h>
 #include <asm/irq_remapping.h>
 #include <asm/hpet.h>
+#include <asm/uv/uv_hub.h>
+#include <asm/uv/uv_irq.h>
 
 #include <mach_ipi.h>
 #include <mach_apic.h>
@@ -277,23 +279,6 @@ static struct irq_cfg *irq_cfg_alloc(unsigned int irq)
 
 	spin_unlock_irqrestore(&irq_cfg_lock, flags);
 
-	printk(KERN_DEBUG "found new irq_cfg for irq %d\n", cfg->irq);
-#ifdef CONFIG_HAVE_SPARSE_IRQ_DEBUG
-	{
-		/* dump the results */
-		struct irq_cfg *cfg;
-		unsigned long phys;
-		unsigned long bytes = sizeof(struct irq_cfg);
-
-		printk(KERN_DEBUG "=========================== %d\n", irq);
-		printk(KERN_DEBUG "irq_cfg dump after get that for %d\n", irq);
-		for_each_irq_cfg(cfg) {
-			phys = __pa(cfg);
-			printk(KERN_DEBUG "irq_cfg %d ==> [%#lx - %#lx]\n", cfg->irq, phys, phys + bytes);
-		}
-		printk(KERN_DEBUG "===========================\n");
-	}
-#endif
 	return cfg;
 }
 #else
@@ -597,7 +582,6 @@ static void add_pin_to_irq(unsigned int irq, int apic, int pin)
 		cfg->irq_2_pin = entry;
 		entry->apic = apic;
 		entry->pin = pin;
-		printk(KERN_DEBUG " 0 add_pin_to_irq: irq %d --> apic %d pin %d\n", irq, apic, pin);
 		return;
 	}
 
@@ -613,7 +597,6 @@ static void add_pin_to_irq(unsigned int irq, int apic, int pin)
 	entry = entry->next;
 	entry->apic = apic;
 	entry->pin = pin;
-	printk(KERN_DEBUG " x add_pin_to_irq: irq %d --> apic %d pin %d\n", irq, apic, pin);
 }
 
 /*
@@ -643,65 +626,66 @@ static void __init replace_pin_at_irq(unsigned int irq,
 		add_pin_to_irq(irq, newapic, newpin);
 }
 
-#define __DO_ACTION(R, ACTION_ENABLE, ACTION_DISABLE, FINAL)		\
-									\
-{									\
-	int pin;							\
-	struct irq_cfg *cfg;						\
-	struct irq_pin_list *entry;					\
-									\
-	cfg = irq_cfg(irq);						\
-	entry = cfg->irq_2_pin;						\
-	for (;;) {							\
-		unsigned int reg;					\
-		if (!entry)						\
-			break;						\
-		pin = entry->pin;					\
-		reg = io_apic_read(entry->apic, 0x10 + R + pin*2);	\
-		reg ACTION_DISABLE;					\
-		reg ACTION_ENABLE;					\
-		io_apic_modify(entry->apic, 0x10 + R + pin*2, reg);	\
-		FINAL;							\
-		if (!entry->next)					\
-			break;						\
-		entry = entry->next;					\
-	}								\
+static inline void io_apic_modify_irq(unsigned int irq,
+				int mask_and, int mask_or,
+				void (*final)(struct irq_pin_list *entry))
+{
+	int pin;
+	struct irq_cfg *cfg;
+	struct irq_pin_list *entry;
+
+	cfg = irq_cfg(irq);
+	for (entry = cfg->irq_2_pin; entry != NULL; entry = entry->next) {
+		unsigned int reg;
+		pin = entry->pin;
+		reg = io_apic_read(entry->apic, 0x10 + pin * 2);
+		reg &= mask_and;
+		reg |= mask_or;
+		io_apic_modify(entry->apic, 0x10 + pin * 2, reg);
+		if (final)
+			final(entry);
+	}
 }
 
-#define DO_ACTION(name,R, ACTION_ENABLE, ACTION_DISABLE, FINAL)		\
-									\
-	static void name##_IO_APIC_irq (unsigned int irq)		\
-	__DO_ACTION(R, ACTION_ENABLE, ACTION_DISABLE, FINAL)
-
-/* mask = 0 */
-DO_ACTION(__unmask,	0, |= 0, &= ~IO_APIC_REDIR_MASKED, )
+static void __unmask_IO_APIC_irq(unsigned int irq)
+{
+	io_apic_modify_irq(irq, ~IO_APIC_REDIR_MASKED, 0, NULL);
+}
 
 #ifdef CONFIG_X86_64
-/*
- * Synchronize the IO-APIC and the CPU by doing
- * a dummy read from the IO-APIC
- */
-static inline void io_apic_sync(unsigned int apic)
+void io_apic_sync(struct irq_pin_list *entry)
 {
-	struct io_apic __iomem *io_apic = io_apic_base(apic);
+	/*
+	 * Synchronize the IO-APIC and the CPU by doing
+	 * a dummy read from the IO-APIC
+	 */
+	struct io_apic __iomem *io_apic;
+	io_apic = io_apic_base(entry->apic);
 	readl(&io_apic->data);
 }
 
-/* mask = 1 */
-DO_ACTION(__mask,	0, |= IO_APIC_REDIR_MASKED, &= ~0, io_apic_sync(entry->apic))
+static void __mask_IO_APIC_irq(unsigned int irq)
+{
+	io_apic_modify_irq(irq, ~0, IO_APIC_REDIR_MASKED, &io_apic_sync);
+}
+#else /* CONFIG_X86_32 */
+static void __mask_IO_APIC_irq(unsigned int irq)
+{
+	io_apic_modify_irq(irq, ~0, IO_APIC_REDIR_MASKED, NULL);
+}
 
-#else
+static void __mask_and_edge_IO_APIC_irq(unsigned int irq)
+{
+	io_apic_modify_irq(irq, ~IO_APIC_REDIR_LEVEL_TRIGGER,
+			IO_APIC_REDIR_MASKED, NULL);
+}
 
-/* mask = 1 */
-DO_ACTION(__mask,	0, |= IO_APIC_REDIR_MASKED, &= ~0, )
-
-/* mask = 1, trigger = 0 */
-DO_ACTION(__mask_and_edge, 0, |= IO_APIC_REDIR_MASKED, &= ~IO_APIC_REDIR_LEVEL_TRIGGER, )
-
-/* mask = 0, trigger = 1 */
-DO_ACTION(__unmask_and_level, 0, |= IO_APIC_REDIR_LEVEL_TRIGGER, &= ~IO_APIC_REDIR_MASKED, )
-
-#endif
+static void __unmask_and_level_IO_APIC_irq(unsigned int irq)
+{
+	io_apic_modify_irq(irq, ~IO_APIC_REDIR_MASKED,
+			IO_APIC_REDIR_LEVEL_TRIGGER, NULL);
+}
+#endif /* CONFIG_X86_32 */
 
 static void mask_IO_APIC_irq (unsigned int irq)
 {
@@ -830,7 +814,7 @@ int save_mask_IO_APIC_setup(void)
 			kzalloc(sizeof(struct IO_APIC_route_entry) *
 				nr_ioapic_registers[apic], GFP_KERNEL);
 		if (!early_ioapic_entries[apic])
-			return -ENOMEM;
+			goto nomem;
 	}
 
 	for (apic = 0; apic < nr_ioapics; apic++)
@@ -844,17 +828,31 @@ int save_mask_IO_APIC_setup(void)
 				ioapic_write_entry(apic, pin, entry);
 			}
 		}
+
 	return 0;
+
+nomem:
+	while (apic >= 0)
+		kfree(early_ioapic_entries[apic--]);
+	memset(early_ioapic_entries, 0,
+		ARRAY_SIZE(early_ioapic_entries));
+
+	return -ENOMEM;
 }
 
 void restore_IO_APIC_setup(void)
 {
 	int apic, pin;
 
-	for (apic = 0; apic < nr_ioapics; apic++)
+	for (apic = 0; apic < nr_ioapics; apic++) {
+		if (!early_ioapic_entries[apic])
+			break;
 		for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
 			ioapic_write_entry(apic, pin,
 					   early_ioapic_entries[apic][pin]);
+		kfree(early_ioapic_entries[apic]);
+		early_ioapic_entries[apic] = NULL;
+	}
 }
 
 void reinit_intr_remapped_IO_APIC(int intr_remapping)
@@ -1518,41 +1516,49 @@ static void setup_IO_APIC_irq(int apic, int pin, unsigned int irq,
 
 static void __init setup_IO_APIC_irqs(void)
 {
-	int apic, pin, idx, irq, first_notcon = 1;
+	int apic, pin, idx, irq;
+	int notcon = 0;
 
 	apic_printk(APIC_VERBOSE, KERN_DEBUG "init IO_APIC IRQs\n");
 
 	for (apic = 0; apic < nr_ioapics; apic++) {
-	for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
+		for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
 
-		idx = find_irq_entry(apic,pin,mp_INT);
-		if (idx == -1) {
-			if (first_notcon) {
-				apic_printk(APIC_VERBOSE, KERN_DEBUG " IO-APIC (apicid-pin) %d-%d", mp_ioapics[apic].mp_apicid, pin);
-				first_notcon = 0;
-			} else
-				apic_printk(APIC_VERBOSE, ", %d-%d", mp_ioapics[apic].mp_apicid, pin);
-			continue;
-		}
-		if (!first_notcon) {
-			apic_printk(APIC_VERBOSE, " not connected.\n");
-			first_notcon = 1;
-		}
+			idx = find_irq_entry(apic, pin, mp_INT);
+			if (idx == -1) {
+				if (!notcon) {
+					notcon = 1;
+					apic_printk(APIC_VERBOSE,
+						KERN_DEBUG " %d-%d",
+						mp_ioapics[apic].mp_apicid,
+						pin);
+				} else
+					apic_printk(APIC_VERBOSE, " %d-%d",
+						mp_ioapics[apic].mp_apicid,
+						pin);
+				continue;
+			}
+			if (notcon) {
+				apic_printk(APIC_VERBOSE,
+					" (apicid-pin) not connected\n");
+				notcon = 0;
+			}
 
-		irq = pin_2_irq(idx, apic, pin);
+			irq = pin_2_irq(idx, apic, pin);
 #ifdef CONFIG_X86_32
-                if (multi_timer_check(apic, irq))
-                        continue;
+			if (multi_timer_check(apic, irq))
+				continue;
 #endif
-		add_pin_to_irq(irq, apic, pin);
+			add_pin_to_irq(irq, apic, pin);
 
-		setup_IO_APIC_irq(apic, pin, irq,
-				  irq_trigger(idx), irq_polarity(idx));
-	}
+			setup_IO_APIC_irq(apic, pin, irq,
+					irq_trigger(idx), irq_polarity(idx));
+		}
 	}
 
-	if (!first_notcon)
-		apic_printk(APIC_VERBOSE, " not connected.\n");
+	if (notcon)
+		apic_printk(APIC_VERBOSE,
+			" (apicid-pin) not connected\n");
 }
 
 /*
@@ -3350,6 +3356,8 @@ static int setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc, int irq)
 #endif
 		set_irq_chip_and_handler_name(irq, &msi_chip, handle_edge_irq, "edge");
 
+	dev_printk(KERN_DEBUG, &dev->dev, "irq %d for MSI/MSI-X\n", irq);
+
 	return 0;
 }
 
@@ -3582,6 +3590,7 @@ int arch_setup_hpet_msi(unsigned int irq)
 	hpet_msi_write(irq, &msg);
 	set_irq_chip_and_handler_name(irq, &hpet_msi_type, handle_edge_irq,
 		"edge");
+
 	return 0;
 }
 #endif
@@ -3678,10 +3687,78 @@ int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev)
 
 		set_irq_chip_and_handler_name(irq, &ht_irq_chip,
 					      handle_edge_irq, "edge");
+
+		dev_printk(KERN_DEBUG, &dev->dev, "irq %d for HT\n", irq);
 	}
 	return err;
 }
 #endif /* CONFIG_HT_IRQ */
+
+#ifdef CONFIG_X86_64
+/*
+ * Re-target the irq to the specified CPU and enable the specified MMR located
+ * on the specified blade to allow the sending of MSIs to the specified CPU.
+ */
+int arch_enable_uv_irq(char *irq_name, unsigned int irq, int cpu, int mmr_blade,
+		       unsigned long mmr_offset)
+{
+	const cpumask_t *eligible_cpu = get_cpu_mask(cpu);
+	struct irq_cfg *cfg;
+	int mmr_pnode;
+	unsigned long mmr_value;
+	struct uv_IO_APIC_route_entry *entry;
+	unsigned long flags;
+	int err;
+
+	err = assign_irq_vector(irq, *eligible_cpu);
+	if (err != 0)
+		return err;
+
+	spin_lock_irqsave(&vector_lock, flags);
+	set_irq_chip_and_handler_name(irq, &uv_irq_chip, handle_percpu_irq,
+				      irq_name);
+	spin_unlock_irqrestore(&vector_lock, flags);
+
+	cfg = irq_cfg(irq);
+
+	mmr_value = 0;
+	entry = (struct uv_IO_APIC_route_entry *)&mmr_value;
+	BUG_ON(sizeof(struct uv_IO_APIC_route_entry) != sizeof(unsigned long));
+
+	entry->vector = cfg->vector;
+	entry->delivery_mode = INT_DELIVERY_MODE;
+	entry->dest_mode = INT_DEST_MODE;
+	entry->polarity = 0;
+	entry->trigger = 0;
+	entry->mask = 0;
+	entry->dest = cpu_mask_to_apicid(*eligible_cpu);
+
+	mmr_pnode = uv_blade_to_pnode(mmr_blade);
+	uv_write_global_mmr64(mmr_pnode, mmr_offset, mmr_value);
+
+	return irq;
+}
+
+/*
+ * Disable the specified MMR located on the specified blade so that MSIs are
+ * longer allowed to be sent.
+ */
+void arch_disable_uv_irq(int mmr_blade, unsigned long mmr_offset)
+{
+	unsigned long mmr_value;
+	struct uv_IO_APIC_route_entry *entry;
+	int mmr_pnode;
+
+	mmr_value = 0;
+	entry = (struct uv_IO_APIC_route_entry *)&mmr_value;
+	BUG_ON(sizeof(struct uv_IO_APIC_route_entry) != sizeof(unsigned long));
+
+	entry->mask = 1;
+
+	mmr_pnode = uv_blade_to_pnode(mmr_blade);
+	uv_write_global_mmr64(mmr_pnode, mmr_offset, mmr_value);
+}
+#endif /* CONFIG_X86_64 */
 
 int __init io_apic_get_redir_entries (int ioapic)
 {

@@ -111,12 +111,11 @@ static void init_kstat_irqs(struct irq_desc *desc, int nr_desc, int nr)
 	}
 }
 
+#ifdef CONFIG_HAVE_SPARSE_IRQ
 /*
  * Protect the sparse_irqs_free freelist:
  */
 static DEFINE_SPINLOCK(sparse_irq_lock);
-
-#ifdef CONFIG_HAVE_SPARSE_IRQ
 static struct irq_desc *sparse_irqs_free;
 struct irq_desc *sparse_irqs;
 #endif
@@ -238,24 +237,6 @@ struct irq_desc *irq_to_desc_alloc(unsigned int irq)
 
 	spin_unlock_irqrestore(&sparse_irq_lock, flags);
 
-	printk(KERN_DEBUG "found new irq_desc for irq %d\n", desc->irq);
-#ifdef CONFIG_HAVE_SPARSE_IRQ_DEBUG
-	{
-		/* dump the results */
-		struct irq_desc *desc;
-		unsigned long phys;
-		unsigned long bytes = sizeof(struct irq_desc);
-		unsigned int irqx;
-
-		printk(KERN_DEBUG "=========================== %d\n", irq);
-		printk(KERN_DEBUG "irq_desc dump after get that for %d\n", irq);
-		for_each_irq_desc(irqx, desc) {
-			phys = __pa(desc);
-			printk(KERN_DEBUG "irq_desc %d ==> [%#lx - %#lx]\n", irqx, phys, phys + bytes);
-		}
-		printk(KERN_DEBUG "===========================\n");
-	}
-#endif
 	return desc;
 }
 #else
@@ -272,7 +253,7 @@ struct irq_desc irq_desc[NR_IRQS] __cacheline_aligned_in_smp = {
 		.chip = &no_irq_chip,
 		.handle_irq = handle_bad_irq,
 		.depth = 1,
-		.lock = __SPIN_LOCK_UNLOCKED(sparse_irqs->lock),
+		.lock = __SPIN_LOCK_UNLOCKED(irq_desc->lock),
 #ifdef CONFIG_SMP
 		.affinity = CPU_MASK_ALL
 #endif
