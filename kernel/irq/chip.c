@@ -112,9 +112,9 @@ int set_irq_chip(unsigned int irq, struct irq_chip *chip)
 EXPORT_SYMBOL(set_irq_chip);
 
 /**
- *	set_irq_type - set the irq type for an irq
+ *	set_irq_type - set the irq trigger type for an irq
  *	@irq:	irq number
- *	@type:	interrupt type - see include/linux/interrupt.h
+ *	@type:	IRQ_TYPE_{LEVEL,EDGE}_* value - see include/linux/irq.h
  */
 int set_irq_type(unsigned int irq, unsigned int type)
 {
@@ -128,11 +128,12 @@ int set_irq_type(unsigned int irq, unsigned int type)
 		return -ENODEV;
 	}
 
-	if (desc->chip->set_type) {
-		spin_lock_irqsave(&desc->lock, flags);
-		ret = desc->chip->set_type(irq, type);
-		spin_unlock_irqrestore(&desc->lock, flags);
-	}
+	if (type == IRQ_TYPE_NONE)
+		return 0;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	ret = __irq_set_trigger(desc, irq, flags);
+	spin_unlock_irqrestore(&desc->lock, flags);
 	return ret;
 }
 EXPORT_SYMBOL(set_irq_type);
@@ -610,7 +611,7 @@ __set_irq_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
 		desc->status &= ~IRQ_DISABLED;
 		desc->status |= IRQ_NOREQUEST | IRQ_NOPROBE;
 		desc->depth = 0;
-		desc->chip->unmask(irq);
+		desc->chip->startup(irq);
 	}
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
