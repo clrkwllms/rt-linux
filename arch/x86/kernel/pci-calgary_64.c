@@ -261,7 +261,7 @@ static void iommu_range_reserve(struct iommu_table *tbl,
 			       badbit, tbl, start_addr, npages);
 	}
 
-	set_bit_string(tbl->it_map, index, npages);
+	iommu_area_reserve(tbl->it_map, index, npages);
 
 	spin_unlock_irqrestore(&tbl->it_lock, flags);
 }
@@ -490,6 +490,8 @@ static void* calgary_alloc_coherent(struct device *dev, size_t size,
 	size = PAGE_ALIGN(size); /* size rounded up to full pages */
 	npages = size >> PAGE_SHIFT;
 	order = get_order(size);
+
+	flag &= ~(__GFP_DMA | __GFP_HIGHMEM | __GFP_DMA32);
 
 	/* alloc enough pages (and possibly more) */
 	ret = (void *)__get_free_pages(flag, order);
