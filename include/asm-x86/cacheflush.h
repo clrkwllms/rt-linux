@@ -24,6 +24,8 @@
 #define copy_from_user_page(vma, page, vaddr, dst, src, len)	\
 	memcpy((dst), (src), (len))
 
+#define PG_non_WB				PG_arch_1
+PAGEFLAG(NonWB, non_WB)
 
 /*
  * The set_memory_* API can be used to change various attributes of a virtual
@@ -98,8 +100,6 @@ int set_pages_rw(struct page *page, int numpages);
 
 
 void clflush_cache_range(void *addr, unsigned int size);
-
-void cpa_init(void);
 
 #ifdef CONFIG_DEBUG_RODATA
 void mark_rodata_ro(void);

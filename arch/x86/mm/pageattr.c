@@ -35,6 +35,14 @@ struct cpa_data {
 	int		curpage;
 };
 
+/*
+ * Serialize cpa() (for !DEBUG_PAGEALLOC which uses large identity mappings)
+ * using cpa_lock. So that we don't allow any other cpu, with stale large tlb
+ * entries change the page attribute in parallel to some other cpu
+ * splitting a large page entry along with changing the attribute.
+ */
+static DEFINE_SPINLOCK(cpa_lock);
+
 #define CPA_FLUSHTLB 1
 #define CPA_ARRAY 2
 
@@ -447,84 +455,6 @@ out_unlock:
 	return do_split;
 }
 
-static LIST_HEAD(page_pool);
-static unsigned long pool_size, pool_pages, pool_low;
-static unsigned long pool_used, pool_failed;
-
-static void cpa_fill_pool(struct page **ret)
-{
-	gfp_t gfp = GFP_KERNEL;
-	unsigned long flags;
-	struct page *p;
-
-	/*
-	 * Avoid recursion (on debug-pagealloc) and also signal
-	 * our priority to get to these pagetables:
-	 */
-	if (current->flags & PF_MEMALLOC)
-		return;
-	current->flags |= PF_MEMALLOC;
-
-	/*
-	 * Allocate atomically from atomic contexts:
-	 */
-	if (in_atomic() || irqs_disabled() || debug_pagealloc)
-		gfp =  GFP_ATOMIC | __GFP_NORETRY | __GFP_NOWARN;
-
-	while (pool_pages < pool_size || (ret && !*ret)) {
-		p = alloc_pages(gfp, 0);
-		if (!p) {
-			pool_failed++;
-			break;
-		}
-		/*
-		 * If the call site needs a page right now, provide it:
-		 */
-		if (ret && !*ret) {
-			*ret = p;
-			continue;
-		}
-		spin_lock_irqsave(&pgd_lock, flags);
-		list_add(&p->lru, &page_pool);
-		pool_pages++;
-		spin_unlock_irqrestore(&pgd_lock, flags);
-	}
-
-	current->flags &= ~PF_MEMALLOC;
-}
-
-#define SHIFT_MB		(20 - PAGE_SHIFT)
-#define ROUND_MB_GB		((1 << 10) - 1)
-#define SHIFT_MB_GB		10
-#define POOL_PAGES_PER_GB	16
-
-void __init cpa_init(void)
-{
-	struct sysinfo si;
-	unsigned long gb;
-
-	si_meminfo(&si);
-	/*
-	 * Calculate the number of pool pages:
-	 *
-	 * Convert totalram (nr of pages) to MiB and round to the next
-	 * GiB. Shift MiB to Gib and multiply the result by
-	 * POOL_PAGES_PER_GB:
-	 */
-	if (debug_pagealloc) {
-		gb = ((si.totalram >> SHIFT_MB) + ROUND_MB_GB) >> SHIFT_MB_GB;
-		pool_size = POOL_PAGES_PER_GB * gb;
-	} else {
-		pool_size = 1;
-	}
-	pool_low = pool_size;
-
-	cpa_fill_pool(NULL);
-	printk(KERN_DEBUG
-	       "CPA: page pool initialized %lu of %lu pages preallocated\n",
-	       pool_pages, pool_size);
-}
-
 static int split_large_page(pte_t *kpte, unsigned long address)
 {
 	unsigned long flags, pfn, pfninc = 1;
@@ -533,28 +463,15 @@ static int split_large_page(pte_t *kpte, unsigned long address)
 	pgprot_t ref_prot;
 	struct page *base;
 
-	/*
-	 * Get a page from the pool. The pool list is protected by the
-	 * pgd_lock, which we have to take anyway for the split
-	 * operation:
-	 */
+	if (!debug_pagealloc)
+		spin_unlock(&cpa_lock);
+	base = alloc_pages(GFP_KERNEL, 0);
+	if (!debug_pagealloc)
+		spin_lock(&cpa_lock);
+	if (!base)
+		return -ENOMEM;
+
 	spin_lock_irqsave(&pgd_lock, flags);
-	if (list_empty(&page_pool)) {
-		spin_unlock_irqrestore(&pgd_lock, flags);
-		base = NULL;
-		cpa_fill_pool(&base);
-		if (!base)
-			return -ENOMEM;
-		spin_lock_irqsave(&pgd_lock, flags);
-	} else {
-		base = list_first_entry(&page_pool, struct page, lru);
-		list_del(&base->lru);
-		pool_pages--;
-
-		if (pool_pages < pool_low)
-			pool_low = pool_pages;
-	}
-
 	/*
 	 * Check for races, another CPU might have split this page
 	 * up for us already:
@@ -611,11 +528,8 @@ out_unlock:
 	 * If we dropped out via the lookup_address check under
 	 * pgd_lock then stick the page back into the pool:
 	 */
-	if (base) {
-		list_add(&base->lru, &page_pool);
-		pool_pages++;
-	} else
-		pool_used++;
+	if (base)
+		__free_page(base);
 	spin_unlock_irqrestore(&pgd_lock, flags);
 
 	return 0;
@@ -694,7 +608,25 @@ repeat:
 	 */
 	err = split_large_page(kpte, address);
 	if (!err) {
-		cpa->flags |= CPA_FLUSHTLB;
+		/*
+	 	 * Do a global flush tlb after splitting the large page
+	 	 * and before we do the actual change page attribute in the PTE.
+	 	 *
+	 	 * With out this, we violate the TLB application note, that says
+	 	 * "The TLBs may contain both ordinary and large-page
+		 *  translations for a 4-KByte range of linear addresses. This
+		 *  may occur if software modifies the paging structures so that
+		 *  the page size used for the address range changes. If the two
+		 *  translations differ with respect to page frame or attributes
+		 *  (e.g., permissions), processor behavior is undefined and may
+		 *  be implementation-specific."
+	 	 *
+	 	 * We do this global tlb flush inside the cpa_lock, so that we
+		 * don't allow any other cpu, with stale tlb entries change the
+		 * page attribute in parallel, that also falls into the
+		 * just split large page entry.
+	 	 */
+		flush_tlb_all();
 		goto repeat;
 	}
 
@@ -786,7 +718,11 @@ static int __change_page_attr_set_clr(struct cpa_data *cpa, int checkalias)
 		if (cpa->flags & CPA_ARRAY)
 			cpa->numpages = 1;
 
+		if (!debug_pagealloc)
+			spin_lock(&cpa_lock);
 		ret = __change_page_attr(cpa, checkalias);
+		if (!debug_pagealloc)
+			spin_unlock(&cpa_lock);
 		if (ret)
 			return ret;
 
@@ -899,8 +835,6 @@ static int change_page_attr_set_clr(unsigned long *addr, int numpages,
 		cpa_flush_all(cache);
 
 out:
-	cpa_fill_pool(NULL);
-
 	return ret;
 }
 
@@ -1123,7 +1057,13 @@ static int __set_pages_p(struct page *page, int numpages)
 				.mask_clr = __pgprot(0),
 				.flags = 0};
 
-	return __change_page_attr_set_clr(&cpa, 1);
+	/*
+	 * No alias checking needed for setting present flag. otherwise,
+	 * we may need to break large pages for 64-bit kernel text
+	 * mappings (this adds to complexity if we want to do this from
+	 * atomic context especially). Let's keep it simple!
+	 */
+	return __change_page_attr_set_clr(&cpa, 0);
 }
 
 static int __set_pages_np(struct page *page, int numpages)
@@ -1135,7 +1075,13 @@ static int __set_pages_np(struct page *page, int numpages)
 				.mask_clr = __pgprot(_PAGE_PRESENT | _PAGE_RW),
 				.flags = 0};
 
-	return __change_page_attr_set_clr(&cpa, 1);
+	/*
+	 * No alias checking needed for setting not present flag. otherwise,
+	 * we may need to break large pages for 64-bit kernel text
+	 * mappings (this adds to complexity if we want to do this from
+	 * atomic context especially). Let's keep it simple!
+	 */
+	return __change_page_attr_set_clr(&cpa, 0);
 }
 
 void kernel_map_pages(struct page *page, int numpages, int enable)
@@ -1155,11 +1101,8 @@ void kernel_map_pages(struct page *page, int numpages, int enable)
 
 	/*
 	 * The return value is ignored as the calls cannot fail.
-	 * Large pages are kept enabled at boot time, and are
-	 * split up quickly with DEBUG_PAGEALLOC. If a splitup
-	 * fails here (due to temporary memory shortage) no damage
-	 * is done because we just keep the largepage intact up
-	 * to the next attempt when it will likely be split up:
+	 * Large pages for identity mappings are not used at boot time
+	 * and hence no memory allocations during large page split.
 	 */
 	if (enable)
 		__set_pages_p(page, numpages);
@@ -1171,52 +1114,7 @@ void kernel_map_pages(struct page *page, int numpages, int enable)
 	 * but that can deadlock->flush only current cpu:
 	 */
 	__flush_tlb_all();
-
-	/*
-	 * Try to refill the page pool here. We can do this only after
-	 * the tlb flush.
-	 */
-	cpa_fill_pool(NULL);
 }
-
-#ifdef CONFIG_DEBUG_FS
-static int dpa_show(struct seq_file *m, void *v)
-{
-	seq_puts(m, "DEBUG_PAGEALLOC\n");
-	seq_printf(m, "pool_size     : %lu\n", pool_size);
-	seq_printf(m, "pool_pages    : %lu\n", pool_pages);
-	seq_printf(m, "pool_low      : %lu\n", pool_low);
-	seq_printf(m, "pool_used     : %lu\n", pool_used);
-	seq_printf(m, "pool_failed   : %lu\n", pool_failed);
-
-	return 0;
-}
-
-static int dpa_open(struct inode *inode, struct file *filp)
-{
-	return single_open(filp, dpa_show, NULL);
-}
-
-static const struct file_operations dpa_fops = {
-	.open		= dpa_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
-static int __init debug_pagealloc_proc_init(void)
-{
-	struct dentry *de;
-
-	de = debugfs_create_file("debug_pagealloc", 0600, NULL, NULL,
-				 &dpa_fops);
-	if (!de)
-		return -ENOMEM;
-
-	return 0;
-}
-__initcall(debug_pagealloc_proc_init);
-#endif
 
 #ifdef CONFIG_HIBERNATION
 
