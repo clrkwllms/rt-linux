@@ -2595,5 +2595,11 @@ __attribute__((weak)) const char *arch_vma_name(struct vm_area_struct *vma)
 
 void __init signals_init(void)
 {
-	sigqueue_cachep = KMEM_CACHE(sigqueue, SLAB_PANIC);
+	/*
+	 * XXX: The SLAB_NOTRACK is not strictly required, and could mask
+	 * potential errors. Unfortunately, different architectures have
+	 * different structs, and figuring out exactly how many bytes to
+	 * copy for each union member... Well, I tried and I failed.
+	 */
+	sigqueue_cachep = KMEM_CACHE(sigqueue, SLAB_PANIC | SLAB_NOTRACK);
 }
