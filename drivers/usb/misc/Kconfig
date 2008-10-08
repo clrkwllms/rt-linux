@@ -42,16 +42,6 @@ config USB_ADUTUX
 	  To compile this driver as a module, choose M here.  The module
 	  will be called adutux.
 
-config USB_AUERSWALD
-	tristate "USB Auerswald ISDN support"
-	depends on USB
-	help
-	  Say Y here if you want to connect an Auerswald USB ISDN Device
-	  to your computer's USB port.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called auerswald.
-
 config USB_RIO500
 	tristate "USB Diamond Rio500 support"
 	depends on USB
@@ -269,3 +259,15 @@ config USB_TEST
 	  See <http://www.linux-usb.org/usbtest/> for more information,
 	  including sample test device firmware and "how to use it".
 
+config USB_ISIGHTFW
+	tristate "iSight firmware loading support"
+	depends on USB
+	select FW_LOADER
+	help
+	  This driver loads firmware for USB Apple iSight cameras, allowing
+	  them to be driven by the USB video class driver available at
+	  http://linux-uvc.berlios.de
+
+	  The firmware for this driver must be extracted from the MacOS
+	  driver beforehand. Tools for doing so are available at
+	  http://bersace03.free.fr

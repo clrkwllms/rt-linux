@@ -25,7 +25,6 @@
 #include <linux/kref.h>
 #include <linux/dma-mapping.h>
 
-#define IN_CARD_SERVICES
 #include <pcmcia/cs_types.h>
 #include <pcmcia/cs.h>
 #include <pcmcia/cistpl.h>
@@ -428,6 +427,18 @@ static int pcmcia_device_probe(struct device * dev)
 	p_drv = to_pcmcia_drv(dev->driver);
 	s = p_dev->socket;
 
+	/* The PCMCIA code passes the match data in via dev->driver_data
+	 * which is an ugly hack. Once the driver probe is called it may
+	 * and often will overwrite the match data so we must save it first
+	 *
+	 * handle pseudo multifunction devices:
+	 * there are at most two pseudo multifunction devices.
+	 * if we're matching against the first, schedule a
+	 * call which will then check whether there are two
+	 * pseudo devices, and if not, add the second one.
+	 */
+	did = p_dev->dev.driver_data;
+
 	ds_dbg(1, "trying to bind %s to %s\n", p_dev->dev.bus_id,
 	       p_drv->drv.name);
 
@@ -456,21 +467,14 @@ static int pcmcia_device_probe(struct device * dev)
 		goto put_module;
 	}
 
-	/* handle pseudo multifunction devices:
-	 * there are at most two pseudo multifunction devices.
-	 * if we're matching against the first, schedule a
-	 * call which will then check whether there are two
-	 * pseudo devices, and if not, add the second one.
-	 */
-	did = p_dev->dev.driver_data;
 	if (did && (did->match_flags & PCMCIA_DEV_ID_MATCH_DEVICE_NO) &&
 	    (p_dev->socket->device_count == 1) && (p_dev->device_no == 0))
 		pcmcia_add_device_later(p_dev->socket, 0);
 
- put_module:
+put_module:
 	if (ret)
 		module_put(p_drv->owner);
- put_dev:
+put_dev:
 	if (ret)
 		put_device(dev);
 	return (ret);
@@ -741,9 +745,8 @@ struct pcmcia_device * pcmcia_device_add(struct pcmcia_socket *s, unsigned int f
 
 static int pcmcia_card_add(struct pcmcia_socket *s)
 {
-	cisinfo_t cisinfo;
 	cistpl_longlink_mfc_t mfc;
-	unsigned int no_funcs, i;
+	unsigned int no_funcs, i, no_chains;
 	int ret = 0;
 
 	if (!(s->resource_setup_done)) {
@@ -757,8 +760,8 @@ static int pcmcia_card_add(struct pcmcia_socket *s)
 		return -EAGAIN; /* try again, but later... */
 	}
 
-	ret = pccard_validate_cis(s, BIND_FN_ALL, &cisinfo);
-	if (ret || !cisinfo.Chains) {
+	ret = pccard_validate_cis(s, BIND_FN_ALL, &no_chains);
+	if (ret || !no_chains) {
 		ds_dbg(0, "invalid CIS or invalid resources\n");
 		return -ENODEV;
 	}
@@ -852,7 +855,7 @@ static int pcmcia_load_firmware(struct pcmcia_device *dev, char * filename)
 {
 	struct pcmcia_socket *s = dev->socket;
 	const struct firmware *fw;
-	char path[20];
+	char path[FIRMWARE_NAME_MAX];
 	int ret = -ENOMEM;
 	int no_funcs;
 	int old_funcs;
@@ -864,7 +867,7 @@ static int pcmcia_load_firmware(struct pcmcia_device *dev, char * filename)
 
 	ds_dbg(1, "trying to load CIS file %s\n", filename);
 
-	if (strlen(filename) > 14) {
+	if (strlen(filename) > (FIRMWARE_NAME_MAX - 1)) {
 		printk(KERN_WARNING "pcmcia: CIS filename is too long [%s]\n",
 			filename);
 		return -EINVAL;

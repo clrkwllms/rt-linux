@@ -76,6 +76,13 @@ void ivtv_irq_work_handler(struct work_struct *work)
 
 	DEFINE_WAIT(wait);
 
+	if (test_and_clear_bit(IVTV_F_I_WORK_INITED, &itv->i_flags)) {
+		struct sched_param param = { .sched_priority = 99 };
+
+		/* This thread must use the FIFO scheduler as it
+		   is realtime sensitive. */
+		sched_setscheduler(current, SCHED_FIFO, &param);
+	}
 	if (test_and_clear_bit(IVTV_F_I_WORK_HANDLER_PIO, &itv->i_flags))
 		ivtv_pio_work_handler(itv);
 
@@ -231,14 +238,14 @@ static void dma_post(struct ivtv_stream *s)
 	struct ivtv_buffer *buf = NULL;
 	struct list_head *p;
 	u32 offset;
-	u32 *u32buf;
+	__le32 *u32buf;
 	int x = 0;
 
 	IVTV_DEBUG_HI_DMA("%s %s completed (%x)\n", ivtv_use_pio(s) ? "PIO" : "DMA",
 			s->name, s->dma_offset);
 	list_for_each(p, &s->q_dma.list) {
 		buf = list_entry(p, struct ivtv_buffer, list);
-		u32buf = (u32 *)buf->buf;
+		u32buf = (__le32 *)buf->buf;
 
 		/* Sync Buffer */
 		ivtv_buf_sync_for_cpu(s, buf);
@@ -444,7 +451,7 @@ static void ivtv_dma_enc_start(struct ivtv_stream *s)
 	}
 
 	s->dma_xfer_cnt++;
-	memcpy(s->sg_processing, s->sg_pending, sizeof(struct ivtv_sg_element) * s->sg_pending_size);
+	memcpy(s->sg_processing, s->sg_pending, sizeof(struct ivtv_sg_host_element) * s->sg_pending_size);
 	s->sg_processing_size = s->sg_pending_size;
 	s->sg_pending_size = 0;
 	s->sg_processed = 0;
@@ -473,7 +480,7 @@ static void ivtv_dma_dec_start(struct ivtv_stream *s)
 	if (s->q_predma.bytesused)
 		ivtv_queue_move(s, &s->q_predma, NULL, &s->q_dma, s->q_predma.bytesused);
 	s->dma_xfer_cnt++;
-	memcpy(s->sg_processing, s->sg_pending, sizeof(struct ivtv_sg_element) * s->sg_pending_size);
+	memcpy(s->sg_processing, s->sg_pending, sizeof(struct ivtv_sg_host_element) * s->sg_pending_size);
 	s->sg_processing_size = s->sg_pending_size;
 	s->sg_pending_size = 0;
 	s->sg_processed = 0;
@@ -678,34 +685,14 @@ static void ivtv_irq_enc_start_cap(struct ivtv *itv)
 
 static void ivtv_irq_enc_vbi_cap(struct ivtv *itv)
 {
-	struct ivtv_stream *s_mpg = &itv->streams[IVTV_ENC_STREAM_TYPE_MPG];
 	u32 data[CX2341X_MBOX_MAX_DATA];
 	struct ivtv_stream *s;
 
 	IVTV_DEBUG_HI_IRQ("ENC START VBI CAP\n");
 	s = &itv->streams[IVTV_ENC_STREAM_TYPE_VBI];
 
-	/* If more than two VBI buffers are pending, then
-	   clear the old ones and start with this new one.
-	   This can happen during transition stages when MPEG capturing is
-	   started, but the first interrupts haven't arrived yet. During
-	   that period VBI requests can accumulate without being able to
-	   DMA the data. Since at most four VBI DMA buffers are available,
-	   we just drop the old requests when there are already three
-	   requests queued. */
-	if (s->sg_pending_size > 2) {
-		struct ivtv_buffer *buf;
-		list_for_each_entry(buf, &s->q_predma.list, list)
-			ivtv_buf_sync_for_cpu(s, buf);
-		ivtv_queue_move(s, &s->q_predma, NULL, &s->q_free, 0);
-		s->sg_pending_size = 0;
-	}
-	/* if we can append the data, and the MPEG stream isn't capturing,
-	   then start a DMA request for just the VBI data. */
-	if (!stream_enc_dma_append(s, data) &&
-			!test_bit(IVTV_F_S_STREAMING, &s_mpg->s_flags)) {
+	if (!stream_enc_dma_append(s, data))
 		set_bit(ivtv_use_pio(s) ? IVTV_F_S_PIO_PENDING : IVTV_F_S_DMA_PENDING, &s->s_flags);
-	}
 }
 
 static void ivtv_irq_dec_vbi_reinsert(struct ivtv *itv)

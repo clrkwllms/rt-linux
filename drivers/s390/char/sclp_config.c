@@ -40,7 +40,7 @@ static void sclp_cpu_capability_notify(struct work_struct *work)
 	put_online_cpus();
 }
 
-static void sclp_cpu_change_notify(struct work_struct *work)
+static void __ref sclp_cpu_change_notify(struct work_struct *work)
 {
 	smp_rescan_cpus();
 }
@@ -74,10 +74,8 @@ static int __init sclp_conf_init(void)
 	INIT_WORK(&sclp_cpu_change_work, sclp_cpu_change_notify);
 
 	rc = sclp_register(&sclp_conf_register);
-	if (rc) {
-		printk(KERN_ERR TAG "failed to register (%d).\n", rc);
+	if (rc)
 		return rc;
-	}
 
 	if (!(sclp_conf_register.sclp_send_mask & EVTYP_CONFMGMDATA_MASK)) {
 		printk(KERN_WARNING TAG "no configuration management.\n");

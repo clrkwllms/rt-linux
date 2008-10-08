@@ -165,11 +165,11 @@ out_free:
 		/* See dccp_v4_conn_request */
 		newdmsk->dccpms_sequence_window = req->rcv_wnd;
 
-		newdp->dccps_gar = newdp->dccps_isr = dreq->dreq_isr;
-		dccp_update_gsr(newsk, dreq->dreq_isr);
-
-		newdp->dccps_iss = dreq->dreq_iss;
+		newdp->dccps_gar = newdp->dccps_iss = dreq->dreq_iss;
 		dccp_update_gss(newsk, dreq->dreq_iss);
+
+		newdp->dccps_isr = dreq->dreq_isr;
+		dccp_update_gsr(newsk, dreq->dreq_isr);
 
 		/*
 		 * SWL and AWL are initially adjusted so that they are not less than
@@ -296,7 +296,8 @@ int dccp_child_process(struct sock *parent, struct sock *child,
 
 EXPORT_SYMBOL_GPL(dccp_child_process);
 
-void dccp_reqsk_send_ack(struct sk_buff *skb, struct request_sock *rsk)
+void dccp_reqsk_send_ack(struct sock *sk, struct sk_buff *skb,
+			 struct request_sock *rsk)
 {
 	DCCP_BUG("DCCP-ACK packets are never sent in LISTEN/RESPOND state");
 }

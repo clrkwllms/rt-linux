@@ -61,7 +61,7 @@ static void epu_dma_done(struct cx18 *cx, struct cx18_mailbox *mb)
 		CX18_WARN("Ack struct = %d for %s\n",
 			mb->args[2], s->name);
 	id = read_enc(off);
-	buf = cx18_queue_find_buf(s, id, read_enc(off + 4));
+	buf = cx18_queue_get_buf_irq(s, id, read_enc(off + 4));
 	CX18_DEBUG_HI_DMA("DMA DONE for %s (buffer %d)\n", s->name, id);
 	if (buf) {
 		cx18_buf_sync_for_cpu(s, buf);
@@ -75,7 +75,7 @@ static void epu_dma_done(struct cx18 *cx, struct cx18_mailbox *mb)
 
 			cx18_buf_sync_for_device(s, buf);
 			cx18_vapi(cx, CX18_CPU_DE_SET_MDL, 5, s->handle,
-			    (void *)&cx->scb->cpu_mdl[buf->id] - cx->enc_mem,
+			    (void __iomem *)&cx->scb->cpu_mdl[buf->id] - cx->enc_mem,
 			    1, buf->id, s->buf_size);
 		} else
 			set_bit(CX18_F_B_NEED_BUF_SWAP, &buf->b_flags);
@@ -161,13 +161,15 @@ irqreturn_t cx18_irq_handler(int irq, void *dev_id)
 	*/
 
 	if (sw2) {
-		if (sw2 & (cx->scb->cpu2hpu_irq_ack | cx->scb->cpu2epu_irq_ack))
+		if (sw2 & (readl(&cx->scb->cpu2hpu_irq_ack) |
+			   readl(&cx->scb->cpu2epu_irq_ack)))
 			wake_up(&cx->mb_cpu_waitq);
-		if (sw2 & (cx->scb->apu2hpu_irq_ack | cx->scb->apu2epu_irq_ack))
+		if (sw2 & (readl(&cx->scb->apu2hpu_irq_ack) |
+			   readl(&cx->scb->apu2epu_irq_ack)))
 			wake_up(&cx->mb_apu_waitq);
-		if (sw2 & cx->scb->epu2hpu_irq_ack)
+		if (sw2 & readl(&cx->scb->epu2hpu_irq_ack))
 			wake_up(&cx->mb_epu_waitq);
-		if (sw2 & cx->scb->hpu2epu_irq_ack)
+		if (sw2 & readl(&cx->scb->hpu2epu_irq_ack))
 			wake_up(&cx->mb_hpu_waitq);
 	}
 

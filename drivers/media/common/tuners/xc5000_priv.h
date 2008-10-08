@@ -1,7 +1,7 @@
 /*
  *  Driver for Xceive XC5000 "QAM/8VSB single chip tuner"
  *
- *  Copyright (c) 2007 Steven Toth <stoth@hauppauge.com>
+ *  Copyright (c) 2007 Steven Toth <stoth@linuxtv.org>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,7 +30,6 @@ struct xc5000_priv {
 	u32 bandwidth;
 	u8  video_standard;
 	u8  rf_mode;
-	u8  fwloaded;
 
 	void *devptr;
 };

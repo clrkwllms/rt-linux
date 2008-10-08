@@ -226,23 +226,28 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 		/* If Open reported that we actually created a file
 		then we now have to set the mode if possible */
 		if ((pTcon->unix_ext) && (oplock & CIFS_CREATE_ACTION)) {
+			struct cifs_unix_set_info_args args = {
+				.mode	= mode,
+				.ctime	= NO_CHANGE_64,
+				.atime	= NO_CHANGE_64,
+				.mtime	= NO_CHANGE_64,
+				.device	= 0,
+			};
+
 			if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SET_UID) {
-				CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
-					(__u64)current->fsuid,
-					(__u64)current->fsgid,
-					0 /* dev */,
-					cifs_sb->local_nls,
-					cifs_sb->mnt_cifs_flags &
-						CIFS_MOUNT_MAP_SPECIAL_CHR);
+				args.uid = (__u64) current->fsuid;
+				if (inode->i_mode & S_ISGID)
+					args.gid = (__u64) inode->i_gid;
+				else
+					args.gid = (__u64) current->fsgid;
 			} else {
-				CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
-					(__u64)-1,
-					(__u64)-1,
-					0 /* dev */,
-					cifs_sb->local_nls,
-					cifs_sb->mnt_cifs_flags &
-						CIFS_MOUNT_MAP_SPECIAL_CHR);
+				args.uid = NO_CHANGE_64;
+				args.gid = NO_CHANGE_64;
 			}
+			CIFSSMBUnixSetInfo(xid, pTcon, full_path, &args,
+				cifs_sb->local_nls,
+				cifs_sb->mnt_cifs_flags &
+					CIFS_MOUNT_MAP_SPECIAL_CHR);
 		} else {
 			/* BB implement mode setting via Windows security
 			   descriptors e.g. */
@@ -260,12 +265,19 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 						 buf, inode->i_sb, xid,
 						 &fileHandle);
 			if (newinode) {
-				newinode->i_mode = mode;
+				if (cifs_sb->mnt_cifs_flags &
+				    CIFS_MOUNT_DYNPERM)
+					newinode->i_mode = mode;
 				if ((oplock & CIFS_CREATE_ACTION) &&
 				    (cifs_sb->mnt_cifs_flags &
 				     CIFS_MOUNT_SET_UID)) {
 					newinode->i_uid = current->fsuid;
-					newinode->i_gid = current->fsgid;
+					if (inode->i_mode & S_ISGID)
+						newinode->i_gid =
+							inode->i_gid;
+					else
+						newinode->i_gid =
+							current->fsgid;
 				}
 			}
 		}
@@ -355,21 +367,24 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode,
 	if (full_path == NULL)
 		rc = -ENOMEM;
 	else if (pTcon->unix_ext) {
-		mode &= ~current->fs->umask;
+		struct cifs_unix_set_info_args args = {
+			.mode	= mode & ~current->fs->umask,
+			.ctime	= NO_CHANGE_64,
+			.atime	= NO_CHANGE_64,
+			.mtime	= NO_CHANGE_64,
+			.device	= device_number,
+		};
 		if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SET_UID) {
-			rc = CIFSSMBUnixSetPerms(xid, pTcon, full_path,
-				mode, (__u64)current->fsuid,
-				(__u64)current->fsgid,
-				device_number, cifs_sb->local_nls,
-				cifs_sb->mnt_cifs_flags &
-					CIFS_MOUNT_MAP_SPECIAL_CHR);
+			args.uid = (__u64) current->fsuid;
+			args.gid = (__u64) current->fsgid;
 		} else {
-			rc = CIFSSMBUnixSetPerms(xid, pTcon,
-				full_path, mode, (__u64)-1, (__u64)-1,
-				device_number, cifs_sb->local_nls,
-				cifs_sb->mnt_cifs_flags &
-					CIFS_MOUNT_MAP_SPECIAL_CHR);
+			args.uid = NO_CHANGE_64;
+			args.gid = NO_CHANGE_64;
 		}
+		rc = CIFSSMBUnixSetInfo(xid, pTcon, full_path,
+			&args, cifs_sb->local_nls,
+			cifs_sb->mnt_cifs_flags &
+				CIFS_MOUNT_MAP_SPECIAL_CHR);
 
 		if (!rc) {
 			rc = cifs_get_inode_info_unix(&newinode, full_path,

@@ -25,7 +25,6 @@
 #include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/spinlock.h>
-#include <linux/hdreg.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/div64.h>
@@ -444,7 +443,7 @@ static void __iomem *hptiop_map_pci_bar(struct hptiop_hba *hba, int index)
 	if (!(pci_resource_flags(pcidev, index) & IORESOURCE_MEM)) {
 		printk(KERN_ERR "scsi%d: pci resource invalid\n",
 				hba->host->host_no);
-		return 0;
+		return NULL;
 	}
 
 	mem_base_phy = pci_resource_start(pcidev, index);
@@ -454,7 +453,7 @@ static void __iomem *hptiop_map_pci_bar(struct hptiop_hba *hba, int index)
 	if (!mem_base_virt) {
 		printk(KERN_ERR "scsi%d: Fail to ioremap memory space\n",
 				hba->host->host_no);
-		return 0;
+		return NULL;
 	}
 	return mem_base_virt;
 }
@@ -476,11 +475,11 @@ static void hptiop_unmap_pci_bar_itl(struct hptiop_hba *hba)
 static int hptiop_map_pci_bar_mv(struct hptiop_hba *hba)
 {
 	hba->u.mv.regs = hptiop_map_pci_bar(hba, 0);
-	if (hba->u.mv.regs == 0)
+	if (hba->u.mv.regs == NULL)
 		return -1;
 
 	hba->u.mv.mu = hptiop_map_pci_bar(hba, 2);
-	if (hba->u.mv.mu == 0) {
+	if (hba->u.mv.mu == NULL) {
 		iounmap(hba->u.mv.regs);
 		return -1;
 	}
@@ -1210,8 +1209,8 @@ static void hptiop_remove(struct pci_dev *pcidev)
 
 static struct hptiop_adapter_ops hptiop_itl_ops = {
 	.iop_wait_ready    = iop_wait_ready_itl,
-	.internal_memalloc = 0,
-	.internal_memfree  = 0,
+	.internal_memalloc = NULL,
+	.internal_memfree  = NULL,
 	.map_pci_bar       = hptiop_map_pci_bar_itl,
 	.unmap_pci_bar     = hptiop_unmap_pci_bar_itl,
 	.enable_intr       = hptiop_enable_intr_itl,
@@ -1249,6 +1248,13 @@ static struct pci_device_id hptiop_id_table[] = {
 	{ PCI_VDEVICE(TTI, 0x3522), (kernel_ulong_t)&hptiop_itl_ops },
 	{ PCI_VDEVICE(TTI, 0x3410), (kernel_ulong_t)&hptiop_itl_ops },
 	{ PCI_VDEVICE(TTI, 0x3540), (kernel_ulong_t)&hptiop_itl_ops },
+	{ PCI_VDEVICE(TTI, 0x3530), (kernel_ulong_t)&hptiop_itl_ops },
+	{ PCI_VDEVICE(TTI, 0x3560), (kernel_ulong_t)&hptiop_itl_ops },
+	{ PCI_VDEVICE(TTI, 0x4322), (kernel_ulong_t)&hptiop_itl_ops },
+	{ PCI_VDEVICE(TTI, 0x4210), (kernel_ulong_t)&hptiop_itl_ops },
+	{ PCI_VDEVICE(TTI, 0x4211), (kernel_ulong_t)&hptiop_itl_ops },
+	{ PCI_VDEVICE(TTI, 0x4310), (kernel_ulong_t)&hptiop_itl_ops },
+	{ PCI_VDEVICE(TTI, 0x4311), (kernel_ulong_t)&hptiop_itl_ops },
 	{ PCI_VDEVICE(TTI, 0x3120), (kernel_ulong_t)&hptiop_mv_ops },
 	{ PCI_VDEVICE(TTI, 0x3122), (kernel_ulong_t)&hptiop_mv_ops },
 	{ PCI_VDEVICE(TTI, 0x3020), (kernel_ulong_t)&hptiop_mv_ops },

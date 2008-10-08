@@ -4,7 +4,6 @@
 #include <asm/system.h>
 #include <asm/pgtable.h>
 
-#define LOAD_OFFSET	(KERNEL_START - KERNEL_TR_PAGE_SIZE)
 #include <asm-generic/vmlinux.lds.h>
 
 #define IVT_TEXT							\
@@ -156,6 +155,13 @@ SECTIONS
 	  __end___vtop_patchlist = .;
 	}
 
+  .data.patch.rse : AT(ADDR(.data.patch.rse) - LOAD_OFFSET)
+	{
+	  __start___rse_patchlist = .;
+	  *(.data.patch.rse)
+	  __end___rse_patchlist = .;
+	}
+
   .data.patch.mckinley_e9 : AT(ADDR(.data.patch.mckinley_e9) - LOAD_OFFSET)
 	{
 	  __start___mckinley_e9_bundles = .;
@@ -224,6 +230,11 @@ SECTIONS
   data : { } :data
   .data : AT(ADDR(.data) - LOAD_OFFSET)
 	{
+#ifdef	CONFIG_SMP
+  . = ALIGN(PERCPU_PAGE_SIZE);
+		__cpu0_per_cpu = .;
+  . = . + PERCPU_PAGE_SIZE;	/* cpu0 per-cpu space */
+#endif
 		DATA_DATA
 		*(.data1)
 		*(.gnu.linkonce.d*)

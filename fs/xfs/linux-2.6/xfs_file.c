@@ -184,19 +184,24 @@ xfs_file_release(
 	return -xfs_release(XFS_I(inode));
 }
 
+/*
+ * We ignore the datasync flag here because a datasync is effectively
+ * identical to an fsync. That is, datasync implies that we need to write
+ * only the metadata needed to be able to access the data that is written
+ * if we crash after the call completes. Hence if we are writing beyond
+ * EOF we have to log the inode size change as well, which makes it a
+ * full fsync. If we don't write beyond EOF, the inode core will be
+ * clean in memory and so we don't need to log the inode, just like
+ * fsync.
+ */
 STATIC int
 xfs_file_fsync(
 	struct file	*filp,
 	struct dentry	*dentry,
 	int		datasync)
 {
-	int		flags = FSYNC_WAIT;
-
-	if (datasync)
-		flags |= FSYNC_DATA;
 	xfs_iflags_clear(XFS_I(dentry->d_inode), XFS_ITRUNCATED);
-	return -xfs_fsync(XFS_I(dentry->d_inode), flags,
-			(xfs_off_t)0, (xfs_off_t)-1);
+	return -xfs_fsync(XFS_I(dentry->d_inode));
 }
 
 /*
@@ -470,6 +475,7 @@ const struct file_operations xfs_invis_file_operations = {
 const struct file_operations xfs_dir_file_operations = {
 	.read		= generic_read_dir,
 	.readdir	= xfs_file_readdir,
+	.llseek		= generic_file_llseek,
 	.unlocked_ioctl	= xfs_file_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= xfs_file_compat_ioctl,

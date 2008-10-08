@@ -1,7 +1,28 @@
+Version 1.54
+------------
+Fix premature write failure on congested networks (we would give up
+on EAGAIN from the socket too quickly on large writes).
+Cifs_mkdir and cifs_create now respect the setgid bit on parent dir.
+Fix endian problems in acl (mode from/to cifs acl) on bigendian
+architectures.  Fix problems with preserving timestamps on copying open
+files (e.g. "cp -a") to Windows servers.  For mkdir and create honor setgid bit
+on parent directory when server supports Unix Extensions but not POSIX
+create. Update cifs.upcall version to handle new Kerberos sec flags
+(this requires update of cifs.upcall program from Samba).  Fix memory leak
+on dns_upcall (resolving DFS referralls).  Fix plain text password
+authentication (requires setting SecurityFlags to 0x30030 to enable
+lanman and plain text though).  Fix writes to be at correct offset when
+file is open with O_APPEND and file is on a directio (forcediretio) mount.
+
 Version 1.53
 ------------
 DFS support added (Microsoft Distributed File System client support needed
 for referrals which enable a hierarchical name space among servers).
+Disable temporary caching of mode bits to servers which do not support
+storing of mode (e.g. Windows servers, when client mounts without cifsacl
+mount option) and add new "dynperm" mount option to enable temporary caching
+of mode (enable old behavior).  Fix hang on mount caused when server crashes
+tcp session during negotiate protocol.
 
 Version 1.52
 ------------

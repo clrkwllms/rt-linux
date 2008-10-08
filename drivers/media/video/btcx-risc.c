@@ -63,7 +63,7 @@ int btcx_riscmem_alloc(struct pci_dev *pci,
 		       struct btcx_riscmem *risc,
 		       unsigned int size)
 {
-	u32 *cpu;
+	__le32 *cpu;
 	dma_addr_t dma;
 
 	if (NULL != risc->cpu && risc->size < size)
@@ -184,12 +184,12 @@ btcx_sort_clips(struct v4l2_clip *clips, unsigned int nclips)
 }
 
 void
-btcx_calc_skips(int line, int width, unsigned int *maxy,
+btcx_calc_skips(int line, int width, int *maxy,
 		struct btcx_skiplist *skips, unsigned int *nskips,
 		const struct v4l2_clip *clips, unsigned int nclips)
 {
 	unsigned int clip,skip;
-	int end,maxline;
+	int end, maxline;
 
 	skip=0;
 	maxline = 9999;

@@ -224,8 +224,9 @@ static u32 final_handler[64] __cpuinitdata;
 static void __cpuinit __maybe_unused build_tlb_probe_entry(u32 **p)
 {
 	switch (current_cpu_type()) {
-	/* Found by experiment: R4600 v2.0 needs this, too.  */
+	/* Found by experiment: R4600 v2.0/R4700 needs this, too.  */
 	case CPU_R4600:
+	case CPU_R4700:
 	case CPU_R5000:
 	case CPU_R5000A:
 	case CPU_NEVADA:
@@ -1272,10 +1273,10 @@ void __cpuinit build_tlb_refill_handler(void)
 
 void __cpuinit flush_tlb_handlers(void)
 {
-	flush_icache_range((unsigned long)handle_tlbl,
+	local_flush_icache_range((unsigned long)handle_tlbl,
 			   (unsigned long)handle_tlbl + sizeof(handle_tlbl));
-	flush_icache_range((unsigned long)handle_tlbs,
+	local_flush_icache_range((unsigned long)handle_tlbs,
 			   (unsigned long)handle_tlbs + sizeof(handle_tlbs));
-	flush_icache_range((unsigned long)handle_tlbm,
+	local_flush_icache_range((unsigned long)handle_tlbm,
 			   (unsigned long)handle_tlbm + sizeof(handle_tlbm));
 }

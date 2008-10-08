@@ -97,9 +97,6 @@ cifs_read_super(struct super_block *sb, void *data,
 {
 	struct inode *inode;
 	struct cifs_sb_info *cifs_sb;
-#ifdef CONFIG_CIFS_DFS_UPCALL
-	int len;
-#endif
 	int rc = 0;
 
 	/* BB should we make this contingent on mount parm? */
@@ -117,15 +114,17 @@ cifs_read_super(struct super_block *sb, void *data,
 	 * complex operation (mount), and in case of fail
 	 * just exit instead of doing mount and attempting
 	 * undo it if this copy fails?*/
-	len = strlen(data);
-	cifs_sb->mountdata = kzalloc(len + 1, GFP_KERNEL);
-	if (cifs_sb->mountdata == NULL) {
-		kfree(sb->s_fs_info);
-		sb->s_fs_info = NULL;
-		return -ENOMEM;
+	if (data) {
+		int len = strlen(data);
+		cifs_sb->mountdata = kzalloc(len + 1, GFP_KERNEL);
+		if (cifs_sb->mountdata == NULL) {
+			kfree(sb->s_fs_info);
+			sb->s_fs_info = NULL;
+			return -ENOMEM;
+		}
+		strncpy(cifs_sb->mountdata, data, len + 1);
+		cifs_sb->mountdata[len] = '\0';
 	}
-	strncpy(cifs_sb->mountdata, data, len + 1);
-	cifs_sb->mountdata[len] = '\0';
 #endif
 
 	rc = cifs_mount(sb, cifs_sb, data, devname);
@@ -175,6 +174,8 @@ out_no_root:
 	cERROR(1, ("cifs_read_super: get root inode failed"));
 	if (inode)
 		iput(inode);
+
+	cifs_umount(sb, cifs_sb);
 
 out_mount_failed:
 	if (cifs_sb) {
@@ -268,7 +269,7 @@ cifs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	return 0;
 }
 
-static int cifs_permission(struct inode *inode, int mask, struct nameidata *nd)
+static int cifs_permission(struct inode *inode, int mask)
 {
 	struct cifs_sb_info *cifs_sb;
 
@@ -613,7 +614,7 @@ static loff_t cifs_llseek(struct file *file, loff_t offset, int origin)
 		if (retval < 0)
 			return (loff_t)retval;
 	}
-	return remote_llseek(file, offset, origin);
+	return generic_file_llseek_unlocked(file, offset, origin);
 }
 
 struct file_system_type cifs_fs_type = {
@@ -767,7 +768,7 @@ const struct file_operations cifs_dir_ops = {
 };
 
 static void
-cifs_init_once(struct kmem_cache *cachep, void *inode)
+cifs_init_once(void *inode)
 {
 	struct cifsInodeInfo *cifsi = inode;
 
@@ -931,36 +932,34 @@ static int cifs_oplock_thread(void *dummyarg)
 			schedule_timeout(39*HZ);
 		} else {
 			oplock_item = list_entry(GlobalOplock_Q.next,
-				struct oplock_q_entry, qhead);
-			if (oplock_item) {
-				cFYI(1, ("found oplock item to write out"));
-				pTcon = oplock_item->tcon;
-				inode = oplock_item->pinode;
-				netfid = oplock_item->netfid;
-				spin_unlock(&GlobalMid_Lock);
-				DeleteOplockQEntry(oplock_item);
-				/* can not grab inode sem here since it would
+						struct oplock_q_entry, qhead);
+			cFYI(1, ("found oplock item to write out"));
+			pTcon = oplock_item->tcon;
+			inode = oplock_item->pinode;
+			netfid = oplock_item->netfid;
+			spin_unlock(&GlobalMid_Lock);
+			DeleteOplockQEntry(oplock_item);
+			/* can not grab inode sem here since it would
 				deadlock when oplock received on delete
 				since vfs_unlink holds the i_mutex across
 				the call */
-				/* mutex_lock(&inode->i_mutex);*/
-				if (S_ISREG(inode->i_mode)) {
-					rc =
-					   filemap_fdatawrite(inode->i_mapping);
-					if (CIFS_I(inode)->clientCanCacheRead
-									 == 0) {
-						waitrc = filemap_fdatawait(inode->i_mapping);
-						invalidate_remote_inode(inode);
-					}
-					if (rc == 0)
-						rc = waitrc;
-				} else
-					rc = 0;
-				/* mutex_unlock(&inode->i_mutex);*/
-				if (rc)
-					CIFS_I(inode)->write_behind_rc = rc;
-				cFYI(1, ("Oplock flush inode %p rc %d",
-					inode, rc));
+			/* mutex_lock(&inode->i_mutex);*/
+			if (S_ISREG(inode->i_mode)) {
+				rc = filemap_fdatawrite(inode->i_mapping);
+				if (CIFS_I(inode)->clientCanCacheRead == 0) {
+					waitrc = filemap_fdatawait(
+							      inode->i_mapping);
+					invalidate_remote_inode(inode);
+				}
+				if (rc == 0)
+					rc = waitrc;
+			} else
+				rc = 0;
+			/* mutex_unlock(&inode->i_mutex);*/
+			if (rc)
+				CIFS_I(inode)->write_behind_rc = rc;
+			cFYI(1, ("Oplock flush inode %p rc %d",
+				inode, rc));
 
 				/* releasing stale oplock after recent reconnect
 				of smb session using a now incorrect file
@@ -968,15 +967,13 @@ static int cifs_oplock_thread(void *dummyarg)
 				not bother sending an oplock release if session
 				to server still is disconnected since oplock
 				already released by the server in that case */
-				if (pTcon->tidStatus != CifsNeedReconnect) {
-				    rc = CIFSSMBLock(0, pTcon, netfid,
-					    0 /* len */ , 0 /* offset */, 0,
-					    0, LOCKING_ANDX_OPLOCK_RELEASE,
-					    false /* wait flag */);
-					cFYI(1, ("Oplock release rc = %d", rc));
-				}
-			} else
-				spin_unlock(&GlobalMid_Lock);
+			if (pTcon->tidStatus != CifsNeedReconnect) {
+				rc = CIFSSMBLock(0, pTcon, netfid,
+						0 /* len */ , 0 /* offset */, 0,
+						0, LOCKING_ANDX_OPLOCK_RELEASE,
+						false /* wait flag */);
+				cFYI(1, ("Oplock release rc = %d", rc));
+			}
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1);  /* yield in case q were corrupt */
 		}
@@ -1002,8 +999,7 @@ static int cifs_dnotify_thread(void *dummyarg)
 		list_for_each(tmp, &GlobalSMBSessionList) {
 			ses = list_entry(tmp, struct cifsSesInfo,
 				cifsSessionList);
-			if (ses && ses->server &&
-			     atomic_read(&ses->server->inFlight))
+			if (ses->server && atomic_read(&ses->server->inFlight))
 				wake_up_all(&ses->server->response_q);
 		}
 		read_unlock(&GlobalSMBSeslock);

@@ -2,7 +2,7 @@
     MaxLinear MXL5005S VSB/QAM/DVBT tuner driver
 
     Copyright (C) 2008 MaxLinear
-    Copyright (C) 2006 Steven Toth <stoth@hauppauge.com>
+    Copyright (C) 2006 Steven Toth <stoth@linuxtv.org>
       Functions:
 	mxl5005s_reset()
 	mxl5005s_writereg()
@@ -101,7 +101,7 @@ enum {
 	MXL_QAM,
 	MXL_ANALOG_CABLE,
 	MXL_ANALOG_OTA
-} tuner_modu_type;
+};
 
 /* MXL5005 Tuner Register Struct */
 struct TunerReg {
@@ -194,7 +194,7 @@ enum {
 	RFSYN_DIVM,                /* 88 */
 	DN_BYPASS_AGC_I2C          /* 89 */
 #endif
-} MXL5005_ControlName;
+};
 
 /*
  * The following context is source code provided by MaxLinear.
@@ -3837,7 +3837,7 @@ static u16 MXL_Hystersis_Test(struct dvb_frontend *fe, int Hystersis)
 /* ----------------------------------------------------------------
  * Begin: Everything after here is new code to adapt the
  * proprietary Realtek driver into a Linux API tuner.
- * Copyright (C) 2008 Steven Toth <stoth@hauppauge.com>
+ * Copyright (C) 2008 Steven Toth <stoth@linuxtv.org>
  */
 static int mxl5005s_reset(struct dvb_frontend *fe)
 {

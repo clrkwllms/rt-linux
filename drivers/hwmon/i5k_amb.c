@@ -81,6 +81,8 @@ static unsigned long amb_reg_temp(unsigned int amb)
 #define MAX_AMBS_PER_CHANNEL		16
 #define MAX_AMBS			(MAX_MEM_CHANNELS * \
 					 MAX_AMBS_PER_CHANNEL)
+#define CHANNEL_SHIFT			4
+#define DIMM_MASK			0xF
 /*
  * Ugly hack: For some reason the highest bit is set if there
  * are _any_ DIMMs in the channel.  Attempting to read from
@@ -89,7 +91,7 @@ static unsigned long amb_reg_temp(unsigned int amb)
  * might prevent us from seeing the 16th DIMM in the channel.
  */
 #define REAL_MAX_AMBS_PER_CHANNEL	15
-#define KNOBS_PER_AMB			5
+#define KNOBS_PER_AMB			6
 
 static unsigned long amb_num_from_reg(unsigned int byte_num, unsigned int bit)
 {
@@ -111,6 +113,7 @@ struct i5k_amb_data {
 	void __iomem *amb_mmio;
 	struct i5k_device_attribute *attrs;
 	unsigned int num_attrs;
+	unsigned long chipset_id;
 };
 
 static ssize_t show_name(struct device *dev, struct device_attribute *devattr,
@@ -237,6 +240,16 @@ static ssize_t show_amb_temp(struct device *dev,
 		500 * amb_read_byte(data, amb_reg_temp(attr->index)));
 }
 
+static ssize_t show_label(struct device *dev,
+			  struct device_attribute *devattr,
+			  char *buf)
+{
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+
+	return sprintf(buf, "Ch. %d DIMM %d\n", attr->index >> CHANNEL_SHIFT,
+		       attr->index & DIMM_MASK);
+}
+
 static int __devinit i5k_amb_hwmon_init(struct platform_device *pdev)
 {
 	int i, j, k, d = 0;
@@ -266,6 +279,20 @@ static int __devinit i5k_amb_hwmon_init(struct platform_device *pdev)
 			if (!(c & 0x1))
 				continue;
 			d++;
+
+			/* sysfs label */
+			iattr = data->attrs + data->num_attrs;
+			snprintf(iattr->name, AMB_SYSFS_NAME_LEN,
+				 "temp%d_label", d);
+			iattr->s_attr.dev_attr.attr.name = iattr->name;
+			iattr->s_attr.dev_attr.attr.mode = S_IRUGO;
+			iattr->s_attr.dev_attr.show = show_label;
+			iattr->s_attr.index = k;
+			res = device_create_file(&pdev->dev,
+						 &iattr->s_attr.dev_attr);
+			if (res)
+				goto exit_remove;
+			data->num_attrs++;
 
 			/* Temperature sysfs knob */
 			iattr = data->attrs + data->num_attrs;
@@ -382,7 +409,8 @@ err:
 	return res;
 }
 
-static int __devinit i5k_find_amb_registers(struct i5k_amb_data *data)
+static int __devinit i5k_find_amb_registers(struct i5k_amb_data *data,
+					    unsigned long devid)
 {
 	struct pci_dev *pcidev;
 	u32 val32;
@@ -390,7 +418,7 @@ static int __devinit i5k_find_amb_registers(struct i5k_amb_data *data)
 
 	/* Find AMB register memory space */
 	pcidev = pci_get_device(PCI_VENDOR_ID_INTEL,
-				PCI_DEVICE_ID_INTEL_5000_ERR,
+				devid,
 				NULL);
 	if (!pcidev)
 		return -ENODEV;
@@ -408,6 +436,8 @@ static int __devinit i5k_find_amb_registers(struct i5k_amb_data *data)
 		dev_err(&pcidev->dev, "AMB region too small!\n");
 		goto out;
 	}
+
+	data->chipset_id = devid;
 
 	res = 0;
 out:
@@ -441,10 +471,30 @@ out:
 	return res;
 }
 
+static unsigned long i5k_channel_pci_id(struct i5k_amb_data *data,
+					unsigned long channel)
+{
+	switch (data->chipset_id) {
+	case PCI_DEVICE_ID_INTEL_5000_ERR:
+		return PCI_DEVICE_ID_INTEL_5000_FBD0 + channel;
+	case PCI_DEVICE_ID_INTEL_5400_ERR:
+		return PCI_DEVICE_ID_INTEL_5400_FBD0 + channel;
+	default:
+		BUG();
+	}
+}
+
+static unsigned long chipset_ids[] = {
+	PCI_DEVICE_ID_INTEL_5000_ERR,
+	PCI_DEVICE_ID_INTEL_5400_ERR,
+	0
+};
+
 static int __devinit i5k_amb_probe(struct platform_device *pdev)
 {
 	struct i5k_amb_data *data;
 	struct resource *reso;
+	int i;
 	int res = -ENODEV;
 
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
@@ -452,19 +502,24 @@ static int __devinit i5k_amb_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	/* Figure out where the AMB registers live */
-	res = i5k_find_amb_registers(data);
+	i = 0;
+	do {
+		res = i5k_find_amb_registers(data, chipset_ids[i]);
+		i++;
+	} while (res && chipset_ids[i]);
+
 	if (res)
 		goto err;
 
 	/* Copy the DIMM presence map for the first two channels */
 	res = i5k_channel_probe(&data->amb_present[0],
-				PCI_DEVICE_ID_INTEL_5000_FBD0);
+				i5k_channel_pci_id(data, 0));
 	if (res)
 		goto err;
 
 	/* Copy the DIMM presence map for the optional second two channels */
 	i5k_channel_probe(&data->amb_present[2],
-			  PCI_DEVICE_ID_INTEL_5000_FBD1);
+			  i5k_channel_pci_id(data, 1));
 
 	/* Set up resource regions */
 	reso = request_mem_region(data->amb_base, data->amb_len, DRVNAME);

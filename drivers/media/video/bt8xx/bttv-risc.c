@@ -31,6 +31,7 @@
 #include <linux/interrupt.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <media/v4l2-ioctl.h>
 
 #include "bttvp.h"
 
@@ -48,7 +49,7 @@ bttv_risc_packed(struct bttv *btv, struct btcx_riscmem *risc,
 {
 	u32 instructions,line,todo;
 	struct scatterlist *sg;
-	u32 *rp;
+	__le32 *rp;
 	int rc;
 
 	/* estimate risc mem: worst case is one write per page border +
@@ -128,7 +129,8 @@ bttv_risc_planar(struct bttv *btv, struct btcx_riscmem *risc,
 		 unsigned int cpadding)
 {
 	unsigned int instructions,line,todo,ylen,chroma;
-	u32 *rp,ri;
+	__le32 *rp;
+	u32 ri;
 	struct scatterlist *ysg;
 	struct scatterlist *usg;
 	struct scatterlist *vsg;
@@ -242,9 +244,11 @@ bttv_risc_overlay(struct bttv *btv, struct btcx_riscmem *risc,
 		  const struct bttv_format *fmt, struct bttv_overlay *ov,
 		  int skip_even, int skip_odd)
 {
-	int dwords,rc,line,maxy,start,end,skip,nskips;
+	int dwords, rc, line, maxy, start, end;
+	unsigned skip, nskips;
 	struct btcx_skiplist *skips;
-	u32 *rp,ri,ra;
+	__le32 *rp;
+	u32 ri,ra;
 	u32 addr;
 
 	/* skip list for window clipping */
