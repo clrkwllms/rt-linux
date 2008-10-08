@@ -45,7 +45,12 @@ extern unsigned long __per_cpu_offset[NR_CPUS];
  * Only S390 provides its own means of moving the pointer.
  */
 #ifndef SHIFT_PERCPU_PTR
-#define SHIFT_PERCPU_PTR(__p, __offset)	RELOC_HIDE((__p), (__offset))
+# ifdef CONFIG_HAVE_ZERO_BASED_PER_CPU
+#  define SHIFT_PERCPU_PTR(__p, __offset) \
+	((__typeof(__p))(((void *)(__p)) + (__offset)))
+# else
+#  define SHIFT_PERCPU_PTR(__p, __offset)	RELOC_HIDE((__p), (__offset))
+# endif /* CONFIG_HAVE_ZERO_BASED_PER_CPU */
 #endif
 
 /*
@@ -70,6 +75,10 @@ extern void setup_per_cpu_areas(void);
 #define per_cpu(var, cpu)			(*((void)(cpu), &per_cpu_var(var)))
 #define __get_cpu_var(var)			per_cpu_var(var)
 #define __raw_get_cpu_var(var)			per_cpu_var(var)
+#ifndef SHIFT_PERCPU_PTR
+# define SHIFT_PERCPU_PTR(__p, __offset)		(__p)
+#endif
+#define per_cpu_offset(x)			0L
 
 #endif	/* SMP */
 
