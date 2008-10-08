@@ -20,6 +20,8 @@ if PHONE
 config PHONE_IXJ
 	tristate "QuickNet Internet LineJack/PhoneJack support"
 	depends on ISA || PCI
+	# build breakage, config-Sat_Jul_19_00_58_16_CEST_2008.bad
+	depends on 0
 	---help---
 	  Say M if you have a telephony card manufactured by Quicknet
 	  Technologies, Inc.  These include the Internet PhoneJACK and
