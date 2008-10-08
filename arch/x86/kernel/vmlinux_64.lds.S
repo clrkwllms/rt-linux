@@ -175,6 +175,10 @@ SECTIONS
   __x86_cpu_dev_end = .;
   SECURITY_INIT
 
+  DYN_ARRAY_INIT(8)
+
+  SECURITY_INIT
+
   . = ALIGN(8);
   .parainstructions : AT(ADDR(.parainstructions) - LOAD_OFFSET) {
   __parainstructions = .;

@@ -127,6 +127,8 @@ struct irq_chip {
 	const char	*typename;
 };
 
+struct timer_rand_state;
+struct irq_2_iommu;
 /**
  * struct irq_desc - interrupt descriptor
  *
@@ -152,6 +154,17 @@ struct irq_chip {
  * @name:		flow handler name for /proc/interrupts output
  */
 struct irq_desc {
+	unsigned int		irq;
+#ifdef CONFIG_HAVE_SPARSE_IRQ
+	struct irq_desc		*next;
+	struct timer_rand_state *timer_rand_state;
+#endif
+#ifdef CONFIG_HAVE_DYN_ARRAY
+	unsigned int            *kstat_irqs;
+#endif
+#if defined(CONFIG_INTR_REMAP) && defined(CONFIG_HAVE_SPARSE_IRQ)
+       struct irq_2_iommu      *irq_2_iommu;
+#endif
 	irq_flow_handler_t	handle_irq;
 	struct irq_chip		*chip;
 	struct msi_desc		*msi_desc;
@@ -170,7 +183,7 @@ struct irq_desc {
 	cpumask_t		affinity;
 	unsigned int		cpu;
 #endif
-#if defined(CONFIG_GENERIC_PENDING_IRQ) || defined(CONFIG_IRQBALANCE)
+#ifdef CONFIG_GENERIC_PENDING_IRQ
 	cpumask_t		pending_mask;
 #endif
 #ifdef CONFIG_PROC_FS
@@ -179,7 +192,35 @@ struct irq_desc {
 	const char		*name;
 } ____cacheline_internodealigned_in_smp;
 
+extern struct irq_desc *irq_to_desc(unsigned int irq);
+extern struct irq_desc *irq_to_desc_alloc(unsigned int irq);
+
+#ifndef CONFIG_HAVE_SPARSE_IRQ
+
+#ifndef CONFIG_HAVE_DYN_ARRAY
+/* could be removed if we get rid of all irq_desc reference */
 extern struct irq_desc irq_desc[NR_IRQS];
+#else
+extern struct irq_desc *irq_desc;
+#endif
+
+#ifdef CONFIG_GENERIC_HARDIRQS
+#define for_each_irq_desc(irq, desc)		\
+	for (irq = 0, desc = irq_desc; irq < nr_irqs; irq++, desc = &irq_desc[irq])
+#endif
+
+#else
+
+extern struct irq_desc *sparse_irqs;
+#define for_each_irq_desc(irqX, desc)		\
+	for (desc = sparse_irqs, irqX = desc->irq; desc; desc = desc->next, irqX = desc ? desc->irq : -1U)
+
+#endif
+
+#ifdef CONFIG_HAVE_DYN_ARRAY
+#define kstat_irqs_this_cpu(DESC) \
+	((DESC)->kstat_irqs[smp_processor_id()])
+#endif
 
 /*
  * Migration helpers for obsolete names, they will go away:
@@ -198,19 +239,15 @@ extern int setup_irq(unsigned int irq, struct irqaction *new);
 
 #ifdef CONFIG_GENERIC_HARDIRQS
 
-#ifndef handle_dynamic_tick
-# define handle_dynamic_tick(a)		do { } while (0)
-#endif
-
 #ifdef CONFIG_SMP
 
-#if defined(CONFIG_GENERIC_PENDING_IRQ) || defined(CONFIG_IRQBALANCE)
+#ifdef CONFIG_GENERIC_PENDING_IRQ
 
 void set_pending_irq(unsigned int irq, cpumask_t mask);
 void move_native_irq(int irq);
 void move_masked_irq(int irq);
 
-#else /* CONFIG_GENERIC_PENDING_IRQ || CONFIG_IRQBALANCE */
+#else /* CONFIG_GENERIC_PENDING_IRQ */
 
 static inline void move_irq(int irq)
 {
@@ -237,19 +274,14 @@ static inline void set_pending_irq(unsigned int irq, cpumask_t mask)
 
 #endif /* CONFIG_SMP */
 
-#ifdef CONFIG_IRQBALANCE
-extern void set_balance_irq_affinity(unsigned int irq, cpumask_t mask);
-#else
-static inline void set_balance_irq_affinity(unsigned int irq, cpumask_t mask)
-{
-}
-#endif
-
 extern int no_irq_affinity;
 
 static inline int irq_balancing_disabled(unsigned int irq)
 {
-	return irq_desc[irq].status & IRQ_NO_BALANCING_MASK;
+	struct irq_desc *desc;
+
+	desc = irq_to_desc(irq);
+	return desc->status & IRQ_NO_BALANCING_MASK;
 }
 
 /* Handle irq action chains: */
@@ -279,10 +311,8 @@ extern unsigned int __do_IRQ(unsigned int irq);
  * irqchip-style controller then we call the ->handle_irq() handler,
  * and it calls __do_IRQ() if it's attached to an irqtype-style controller.
  */
-static inline void generic_handle_irq(unsigned int irq)
+static inline void generic_handle_irq_desc(unsigned int irq, struct irq_desc *desc)
 {
-	struct irq_desc *desc = irq_desc + irq;
-
 #ifdef CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ
 	desc->handle_irq(irq, desc);
 #else
@@ -291,6 +321,11 @@ static inline void generic_handle_irq(unsigned int irq)
 	else
 		__do_IRQ(irq);
 #endif
+}
+
+static inline void generic_handle_irq(unsigned int irq)
+{
+	generic_handle_irq_desc(irq, irq_to_desc(irq));
 }
 
 /* Handling of unhandled and spurious interrupts: */
@@ -325,7 +360,10 @@ __set_irq_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
 static inline void __set_irq_handler_unlocked(int irq,
 					      irq_flow_handler_t handler)
 {
-	irq_desc[irq].handle_irq = handler;
+	struct irq_desc *desc;
+
+	desc = irq_to_desc(irq);
+	desc->handle_irq = handler;
 }
 
 /*
@@ -353,13 +391,14 @@ extern void set_irq_noprobe(unsigned int irq);
 extern void set_irq_probe(unsigned int irq);
 
 /* Handle dynamic irq creation and destruction */
+extern unsigned int create_irq_nr(unsigned int irq_want);
 extern int create_irq(void);
 extern void destroy_irq(unsigned int irq);
 
 /* Test to see if a driver has successfully requested an irq */
 static inline int irq_has_action(unsigned int irq)
 {
-	struct irq_desc *desc = irq_desc + irq;
+	struct irq_desc *desc = irq_to_desc(irq);
 	return desc->action != NULL;
 }
 
@@ -374,10 +413,10 @@ extern int set_irq_chip_data(unsigned int irq, void *data);
 extern int set_irq_type(unsigned int irq, unsigned int type);
 extern int set_irq_msi(unsigned int irq, struct msi_desc *entry);
 
-#define get_irq_chip(irq)	(irq_desc[irq].chip)
-#define get_irq_chip_data(irq)	(irq_desc[irq].chip_data)
-#define get_irq_data(irq)	(irq_desc[irq].handler_data)
-#define get_irq_msi(irq)	(irq_desc[irq].msi_desc)
+#define get_irq_chip(irq)	(irq_to_desc(irq)->chip)
+#define get_irq_chip_data(irq)	(irq_to_desc(irq)->chip_data)
+#define get_irq_data(irq)	(irq_to_desc(irq)->handler_data)
+#define get_irq_msi(irq)	(irq_to_desc(irq)->msi_desc)
 
 #endif /* CONFIG_GENERIC_HARDIRQS */
 
