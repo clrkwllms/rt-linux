@@ -60,7 +60,7 @@ LOW_PAGES = 1<<(32-PAGE_SHIFT_asm)
  * pagetables from above the 16MB DMA limit, so we'll have to set
  * up pagetables 16MB more (worst-case):
  */
-#ifdef CONFIG_DEBUG_PAGEALLOC
+#if defined(CONFIG_DEBUG_PAGEALLOC) || defined(CONFIG_KMEMCHECK)
 LOW_PAGES = LOW_PAGES + 0x1000000
 #endif
 

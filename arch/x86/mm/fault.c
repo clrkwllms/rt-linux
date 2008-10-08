@@ -34,7 +34,9 @@
 #include <asm/smp.h>
 #include <asm/tlbflush.h>
 #include <asm/proto.h>
+#include <asm/kmemcheck.h>
 #include <asm-generic/sections.h>
+#include <asm/traps.h>
 
 /*
  * Page fault error code bits
@@ -357,8 +359,6 @@ static int is_errata100(struct pt_regs *regs, unsigned long address)
 	return 0;
 }
 
-void do_invalid_op(struct pt_regs *, unsigned long);
-
 static int is_f00f_bug(struct pt_regs *regs, unsigned long address)
 {
 #ifdef CONFIG_X86_F00F_BUG
@@ -593,11 +593,6 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	unsigned long flags;
 #endif
 
-	/*
-	 * We can fault from pretty much anywhere, with unknown IRQ state.
-	 */
-	trace_hardirqs_fixup();
-
 	tsk = current;
 	mm = tsk->mm;
 	prefetchw(&mm->mmap_sem);
@@ -606,6 +601,13 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	address = read_cr2();
 
 	si_code = SEGV_MAPERR;
+
+	/*
+	 * Detect and handle instructions that would cause a page fault for
+	 * both a tracked kernel page and a userspace page.
+	 */
+	if(kmemcheck_active(regs))
+		kmemcheck_hide(regs);
 
 	if (notify_page_fault(regs))
 		return;
@@ -630,9 +632,13 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 #else
 	if (unlikely(address >= TASK_SIZE64)) {
 #endif
-		if (!(error_code & (PF_RSVD|PF_USER|PF_PROT)) &&
-		    vmalloc_fault(address) >= 0)
-			return;
+		if (!(error_code & (PF_RSVD | PF_USER | PF_PROT))) {
+			if (vmalloc_fault(address) >= 0)
+				return;
+
+			if (kmemcheck_fault(regs, address, error_code))
+				return;
+		}
 
 		/* Can handle a stale RO->RW TLB */
 		if (spurious_fault(address, error_code))
@@ -915,15 +921,15 @@ LIST_HEAD(pgd_list);
 
 void vmalloc_sync_all(void)
 {
-#ifdef CONFIG_X86_32
-	unsigned long start = VMALLOC_START & PGDIR_MASK;
 	unsigned long address;
 
+#ifdef CONFIG_X86_32
 	if (SHARED_KERNEL_PMD)
 		return;
 
-	BUILD_BUG_ON(TASK_SIZE & ~PGDIR_MASK);
-	for (address = start; address >= TASK_SIZE; address += PGDIR_SIZE) {
+	for (address = VMALLOC_START & PMD_MASK;
+	     address >= TASK_SIZE && address < FIXADDR_TOP;
+	     address += PMD_SIZE) {
 		unsigned long flags;
 		struct page *page;
 
@@ -936,10 +942,8 @@ void vmalloc_sync_all(void)
 		spin_unlock_irqrestore(&pgd_lock, flags);
 	}
 #else /* CONFIG_X86_64 */
-	unsigned long start = VMALLOC_START & PGDIR_MASK;
-	unsigned long address;
-
-	for (address = start; address <= VMALLOC_END; address += PGDIR_SIZE) {
+	for (address = VMALLOC_START & PGDIR_MASK; address <= VMALLOC_END;
+	     address += PGDIR_SIZE) {
 		const pgd_t *pgd_ref = pgd_offset_k(address);
 		unsigned long flags;
 		struct page *page;

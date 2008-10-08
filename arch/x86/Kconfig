@@ -29,6 +29,7 @@ config X86
 	select HAVE_FTRACE
 	select HAVE_KVM if ((X86_32 && !X86_VOYAGER && !X86_VISWS && !X86_NUMAQ) || X86_64)
 	select HAVE_ARCH_KGDB if !X86_VOYAGER
+	select HAVE_ARCH_TRACEHOOK
 	select HAVE_GENERIC_DMA_COHERENT if X86_32
 	select HAVE_EFFICIENT_UNALIGNED_ACCESS
 
@@ -1191,7 +1192,6 @@ config IRQBALANCE
 config SECCOMP
 	def_bool y
 	prompt "Enable seccomp to safely compute untrusted bytecode"
-	depends on PROC_FS
 	help
 	  This kernel feature is useful for number crunching applications
 	  that may need to compute untrusted bytecode during their
@@ -1199,7 +1199,7 @@ config SECCOMP
 	  the process as file descriptors supporting the read/write
 	  syscalls, it's possible to isolate those applications in
 	  their own address space using seccomp. Once seccomp is
-	  enabled via /proc/<pid>/seccomp, it cannot be disabled
+	  enabled via prctl(PR_SET_SECCOMP), it cannot be disabled
 	  and the task is only allowed to execute a few safe syscalls
 	  defined by each seccomp mode.
 
@@ -1364,6 +1364,24 @@ config HOTPLUG_CPU
 	  /sys/devices/system/cpu.
 	  Say N if you want to disable CPU hotplug and don't need to
 	  suspend.
+
+config HOTPLUG_RESTRICT_TO_BOOTUP_CPUS
+	def_bool n
+	prompt "Restrict CPU hotplugging to processors found during boot" if HOTPLUG_CPU
+	---help---
+	  Say no here to use the default, which allows as many CPUs as are marked
+	  "disabled" by ACPI or MPTABLES to be hotplugged after bootup.
+
+	  Say yes if you do not want to allow CPUs to be added after booting, for
+	  example if you only need CPU hotplugging enabled for suspend/resume.
+
+	  If CPU_HOTPLUG is enabled this value may be overridden at boot time
+	  with the "additional_cpus" kernel parameter.
+
+config HOTPLUG_ADDITIONAL_CPUS
+	int
+	default  0 if !HOTPLUG_CPU || HOTPLUG_RESTRICT_TO_BOOTUP_CPUS
+	default -1
 
 config COMPAT_VDSO
 	def_bool y
@@ -1642,6 +1660,14 @@ config DMAR_FLOPPY_WA
 	 thereby failing to work when IOMMU is enabled. This
 	 workaround will setup a 1:1 mapping for the first
 	 16M to make floppy (an ISA device) work.
+
+config INTR_REMAP
+	bool "Support for Interrupt Remapping (EXPERIMENTAL)"
+	depends on X86_64 && X86_IO_APIC && PCI_MSI && ACPI && EXPERIMENTAL
+	help
+	 Supports Interrupt remapping for IO-APIC and MSI devices.
+	 To use x2apic mode in the CPU's which support x2APIC enhancements or
+	 to support platforms with CPU's having > 8 bit APIC ID, say Y.
 
 source "drivers/pci/pcie/Kconfig"
 
