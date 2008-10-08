@@ -216,7 +216,7 @@ void enable_irq(unsigned int irq)
 }
 EXPORT_SYMBOL(enable_irq);
 
-int set_irq_wake_real(unsigned int irq, unsigned int on)
+static int set_irq_wake_real(unsigned int irq, unsigned int on)
 {
 	struct irq_desc *desc = irq_desc + irq;
 	int ret = -ENXIO;
@@ -305,10 +305,11 @@ void compat_irq_chip_set_default_handler(struct irq_desc *desc)
 		desc->handle_irq = NULL;
 }
 
-static int __irq_set_trigger(struct irq_chip *chip, unsigned int irq,
+int __irq_set_trigger(struct irq_desc *desc, unsigned int irq,
 		unsigned long flags)
 {
 	int ret;
+	struct irq_chip *chip = desc->chip;
 
 	if (!chip || !chip->set_type) {
 		/*
@@ -326,6 +327,11 @@ static int __irq_set_trigger(struct irq_chip *chip, unsigned int irq,
 		pr_err("setting trigger mode %d for irq %u failed (%pF)\n",
 				(int)(flags & IRQF_TRIGGER_MASK),
 				irq, chip->set_type);
+	else {
+		/* note that IRQF_TRIGGER_MASK == IRQ_TYPE_SENSE_MASK */
+		desc->status &= ~IRQ_TYPE_SENSE_MASK;
+		desc->status |= flags & IRQ_TYPE_SENSE_MASK;
+	}
 
 	return ret;
 }
@@ -404,7 +410,7 @@ int setup_irq(unsigned int irq, struct irqaction *new)
 
 		/* Setup the type (level, edge polarity) if configured: */
 		if (new->flags & IRQF_TRIGGER_MASK) {
-			ret = __irq_set_trigger(desc->chip, irq, new->flags);
+			ret = __irq_set_trigger(desc, irq, new->flags);
 
 			if (ret) {
 				spin_unlock_irqrestore(&desc->lock, flags);
@@ -423,16 +429,21 @@ int setup_irq(unsigned int irq, struct irqaction *new)
 		if (!(desc->status & IRQ_NOAUTOEN)) {
 			desc->depth = 0;
 			desc->status &= ~IRQ_DISABLED;
-			if (desc->chip->startup)
-				desc->chip->startup(irq);
-			else
-				desc->chip->enable(irq);
+			desc->chip->startup(irq);
 		} else
 			/* Undo nested disables: */
 			desc->depth = 1;
 
 		/* Set default affinity mask once everything is setup */
 		irq_select_affinity(irq);
+
+	} else if ((new->flags & IRQF_TRIGGER_MASK)
+			&& (new->flags & IRQF_TRIGGER_MASK)
+				!= (desc->status & IRQ_TYPE_SENSE_MASK)) {
+		/* hope the handler works with the actual trigger mode... */
+		pr_warning("IRQ %d uses trigger mode %d; requested %d\n",
+				irq, (int)(desc->status & IRQ_TYPE_SENSE_MASK),
+				(int)(new->flags & IRQF_TRIGGER_MASK));
 	}
 
 	*p = new;
@@ -589,6 +600,7 @@ EXPORT_SYMBOL(free_irq);
  *	IRQF_SHARED		Interrupt is shared
  *	IRQF_DISABLED	Disable local interrupts while processing
  *	IRQF_SAMPLE_RANDOM	The interrupt can be used for entropy
+ *	IRQF_TRIGGER_*		Specify active edge(s) or level
  *
  */
 int request_irq(unsigned int irq, irq_handler_t handler,
@@ -629,26 +641,29 @@ int request_irq(unsigned int irq, irq_handler_t handler,
 	action->next = NULL;
 	action->dev_id = dev_id;
 
+	retval = setup_irq(irq, action);
+	if (retval)
+		kfree(action);
+
 #ifdef CONFIG_DEBUG_SHIRQ
 	if (irqflags & IRQF_SHARED) {
 		/*
 		 * It's a shared IRQ -- the driver ought to be prepared for it
 		 * to happen immediately, so let's make sure....
-		 * We do this before actually registering it, to make sure that
-		 * a 'real' IRQ doesn't run in parallel with our fake
+		 * We disable the irq to make sure that a 'real' IRQ doesn't
+		 * run in parallel with our fake.
 		 */
 		unsigned long flags;
 
+		disable_irq(irq);
 		local_irq_save(flags);
+
 		handler(irq, dev_id);
+
 		local_irq_restore(flags);
+		enable_irq(irq);
 	}
 #endif
-
-	retval = setup_irq(irq, action);
-	if (retval)
-		kfree(action);
-
 	return retval;
 }
 EXPORT_SYMBOL(request_irq);
