@@ -708,7 +708,7 @@ int do_one_initcall(initcall_t fn)
 	int result;
 
 	if (initcall_debug) {
-		printk("calling  %pF\n", fn);
+		printk("calling  %pF @ %i\n", fn, task_pid_nr(current));
 		t0 = ktime_get();
 	}
 
@@ -718,9 +718,8 @@ int do_one_initcall(initcall_t fn)
 		t1 = ktime_get();
 		delta = ktime_sub(t1, t0);
 
-		printk("initcall %pF returned %d after %Ld msecs\n",
-			fn, result,
-			(unsigned long long) delta.tv64 >> 20);
+		printk("initcall %pF returned %d after %Ld msecs\n", fn,
+			result, (unsigned long long) delta.tv64 >> 20);
 	}
 
 	msgbuf[0] = 0;
@@ -745,16 +744,68 @@ int do_one_initcall(initcall_t fn)
 
 
 extern initcall_t __initcall_start[], __initcall_end[], __early_initcall_end[];
+extern initcall_t __async_initcall_start[], __async_initcall_end[];
+extern initcall_t __device_initcall_end[];
+
+static void __init do_async_initcalls(struct work_struct *dummy)
+{
+	initcall_t *call;
+
+	/*
+	 * For compatibility with normal init calls... take the BKL
+	 * not pretty, not desirable, but compatibility first
+	 */
+	lock_kernel();
+	for (call = __async_initcall_start; call < __async_initcall_end; call++)
+		do_one_initcall(*call);
+	unlock_kernel();
+}
+
+static struct workqueue_struct *async_init_wq;
+
+
 
 static void __init do_initcalls(void)
 {
 	initcall_t *call;
+	static DECLARE_WORK(async_work, do_async_initcalls);
+	/*
+	 * 0 = levels 0 - 6,
+	 * 1 = level 6a,
+	 * 2 = after level 6a,
+	 * 3 = after level 6
+	 */
+	int phase = 0;
 
-	for (call = __early_initcall_end; call < __initcall_end; call++)
-		do_one_initcall(*call);
+	async_init_wq = create_singlethread_workqueue("kasyncinit");
 
-	/* Make sure there is no pending stuff from the initcall sequence */
+	for (call = __early_initcall_end; call < __initcall_end; call++) {
+		if (phase == 0 && call >= __async_initcall_start) {
+			phase = 1;
+#ifdef CONFIG_FASTBOOT
+			queue_work(async_init_wq, &async_work);
+#else
+			do_async_initcalls(NULL);
+#endif
+		}
+		if (phase == 1 && call >= __async_initcall_end)
+			phase = 2;
+		if (phase == 2 && call >= __device_initcall_end) {
+			phase = 3;
+			/* make sure all async work is done before level 7 */
+			flush_workqueue(async_init_wq);
+		}
+		if (phase != 1)
+			do_one_initcall(*call);
+	}
+
+	/*
+	 * Make sure there is no pending stuff from the initcall sequence,
+	 * including the async initcalls
+	 */
 	flush_scheduled_work();
+	flush_workqueue(async_init_wq);
+	destroy_workqueue(async_init_wq);
 }
 
 /*
@@ -794,6 +845,7 @@ static void run_init_process(char *init_filename)
  */
 static int noinline init_post(void)
 {
+	int retry_count = 1;
 	free_initmem();
 	unlock_kernel();
 	mark_rodata_ro();
@@ -814,6 +866,7 @@ static int noinline init_post(void)
 				ramdisk_execute_command);
 	}
 
+retry:
 	/*
 	 * We try each of these until one succeeds.
 	 *
@@ -826,6 +879,23 @@ static int noinline init_post(void)
 					"defaults...\n", execute_command);
 	}
 	run_init_process("/sbin/init");
+
+	if (retry_count > 0) {
+		retry_count--;
+		/* 
+		 * We haven't found init yet... potentially because the device
+		 * is still being probed. We need to
+		 * - flush keventd and friends
+		 * - wait for the known devices to complete their probing
+		 * - try to mount the root fs again
+		 */
+		flush_scheduled_work();
+		while (driver_probe_done() != 0)
+			msleep(100);
+		prepare_namespace();
+		goto retry;
+	}
+	
 	run_init_process("/etc/init");
 	run_init_process("/bin/init");
 	run_init_process("/bin/sh");
