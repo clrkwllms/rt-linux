@@ -575,6 +575,13 @@ void __init early_cpu_init(void)
 	}
 
 	early_identify_cpu(&boot_cpu_data);
+
+#ifdef CONFIG_KMEMCHECK
+	/*
+	 * We need 4K granular PTEs for kmemcheck:
+	 */
+	setup_clear_cpu_cap(X86_FEATURE_PSE);
+#endif
 }
 
 /*
