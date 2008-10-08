@@ -56,6 +56,7 @@
 #include <asm/tlbflush.h>
 #include <asm/cpu.h>
 #include <asm/kdebug.h>
+#include <asm/idle.h>
 #include <asm/syscalls.h>
 #include <asm/smp.h>
 
