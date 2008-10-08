@@ -999,7 +999,7 @@ static void __exit uhci_hcd_cleanup(void)
 	kfree(errbuf);
 }
 
-module_init(uhci_hcd_init);
+module_init_async(uhci_hcd_init);
 module_exit(uhci_hcd_cleanup);
 
 MODULE_AUTHOR(DRIVER_AUTHOR);

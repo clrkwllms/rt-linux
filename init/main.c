@@ -60,6 +60,7 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/idr.h>
+#include <linux/ftrace.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -687,6 +688,8 @@ asmlinkage void __init start_kernel(void)
 
 	acpi_early_init(); /* before LAPIC and SMP init */
 
+	ftrace_init();
+
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
 }
@@ -703,30 +706,31 @@ __setup("initcall_debug", initcall_debug_setup);
 int do_one_initcall(initcall_t fn)
 {
 	int count = preempt_count();
-	ktime_t t0, t1, delta;
+	ktime_t delta;
 	char msgbuf[64];
-	int result;
+	struct boot_trace it;
 
 	if (initcall_debug) {
-		printk("calling  %pF\n", fn);
-		t0 = ktime_get();
+		it.caller = task_pid_nr(current);
+		printk("calling  %pF @ %i\n", fn, it.caller);
+		it.calltime = ktime_get();
 	}
 
-	result = fn();
+	it.result = fn();
 
 	if (initcall_debug) {
-		t1 = ktime_get();
-		delta = ktime_sub(t1, t0);
-
-		printk("initcall %pF returned %d after %Ld msecs\n",
-			fn, result,
-			(unsigned long long) delta.tv64 >> 20);
+		it.rettime = ktime_get();
+		delta = ktime_sub(it.rettime, it.calltime);
+		it.duration = (unsigned long long) delta.tv64 >> 20;
+		printk("initcall %pF returned %d after %Ld msecs\n", fn,
+			it.result, it.duration);
+		trace_boot(&it, fn);
 	}
 
 	msgbuf[0] = 0;
 
-	if (result && result != -ENODEV && initcall_debug)
-		sprintf(msgbuf, "error code %d ", result);
+	if (it.result && it.result != -ENODEV && initcall_debug)
+		sprintf(msgbuf, "error code %d ", it.result);
 
 	if (preempt_count() != count) {
 		strlcat(msgbuf, "preemption imbalance ", sizeof(msgbuf));
@@ -740,21 +744,73 @@ int do_one_initcall(initcall_t fn)
 		printk("initcall %pF returned with %s\n", fn, msgbuf);
 	}
 
-	return result;
+	return it.result;
 }
 
 
 extern initcall_t __initcall_start[], __initcall_end[], __early_initcall_end[];
+extern initcall_t __async_initcall_start[], __async_initcall_end[];
+extern initcall_t __device_initcall_end[];
+
+static void __init do_async_initcalls(struct work_struct *dummy)
+{
+	initcall_t *call;
+
+	/*
+	 * For compatibility with normal init calls... take the BKL
+	 * not pretty, not desirable, but compatibility first
+	 */
+	lock_kernel();
+	for (call = __async_initcall_start; call < __async_initcall_end; call++)
+		do_one_initcall(*call);
+	unlock_kernel();
+}
+
+static struct workqueue_struct *async_init_wq;
+
+
 
 static void __init do_initcalls(void)
 {
 	initcall_t *call;
+	static DECLARE_WORK(async_work, do_async_initcalls);
+	/*
+	 * 0 = levels 0 - 6,
+	 * 1 = level 6a,
+	 * 2 = after level 6a,
+	 * 3 = after level 6
+	 */
+	int phase = 0;
 
-	for (call = __early_initcall_end; call < __initcall_end; call++)
-		do_one_initcall(*call);
+	async_init_wq = create_singlethread_workqueue("kasyncinit");
 
-	/* Make sure there is no pending stuff from the initcall sequence */
+	for (call = __early_initcall_end; call < __initcall_end; call++) {
+		if (phase == 0 && call >= __async_initcall_start) {
+			phase = 1;
+#ifdef CONFIG_FASTBOOT
+			queue_work(async_init_wq, &async_work);
+#else
+			do_async_initcalls(NULL);
+#endif
+		}
+		if (phase == 1 && call >= __async_initcall_end)
+			phase = 2;
+		if (phase == 2 && call >= __device_initcall_end) {
+			phase = 3;
+			/* make sure all async work is done before level 7 */
+			flush_workqueue(async_init_wq);
+		}
+		if (phase != 1)
+			do_one_initcall(*call);
+	}
+
+	/*
+	 * Make sure there is no pending stuff from the initcall sequence,
+	 * including the async initcalls
+	 */
 	flush_scheduled_work();
+	flush_workqueue(async_init_wq);
+	destroy_workqueue(async_init_wq);
 }
 
 /*
@@ -794,6 +850,7 @@ static void run_init_process(char *init_filename)
  */
 static int noinline init_post(void)
 {
+	int retry_count = 1;
 	free_initmem();
 	unlock_kernel();
 	mark_rodata_ro();
@@ -814,6 +871,7 @@ static int noinline init_post(void)
 				ramdisk_execute_command);
 	}
 
+retry:
 	/*
 	 * We try each of these until one succeeds.
 	 *
@@ -826,6 +884,23 @@ static int noinline init_post(void)
 					"defaults...\n", execute_command);
 	}
 	run_init_process("/sbin/init");
+
+	if (retry_count > 0) {
+		retry_count--;
+		/* 
+		 * We haven't found init yet... potentially because the device
+		 * is still being probed. We need to
+		 * - flush keventd and friends
+		 * - wait for the known devices to complete their probing
+		 * - try to mount the root fs again
+		 */
+		flush_scheduled_work();
+		while (driver_probe_done() != 0)
+			msleep(100);
+		prepare_namespace();
+		goto retry;
+	}
+	
 	run_init_process("/etc/init");
 	run_init_process("/bin/init");
 	run_init_process("/bin/sh");
@@ -855,6 +930,7 @@ static int __init kernel_init(void * unused)
 	smp_prepare_cpus(setup_max_cpus);
 
 	do_pre_smp_initcalls();
+	start_boot_trace();
 
 	smp_init();
 	sched_init_smp();
@@ -881,6 +957,7 @@ static int __init kernel_init(void * unused)
 	 * we're essentially up and running. Get rid of the
 	 * initmem segments and start the user-mode stuff..
 	 */
+	stop_boot_trace();
 	init_post();
 	return 0;
 }
