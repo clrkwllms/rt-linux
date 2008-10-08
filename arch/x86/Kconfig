@@ -31,6 +31,7 @@ config X86
 	select HAVE_ARCH_KGDB if !X86_VOYAGER
 	select HAVE_GENERIC_DMA_COHERENT if X86_32
 	select HAVE_EFFICIENT_UNALIGNED_ACCESS
+	select HAVE_DYN_ARRAY
 
 config ARCH_DEFCONFIG
 	string
@@ -236,6 +237,17 @@ config SMP
 	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
+
+config HAVE_SPARSE_IRQ
+	bool "Support sparse irq numbering"
+	depends on PCI_MSI || HT_IRQ
+	default y
+	help
+	  This enables support for sparse irq, esp for msi/msi-x. the irq
+	  number will be bus/dev/fn + 12bit. You may need if you have lots of
+	  cards supports msi-x installed.
+
+	  If you don't know what to do here, say Y.
 
 config X86_FIND_SMP_CONFIG
 	def_bool y
@@ -1180,14 +1192,6 @@ config EFI
   	resultant kernel should continue to boot on existing non-EFI
   	platforms.
 
-config IRQBALANCE
-	def_bool y
-	prompt "Enable kernel irq balancing"
-	depends on X86_32 && SMP && X86_IO_APIC
-	help
-	  The default yes will allow the kernel to do irq load balancing.
-	  Saying no will keep the kernel from doing irq load balancing.
-
 config SECCOMP
 	def_bool y
 	prompt "Enable seccomp to safely compute untrusted bytecode"
@@ -1642,6 +1646,14 @@ config DMAR_FLOPPY_WA
 	 thereby failing to work when IOMMU is enabled. This
 	 workaround will setup a 1:1 mapping for the first
 	 16M to make floppy (an ISA device) work.
+
+config INTR_REMAP
+	bool "Support for Interrupt Remapping (EXPERIMENTAL)"
+	depends on X86_64 && X86_IO_APIC && PCI_MSI && ACPI && EXPERIMENTAL
+	help
+	 Supports Interrupt remapping for IO-APIC and MSI devices.
+	 To use x2apic mode in the CPU's which support x2APIC enhancements or
+	 to support platforms with CPU's having > 8 bit APIC ID, say Y.
 
 source "drivers/pci/pcie/Kconfig"
 
