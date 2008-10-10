@@ -144,6 +144,7 @@ static int drm_set_busid(struct drm_device * dev)
 
 	if (len > dev->unique_len)
 		DRM_ERROR("Unique buffer overflowed\n");
+	dev->unique_len = len + 1;
 
 	dev->devname =
 	    drm_alloc(strlen(dev->driver->pci_driver.name) + dev->unique_len +
