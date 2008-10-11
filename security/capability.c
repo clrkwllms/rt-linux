@@ -11,6 +11,7 @@
  */
 
 #include <linux/security.h>
+#include <net/sock.h>
 
 static int cap_acct(struct file *file)
 {
@@ -624,6 +625,9 @@ static int cap_socket_getpeersec_dgram(struct socket *sock,
 
 static int cap_sk_alloc_security(struct sock *sk, int family, gfp_t priority)
 {
+#ifdef CONFIG_SECURITY_NETWORK
+	sk->sk_security = NULL;
+#endif
 	return 0;
 }
 
