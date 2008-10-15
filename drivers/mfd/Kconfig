@@ -105,6 +105,8 @@ config MFD_TC6393XB
 
 config MFD_WM8400
 	tristate "Support Wolfson Microelectronics WM8400"
+	# build error - see config-Wed_Oct_15_11_28_40_CEST_2008.bad
+	depends on 0
 	help
 	  Support for the Wolfson Microelecronics WM8400 PMIC and audio
 	  CODEC.  This driver adds provides common support for accessing
