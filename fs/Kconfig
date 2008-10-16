@@ -172,7 +172,7 @@ config FS_POSIX_ACL
 	default n
 
 config FILE_LOCKING
-	bool "Enable POSIX file locking API" if EMBEDDED
+	bool "Enable POSIX file locking API" if BROKEN
 	default y
 	help
 	  This option enables standard file locking support, required
