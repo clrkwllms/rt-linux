@@ -68,8 +68,10 @@ void iwl_dbgfs_unregister(struct iwl_priv *priv);
 #endif
 
 #else
-#define IWL_DEBUG(level, fmt, args...)
-#define IWL_DEBUG_LIMIT(level, fmt, args...)
+static inline void __attribute__ ((format(printf, 2, 3)))
+IWL_DEBUG(int level, const char *fmt, ...) { }
+static inline void __attribute__ ((format(printf, 2, 3)))
+IWL_DEBUG_LIMIT(int level, const char *fmt, ...) { }
 #endif				/* CONFIG_IWLWIFI_DEBUG */
 
 
