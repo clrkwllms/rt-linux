@@ -106,7 +106,7 @@ minstrel_stats_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
+static ssize_t
 minstrel_stats_read(struct file *file, char __user *buf, size_t len, loff_t *o)
 {
 	struct minstrel_stats_info *ms;
