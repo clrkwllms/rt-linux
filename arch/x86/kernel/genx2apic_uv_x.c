@@ -242,7 +242,8 @@ static __init int boot_pnode_to_blade(int pnode)
 	for (blade = 0; blade < uv_num_possible_blades(); blade++)
 		if (pnode == uv_blade_info[blade].pnode)
 			return blade;
-	BUG();
+
+	panic("x2apic_uv: bad pnode!");
 }
 
 struct redir_addr {
@@ -273,7 +274,7 @@ static __init void get_lowmem_redirect(unsigned long *base, unsigned long *size)
 			return;
 		}
 	}
-	BUG();
+	panic("get_lowmem_redirect: no match!");
 }
 
 static __init void map_low_mmrs(void)
