@@ -516,7 +516,7 @@ extern int audit_signals;
 #define audit_inode(n,d) do { ; } while (0)
 #define audit_inode_child(d,i,p) do { ; } while (0)
 #define audit_core_dumps(i) do { ; } while (0)
-#define auditsc_get_stamp(c,t,s) do { BUG(); } while (0)
+#define auditsc_get_stamp(c,t,s) do { BUG(); *(t) = (struct timespec){ 0, }; } while (0)
 #define audit_get_loginuid(t) (-1)
 #define audit_get_sessionid(t) (-1)
 #define audit_log_task_context(b) do { ; } while (0)
