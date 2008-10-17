@@ -1675,7 +1675,7 @@ static inline int break_lease(struct inode *inode, unsigned int mode)
 #else /* !CONFIG_FILE_LOCKING */
 #define locks_mandatory_locked(a) ({ 0; })
 #define locks_mandatory_area(a, b, c, d, e) ({ 0; })
-#define __mandatory_lock(a) ({ 0; })
+static inline int __mandatory_lock(struct inode *ino) { return 0; }
 #define mandatory_lock(a) ({ 0; })
 #define locks_verify_locked(a) ({ 0; })
 #define locks_verify_truncate(a, b, c) ({ 0; })
