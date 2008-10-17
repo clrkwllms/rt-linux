@@ -54,18 +54,14 @@ static ctl_table fs_table[] = {
 
 void coda_sysctl_init(void)
 {
-#ifdef CONFIG_SYSCTL
-	if ( !fs_table_header )
+	if (!fs_table_header)
 		fs_table_header = register_sysctl_table(fs_table);
-#endif
 }
 
 void coda_sysctl_clean(void)
 {
-#ifdef CONFIG_SYSCTL
-	if ( fs_table_header ) {
+	if (fs_table_header) {
 		unregister_sysctl_table(fs_table_header);
 		fs_table_header = NULL;
 	}
-#endif
 }
