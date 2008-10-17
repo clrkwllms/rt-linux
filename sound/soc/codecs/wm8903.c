@@ -391,7 +391,7 @@ static int wm8903_output_event(struct snd_soc_dapm_widget *w,
 		reg = WM8903_ANALOGUE_LINEOUT_0;
 		break;
 	default:
-		BUG();
+		panic("wm8903_output_event: bad register");
 	}
 
 	switch (w->shift) {
@@ -402,7 +402,7 @@ static int wm8903_output_event(struct snd_soc_dapm_widget *w,
 		shift = 4;
 		break;
 	default:
-		BUG();
+		panic("wm8903_output_event: bad shift");
 	}
 
 	if (event & SND_SOC_DAPM_PRE_PMU) {
