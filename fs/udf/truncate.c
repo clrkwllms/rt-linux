@@ -87,7 +87,7 @@ void udf_truncate_tail_extent(struct inode *inode)
 	else if (iinfo->i_alloc_type == ICBTAG_FLAG_AD_LONG)
 		adsize = sizeof(long_ad);
 	else
-		BUG();
+		panic("udf_truncate_tail_extent: unknown alloc type!");
 
 	/* Find the last extent in the file */
 	while ((netype = udf_next_aext(inode, &epos, &eloc, &elen, 1)) != -1) {
@@ -214,7 +214,7 @@ void udf_truncate_extents(struct inode *inode)
 	else if (iinfo->i_alloc_type == ICBTAG_FLAG_AD_LONG)
 		adsize = sizeof(long_ad);
 	else
-		BUG();
+		panic("udf_truncate_extents: unknown alloc type!");
 
 	etype = inode_bmap(inode, first_block, &epos, &eloc, &elen, &offset);
 	byte_offset = (offset << sb->s_blocksize_bits) +
