@@ -93,7 +93,7 @@ void __init acpi_old_suspend_ordering(void)
 /**
  *	acpi_pm_disable_gpes - Disable the GPEs.
  */
-static int acpi_pm_disable_gpes(void)
+static inline int acpi_pm_disable_gpes(void)
 {
 	acpi_hw_disable_all_gpes();
 	return 0;
@@ -105,7 +105,7 @@ static int acpi_pm_disable_gpes(void)
  *	If necessary, set the firmware waking vector and do arch-specific
  *	nastiness to get the wakeup code to the waking vector.
  */
-static int __acpi_pm_prepare(void)
+static inline int __acpi_pm_prepare(void)
 {
 	int error = acpi_sleep_prepare(acpi_target_sleep_state);
 
@@ -118,7 +118,7 @@ static int __acpi_pm_prepare(void)
  *	acpi_pm_prepare - Prepare the platform to enter the target sleep
  *		state and disable the GPEs.
  */
-static int acpi_pm_prepare(void)
+static inline int acpi_pm_prepare(void)
 {
 	int error = __acpi_pm_prepare();
 
@@ -133,7 +133,7 @@ static int acpi_pm_prepare(void)
  *	This is called after we wake back up (or if entering the sleep state
  *	failed).
  */
-static void acpi_pm_finish(void)
+static inline void acpi_pm_finish(void)
 {
 	u32 acpi_state = acpi_target_sleep_state;
 
@@ -154,7 +154,7 @@ static void acpi_pm_finish(void)
 /**
  *	acpi_pm_end - Finish up suspend sequence.
  */
-static void acpi_pm_end(void)
+static inline void acpi_pm_end(void)
 {
 	/*
 	 * This is necessary in case acpi_pm_finish() is not called during a
