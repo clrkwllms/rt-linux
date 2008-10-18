@@ -313,16 +313,20 @@ void __init parse_early_param(void);
 #define __initdata_or_module __initdata
 #endif /*CONFIG_MODULES*/
 
-/* Functions marked as __devexit may be discarded at kernel link time, depending
-   on config options.  Newer versions of binutils detect references from
-   retained sections to discarded sections and flag an error.  Pointers to
-   __devexit functions must use __devexit_p(function_name), the wrapper will
-   insert either the function_name or NULL, depending on the config options.
+/*
+ * Functions marked as __devexit may be discarded at kernel link time,
+ * depending on config options.  Newer versions of binutils detect
+ * references from retained sections to discarded sections and flag an
+ * error.
+ *
+ * Pointers to __devexit functions must use __devexit_p(function_name),
+ * the wrapper will insert either the function_name or NULL, depending on
+ * the config options.
  */
 #if defined(MODULE) || defined(CONFIG_HOTPLUG)
-#define __devexit_p(x) x
+# define __devexit_p(x) x
 #else
-#define __devexit_p(x) NULL
+# define __devexit_p(x) ((void *)((long)(x) & 0) /* NULL */)
 #endif
 
 #ifdef MODULE
