@@ -13876,7 +13876,9 @@ static int __devinit advansys_board_found(struct Scsi_Host *shost,
 		free_dma(shost->dma_channel);
  err_free_proc:
 	kfree(boardp->prtbuf);
+#ifdef CONFIG_PROC_FS
  err_unmap:
+#endif
 	if (boardp->ioremap_addr)
 		iounmap(boardp->ioremap_addr);
  err_shost:
