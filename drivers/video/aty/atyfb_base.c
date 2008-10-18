@@ -529,8 +529,10 @@ static int __devinit correct_chipset(struct atyfb_par *par)
 	return 0;
 }
 
+#if defined(CONFIG_FB_ATY_GX) || defined(CONFIG_FB_ATY_CT)
 static char ram_dram[] __devinitdata = "DRAM";
 static char ram_resv[] __devinitdata = "RESV";
+#endif
 #ifdef CONFIG_FB_ATY_GX
 static char ram_vram[] __devinitdata = "VRAM";
 #endif /* CONFIG_FB_ATY_GX */
@@ -3850,3 +3852,4 @@ MODULE_PARM_DESC(mode, "Specify resolution as \"<xres>x<yres>[-<bpp>][@<refresh>
 module_param(nomtrr, bool, 0);
 MODULE_PARM_DESC(nomtrr, "bool: disable use of MTRR registers");
 #endif
+
