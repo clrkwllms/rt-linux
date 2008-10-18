@@ -135,7 +135,7 @@ struct _cpuid4_info {
 	cpumask_t shared_cpu_map;	/* future?: only cpus/node is needed */
 };
 
-#ifdef CONFIG_PCI
+#if defined(CONFIG_PCI) && defined(CONFIG_SYSFS)
 static struct pci_device_id k8_nb_id[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_AMD, 0x1103) },
 	{ PCI_DEVICE(PCI_VENDOR_ID_AMD, 0x1203) },
@@ -475,6 +475,8 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 	return l2;
 }
 
+#ifdef CONFIG_SYSFS
+
 /* pointer to _cpuid4_info array (for each cache leaf) */
 static DEFINE_PER_CPU(struct _cpuid4_info *, cpuid4_info);
 #define CPUID4_INFO_IDX(x, y)	(&((per_cpu(cpuid4_info, x))[y]))
@@ -577,8 +579,6 @@ out:
 
 	return retval;
 }
-
-#ifdef CONFIG_SYSFS
 
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
