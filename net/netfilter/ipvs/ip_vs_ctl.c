@@ -2327,6 +2327,7 @@ __ip_vs_get_dest_entries(const struct ip_vs_get_dests *get,
 static inline void
 __ip_vs_get_timeouts(struct ip_vs_timeout_user *u)
 {
+	memset(u, 0, sizeof(*u));
 #ifdef CONFIG_IP_VS_PROTO_TCP
 	u->tcp_timeout =
 		ip_vs_protocol_tcp.timeout_table[IP_VS_TCP_S_ESTABLISHED] / HZ;
