@@ -1280,7 +1280,9 @@ isdn_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 	int ret;
 	int i;
 	char __user *p;
+#ifdef CONFIG_NETDEVICES
 	char *s;
+#endif
 	union iocpar {
 		char name[10];
 		char bname[22];
