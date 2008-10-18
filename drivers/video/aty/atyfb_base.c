@@ -430,7 +430,7 @@ static int __devinit correct_chipset(struct atyfb_par *par)
 	u16 type;
 	u32 chip_id;
 	const char *name;
-	int i;
+	long i;
 
 	for (i = ARRAY_SIZE(aty_chips) - 1; i >= 0; i--)
 		if (par->pci_id == aty_chips[i].pci_id)
