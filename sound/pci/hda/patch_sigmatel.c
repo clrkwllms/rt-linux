@@ -4425,17 +4425,17 @@ static int stac92hd71xx_suspend(struct hda_codec *codec, pm_message_t state)
 
 #endif
 
+#ifdef SND_HDA_NEEDS_RESUME
 static struct hda_codec_ops stac92hd71bxx_patch_ops = {
 	.build_controls = stac92xx_build_controls,
 	.build_pcms = stac92xx_build_pcms,
 	.init = stac92xx_init,
 	.free = stac92xx_free,
 	.unsol_event = stac92xx_unsol_event,
-#ifdef SND_HDA_NEEDS_RESUME
 	.resume = stac92hd71xx_resume,
 	.suspend = stac92hd71xx_suspend,
-#endif
 };
+#endif
 
 static struct hda_input_mux stac92hd71bxx_dmux = {
 	.num_items = 4,
