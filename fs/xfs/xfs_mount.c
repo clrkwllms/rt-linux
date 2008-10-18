@@ -1453,6 +1453,8 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 	/* find modified range */
 
 	f = (xfs_sb_field_t)xfs_lowbit64((__uint64_t)fields);
+	if ((long)f < 0) /* work around gcc warning */
+		return;
 	ASSERT((1LL << f) & XFS_SB_MOD_BITS);
 	first = xfs_sb_info[f].offset;
 
