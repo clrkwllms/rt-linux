@@ -294,7 +294,9 @@ static char hop_pattern_length[] = { 1,
 	     JAPAN_TEST_HOP_MOD
 };
 
+#ifdef CONFIG_PROC_FS
 static char rcsid[] = "Raylink/WebGear wireless LAN - Corey <Thomas corey@world.std.com>";
+#endif
 
 /*=============================================================================
     ray_attach() creates an "instance" of the driver, allocating
