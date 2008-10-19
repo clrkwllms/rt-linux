@@ -82,15 +82,9 @@ The most prominent problem seems to be that of bit-fields. kmemcheck can only
 track memory with byte granularity. Therefore, when gcc generates code to
 access only one bit in a bit-field, there is really no way for kmemcheck to
 know which of the other bits will be used or thrown away. Consequently, there
-may be bogus warnings for bit-field accesses. There is some experimental
-support to detect this automatically, though it is probably better to work
-around this by explicitly initializing whole bit-fields at once.
-
-Some allocations are used for DMA. As DMA doesn't go through the paging
-mechanism, we have absolutely no way to detect DMA writes. This means that
-spurious warnings may be seen on access to DMA memory. DMA allocations should
-be annotated with the __GFP_NOTRACK flag or allocated from caches marked
-SLAB_NOTRACK to work around this problem.
+may be bogus warnings for bit-field accesses. We have added a "bitfields" API
+to get around this problem. See include/linux/kmemcheck.h for detailed
+instructions!
 
 
 Parameters
