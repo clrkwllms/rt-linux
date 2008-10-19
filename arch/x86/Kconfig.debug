@@ -338,11 +338,12 @@ config KMEMCHECK_QUEUE_SIZE
 	depends on KMEMCHECK
 	default 64
 	help
-	  Select the maximum number of errors to store in the queue. This
-	  queue will be emptied once every second, so this is effectively a
-	  limit on how many reports to print in one go. Note however, that
-	  if the number of errors occuring between two bursts is larger than
-	  this number, the extra error reports will get lost.
+	  Select the maximum number of errors to store in the queue. Since
+	  errors can occur virtually anywhere and in any context, we need a
+	  temporary storage area which is guarantueed not to generate any
+	  other faults. The queue will be emptied as soon as a tasklet may
+	  be scheduled. If the queue is full, new error reports will be
+	  lost.
 
 config KMEMCHECK_SHADOW_COPY_SHIFT
 	int "kmemcheck: shadow copy size (5 => 32 bytes, 6 => 64 bytes)"
