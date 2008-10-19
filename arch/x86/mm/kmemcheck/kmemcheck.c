@@ -295,10 +295,6 @@ void kmemcheck_hide_pages(struct page *p, unsigned int n)
 {
 	unsigned int i;
 
-#ifdef CONFIG_X86_64
-	set_memory_4k((unsigned long) page_address(p), n);
-#endif
-
 	for (i = 0; i < n; ++i) {
 		unsigned long address;
 		pte_t *pte;

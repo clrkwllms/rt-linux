@@ -10,14 +10,6 @@ void kmemcheck_alloc_shadow(struct kmem_cache *s, gfp_t flags, int node,
 	int pages;
 	int i;
 
-#ifdef CONFIG_X86_64
-	/* XXX: x86_64 doesn't honour PSE capabilities, so we need the call
-	 * to set_memory_4k(). However, that one wants to flush all CPUs,
-	 * which doesn't work when irqs are disabled. Temporary hack: */
-	if (irqs_disabled())
-		return;
-#endif
-
 	pages = 1 << order;
 
 	/*
