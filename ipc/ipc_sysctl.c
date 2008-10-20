@@ -18,6 +18,7 @@
 #include <linux/msg.h>
 #include "util.h"
 
+#if defined(CONFIG_PROC_FS) || defined(CONFIG_SYSCTL_SYSCALL)
 static void *get_ipc(ctl_table *table)
 {
 	char *which = table->data;
@@ -25,7 +26,9 @@ static void *get_ipc(ctl_table *table)
 	which = (which - (char *)&init_ipc_ns) + (char *)ipc_ns;
 	return which;
 }
+#endif
 
+#ifdef CONFIG_PROC_FS
 /*
  * Routine that is called when the file "auto_msgmni" has successfully been
  * written.
@@ -49,7 +52,6 @@ static void ipc_auto_callback(int val)
 	}
 }
 
-#ifdef CONFIG_PROC_FS
 static int proc_ipc_dointvec(ctl_table *table, int write, struct file *filp,
 	void __user *buffer, size_t *lenp, loff_t *ppos)
 {
