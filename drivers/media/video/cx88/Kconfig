@@ -1,6 +1,8 @@
 config VIDEO_CX88
 	tristate "Conexant 2388x (bt878 successor) support"
 	depends on VIDEO_DEV && PCI && I2C && INPUT
+	# build failure, see config-Mon_Oct_20_13_45_14_CEST_2008.bad
+	depends on BROKEN
 	select I2C_ALGOBIT
 	select VIDEO_BTCX
 	select VIDEOBUF_DMA_SG
