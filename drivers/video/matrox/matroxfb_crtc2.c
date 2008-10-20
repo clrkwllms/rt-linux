@@ -262,7 +262,7 @@ static int matroxfb_dh_open(struct fb_info* info, int user) {
 #define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	MINFO_FROM(m2info->primary_dev);
 
-	if (MINFO) {
+	if (MINFO != NULL) {
 		int err;
 
 		if (ACCESS_FBINFO(dead)) {
@@ -282,7 +282,7 @@ static int matroxfb_dh_release(struct fb_info* info, int user) {
 	int err = 0;
 	MINFO_FROM(m2info->primary_dev);
 
-	if (MINFO) {
+	if (MINFO != NULL) {
 		err = ACCESS_FBINFO(fbops).fb_release(&ACCESS_FBINFO(fbcon), user);
 	}
 	return err;
