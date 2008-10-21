@@ -48,8 +48,7 @@ static int __init alloc_node_page_cgroup(int nid)
 
 	table_size = sizeof(struct page_cgroup) * nr_pages;
 
-	base = __alloc_bootmem_node_nopanic(NODE_DATA(nid),
-			table_size, PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
+	base = vmalloc_node(table_size, nid);
 	if (!base)
 		return -ENOMEM;
 	for (index = 0; index < nr_pages; index++) {
