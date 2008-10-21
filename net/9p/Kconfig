@@ -4,6 +4,8 @@
 
 menuconfig NET_9P
 	depends on NET && EXPERIMENTAL
+	# build breakage
+	depends on 0
 	tristate "Plan 9 Resource Sharing Support (9P2000) (Experimental)"
 	help
 	  If you say Y here, you will get experimental support for
