@@ -99,6 +99,10 @@ struct page {
 #endif
 
 #ifdef CONFIG_KMEMCHECK
+	/*
+	 * kmemcheck wants to track the status of each byte in a page; this
+	 * is a pointer to such a status block. NULL if not tracked.
+	 */
 	void *shadow;
 #endif
 };
