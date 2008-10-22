@@ -1063,7 +1063,9 @@ vfs_lock_file(struct file *filp, unsigned int cmd,
 #define vfs_cancel_lock(a, b) ({ 0; })
 #define flock_lock_file_wait(a, b) ({ -ENOLCK; })
 #define __break_lease(a, b) ({ 0; })
-#define lease_get_mtime(a, b) ({ })
+static inline void lease_get_mtime(struct inode *inode, struct timespec *time)
+{
+}
 #define generic_setlease(a, b, c) ({ -EINVAL; })
 #define vfs_setlease(a, b, c) ({ -EINVAL; })
 #define lease_modify(a, b) ({ -EINVAL; })
