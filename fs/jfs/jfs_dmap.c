@@ -1618,7 +1618,7 @@ static int dbAllocAny(struct bmap * bmp, s64 nblocks, int l2nb, s64 * results)
  */
 static int dbFindCtl(struct bmap * bmp, int l2nb, int level, s64 * blkno)
 {
-	int rc, leafidx, lev;
+	int rc, uninitialized_var(leafidx), lev;
 	s64 b, lblkno;
 	struct dmapctl *dcp;
 	int budmin;
