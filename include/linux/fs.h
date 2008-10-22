@@ -1054,7 +1054,12 @@ extern int lock_may_write(struct inode *, loff_t start, unsigned long count);
 #define posix_lock_file_wait(a, b) ({ -ENOLCK; })
 #define posix_unblock_lock(a, b) (-ENOENT)
 #define vfs_test_lock(a, b) ({ 0; })
-#define vfs_lock_file(a, b, c, d) (-ENOLCK)
+static inline int
+vfs_lock_file(struct file *filp, unsigned int cmd,
+	      struct file_lock *fl, struct file_lock *conf)
+{
+	return -ENOLCK;
+}
 #define vfs_cancel_lock(a, b) ({ 0; })
 #define flock_lock_file_wait(a, b) ({ -ENOLCK; })
 #define __break_lease(a, b) ({ 0; })
