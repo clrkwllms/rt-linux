@@ -4175,6 +4175,7 @@ sisfb_find_rom(struct pci_dev *pdev)
 	return myrombase;
 }
 
+#if defined(CONFIG_FB_SIS_300) || defined(CONFIG_FB_SIS_315)
 static void __devinit
 sisfb_post_map_vram(struct sis_video_info *ivideo, unsigned int *mapsize,
 			unsigned int min)
@@ -4197,6 +4198,7 @@ sisfb_post_map_vram(struct sis_video_info *ivideo, unsigned int *mapsize,
 		}
 	}
 }
+#endif
 
 #ifdef CONFIG_FB_SIS_300
 static int __devinit
