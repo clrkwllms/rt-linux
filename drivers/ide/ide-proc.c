@@ -227,7 +227,7 @@ static int set_xfer_rate (ide_drive_t *drive, int arg)
 
 ide_devset_rw(current_speed, xfer_rate);
 ide_devset_rw_field(init_speed, init_speed);
-ide_devset_rw_field(nice1, nice1);
+ide_devset_rw_flag(nice1, IDE_DFLAG_NICE1);
 ide_devset_rw_field(number, dn);
 
 static const struct ide_proc_devset ide_generic_settings[] = {
@@ -567,10 +567,10 @@ static void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t
 void ide_proc_register_driver(ide_drive_t *drive, ide_driver_t *driver)
 {
 	mutex_lock(&ide_setting_mtx);
-	drive->settings = driver->settings;
+	drive->settings = driver->proc_devsets(drive);
 	mutex_unlock(&ide_setting_mtx);
 
-	ide_add_proc_entries(drive->proc, driver->proc, drive);
+	ide_add_proc_entries(drive->proc, driver->proc_entries(drive), drive);
 }
 
 EXPORT_SYMBOL(ide_proc_register_driver);
@@ -591,7 +591,7 @@ void ide_proc_unregister_driver(ide_drive_t *drive, ide_driver_t *driver)
 {
 	unsigned long flags;
 
-	ide_remove_proc_entries(drive->proc, driver->proc);
+	ide_remove_proc_entries(drive->proc, driver->proc_entries(drive));
 
 	mutex_lock(&ide_setting_mtx);
 	spin_lock_irqsave(&ide_lock, flags);
@@ -622,9 +622,7 @@ void ide_proc_port_register_devices(ide_hwif_t *hwif)
 	for (d = 0; d < MAX_DRIVES; d++) {
 		ide_drive_t *drive = &hwif->drives[d];
 
-		if (!drive->present)
-			continue;
-		if (drive->proc)
+		if ((drive->dev_flags & IDE_DFLAG_PRESENT) == 0 || drive->proc)
 			continue;
 
 		drive->proc = proc_mkdir(drive->name, parent);

@@ -33,7 +33,7 @@
 
 static int ide_floppy_get_format_capacities(ide_drive_t *drive, int __user *arg)
 {
-	struct ide_floppy_obj *floppy = drive->driver_data;
+	struct ide_disk_obj *floppy = drive->driver_data;
 	struct ide_atapi_pc pc;
 	u8 header_len, desc_cnt;
 	int i, blocks, length, u_array_size, u_index;
@@ -113,7 +113,7 @@ static void ide_floppy_create_format_unit_cmd(struct ide_atapi_pc *pc, int b,
 
 static int ide_floppy_get_sfrp_bit(ide_drive_t *drive)
 {
-	idefloppy_floppy_t *floppy = drive->driver_data;
+	struct ide_disk_obj *floppy = drive->driver_data;
 	struct ide_atapi_pc pc;
 
 	drive->atapi_flags &= ~IDE_AFLAG_SRFP;
@@ -132,17 +132,17 @@ static int ide_floppy_get_sfrp_bit(ide_drive_t *drive)
 
 static int ide_floppy_format_unit(ide_drive_t *drive, int __user *arg)
 {
-	idefloppy_floppy_t *floppy = drive->driver_data;
+	struct ide_disk_obj *floppy = drive->driver_data;
 	struct ide_atapi_pc pc;
 	int blocks, length, flags, err = 0;
 
 	if (floppy->openers > 1) {
 		/* Don't format if someone is using the disk */
-		drive->atapi_flags &= ~IDE_AFLAG_FORMAT_IN_PROGRESS;
+		drive->dev_flags &= ~IDE_DFLAG_FORMAT_IN_PROGRESS;
 		return -EBUSY;
 	}
 
-	drive->atapi_flags |= IDE_AFLAG_FORMAT_IN_PROGRESS;
+	drive->dev_flags |= IDE_DFLAG_FORMAT_IN_PROGRESS;
 
 	/*
 	 * Send ATAPI_FORMAT_UNIT to the drive.
@@ -174,7 +174,7 @@ static int ide_floppy_format_unit(ide_drive_t *drive, int __user *arg)
 
 out:
 	if (err)
-		drive->atapi_flags &= ~IDE_AFLAG_FORMAT_IN_PROGRESS;
+		drive->dev_flags &= ~IDE_DFLAG_FORMAT_IN_PROGRESS;
 	return err;
 }
 
@@ -190,12 +190,12 @@ out:
 
 static int ide_floppy_get_format_progress(ide_drive_t *drive, int __user *arg)
 {
-	idefloppy_floppy_t *floppy = drive->driver_data;
+	struct ide_disk_obj *floppy = drive->driver_data;
 	struct ide_atapi_pc pc;
 	int progress_indication = 0x10000;
 
 	if (drive->atapi_flags & IDE_AFLAG_SRFP) {
-		ide_floppy_create_request_sense_cmd(&pc);
+		ide_create_request_sense_cmd(drive, &pc);
 		if (ide_queue_pc_tail(drive, floppy->disk, &pc))
 			return -EIO;
 
@@ -223,8 +223,26 @@ static int ide_floppy_get_format_progress(ide_drive_t *drive, int __user *arg)
 	return 0;
 }
 
-int ide_floppy_format_ioctl(ide_drive_t *drive, struct file *file,
-			    unsigned int cmd, void __user *argp)
+static int ide_floppy_lockdoor(ide_drive_t *drive, struct ide_atapi_pc *pc,
+			       unsigned long arg, unsigned int cmd)
+{
+	struct ide_disk_obj *floppy = drive->driver_data;
+	struct gendisk *disk = floppy->disk;
+	int prevent = (arg && cmd != CDROMEJECT) ? 1 : 0;
+
+	if (floppy->openers > 1)
+		return -EBUSY;
+
+	ide_set_media_lock(drive, disk, prevent);
+
+	if (cmd == CDROMEJECT)
+		ide_do_start_stop(drive, disk, 2);
+
+	return 0;
+}
+
+static int ide_floppy_format_ioctl(ide_drive_t *drive, fmode_t mode,
+				   unsigned int cmd, void __user *argp)
 {
 	switch (cmd) {
 	case IDEFLOPPY_IOCTL_FORMAT_SUPPORTED:
@@ -232,7 +250,7 @@ int ide_floppy_format_ioctl(ide_drive_t *drive, struct file *file,
 	case IDEFLOPPY_IOCTL_FORMAT_GET_CAPACITY:
 		return ide_floppy_get_format_capacities(drive, argp);
 	case IDEFLOPPY_IOCTL_FORMAT_START:
-		if (!(file->f_mode & 2))
+		if (!(mode & FMODE_WRITE))
 			return -EPERM;
 		return ide_floppy_format_unit(drive, (int __user *)argp);
 	case IDEFLOPPY_IOCTL_FORMAT_GET_PROGRESS:
@@ -240,4 +258,32 @@ int ide_floppy_format_ioctl(ide_drive_t *drive, struct file *file,
 	default:
 		return -ENOTTY;
 	}
+}
+
+int ide_floppy_ioctl(ide_drive_t *drive, struct block_device *bdev,
+		     fmode_t mode, unsigned int cmd, unsigned long arg)
+{
+	struct ide_atapi_pc pc;
+	void __user *argp = (void __user *)arg;
+	int err;
+
+	if (cmd == CDROMEJECT || cmd == CDROM_LOCKDOOR)
+		return ide_floppy_lockdoor(drive, &pc, arg, cmd);
+
+	err = ide_floppy_format_ioctl(drive, mode, cmd, argp);
+	if (err != -ENOTTY)
+		return err;
+
+	/*
+	 * skip SCSI_IOCTL_SEND_COMMAND (deprecated)
+	 * and CDROM_SEND_PACKET (legacy) ioctls
+	 */
+	if (cmd != CDROM_SEND_PACKET && cmd != SCSI_IOCTL_SEND_COMMAND)
+		err = scsi_cmd_ioctl(bdev->bd_disk->queue, bdev->bd_disk,
+				mode, cmd, argp);
+
+	if (err == -ENOTTY)
+		err = generic_ide_ioctl(drive, bdev, cmd, arg);
+
+	return err;
 }
