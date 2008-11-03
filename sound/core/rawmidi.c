@@ -149,7 +149,7 @@ static int snd_rawmidi_runtime_free(struct snd_rawmidi_substream *substream)
 static inline void snd_rawmidi_output_trigger(struct snd_rawmidi_substream *substream,int up)
 {
 	if (!substream->opened)
-		return -EBADFD;
+		return;
 	if (up) {
 		tasklet_hi_schedule(&substream->runtime->tasklet);
 	} else {
@@ -161,7 +161,7 @@ static inline void snd_rawmidi_output_trigger(struct snd_rawmidi_substream *subs
 static void snd_rawmidi_input_trigger(struct snd_rawmidi_substream *substream, int up)
 {
 	if (!substream->opened)
-		return -EBADFD;
+		return;
 	substream->ops->trigger(substream, up);
 	if (!up && substream->runtime->event)
 		tasklet_kill(&substream->runtime->tasklet);
