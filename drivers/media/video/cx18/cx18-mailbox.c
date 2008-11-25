@@ -184,7 +184,7 @@ long cx18_mb_ack(struct cx18 *cx, const struct cx18_mailbox *mb)
 static int cx18_api_call(struct cx18 *cx, u32 cmd, int args, u32 data[])
 {
 	const struct cx18_api_info *info = find_api_info(cmd);
-	u32 state = 0, irq = 0, req, oldreq, err;
+	u32 state = 0, irq = 0, uninitialized_var(req), oldreq, err;
 	struct cx18_mailbox __iomem *mb;
 	wait_queue_head_t *waitq;
 	int timeout = 100;
