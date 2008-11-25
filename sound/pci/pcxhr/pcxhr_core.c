@@ -1084,7 +1084,7 @@ static void pcxhr_update_timer_pos(struct pcxhr_mgr *mgr,
 				   struct pcxhr_stream *stream, int samples_to_add)
 {
 	if (stream->substream && (stream->status == PCXHR_STREAM_STATUS_RUNNING)) {
-		u_int64_t new_sample_count;
+		u_int64_t new_sample_count = 0;
 		int elapsed = 0;
 		int hardware_read = 0;
 		struct snd_pcm_runtime *runtime = stream->substream->runtime;
