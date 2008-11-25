@@ -1026,8 +1026,8 @@ static ssize_t o2hb_region_block_bytes_write(struct o2hb_region *reg,
 					     size_t count)
 {
 	int status;
-	unsigned long block_bytes;
-	unsigned int block_bits;
+	unsigned long uninitialized_var(block_bytes);
+	unsigned int uninitialized_var(block_bits);
 
 	if (reg->hr_bdev)
 		return -EINVAL;
