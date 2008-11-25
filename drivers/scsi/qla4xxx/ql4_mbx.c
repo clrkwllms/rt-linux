@@ -867,7 +867,7 @@ int qla4xxx_send_tgts(struct scsi_qla_host *ha, char *ip, uint16_t port)
 {
 	struct dev_db_entry *fw_ddb_entry;
 	dma_addr_t fw_ddb_entry_dma;
-	uint32_t ddb_index;
+	uint32_t uninitialized_var(ddb_index);
 	int ret_val = QLA_SUCCESS;
 
 
