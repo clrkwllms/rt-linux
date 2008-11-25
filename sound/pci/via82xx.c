@@ -2428,7 +2428,7 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 				       const struct pci_device_id *pci_id)
 {
 	struct snd_card *card;
-	struct via82xx *chip;
+	struct via82xx *uninitialized_var(chip);
 	int chip_type = 0, card_type;
 	unsigned int i;
 	int err;
