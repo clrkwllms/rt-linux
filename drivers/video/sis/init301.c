@@ -6691,7 +6691,7 @@ SiS_SetGroup2(struct SiS_Private *SiS_Pr, unsigned short ModeNo, unsigned short 
   bool           newtvphase;
   const unsigned char *TimingPoint;
 #ifdef SIS315H
-  unsigned short resindex, CRT2Index;
+  unsigned short uninitialized_var(resindex), uninitialized_var(CRT2Index);
   const struct SiS_Part2PortTbl *CRT2Part2Ptr = NULL;
 
   if(SiS_Pr->SiS_VBInfo & SetCRT2ToLCDA) return;
