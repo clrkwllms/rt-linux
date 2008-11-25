@@ -933,7 +933,7 @@ static int parse_features(struct mirror_set *ms, unsigned argc, char **argv,
 static int mirror_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 {
 	int r;
-	unsigned int nr_mirrors, m, args_used;
+	unsigned int nr_mirrors, m, uninitialized_var(args_used);
 	struct mirror_set *ms;
 	struct dm_dirty_log *dl;
 
