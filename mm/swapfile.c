@@ -1481,7 +1481,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	int swap_header_version;
 	unsigned int nr_good_pages = 0;
 	int nr_extents = 0;
-	sector_t span;
+	sector_t uninitialized_var(span);
 	unsigned long maxpages = 1;
 	int swapfilesize;
 	unsigned short *swap_map = NULL;
