@@ -246,7 +246,7 @@ bsg_map_hdr(struct bsg_device *bd, struct sg_io_v4 *hdr, fmode_t has_write_perm)
 {
 	struct request_queue *q = bd->queue;
 	struct request *rq, *next_rq = NULL;
-	int ret, rw;
+	int ret, uninitialized_var(rw);
 	unsigned int dxfer_len;
 	void *dxferp = NULL;
 
