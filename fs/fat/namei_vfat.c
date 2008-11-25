@@ -595,12 +595,12 @@ static int vfat_build_slots(struct inode *dir, const unsigned char *name,
 	struct fat_mount_options *opts = &sbi->options;
 	struct msdos_dir_slot *ps;
 	struct msdos_dir_entry *de;
-	unsigned char cksum, lcase;
+	unsigned char cksum, uninitialized_var(lcase);
 	unsigned char msdos_name[MSDOS_NAME];
 	wchar_t *uname;
 	__le16 time, date;
 	u8 time_cs;
-	int err, ulen, usize, i;
+	int err, uninitialized_var(ulen), usize, i;
 	loff_t offset;
 
 	*nr_slots = 0;
