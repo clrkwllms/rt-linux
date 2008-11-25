@@ -1662,7 +1662,7 @@ int ocfs2_write_begin_nolock(struct address_space *mapping,
 {
 	int ret, credits = OCFS2_INODE_UPDATE_CREDITS;
 	unsigned int clusters_to_alloc, extents_to_split;
-	struct ocfs2_write_ctxt *wc;
+	struct ocfs2_write_ctxt *uninitialized_var(wc);
 	struct inode *inode = mapping->host;
 	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 	struct ocfs2_dinode *di;
