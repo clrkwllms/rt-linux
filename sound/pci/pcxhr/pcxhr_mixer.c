@@ -798,7 +798,7 @@ static int pcxhr_iec958_capture_byte(struct snd_pcxhr *chip, int aes_idx, unsign
 static int pcxhr_iec958_get(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_pcxhr *chip = snd_kcontrol_chip(kcontrol);
-	unsigned char aes_bits;
+	unsigned char uninitialized_var(aes_bits);
 	int i, err;
 
 	mutex_lock(&chip->mgr->mixer_mutex);
@@ -1056,3 +1056,4 @@ int pcxhr_create_mixer(struct pcxhr_mgr *mgr)
 
 	return 0;
 }
+
