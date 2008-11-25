@@ -96,4 +96,4 @@ static struct usb_device_id i1480_est_id_table[] = {
 	{ USB_DEVICE(0x8086, 0x0c3b), },
 	{ },
 };
-MODULE_DEVICE_TABLE(usb, i1480_est_id_table);
+MODULE_STATIC_DEVICE_TABLE(usb, i1480_est_id_table);
