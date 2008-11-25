@@ -42,20 +42,6 @@ struct ds1390 {
 	u8 txrx_buf[9];	/* cmd + 8 registers */
 };
 
-static void ds1390_set_reg(struct device *dev, unsigned char address,
-				unsigned char data)
-{
-	struct spi_device *spi = to_spi_device(dev);
-	struct ds1390 *chip = dev_get_drvdata(dev);
-
-	/* Set MSB to indicate write */
-	chip->txrx_buf[0] = address | 0x80;
-	chip->txrx_buf[1] = data;
-
-	/* do the i/o */
-	spi_write_then_read(spi, chip->txrx_buf, 2, NULL, 0);
-}
-
 static int ds1390_get_reg(struct device *dev, unsigned char address,
 				unsigned char *data)
 {
