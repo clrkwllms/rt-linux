@@ -1796,7 +1796,8 @@ int ipmi_request_settime(ipmi_user_t      user,
 			 int              retries,
 			 unsigned int     retry_time_ms)
 {
-	unsigned char saddr, lun;
+	unsigned char uninitialized_var(saddr),
+		      uninitialized_var(lun);
 	int           rv;
 
 	if (!user)
@@ -1828,7 +1829,8 @@ int ipmi_request_supply_msgs(ipmi_user_t          user,
 			     struct ipmi_recv_msg *supplied_recv,
 			     int                  priority)
 {
-	unsigned char saddr, lun;
+	unsigned char uninitialized_var(saddr),
+		      uninitialized_var(lun);
 	int           rv;
 
 	if (!user)
