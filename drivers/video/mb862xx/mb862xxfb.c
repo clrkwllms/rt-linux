@@ -85,6 +85,8 @@ static inline unsigned int chan_to_field(unsigned int chan,
 	return chan << bf->offset;
 }
 
+#if defined(CONFIG_FB_MB862XX_PCI_GDC) || defined(CONFIG_FB_MB862XX_LIME)
+
 static int mb862xxfb_setcolreg(unsigned regno,
 			       unsigned red, unsigned green, unsigned blue,
 			       unsigned transp, struct fb_info *info)
@@ -457,6 +459,8 @@ static ssize_t mb862xxfb_show_dispregs(struct device *dev,
 }
 
 static DEVICE_ATTR(dispregs, 0444, mb862xxfb_show_dispregs, NULL);
+
+#endif
 
 irqreturn_t mb862xx_intr(int irq, void *dev_id)
 {
