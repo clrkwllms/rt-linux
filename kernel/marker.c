@@ -430,7 +430,7 @@ static int remove_marker(const char *name)
 {
 	struct hlist_head *head;
 	struct hlist_node *node;
-	struct marker_entry *e;
+	struct marker_entry *uninitialized_var(e);
 	int found = 0;
 	size_t len = strlen(name) + 1;
 	u32 hash = jhash(name, len-1, 0);
