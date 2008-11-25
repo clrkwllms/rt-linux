@@ -23,6 +23,7 @@
 #include <linux/bootmem.h>
 #include <linux/compiler.h>
 #include <linux/kernel.h>
+#include <linux/kmemcheck.h>
 #include <linux/module.h>
 #include <linux/suspend.h>
 #include <linux/pagevec.h>
@@ -549,6 +550,8 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	int i;
 	int bad = 0;
 
+	kmemcheck_free_shadow(page, order);
+
 	for (i = 0 ; i < (1 << order) ; ++i)
 		bad += free_pages_check(page + i);
 	if (bad)
@@ -999,6 +1002,8 @@ static void free_hot_cold_page(struct page *page, int cold)
 	struct zone *zone = page_zone(page);
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
+
+	kmemcheck_free_shadow(page, 0);
 
 	if (PageAnon(page))
 		page->mapping = NULL;
@@ -1667,7 +1672,10 @@ nopage:
 		dump_stack();
 		show_mem();
 	}
+	return page;
 got_pg:
+	if (kmemcheck_enabled)
+		kmemcheck_pagealloc_alloc(page, order, gfp_mask);
 	return page;
 }
 EXPORT_SYMBOL(__alloc_pages_internal);
