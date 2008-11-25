@@ -237,14 +237,14 @@ static int omfs_get_block(struct inode *inode, sector_t block,
 	struct buffer_head *bh;
 	sector_t next, offset;
 	int ret;
-	u64 new_block;
+	u64 uninitialized_var(new_block);
 	u32 max_extents;
 	int extent_count;
 	struct omfs_extent *oe;
 	struct omfs_extent_entry *entry;
 	struct omfs_sb_info *sbi = OMFS_SB(inode->i_sb);
 	int max_blocks = bh_result->b_size >> inode->i_blkbits;
-	int remain;
+	int uninitialized_var(remain);
 
 	ret = -EIO;
 	bh = sb_bread(inode->i_sb, clus_to_blk(sbi, inode->i_ino));
