@@ -319,7 +319,7 @@ acpi_ex_prep_common_field_object(union acpi_operand_object *obj_desc,
 				 u32 field_bit_position, u32 field_bit_length)
 {
 	u32 access_bit_width;
-	u32 byte_alignment;
+	u32 uninitialized_var(byte_alignment);
 	u32 nearest_byte_address;
 
 	ACPI_FUNCTION_TRACE(ex_prep_common_field_object);
