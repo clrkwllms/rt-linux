@@ -1050,7 +1050,7 @@ retry:
 asmlinkage long sys_epoll_create1(int flags)
 {
 	int error, fd = -1;
-	struct eventpoll *ep;
+	struct eventpoll *uninitialized_var(ep);
 
 	/* Check the EPOLL_* constant for consistency.  */
 	BUILD_BUG_ON(EPOLL_CLOEXEC != O_CLOEXEC);
