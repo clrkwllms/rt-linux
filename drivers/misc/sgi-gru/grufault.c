@@ -278,8 +278,8 @@ static int gru_try_dropin(struct gru_thread_state *gts,
 {
 	struct mm_struct *mm = gts->ts_mm;
 	struct vm_area_struct *vma;
-	int pageshift, asid, write, ret;
-	unsigned long paddr, gpa, vaddr;
+	int uninitialized_var(pageshift), asid, write, ret;
+	unsigned long uninitialized_var(paddr), gpa, vaddr;
 
 	/*
 	 * NOTE: The GRU contains magic hardware that eliminates races between
