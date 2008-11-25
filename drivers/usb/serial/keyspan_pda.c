@@ -456,7 +456,7 @@ static int keyspan_pda_tiocmget(struct tty_struct *tty, struct file *file)
 	struct usb_serial_port *port = tty->driver_data;
 	struct usb_serial *serial = port->serial;
 	int rc;
-	unsigned char status;
+	unsigned char uninitialized_var(status);
 	int value;
 
 	rc = keyspan_pda_get_modem_info(serial, &status);
@@ -478,7 +478,7 @@ static int keyspan_pda_tiocmset(struct tty_struct *tty, struct file *file,
 	struct usb_serial_port *port = tty->driver_data;
 	struct usb_serial *serial = port->serial;
 	int rc;
-	unsigned char status;
+	unsigned char uninitialized_var(status);
 
 	rc = keyspan_pda_get_modem_info(serial, &status);
 	if (rc < 0)
@@ -726,7 +726,7 @@ static int keyspan_pda_fake_startup(struct usb_serial *serial)
 	int response;
 	const char *fw_name;
 	const struct ihex_binrec *record;
-	const struct firmware *fw;
+	const struct firmware *uninitialized_var(fw);
 
 	/* download the firmware here ... */
 	response = ezusb_set_reset(serial, 1);
