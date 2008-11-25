@@ -117,7 +117,7 @@ mraid_mm_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 	int		rval;
 	mraid_mmadp_t	*adp;
 	uint8_t		old_ioctl;
-	int		drvrcmd_rval;
+	int		uninitialized_var(drvrcmd_rval);
 	void __user *argp = (void __user *)arg;
 
 	/*
