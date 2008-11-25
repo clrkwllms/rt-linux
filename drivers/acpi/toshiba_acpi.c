@@ -729,8 +729,8 @@ static int __init toshiba_acpi_init(void)
 {
 	acpi_status status = AE_OK;
 	u32 hci_result;
-	bool bt_present;
-	bool bt_on;
+	bool uninitialized_var(bt_present);
+	bool uninitialized_var(bt_on);
 	bool radio_on;
 	int ret = 0;
 
