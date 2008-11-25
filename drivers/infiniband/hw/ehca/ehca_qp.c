@@ -465,9 +465,9 @@ static struct ehca_qp *internal_create_qp(
 	u32 swqe_size = 0, rwqe_size = 0, ib_qp_num;
 	unsigned long flags;
 
-	if (!atomic_add_unless(&shca->num_qps, 1, ehca_max_qp)) {
+	if (!atomic_add_unless(&shca->num_qps, 1, shca->max_num_qps)) {
 		ehca_err(pd->device, "Unable to create QP, max number of %i "
-			 "QPs reached.", ehca_max_qp);
+			 "QPs reached.", shca->max_num_qps);
 		ehca_err(pd->device, "To increase the maximum number of QPs "
 			 "use the number_of_qps module parameter.\n");
 		return ERR_PTR(-ENOSPC);
@@ -501,6 +501,12 @@ static struct ehca_qp *internal_create_qp(
 	/* handle SRQ base QPs */
 	if (init_attr->srq) {
 		my_srq = container_of(init_attr->srq, struct ehca_qp, ib_srq);
+
+		if (qp_type == IB_QPT_UC) {
+			ehca_err(pd->device, "UC with SRQ not supported");
+			atomic_dec(&shca->num_qps);
+			return ERR_PTR(-EINVAL);
+		}
 
 		has_srq = 1;
 		parms.ext_type = EQPT_SRQBASE;
@@ -854,6 +860,11 @@ static struct ehca_qp *internal_create_qp(
 	if (qp_type == IB_QPT_GSI) {
 		h_ret = ehca_define_sqp(shca, my_qp, init_attr);
 		if (h_ret != H_SUCCESS) {
+			kfree(my_qp->mod_qp_parm);
+			my_qp->mod_qp_parm = NULL;
+			/* the QP pointer is no longer valid */
+			shca->sport[init_attr->port_num - 1].ibqp_sqp[qp_type] =
+				NULL;
 			ret = ehca2ib_return_code(h_ret);
 			goto create_qp_exit6;
 		}

@@ -728,6 +728,7 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 		if (ha->isp_ops->abort_command(ha, sp)) {
 			DEBUG2(printk("%s(%ld): abort_command "
 			    "mbx failed.\n", __func__, ha->host_no));
+			ret = FAILED;
 		} else {
 			DEBUG3(printk("%s(%ld): abort_command "
 			    "mbx success.\n", __func__, ha->host_no));
@@ -1566,9 +1567,8 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 			goto probe_out;
 	}
 
-	if (pci_find_aer_capability(pdev))
-		if (pci_enable_pcie_error_reporting(pdev))
-			goto probe_out;
+	/* This may fail but that's ok */
+	pci_enable_pcie_error_reporting(pdev);
 
 	host = scsi_host_alloc(sht, sizeof(scsi_qla_host_t));
 	if (host == NULL) {

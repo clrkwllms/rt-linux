@@ -488,12 +488,13 @@ int cifs_close(struct inode *inode, struct file *file)
 	pTcon = cifs_sb->tcon;
 	if (pSMBFile) {
 		struct cifsLockInfo *li, *tmp;
-
+		write_lock(&GlobalSMBSeslock);
 		pSMBFile->closePend = true;
 		if (pTcon) {
 			/* no sense reconnecting to close a file that is
 			   already closed */
-			if (pTcon->tidStatus != CifsNeedReconnect) {
+			if (!pTcon->need_reconnect) {
+				write_unlock(&GlobalSMBSeslock);
 				timeout = 2;
 				while ((atomic_read(&pSMBFile->wrtPending) != 0)
 					&& (timeout <= 2048)) {
@@ -510,12 +511,15 @@ int cifs_close(struct inode *inode, struct file *file)
 					timeout *= 4;
 				}
 				if (atomic_read(&pSMBFile->wrtPending))
-					cERROR(1,
-						("close with pending writes"));
-				rc = CIFSSMBClose(xid, pTcon,
+					cERROR(1, ("close with pending write"));
+				if (!pTcon->need_reconnect &&
+				    !pSMBFile->invalidHandle)
+					rc = CIFSSMBClose(xid, pTcon,
 						  pSMBFile->netfid);
-			}
-		}
+			} else
+				write_unlock(&GlobalSMBSeslock);
+		} else
+			write_unlock(&GlobalSMBSeslock);
 
 		/* Delete any outstanding lock records.
 		   We'll lose them when the file is closed anyway. */
@@ -587,15 +591,18 @@ int cifs_closedir(struct inode *inode, struct file *file)
 		pTcon = cifs_sb->tcon;
 
 		cFYI(1, ("Freeing private data in close dir"));
+		write_lock(&GlobalSMBSeslock);
 		if (!pCFileStruct->srch_inf.endOfSearch &&
 		    !pCFileStruct->invalidHandle) {
 			pCFileStruct->invalidHandle = true;
+			write_unlock(&GlobalSMBSeslock);
 			rc = CIFSFindClose(xid, pTcon, pCFileStruct->netfid);
 			cFYI(1, ("Closing uncompleted readdir with rc %d",
 				 rc));
 			/* not much we can do if it fails anyway, ignore rc */
 			rc = 0;
-		}
+		} else
+			write_unlock(&GlobalSMBSeslock);
 		ptmp = pCFileStruct->srch_inf.ntwrk_buf_start;
 		if (ptmp) {
 			cFYI(1, ("closedir free smb buf in srch struct"));
@@ -1404,7 +1411,10 @@ retry:
 			if ((wbc->nr_to_write -= n_iov) <= 0)
 				done = 1;
 			index = next;
-		}
+		} else
+			/* Need to re-find the pages we skipped */
+			index = pvec.pages[0]->index + 1;
+
 		pagevec_release(&pvec);
 	}
 	if (!scanned && !done) {
@@ -1791,7 +1801,7 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 		SetPageUptodate(page);
 		unlock_page(page);
 		if (!pagevec_add(plru_pvec, page))
-			__pagevec_lru_add(plru_pvec);
+			__pagevec_lru_add_file(plru_pvec);
 		data += PAGE_CACHE_SIZE;
 	}
 	return;
@@ -1824,7 +1834,7 @@ static int cifs_readpages(struct file *file, struct address_space *mapping,
 	pTcon = cifs_sb->tcon;
 
 	pagevec_init(&lru_pvec, 0);
-		cFYI(DBG2, ("rpages: num pages %d", num_pages));
+	cFYI(DBG2, ("rpages: num pages %d", num_pages));
 	for (i = 0; i < num_pages; ) {
 		unsigned contig_pages;
 		struct page *tmp_page;
@@ -1925,7 +1935,7 @@ static int cifs_readpages(struct file *file, struct address_space *mapping,
 		bytes_read = 0;
 	}
 
-	pagevec_lru_add(&lru_pvec);
+	pagevec_lru_add_file(&lru_pvec);
 
 /* need to free smb_read_data buf before exit */
 	if (smb_read_data) {

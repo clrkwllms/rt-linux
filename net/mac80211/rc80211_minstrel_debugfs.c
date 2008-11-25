@@ -94,8 +94,8 @@ minstrel_stats_open(struct inode *inode, struct file *file)
 				prob / 10, prob % 10,
 				mr->last_success,
 				mr->last_attempts,
-				mr->succ_hist,
-				mr->att_hist);
+				(unsigned long long)mr->succ_hist,
+				(unsigned long long)mr->att_hist);
 	}
 	p += sprintf(p, "\nTotal packet count::    ideal %d      "
 			"lookaround %d\n\n",

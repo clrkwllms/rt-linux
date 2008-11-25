@@ -60,43 +60,6 @@ i915_disable_irq(drm_i915_private_t *dev_priv, u32 mask)
 }
 
 /**
- * i915_get_pipe - return the the pipe associated with a given plane
- * @dev: DRM device
- * @plane: plane to look for
- *
- * The Intel Mesa & 2D drivers call the vblank routines with a plane number
- * rather than a pipe number, since they may not always be equal.  This routine
- * maps the given @plane back to a pipe number.
- */
-static int
-i915_get_pipe(struct drm_device *dev, int plane)
-{
-	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	u32 dspcntr;
-
-	dspcntr = plane ? I915_READ(DSPBCNTR) : I915_READ(DSPACNTR);
-
-	return dspcntr & DISPPLANE_SEL_PIPE_MASK ? 1 : 0;
-}
-
-/**
- * i915_get_plane - return the the plane associated with a given pipe
- * @dev: DRM device
- * @pipe: pipe to look for
- *
- * The Intel Mesa & 2D drivers call the vblank routines with a plane number
- * rather than a plane number, since they may not always be equal.  This routine
- * maps the given @pipe back to a plane number.
- */
-static int
-i915_get_plane(struct drm_device *dev, int pipe)
-{
-	if (i915_get_pipe(dev, 0) == pipe)
-		return 0;
-	return 1;
-}
-
-/**
  * i915_pipe_enabled - check if a pipe is enabled
  * @dev: DRM device
  * @pipe: pipe to check
@@ -117,211 +80,16 @@ i915_pipe_enabled(struct drm_device *dev, int pipe)
 	return 0;
 }
 
-/**
- * Emit blits for scheduled buffer swaps.
- *
- * This function will be called with the HW lock held.
+/* Called from drm generic code, passed a 'crtc', which
+ * we use as a pipe index
  */
-static void i915_vblank_tasklet(struct drm_device *dev)
-{
-	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	unsigned long irqflags;
-	struct list_head *list, *tmp, hits, *hit;
-	int nhits, nrects, slice[2], upper[2], lower[2], i;
-	unsigned counter[2];
-	struct drm_drawable_info *drw;
-	drm_i915_sarea_t *sarea_priv = dev_priv->sarea_priv;
-	u32 cpp = dev_priv->cpp;
-	u32 cmd = (cpp == 4) ? (XY_SRC_COPY_BLT_CMD |
-				XY_SRC_COPY_BLT_WRITE_ALPHA |
-				XY_SRC_COPY_BLT_WRITE_RGB)
-			     : XY_SRC_COPY_BLT_CMD;
-	u32 src_pitch = sarea_priv->pitch * cpp;
-	u32 dst_pitch = sarea_priv->pitch * cpp;
-	u32 ropcpp = (0xcc << 16) | ((cpp - 1) << 24);
-	RING_LOCALS;
-
-	if (IS_I965G(dev) && sarea_priv->front_tiled) {
-		cmd |= XY_SRC_COPY_BLT_DST_TILED;
-		dst_pitch >>= 2;
-	}
-	if (IS_I965G(dev) && sarea_priv->back_tiled) {
-		cmd |= XY_SRC_COPY_BLT_SRC_TILED;
-		src_pitch >>= 2;
-	}
-
-	counter[0] = drm_vblank_count(dev, 0);
-	counter[1] = drm_vblank_count(dev, 1);
-
-	DRM_DEBUG("\n");
-
-	INIT_LIST_HEAD(&hits);
-
-	nhits = nrects = 0;
-
-	spin_lock_irqsave(&dev_priv->swaps_lock, irqflags);
-
-	/* Find buffer swaps scheduled for this vertical blank */
-	list_for_each_safe(list, tmp, &dev_priv->vbl_swaps.head) {
-		drm_i915_vbl_swap_t *vbl_swap =
-			list_entry(list, drm_i915_vbl_swap_t, head);
-		int pipe = i915_get_pipe(dev, vbl_swap->plane);
-
-		if ((counter[pipe] - vbl_swap->sequence) > (1<<23))
-			continue;
-
-		list_del(list);
-		dev_priv->swaps_pending--;
-		drm_vblank_put(dev, pipe);
-
-		spin_unlock(&dev_priv->swaps_lock);
-		spin_lock(&dev->drw_lock);
-
-		drw = drm_get_drawable_info(dev, vbl_swap->drw_id);
-
-		if (!drw) {
-			spin_unlock(&dev->drw_lock);
-			drm_free(vbl_swap, sizeof(*vbl_swap), DRM_MEM_DRIVER);
-			spin_lock(&dev_priv->swaps_lock);
-			continue;
-		}
-
-		list_for_each(hit, &hits) {
-			drm_i915_vbl_swap_t *swap_cmp =
-				list_entry(hit, drm_i915_vbl_swap_t, head);
-			struct drm_drawable_info *drw_cmp =
-				drm_get_drawable_info(dev, swap_cmp->drw_id);
-
-			if (drw_cmp &&
-			    drw_cmp->rects[0].y1 > drw->rects[0].y1) {
-				list_add_tail(list, hit);
-				break;
-			}
-		}
-
-		spin_unlock(&dev->drw_lock);
-
-		/* List of hits was empty, or we reached the end of it */
-		if (hit == &hits)
-			list_add_tail(list, hits.prev);
-
-		nhits++;
-
-		spin_lock(&dev_priv->swaps_lock);
-	}
-
-	if (nhits == 0) {
-		spin_unlock_irqrestore(&dev_priv->swaps_lock, irqflags);
-		return;
-	}
-
-	spin_unlock(&dev_priv->swaps_lock);
-
-	i915_kernel_lost_context(dev);
-
-	if (IS_I965G(dev)) {
-		BEGIN_LP_RING(4);
-
-		OUT_RING(GFX_OP_DRAWRECT_INFO_I965);
-		OUT_RING(0);
-		OUT_RING(((sarea_priv->width - 1) & 0xffff) | ((sarea_priv->height - 1) << 16));
-		OUT_RING(0);
-		ADVANCE_LP_RING();
-	} else {
-		BEGIN_LP_RING(6);
-
-		OUT_RING(GFX_OP_DRAWRECT_INFO);
-		OUT_RING(0);
-		OUT_RING(0);
-		OUT_RING(sarea_priv->width | sarea_priv->height << 16);
-		OUT_RING(sarea_priv->width | sarea_priv->height << 16);
-		OUT_RING(0);
-
-		ADVANCE_LP_RING();
-	}
-
-	sarea_priv->ctxOwner = DRM_KERNEL_CONTEXT;
-
-	upper[0] = upper[1] = 0;
-	slice[0] = max(sarea_priv->pipeA_h / nhits, 1);
-	slice[1] = max(sarea_priv->pipeB_h / nhits, 1);
-	lower[0] = sarea_priv->pipeA_y + slice[0];
-	lower[1] = sarea_priv->pipeB_y + slice[0];
-
-	spin_lock(&dev->drw_lock);
-
-	/* Emit blits for buffer swaps, partitioning both outputs into as many
-	 * slices as there are buffer swaps scheduled in order to avoid tearing
-	 * (based on the assumption that a single buffer swap would always
-	 * complete before scanout starts).
-	 */
-	for (i = 0; i++ < nhits;
-	     upper[0] = lower[0], lower[0] += slice[0],
-	     upper[1] = lower[1], lower[1] += slice[1]) {
-		if (i == nhits)
-			lower[0] = lower[1] = sarea_priv->height;
-
-		list_for_each(hit, &hits) {
-			drm_i915_vbl_swap_t *swap_hit =
-				list_entry(hit, drm_i915_vbl_swap_t, head);
-			struct drm_clip_rect *rect;
-			int num_rects, plane;
-			unsigned short top, bottom;
-
-			drw = drm_get_drawable_info(dev, swap_hit->drw_id);
-
-			if (!drw)
-				continue;
-
-			rect = drw->rects;
-			plane = swap_hit->plane;
-			top = upper[plane];
-			bottom = lower[plane];
-
-			for (num_rects = drw->num_rects; num_rects--; rect++) {
-				int y1 = max(rect->y1, top);
-				int y2 = min(rect->y2, bottom);
-
-				if (y1 >= y2)
-					continue;
-
-				BEGIN_LP_RING(8);
-
-				OUT_RING(cmd);
-				OUT_RING(ropcpp | dst_pitch);
-				OUT_RING((y1 << 16) | rect->x1);
-				OUT_RING((y2 << 16) | rect->x2);
-				OUT_RING(sarea_priv->front_offset);
-				OUT_RING((y1 << 16) | rect->x1);
-				OUT_RING(src_pitch);
-				OUT_RING(sarea_priv->back_offset);
-
-				ADVANCE_LP_RING();
-			}
-		}
-	}
-
-	spin_unlock_irqrestore(&dev->drw_lock, irqflags);
-
-	list_for_each_safe(hit, tmp, &hits) {
-		drm_i915_vbl_swap_t *swap_hit =
-			list_entry(hit, drm_i915_vbl_swap_t, head);
-
-		list_del(hit);
-
-		drm_free(swap_hit, sizeof(*swap_hit), DRM_MEM_DRIVER);
-	}
-}
-
-u32 i915_get_vblank_counter(struct drm_device *dev, int plane)
+u32 i915_get_vblank_counter(struct drm_device *dev, int pipe)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	unsigned long high_frame;
 	unsigned long low_frame;
 	u32 high1, high2, low, count;
-	int pipe;
 
-	pipe = i915_get_pipe(dev, plane);
 	high_frame = pipe ? PIPEBFRAMEHIGH : PIPEAFRAMEHIGH;
 	low_frame = pipe ? PIPEBFRAMEPIXEL : PIPEAFRAMEPIXEL;
 
@@ -347,21 +115,6 @@ u32 i915_get_vblank_counter(struct drm_device *dev, int plane)
 	count = (high1 << 8) | low;
 
 	return count;
-}
-
-void
-i915_gem_vblank_work_handler(struct work_struct *work)
-{
-	drm_i915_private_t *dev_priv;
-	struct drm_device *dev;
-
-	dev_priv = container_of(work, drm_i915_private_t,
-				mm.vblank_work);
-	dev = dev_priv->dev;
-
-	mutex_lock(&dev->struct_mutex);
-	i915_vblank_tasklet(dev);
-	mutex_unlock(&dev->struct_mutex);
 }
 
 irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
@@ -398,7 +151,7 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 		else if (pipea_stats & (PIPE_START_VBLANK_INTERRUPT_STATUS|
 					PIPE_VBLANK_INTERRUPT_STATUS)) {
 			vblank++;
-			drm_handle_vblank(dev, i915_get_plane(dev, 0));
+			drm_handle_vblank(dev, 0);
 		}
 
 		I915_WRITE(PIPEASTAT, pipea_stats);
@@ -416,7 +169,7 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 		else if (pipeb_stats & (PIPE_START_VBLANK_INTERRUPT_STATUS|
 					PIPE_VBLANK_INTERRUPT_STATUS)) {
 			vblank++;
-			drm_handle_vblank(dev, i915_get_plane(dev, 1));
+			drm_handle_vblank(dev, 1);
 		}
 
 		if (pipeb_stats & I915_LEGACY_BLC_EVENT_STATUS)
@@ -441,13 +194,6 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 	if (iir & I915_ASLE_INTERRUPT)
 		opregion_asle_intr(dev);
 
-	if (vblank && dev_priv->swaps_pending > 0) {
-		if (dev_priv->ring.ring_obj == NULL)
-			drm_locked_tasklet(dev, i915_vblank_tasklet);
-		else
-			schedule_work(&dev_priv->mm.vblank_work);
-	}
-
 	return IRQ_HANDLED;
 }
 
@@ -466,12 +212,10 @@ static int i915_emit_irq(struct drm_device * dev)
 	if (dev_priv->sarea_priv)
 		dev_priv->sarea_priv->last_enqueue = dev_priv->counter;
 
-	BEGIN_LP_RING(6);
+	BEGIN_LP_RING(4);
 	OUT_RING(MI_STORE_DWORD_INDEX);
-	OUT_RING(5 << MI_STORE_DWORD_INDEX_SHIFT);
+	OUT_RING(I915_BREADCRUMB_INDEX << MI_STORE_DWORD_INDEX_SHIFT);
 	OUT_RING(dev_priv->counter);
-	OUT_RING(0);
-	OUT_RING(0);
 	OUT_RING(MI_USER_INTERRUPT);
 	ADVANCE_LP_RING();
 
@@ -481,22 +225,24 @@ static int i915_emit_irq(struct drm_device * dev)
 void i915_user_irq_get(struct drm_device *dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+	unsigned long irqflags;
 
-	spin_lock(&dev_priv->user_irq_lock);
+	spin_lock_irqsave(&dev_priv->user_irq_lock, irqflags);
 	if (dev->irq_enabled && (++dev_priv->user_irq_refcount == 1))
 		i915_enable_irq(dev_priv, I915_USER_INTERRUPT);
-	spin_unlock(&dev_priv->user_irq_lock);
+	spin_unlock_irqrestore(&dev_priv->user_irq_lock, irqflags);
 }
 
 void i915_user_irq_put(struct drm_device *dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+	unsigned long irqflags;
 
-	spin_lock(&dev_priv->user_irq_lock);
+	spin_lock_irqsave(&dev_priv->user_irq_lock, irqflags);
 	BUG_ON(dev->irq_enabled && dev_priv->user_irq_refcount <= 0);
 	if (dev->irq_enabled && (--dev_priv->user_irq_refcount == 0))
 		i915_disable_irq(dev_priv, I915_USER_INTERRUPT);
-	spin_unlock(&dev_priv->user_irq_lock);
+	spin_unlock_irqrestore(&dev_priv->user_irq_lock, irqflags);
 }
 
 static int i915_wait_irq(struct drm_device * dev, int irq_nr)
@@ -578,74 +324,95 @@ int i915_irq_wait(struct drm_device *dev, void *data,
 	return i915_wait_irq(dev, irqwait->irq_seq);
 }
 
-int i915_enable_vblank(struct drm_device *dev, int plane)
+/* Called from drm generic code, passed 'crtc' which
+ * we use as a pipe index
+ */
+int i915_enable_vblank(struct drm_device *dev, int pipe)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	int pipe = i915_get_pipe(dev, plane);
 	u32	pipestat_reg = 0;
 	u32	pipestat;
+	u32	interrupt = 0;
+	unsigned long irqflags;
 
 	switch (pipe) {
 	case 0:
 		pipestat_reg = PIPEASTAT;
-		i915_enable_irq(dev_priv, I915_DISPLAY_PIPE_A_EVENT_INTERRUPT);
+		interrupt = I915_DISPLAY_PIPE_A_EVENT_INTERRUPT;
 		break;
 	case 1:
 		pipestat_reg = PIPEBSTAT;
-		i915_enable_irq(dev_priv, I915_DISPLAY_PIPE_B_EVENT_INTERRUPT);
+		interrupt = I915_DISPLAY_PIPE_B_EVENT_INTERRUPT;
 		break;
 	default:
 		DRM_ERROR("tried to enable vblank on non-existent pipe %d\n",
 			  pipe);
-		break;
+		return 0;
 	}
 
-	if (pipestat_reg) {
-		pipestat = I915_READ(pipestat_reg);
-		if (IS_I965G(dev))
-			pipestat |= PIPE_START_VBLANK_INTERRUPT_ENABLE;
-		else
-			pipestat |= PIPE_VBLANK_INTERRUPT_ENABLE;
-		/* Clear any stale interrupt status */
-		pipestat |= (PIPE_START_VBLANK_INTERRUPT_STATUS |
-			     PIPE_VBLANK_INTERRUPT_STATUS);
-		I915_WRITE(pipestat_reg, pipestat);
-	}
+	spin_lock_irqsave(&dev_priv->user_irq_lock, irqflags);
+	/* Enabling vblank events in IMR comes before PIPESTAT write, or
+	 * there's a race where the PIPESTAT vblank bit gets set to 1, so
+	 * the OR of enabled PIPESTAT bits goes to 1, so the PIPExEVENT in
+	 * ISR flashes to 1, but the IIR bit doesn't get set to 1 because
+	 * IMR masks it.  It doesn't ever get set after we clear the masking
+	 * in IMR because the ISR bit is edge, not level-triggered, on the
+	 * OR of PIPESTAT bits.
+	 */
+	i915_enable_irq(dev_priv, interrupt);
+	pipestat = I915_READ(pipestat_reg);
+	if (IS_I965G(dev))
+		pipestat |= PIPE_START_VBLANK_INTERRUPT_ENABLE;
+	else
+		pipestat |= PIPE_VBLANK_INTERRUPT_ENABLE;
+	/* Clear any stale interrupt status */
+	pipestat |= (PIPE_START_VBLANK_INTERRUPT_STATUS |
+		     PIPE_VBLANK_INTERRUPT_STATUS);
+	I915_WRITE(pipestat_reg, pipestat);
+	(void) I915_READ(pipestat_reg);	/* Posting read */
+	spin_unlock_irqrestore(&dev_priv->user_irq_lock, irqflags);
 
 	return 0;
 }
 
-void i915_disable_vblank(struct drm_device *dev, int plane)
+/* Called from drm generic code, passed 'crtc' which
+ * we use as a pipe index
+ */
+void i915_disable_vblank(struct drm_device *dev, int pipe)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	int pipe = i915_get_pipe(dev, plane);
 	u32	pipestat_reg = 0;
 	u32	pipestat;
+	u32	interrupt = 0;
+	unsigned long irqflags;
 
 	switch (pipe) {
 	case 0:
 		pipestat_reg = PIPEASTAT;
-		i915_disable_irq(dev_priv, I915_DISPLAY_PIPE_A_EVENT_INTERRUPT);
+		interrupt = I915_DISPLAY_PIPE_A_EVENT_INTERRUPT;
 		break;
 	case 1:
 		pipestat_reg = PIPEBSTAT;
-		i915_disable_irq(dev_priv, I915_DISPLAY_PIPE_B_EVENT_INTERRUPT);
+		interrupt = I915_DISPLAY_PIPE_B_EVENT_INTERRUPT;
 		break;
 	default:
 		DRM_ERROR("tried to disable vblank on non-existent pipe %d\n",
 			  pipe);
+		return;
 		break;
 	}
 
-	if (pipestat_reg) {
-		pipestat = I915_READ(pipestat_reg);
-		pipestat &= ~(PIPE_START_VBLANK_INTERRUPT_ENABLE |
-			      PIPE_VBLANK_INTERRUPT_ENABLE);
-		/* Clear any stale interrupt status */
-		pipestat |= (PIPE_START_VBLANK_INTERRUPT_STATUS |
-			     PIPE_VBLANK_INTERRUPT_STATUS);
-		I915_WRITE(pipestat_reg, pipestat);
-	}
+	spin_lock_irqsave(&dev_priv->user_irq_lock, irqflags);
+	i915_disable_irq(dev_priv, interrupt);
+	pipestat = I915_READ(pipestat_reg);
+	pipestat &= ~(PIPE_START_VBLANK_INTERRUPT_ENABLE |
+		      PIPE_VBLANK_INTERRUPT_ENABLE);
+	/* Clear any stale interrupt status */
+	pipestat |= (PIPE_START_VBLANK_INTERRUPT_STATUS |
+		     PIPE_VBLANK_INTERRUPT_STATUS);
+	I915_WRITE(pipestat_reg, pipestat);
+	(void) I915_READ(pipestat_reg);	/* Posting read */
+	spin_unlock_irqrestore(&dev_priv->user_irq_lock, irqflags);
 }
 
 /* Set the vblank monitor pipe
@@ -685,116 +452,21 @@ int i915_vblank_pipe_get(struct drm_device *dev, void *data,
 int i915_vblank_swap(struct drm_device *dev, void *data,
 		     struct drm_file *file_priv)
 {
-	drm_i915_private_t *dev_priv = dev->dev_private;
-	drm_i915_vblank_swap_t *swap = data;
-	drm_i915_vbl_swap_t *vbl_swap;
-	unsigned int pipe, seqtype, curseq, plane;
-	unsigned long irqflags;
-	struct list_head *list;
-	int ret;
-
-	if (!dev_priv || !dev_priv->sarea_priv) {
-		DRM_ERROR("%s called with no initialization\n", __func__);
-		return -EINVAL;
-	}
-
-	if (dev_priv->sarea_priv->rotation) {
-		DRM_DEBUG("Rotation not supported\n");
-		return -EINVAL;
-	}
-
-	if (swap->seqtype & ~(_DRM_VBLANK_RELATIVE | _DRM_VBLANK_ABSOLUTE |
-			     _DRM_VBLANK_SECONDARY | _DRM_VBLANK_NEXTONMISS)) {
-		DRM_ERROR("Invalid sequence type 0x%x\n", swap->seqtype);
-		return -EINVAL;
-	}
-
-	plane = (swap->seqtype & _DRM_VBLANK_SECONDARY) ? 1 : 0;
-	pipe = i915_get_pipe(dev, plane);
-
-	seqtype = swap->seqtype & (_DRM_VBLANK_RELATIVE | _DRM_VBLANK_ABSOLUTE);
-
-	if (!(dev_priv->vblank_pipe & (1 << pipe))) {
-		DRM_ERROR("Invalid pipe %d\n", pipe);
-		return -EINVAL;
-	}
-
-	spin_lock_irqsave(&dev->drw_lock, irqflags);
-
-	if (!drm_get_drawable_info(dev, swap->drawable)) {
-		spin_unlock_irqrestore(&dev->drw_lock, irqflags);
-		DRM_DEBUG("Invalid drawable ID %d\n", swap->drawable);
-		return -EINVAL;
-	}
-
-	spin_unlock_irqrestore(&dev->drw_lock, irqflags);
-
-	/*
-	 * We take the ref here and put it when the swap actually completes
-	 * in the tasklet.
+	/* The delayed swap mechanism was fundamentally racy, and has been
+	 * removed.  The model was that the client requested a delayed flip/swap
+	 * from the kernel, then waited for vblank before continuing to perform
+	 * rendering.  The problem was that the kernel might wake the client
+	 * up before it dispatched the vblank swap (since the lock has to be
+	 * held while touching the ringbuffer), in which case the client would
+	 * clear and start the next frame before the swap occurred, and
+	 * flicker would occur in addition to likely missing the vblank.
+	 *
+	 * In the absence of this ioctl, userland falls back to a correct path
+	 * of waiting for a vblank, then dispatching the swap on its own.
+	 * Context switching to userland and back is plenty fast enough for
+	 * meeting the requirements of vblank swapping.
 	 */
-	ret = drm_vblank_get(dev, pipe);
-	if (ret)
-		return ret;
-	curseq = drm_vblank_count(dev, pipe);
-
-	if (seqtype == _DRM_VBLANK_RELATIVE)
-		swap->sequence += curseq;
-
-	if ((curseq - swap->sequence) <= (1<<23)) {
-		if (swap->seqtype & _DRM_VBLANK_NEXTONMISS) {
-			swap->sequence = curseq + 1;
-		} else {
-			DRM_DEBUG("Missed target sequence\n");
-			drm_vblank_put(dev, pipe);
-			return -EINVAL;
-		}
-	}
-
-	spin_lock_irqsave(&dev_priv->swaps_lock, irqflags);
-
-	list_for_each(list, &dev_priv->vbl_swaps.head) {
-		vbl_swap = list_entry(list, drm_i915_vbl_swap_t, head);
-
-		if (vbl_swap->drw_id == swap->drawable &&
-		    vbl_swap->plane == plane &&
-		    vbl_swap->sequence == swap->sequence) {
-			spin_unlock_irqrestore(&dev_priv->swaps_lock, irqflags);
-			DRM_DEBUG("Already scheduled\n");
-			return 0;
-		}
-	}
-
-	spin_unlock_irqrestore(&dev_priv->swaps_lock, irqflags);
-
-	if (dev_priv->swaps_pending >= 100) {
-		DRM_DEBUG("Too many swaps queued\n");
-		drm_vblank_put(dev, pipe);
-		return -EBUSY;
-	}
-
-	vbl_swap = drm_calloc(1, sizeof(*vbl_swap), DRM_MEM_DRIVER);
-
-	if (!vbl_swap) {
-		DRM_ERROR("Failed to allocate memory to queue swap\n");
-		drm_vblank_put(dev, pipe);
-		return -ENOMEM;
-	}
-
-	DRM_DEBUG("\n");
-
-	vbl_swap->drw_id = swap->drawable;
-	vbl_swap->plane = plane;
-	vbl_swap->sequence = swap->sequence;
-
-	spin_lock_irqsave(&dev_priv->swaps_lock, irqflags);
-
-	list_add_tail(&vbl_swap->head, &dev_priv->vbl_swaps.head);
-	dev_priv->swaps_pending++;
-
-	spin_unlock_irqrestore(&dev_priv->swaps_lock, irqflags);
-
-	return 0;
+	return -EINVAL;
 }
 
 /* drm_dma.h hooks
@@ -812,10 +484,6 @@ int i915_driver_irq_postinstall(struct drm_device *dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int ret, num_pipes = 2;
-
-	spin_lock_init(&dev_priv->swaps_lock);
-	INIT_LIST_HEAD(&dev_priv->vbl_swaps.head);
-	dev_priv->swaps_pending = 0;
 
 	/* Set initial unmasked IRQs to just the selected vblank pipes. */
 	dev_priv->irq_mask_reg = ~0;
