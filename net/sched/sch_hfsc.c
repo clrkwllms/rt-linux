@@ -1574,7 +1574,7 @@ static int
 hfsc_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 {
 	struct hfsc_class *cl;
-	int err;
+	int uninitialized_var(err);
 
 	cl = hfsc_classify(skb, sch, &err);
 	if (cl == NULL) {
