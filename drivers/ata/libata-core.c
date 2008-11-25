@@ -1411,7 +1411,7 @@ static int ata_hpa_resize(struct ata_device *dev)
 	struct ata_eh_context *ehc = &dev->link->eh_context;
 	int print_info = ehc->i.flags & ATA_EHI_PRINTINFO;
 	u64 sectors = ata_id_n_sectors(dev->id);
-	u64 native_sectors;
+	u64 uninitialized_var(native_sectors);
 	int rc;
 
 	/* do we need to do it? */
