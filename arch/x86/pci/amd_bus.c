@@ -277,8 +277,8 @@ static int __init early_fill_mp_bus_info(void)
 {
 	int i;
 	int j;
-	unsigned bus;
-	unsigned slot;
+	unsigned uninitialized_var(bus);
+	unsigned uninitialized_var(slot);
 	int found;
 	int node;
 	int link;
