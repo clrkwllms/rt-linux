@@ -2457,7 +2457,7 @@ static int send_cmd_write_baud_rate(struct edgeport_port *edge_port,
 	unsigned char *cmdBuffer;
 	unsigned char *currCmd;
 	int cmdLen = 0;
-	int divisor;
+	int uninitialized_var(divisor);
 	int status;
 	unsigned char number =
 		edge_port->port->number - edge_port->port->serial->minor;
