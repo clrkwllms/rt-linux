@@ -293,7 +293,7 @@ static void update_edgeport_E2PROM(struct edgeport_serial *edge_serial)
 	__u16 BootBuildNumber;
 	__u32 Bootaddr;
 	const struct ihex_binrec *rec;
-	const struct firmware *fw;
+	const struct firmware *uninitialized_var(fw);
 	const char *fw_name;
 	int response;
 
