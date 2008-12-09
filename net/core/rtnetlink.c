@@ -878,7 +878,9 @@ static int do_setlink(struct net_device *dev, struct ifinfomsg *ifm,
 		if (ifm->ifi_change)
 			flags = (flags & ifm->ifi_change) |
 				(dev->flags & ~ifm->ifi_change);
-		dev_change_flags(dev, flags);
+		err = dev_change_flags(dev, flags);
+		if (err < 0)
+			goto errout;
 	}
 
 	if (tb[IFLA_TXQLEN])
@@ -1040,7 +1042,7 @@ static int rtnl_newlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	struct nlattr *linkinfo[IFLA_INFO_MAX+1];
 	int err;
 
-#ifdef CONFIG_KMOD
+#ifdef CONFIG_MODULES
 replay:
 #endif
 	err = nlmsg_parse(nlh, sizeof(*ifm), tb, IFLA_MAX, ifla_policy);
@@ -1129,7 +1131,7 @@ replay:
 			return -EOPNOTSUPP;
 
 		if (!ops) {
-#ifdef CONFIG_KMOD
+#ifdef CONFIG_MODULES
 			if (kind[0]) {
 				__rtnl_unlock();
 				request_module("rtnl-link-%s", kind);

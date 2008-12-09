@@ -257,7 +257,6 @@ void __generic_unplug_device(struct request_queue *q)
 
 	q->request_fn(q);
 }
-EXPORT_SYMBOL(__generic_unplug_device);
 
 /**
  * generic_unplug_device - fire a request queue
@@ -325,6 +324,9 @@ EXPORT_SYMBOL(blk_unplug);
 
 static void blk_invoke_request_fn(struct request_queue *q)
 {
+	if (unlikely(blk_queue_stopped(q)))
+		return;
+
 	/*
 	 * one level of recursion is ok and is much faster than kicking
 	 * the unplug handling
@@ -399,8 +401,13 @@ void blk_sync_queue(struct request_queue *q)
 EXPORT_SYMBOL(blk_sync_queue);
 
 /**
- * blk_run_queue - run a single device queue
+ * __blk_run_queue - run a single device queue
  * @q:	The queue to run
+ *
+ * Description:
+ *    See @blk_run_queue. This variant must be called with the queue lock
+ *    held and interrupts disabled.
+ *
  */
 void __blk_run_queue(struct request_queue *q)
 {
@@ -418,6 +425,12 @@ EXPORT_SYMBOL(__blk_run_queue);
 /**
  * blk_run_queue - run a single device queue
  * @q: The queue to run
+ *
+ * Description:
+ *    Invoke request handling on this queue, if it has pending work to do.
+ *    May be used to restart queueing when a request has completed. Also
+ *    See @blk_start_queueing.
+ *
  */
 void blk_run_queue(struct request_queue *q)
 {
@@ -501,6 +514,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 	init_timer(&q->unplug_timer);
 	setup_timer(&q->timeout, blk_rq_timed_out_timer, (unsigned long) q);
 	INIT_LIST_HEAD(&q->timeout_list);
+	INIT_WORK(&q->unplug_work, blk_unplug_work);
 
 	kobject_init(&q->kobj, &blk_queue_ktype);
 
@@ -578,7 +592,7 @@ blk_init_queue_node(request_fn_proc *rfn, spinlock_t *lock, int node_id)
 				   1 << QUEUE_FLAG_STACKABLE);
 	q->queue_lock		= lock;
 
-	blk_queue_segment_boundary(q, 0xffffffff);
+	blk_queue_segment_boundary(q, BLK_SEG_BOUNDARY_MASK);
 
 	blk_queue_make_request(q, __make_request);
 	blk_queue_max_segment_size(q, MAX_SEGMENT_SIZE);
@@ -884,7 +898,8 @@ EXPORT_SYMBOL(blk_get_request);
  *
  * This is basically a helper to remove the need to know whether a queue
  * is plugged or not if someone just wants to initiate dispatch of requests
- * for this queue.
+ * for this queue. Should be used to start queueing on a device outside
+ * of ->request_fn() context. Also see @blk_run_queue.
  *
  * The queue lock must be held with interrupts disabled.
  */
@@ -1003,8 +1018,9 @@ static void part_round_stats_single(int cpu, struct hd_struct *part,
 }
 
 /**
- * part_round_stats()	- Round off the performance stats on a struct
- * disk_stats.
+ * part_round_stats() - Round off the performance stats on a struct disk_stats.
+ * @cpu: cpu number for stats access
+ * @part: target partition
  *
  * The average IO queue length and utilisation statistics are maintained
  * by observing the current state of the queue length and the amount of
@@ -1075,8 +1091,15 @@ void init_request_from_bio(struct request *req, struct bio *bio)
 	/*
 	 * inherit FAILFAST from bio (for read-ahead, and explicit FAILFAST)
 	 */
-	if (bio_rw_ahead(bio) || bio_failfast(bio))
-		req->cmd_flags |= REQ_FAILFAST;
+	if (bio_rw_ahead(bio))
+		req->cmd_flags |= (REQ_FAILFAST_DEV | REQ_FAILFAST_TRANSPORT |
+				   REQ_FAILFAST_DRIVER);
+	if (bio_failfast_dev(bio))
+		req->cmd_flags |= REQ_FAILFAST_DEV;
+	if (bio_failfast_transport(bio))
+		req->cmd_flags |= REQ_FAILFAST_TRANSPORT;
+	if (bio_failfast_driver(bio))
+		req->cmd_flags |= REQ_FAILFAST_DRIVER;
 
 	/*
 	 * REQ_BARRIER implies no merging, but lets make it explicit
@@ -1614,6 +1637,28 @@ int blk_insert_cloned_request(struct request_queue *q, struct request *rq)
 EXPORT_SYMBOL_GPL(blk_insert_cloned_request);
 
 /**
+ * blkdev_dequeue_request - dequeue request and start timeout timer
+ * @req: request to dequeue
+ *
+ * Dequeue @req and start timeout timer on it.  This hands off the
+ * request to the driver.
+ *
+ * Block internal functions which don't want to start timer should
+ * call elv_dequeue_request().
+ */
+void blkdev_dequeue_request(struct request *req)
+{
+	elv_dequeue_request(req->q, req);
+
+	/*
+	 * We are now handing the request to the hardware, add the
+	 * timeout handler.
+	 */
+	blk_add_timer(req);
+}
+EXPORT_SYMBOL(blkdev_dequeue_request);
+
+/**
  * __end_that_request_first - end I/O on a request
  * @req:      the request being processed
  * @error:    %0 for success, < %0 for error
@@ -1747,16 +1792,16 @@ static void end_that_request_last(struct request *req, int error)
 {
 	struct gendisk *disk = req->rq_disk;
 
-	blk_delete_timer(req);
-
 	if (blk_rq_tagged(req))
 		blk_queue_end_tag(req->q, req);
 
 	if (blk_queued_rq(req))
-		blkdev_dequeue_request(req);
+		elv_dequeue_request(req->q, req);
 
 	if (unlikely(laptop_mode) && blk_fs_request(req))
 		laptop_io_completion();
+
+	blk_delete_timer(req);
 
 	/*
 	 * Account IO completion.  bar_rq isn't accounted as a normal

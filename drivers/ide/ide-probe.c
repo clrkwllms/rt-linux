@@ -208,6 +208,7 @@ static inline void do_identify (ide_drive_t *drive, u8 cmd)
 		drive->ready_stat = 0;
 		if (ata_id_cdb_intr(id))
 			drive->atapi_flags |= IDE_AFLAG_DRQ_INTERRUPT;
+		drive->dev_flags |= IDE_DFLAG_DOORLOCKING;
 		/* we don't do head unloading on ATAPI devices */
 		drive->dev_flags |= IDE_DFLAG_NO_UNLOAD;
 		return;
@@ -265,7 +266,8 @@ static int actual_try_to_identify (ide_drive_t *drive, u8 cmd)
 	/* take a deep breath */
 	msleep(50);
 
-	if (io_ports->ctl_addr) {
+	if (io_ports->ctl_addr &&
+	    (hwif->host_flags & IDE_HFLAG_BROKEN_ALTSTATUS) == 0) {
 		a = tp_ops->read_altstatus(hwif);
 		s = tp_ops->read_status(hwif);
 		if ((a ^ s) & ~ATA_IDX)

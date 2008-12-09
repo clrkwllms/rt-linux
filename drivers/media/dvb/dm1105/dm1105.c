@@ -376,7 +376,7 @@ static void dm1105dvb_dma_unmap(struct dm1105dvb *dm1105dvb)
 	pci_free_consistent(dm1105dvb->pdev, 6*DM1105_DMA_BYTES, dm1105dvb->ts_buf, dm1105dvb->dma_addr);
 }
 
-static void __devinit dm1105dvb_enable_irqs(struct dm1105dvb *dm1105dvb)
+static void dm1105dvb_enable_irqs(struct dm1105dvb *dm1105dvb)
 {
 	outb(INTMAK_ALLMASK, dm_io_mem(DM1105_INTMAK));
 	outb(1, dm_io_mem(DM1105_CR));
@@ -594,6 +594,18 @@ static void dm1105dvb_hw_exit(struct dm1105dvb *dm1105dvb)
 
 	dm1105dvb_dma_unmap(dm1105dvb);
 }
+
+static struct stv0299_config sharp_z0194a_config = {
+	.demod_address = 0x68,
+	.inittab = sharp_z0194a_inittab,
+	.mclk = 88000000UL,
+	.invert = 1,
+	.skip_reinit = 0,
+	.lock_output = STV0299_LOCKOUTPUT_1,
+	.volt13_op0_op1 = STV0299_VOLT13_OP1,
+	.min_delay_ms = 100,
+	.set_symbol_rate = sharp_z0194a_set_symbol_rate,
+};
 
 static struct stv0288_config earda_config = {
 	.demod_address = 0x68,

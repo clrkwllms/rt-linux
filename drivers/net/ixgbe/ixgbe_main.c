@@ -80,7 +80,7 @@ static struct pci_device_id ixgbe_pci_tbl[] = {
 };
 MODULE_DEVICE_TABLE(pci, ixgbe_pci_tbl);
 
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 static int ixgbe_notify_dca(struct notifier_block *, unsigned long event,
                             void *p);
 static struct notifier_block dca_notifier = {
@@ -296,7 +296,7 @@ done_cleaning:
 	return (total_packets ? true : false);
 }
 
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 static void ixgbe_update_rx_dca(struct ixgbe_adapter *adapter,
                                 struct ixgbe_ring *rx_ring)
 {
@@ -383,7 +383,7 @@ static int __ixgbe_notify_dca(struct device *dev, void *data)
 	return 0;
 }
 
-#endif /* CONFIG_DCA or CONFIG_DCA_MODULE */
+#endif /* CONFIG_IXGBE_DCA */
 /**
  * ixgbe_receive_skb - Send a completed packet up the stack
  * @adapter: board private structure
@@ -947,7 +947,7 @@ static irqreturn_t ixgbe_msix_clean_tx(int irq, void *data)
 	r_idx = find_first_bit(q_vector->txr_idx, adapter->num_tx_queues);
 	for (i = 0; i < q_vector->txr_count; i++) {
 		tx_ring = &(adapter->tx_ring[r_idx]);
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 		if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
 			ixgbe_update_tx_dca(adapter, tx_ring);
 #endif
@@ -1022,7 +1022,7 @@ static int ixgbe_clean_rxonly(struct napi_struct *napi, int budget)
 
 	r_idx = find_first_bit(q_vector->rxr_idx, adapter->num_rx_queues);
 	rx_ring = &(adapter->rx_ring[r_idx]);
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
 		ixgbe_update_rx_dca(adapter, rx_ring);
 #endif
@@ -1066,7 +1066,7 @@ static int ixgbe_clean_rxonly_many(struct napi_struct *napi, int budget)
 	r_idx = find_first_bit(q_vector->rxr_idx, adapter->num_rx_queues);
 	for (i = 0; i < q_vector->rxr_count; i++) {
 		rx_ring = &(adapter->rx_ring[r_idx]);
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 		if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
 			ixgbe_update_rx_dca(adapter, rx_ring);
 #endif
@@ -1287,13 +1287,39 @@ static void ixgbe_set_itr(struct ixgbe_adapter *adapter)
 	return;
 }
 
-static inline void ixgbe_irq_enable(struct ixgbe_adapter *adapter);
+/**
+ * ixgbe_irq_disable - Mask off interrupt generation on the NIC
+ * @adapter: board private structure
+ **/
+static inline void ixgbe_irq_disable(struct ixgbe_adapter *adapter)
+{
+	IXGBE_WRITE_REG(&adapter->hw, IXGBE_EIMC, ~0);
+	IXGBE_WRITE_FLUSH(&adapter->hw);
+	if (adapter->flags & IXGBE_FLAG_MSIX_ENABLED) {
+		int i;
+		for (i = 0; i < adapter->num_msix_vectors; i++)
+			synchronize_irq(adapter->msix_entries[i].vector);
+	} else {
+		synchronize_irq(adapter->pdev->irq);
+	}
+}
+
+/**
+ * ixgbe_irq_enable - Enable default interrupt generation settings
+ * @adapter: board private structure
+ **/
+static inline void ixgbe_irq_enable(struct ixgbe_adapter *adapter)
+{
+	u32 mask;
+	mask = IXGBE_EIMS_ENABLE_MASK;
+	IXGBE_WRITE_REG(&adapter->hw, IXGBE_EIMS, mask);
+	IXGBE_WRITE_FLUSH(&adapter->hw);
+}
 
 /**
  * ixgbe_intr - legacy mode Interrupt Handler
  * @irq: interrupt number
  * @data: pointer to a network interface device structure
- * @pt_regs: CPU registers structure
  **/
 static irqreturn_t ixgbe_intr(int irq, void *data)
 {
@@ -1391,35 +1417,6 @@ static void ixgbe_free_irq(struct ixgbe_adapter *adapter)
 	} else {
 		free_irq(adapter->pdev->irq, netdev);
 	}
-}
-
-/**
- * ixgbe_irq_disable - Mask off interrupt generation on the NIC
- * @adapter: board private structure
- **/
-static inline void ixgbe_irq_disable(struct ixgbe_adapter *adapter)
-{
-	IXGBE_WRITE_REG(&adapter->hw, IXGBE_EIMC, ~0);
-	IXGBE_WRITE_FLUSH(&adapter->hw);
-	if (adapter->flags & IXGBE_FLAG_MSIX_ENABLED) {
-		int i;
-		for (i = 0; i < adapter->num_msix_vectors; i++)
-			synchronize_irq(adapter->msix_entries[i].vector);
-	} else {
-		synchronize_irq(adapter->pdev->irq);
-	}
-}
-
-/**
- * ixgbe_irq_enable - Enable default interrupt generation settings
- * @adapter: board private structure
- **/
-static inline void ixgbe_irq_enable(struct ixgbe_adapter *adapter)
-{
-	u32 mask;
-	mask = IXGBE_EIMS_ENABLE_MASK;
-	IXGBE_WRITE_REG(&adapter->hw, IXGBE_EIMS, mask);
-	IXGBE_WRITE_FLUSH(&adapter->hw);
 }
 
 /**
@@ -2155,7 +2152,7 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 
 	netif_carrier_off(netdev);
 
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED) {
 		adapter->flags &= ~IXGBE_FLAG_DCA_ENABLED;
 		dca_remove_requester(&adapter->pdev->dev);
@@ -2167,7 +2164,7 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 	ixgbe_clean_all_tx_rings(adapter);
 	ixgbe_clean_all_rx_rings(adapter);
 
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 	/* since we reset the hardware DCA settings were cleared */
 	if (dca_add_requester(&adapter->pdev->dev) == 0) {
 		adapter->flags |= IXGBE_FLAG_DCA_ENABLED;
@@ -2193,7 +2190,7 @@ static int ixgbe_poll(struct napi_struct *napi, int budget)
 	struct ixgbe_adapter *adapter = q_vector->adapter;
 	int tx_cleaned, work_done = 0;
 
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED) {
 		ixgbe_update_tx_dca(adapter, adapter->tx_ring);
 		ixgbe_update_rx_dca(adapter, adapter->rx_ring);
@@ -2332,7 +2329,7 @@ static void ixgbe_acquire_msix_vectors(struct ixgbe_adapter *adapter,
  * Once we know the feature-set enabled for the device, we'll cache
  * the register offset the descriptor ring is assigned to.
  **/
-static void __devinit ixgbe_cache_ring_register(struct ixgbe_adapter *adapter)
+static void ixgbe_cache_ring_register(struct ixgbe_adapter *adapter)
 {
 	int feature_mask = 0, rss_i;
 	int i, txr_idx, rxr_idx;
@@ -2369,7 +2366,7 @@ static void __devinit ixgbe_cache_ring_register(struct ixgbe_adapter *adapter)
  * number of queues at compile-time.  The polling_netdev array is
  * intended for Multiqueue, but should work fine with a single queue.
  **/
-static int __devinit ixgbe_alloc_queues(struct ixgbe_adapter *adapter)
+static int ixgbe_alloc_queues(struct ixgbe_adapter *adapter)
 {
 	int i;
 
@@ -2410,8 +2407,7 @@ err_tx_ring_allocation:
  * Attempt to configure the interrupts using the best available
  * capabilities of the hardware and the kernel.
  **/
-static int __devinit ixgbe_set_interrupt_capability(struct ixgbe_adapter
-                                                    *adapter)
+static int ixgbe_set_interrupt_capability(struct ixgbe_adapter *adapter)
 {
 	int err = 0;
 	int vector, v_budget;
@@ -2503,7 +2499,7 @@ static void ixgbe_reset_interrupt_capability(struct ixgbe_adapter *adapter)
  * - Hardware queue count (num_*_queues)
  *   - defined by miscellaneous hardware support/features (RSS, etc.)
  **/
-static int __devinit ixgbe_init_interrupt_scheme(struct ixgbe_adapter *adapter)
+static int ixgbe_init_interrupt_scheme(struct ixgbe_adapter *adapter)
 {
 	int err;
 
@@ -3922,7 +3918,7 @@ static int __devinit ixgbe_probe(struct pci_dev *pdev,
 	if (err)
 		goto err_register;
 
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 	if (dca_add_requester(&pdev->dev) == 0) {
 		adapter->flags |= IXGBE_FLAG_DCA_ENABLED;
 		/* always use CB2 mode, difference is masked
@@ -3972,7 +3968,7 @@ static void __devexit ixgbe_remove(struct pci_dev *pdev)
 
 	flush_scheduled_work();
 
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED) {
 		adapter->flags &= ~IXGBE_FLAG_DCA_ENABLED;
 		dca_remove_requester(&pdev->dev);
@@ -4105,10 +4101,10 @@ static int __init ixgbe_init_module(void)
 
 	printk(KERN_INFO "%s: %s\n", ixgbe_driver_name, ixgbe_copyright);
 
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 	dca_register_notify(&dca_notifier);
-
 #endif
+
 	ret = pci_register_driver(&ixgbe_driver);
 	return ret;
 }
@@ -4123,13 +4119,13 @@ module_init(ixgbe_init_module);
  **/
 static void __exit ixgbe_exit_module(void)
 {
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 	dca_unregister_notify(&dca_notifier);
 #endif
 	pci_unregister_driver(&ixgbe_driver);
 }
 
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 static int ixgbe_notify_dca(struct notifier_block *nb, unsigned long event,
                             void *p)
 {
@@ -4140,7 +4136,7 @@ static int ixgbe_notify_dca(struct notifier_block *nb, unsigned long event,
 
 	return ret_val ? NOTIFY_BAD : NOTIFY_DONE;
 }
-#endif /* CONFIG_DCA or CONFIG_DCA_MODULE */
+#endif /* CONFIG_IXGBE_DCA */
 
 module_exit(ixgbe_exit_module);
 

@@ -813,6 +813,7 @@ out:
 	return err;
 }
 
+#ifdef CONFIG_NF_NAT_NEEDED
 static int
 ctnetlink_parse_nat_setup(struct nf_conn *ct,
 			  enum nf_nat_manip_type manip,
@@ -822,7 +823,7 @@ ctnetlink_parse_nat_setup(struct nf_conn *ct,
 
 	parse_nat_setup = rcu_dereference(nfnetlink_parse_nat_setup_hook);
 	if (!parse_nat_setup) {
-#ifdef CONFIG_KMOD
+#ifdef CONFIG_MODULES
 		rcu_read_unlock();
 		nfnl_unlock();
 		if (request_module("nf-nat-ipv4") < 0) {
@@ -840,6 +841,7 @@ ctnetlink_parse_nat_setup(struct nf_conn *ct,
 
 	return parse_nat_setup(ct, manip, attr);
 }
+#endif
 
 static int
 ctnetlink_change_status(struct nf_conn *ct, struct nlattr *cda[])
@@ -1088,7 +1090,7 @@ ctnetlink_create_conntrack(struct nlattr *cda[],
 	struct nf_conn_help *help;
 	struct nf_conntrack_helper *helper;
 
-	ct = nf_conntrack_alloc(&init_net, otuple, rtuple, GFP_KERNEL);
+	ct = nf_conntrack_alloc(&init_net, otuple, rtuple, GFP_ATOMIC);
 	if (ct == NULL || IS_ERR(ct))
 		return -ENOMEM;
 
@@ -1136,7 +1138,7 @@ ctnetlink_create_conntrack(struct nlattr *cda[],
 		}
 	}
 
-	nf_ct_acct_ext_add(ct, GFP_KERNEL);
+	nf_ct_acct_ext_add(ct, GFP_ATOMIC);
 
 #if defined(CONFIG_NF_CONNTRACK_MARK)
 	if (cda[CTA_MARK])
@@ -1210,13 +1212,14 @@ ctnetlink_new_conntrack(struct sock *ctnl, struct sk_buff *skb,
 			atomic_inc(&master_ct->ct_general.use);
 		}
 
-		spin_unlock_bh(&nf_conntrack_lock);
 		err = -ENOENT;
 		if (nlh->nlmsg_flags & NLM_F_CREATE)
 			err = ctnetlink_create_conntrack(cda,
 							 &otuple,
 							 &rtuple,
 							 master_ct);
+		spin_unlock_bh(&nf_conntrack_lock);
+
 		if (err < 0 && master_ct)
 			nf_ct_put(master_ct);
 

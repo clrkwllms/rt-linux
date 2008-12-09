@@ -247,7 +247,7 @@ struct cx88_input {
 	enum cx88_itype type;
 	u32             gpio0, gpio1, gpio2, gpio3;
 	unsigned int    vmux:2;
-	unsigned int    audioroute:2;
+	unsigned int    audioroute:4;
 };
 
 struct cx88_board {
@@ -261,6 +261,7 @@ struct cx88_board {
 	struct cx88_input       radio;
 	enum cx88_board_type    mpeg;
 	unsigned int            audio_chip;
+	int			num_frontends;
 };
 
 struct cx88_subid {
@@ -351,11 +352,13 @@ struct cx88_core {
 	/* various v4l controls */
 	u32                        freq;
 	atomic_t		   users;
+	atomic_t                   mpeg_users;
 
 	/* cx88-video needs to access cx8802 for hybrid tuner pll access. */
 	struct cx8802_dev          *dvbdev;
 	enum cx88_board_type       active_type_id;
 	int			   active_ref;
+	int			   active_fe_id;
 };
 
 struct cx8800_dev;
@@ -490,7 +493,7 @@ struct cx8802_dev {
 
 #if defined(CONFIG_VIDEO_CX88_DVB) || defined(CONFIG_VIDEO_CX88_DVB_MODULE)
 	/* for dvb only */
-	struct videobuf_dvb        dvb;
+	struct videobuf_dvb_frontends frontends;
 #endif
 
 #if defined(CONFIG_VIDEO_CX88_VP3054) || \
@@ -628,6 +631,7 @@ extern void cx88_setup_xc3028(struct cx88_core *core, struct xc2028_ctrl *ctl);
 #define WW_EIAJ		 7
 #define WW_I2SPT	 8
 #define WW_FM		 9
+#define WW_I2SADC	 10
 
 void cx88_set_tvaudio(struct cx88_core *core);
 void cx88_newstation(struct cx88_core *core);
