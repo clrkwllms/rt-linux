@@ -217,7 +217,7 @@ u8 w1_triplet(struct w1_master *dev, int bdir)
  * @param dev     the master device
  * @return        the byte read
  */
-static u8 w1_read_8(struct w1_master * dev)
+u8 w1_read_8(struct w1_master *dev)
 {
 	int i;
 	u8 res = 0;
@@ -230,6 +230,7 @@ static u8 w1_read_8(struct w1_master * dev)
 
 	return res;
 }
+EXPORT_SYMBOL_GPL(w1_read_8);
 
 /**
  * Writes a series of bytes.
@@ -355,7 +356,9 @@ int w1_reset_select_slave(struct w1_slave *sl)
 		w1_write_8(sl->master, W1_SKIP_ROM);
 	else {
 		u8 match[9] = {W1_MATCH_ROM, };
-		memcpy(&match[1], (u8 *)&sl->reg_num, 8);
+		u64 rn = le64_to_cpu(*((u64*)&sl->reg_num));
+
+		memcpy(&match[1], &rn, 8);
 		w1_write_block(sl->master, match, 9);
 	}
 	return 0;
