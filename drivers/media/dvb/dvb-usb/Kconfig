@@ -1,7 +1,6 @@
 config DVB_USB
 	tristate "Support for various USB DVB devices"
 	depends on DVB_CORE && USB && I2C && INPUT
-	depends on BROKEN
 	help
 	  By enabling this you will be able to choose the various supported
 	  USB1.1 and USB2.0 DVB devices.
@@ -236,7 +235,6 @@ config DVB_USB_OPERA1
 config DVB_USB_AF9005
 	tristate "Afatech AF9005 DVB-T USB1.1 support"
 	depends on DVB_USB && EXPERIMENTAL
-	depends on BROKEN
 	select MEDIA_TUNER_MT2060 if !MEDIA_TUNER_CUSTOMIZE
 	select MEDIA_TUNER_QT1010 if !MEDIA_TUNER_CUSTOMIZE
 	help
