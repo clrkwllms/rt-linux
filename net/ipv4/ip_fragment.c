@@ -6,7 +6,7 @@
  *		The IP fragmentation functionality.
  *
  * Authors:	Fred N. van Kempen <waltje@uWalt.NL.Mugnet.ORG>
- *		Alan Cox <Alan.Cox@linux.org>
+ *		Alan Cox <alan@lxorguk.ukuu.org.uk>
  *
  * Fixes:
  *		Alan Cox	:	Split from ip.c , see ip_input.c for history.
@@ -488,8 +488,8 @@ static int ip_frag_reasm(struct ipq *qp, struct sk_buff *prev,
 		qp->q.fragments = head;
 	}
 
-	BUG_TRAP(head != NULL);
-	BUG_TRAP(FRAG_CB(head)->offset == 0);
+	WARN_ON(head == NULL);
+	WARN_ON(FRAG_CB(head)->offset != 0);
 
 	/* Allocate a new buffer for the datagram. */
 	ihlen = ip_hdrlen(head);

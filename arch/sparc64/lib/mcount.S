@@ -48,19 +48,52 @@ mcount:
 	sub		%g3, STACK_BIAS, %g3
 	cmp		%sp, %g3
 	bg,pt		%xcc, 1f
-	 sethi		%hi(panicstring), %g3
+	 nop
+	lduh		[%g6 + TI_CPU], %g1
+	sethi		%hi(hardirq_stack), %g3
+	or		%g3, %lo(hardirq_stack), %g3
+	sllx		%g1, 3, %g1
+	ldx		[%g3 + %g1], %g7
+	sub		%g7, STACK_BIAS, %g7
+	cmp		%sp, %g7
+	bleu,pt		%xcc, 2f
+	 sethi		%hi(THREAD_SIZE), %g3
+	add		%g7, %g3, %g7
+	cmp		%sp, %g7
+	blu,pn		%xcc, 1f
+2:	 sethi		%hi(softirq_stack), %g3
+	or		%g3, %lo(softirq_stack), %g3
+	ldx		[%g3 + %g1], %g7
+	cmp		%sp, %g7
+	bleu,pt		%xcc, 2f
+	 sethi		%hi(THREAD_SIZE), %g3
+	add		%g7, %g3, %g7
+	cmp		%sp, %g7
+	blu,pn		%xcc, 1f
+	 nop
+	/* If we are already on ovstack, don't hop onto it
+	 * again, we are already trying to output the stack overflow
+	 * message.
+	 */
 	sethi		%hi(ovstack), %g7		! cant move to panic stack fast enough
 	 or		%g7, %lo(ovstack), %g7
-	add		%g7, OVSTACKSIZE, %g7
+	add		%g7, OVSTACKSIZE, %g3
+	sub		%g3, STACK_BIAS + 192, %g3
 	sub		%g7, STACK_BIAS, %g7
-	mov		%g7, %sp
+	cmp		%sp, %g7
+	blu,pn		%xcc, 2f
+	 cmp		%sp, %g3
+	bleu,pn		%xcc, 1f
+	 nop
+2:	mov		%g3, %sp
+	sethi		%hi(panicstring), %g3
 	call		prom_printf
 	 or		%g3, %lo(panicstring), %o0
 	call		prom_halt
 	 nop
 1:
 #endif
-#ifdef CONFIG_FTRACE
+#ifdef CONFIG_FUNCTION_TRACER
 #ifdef CONFIG_DYNAMIC_FTRACE
 	mov		%o7, %o0
 	.globl		mcount_call
@@ -86,7 +119,7 @@ mcount_call:
 	.size		_mcount,.-_mcount
 	.size		mcount,.-mcount
 
-#ifdef CONFIG_FTRACE
+#ifdef CONFIG_FUNCTION_TRACER
 	.globl		ftrace_stub
 	.type		ftrace_stub,#function
 ftrace_stub:

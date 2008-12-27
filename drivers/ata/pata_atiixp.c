@@ -1,7 +1,6 @@
 /*
  * pata_atiixp.c 	- ATI PATA for new ATA layer
  *			  (C) 2005 Red Hat Inc
- *			  Alan Cox <alan@redhat.com>
  *
  * Based on
  *
@@ -183,7 +182,7 @@ static void atiixp_bmdma_start(struct ata_queued_cmd *qc)
 	u16 tmp16;
 
 	pci_read_config_word(pdev, ATIIXP_IDE_UDMA_CONTROL, &tmp16);
-	if (adev->dma_mode >= XFER_UDMA_0)
+	if (ata_using_udma(adev))
 		tmp16 |= (1 << dn);
 	else
 		tmp16 &= ~(1 << dn);

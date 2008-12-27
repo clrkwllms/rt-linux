@@ -23,14 +23,11 @@
 #include <linux/module.h>
 
 #include <asm/blackfin.h>
+#include <asm/cacheflush.h>
 #include <asm/cplb.h>
 #include <asm/cplbinit.h>
 
-#ifdef CONFIG_MAX_MEM_SIZE
-# define CPLB_MEM CONFIG_MAX_MEM_SIZE
-#else
-# define CPLB_MEM CONFIG_MEM_SIZE
-#endif
+#define CPLB_MEM CONFIG_MAX_MEM_SIZE
 
 /*
 * Number of required data CPLB switchtable entries
@@ -168,17 +165,13 @@ static struct cplb_desc cplb_data[] = {
 		.name = "Asynchronous Memory Banks",
 	},
 	{
-#ifdef L2_START
 		.start = L2_START,
 		.end = L2_START + L2_LENGTH,
 		.psize = SIZE_1M,
 		.attr = SWITCH_T | I_CPLB | D_CPLB,
-		.i_conf = L2_MEMORY,
-		.d_conf = L2_MEMORY,
-		.valid = 1,
-#else
-		.valid = 0,
-#endif
+		.i_conf = L2_IMEMORY,
+		.d_conf = L2_DMEMORY,
+		.valid = (L2_LENGTH > 0),
 		.name = "L2 Memory",
 	},
 	{
@@ -195,10 +188,11 @@ static struct cplb_desc cplb_data[] = {
 
 static u16 __init lock_kernel_check(u32 start, u32 end)
 {
-	if ((end   <= (u32) _end && end   >= (u32)_stext) ||
-	    (start <= (u32) _end && start >= (u32)_stext))
-		return IN_KERNEL;
-	return 0;
+	if (start >= (u32)_end || end <= (u32)_stext)
+		return 0;
+
+	/* This cplb block overlapped with kernel area. */
+	return IN_KERNEL;
 }
 
 static unsigned short __init
@@ -316,7 +310,7 @@ __fill_data_cplbtab(struct cplb_tab *t, int i, u32 a_start, u32 a_end)
 	}
 }
 
-void __init generate_cpl_tables(void)
+void __init generate_cplb_tables(void)
 {
 
 	u16 i, j, process;

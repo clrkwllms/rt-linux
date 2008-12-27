@@ -54,6 +54,7 @@
 #include <asm/sections.h>
 #include <asm/ebcdic.h>
 #include <asm/compat.h>
+#include <asm/kvm_virtio.h>
 
 long psw_kernel_bits	= (PSW_BASE_BITS | PSW_MASK_DAT | PSW_ASC_PRIMARY |
 			   PSW_MASK_MCHECK | PSW_DEFAULT_KEY);
@@ -603,13 +604,13 @@ setup_memory(void)
 		if (memory_chunk[i].type != CHUNK_READ_WRITE)
 			continue;
 		start_chunk = PFN_DOWN(memory_chunk[i].addr);
-		end_chunk = start_chunk + PFN_DOWN(memory_chunk[i].size) - 1;
+		end_chunk = start_chunk + PFN_DOWN(memory_chunk[i].size);
 		end_chunk = min(end_chunk, end_pfn);
 		if (start_chunk >= end_chunk)
 			continue;
 		add_active_range(0, start_chunk, end_chunk);
 		pfn = max(start_chunk, start_pfn);
-		for (; pfn <= end_chunk; pfn++)
+		for (; pfn < end_chunk; pfn++)
 			page_set_storage_key(PFN_PHYS(pfn), PAGE_DEFAULT_KEY);
 	}
 
@@ -766,7 +767,8 @@ setup_arch(char **cmdline_p)
 		printk("We are running under VM (64 bit mode)\n");
 	else if (MACHINE_IS_KVM) {
 		printk("We are running under KVM (64 bit mode)\n");
-		add_preferred_console("ttyS", 1, NULL);
+		add_preferred_console("hvc", 0, NULL);
+		s390_virtio_console_init();
 	} else
 		printk("We are running native (64 bit mode)\n");
 #endif /* CONFIG_64BIT */

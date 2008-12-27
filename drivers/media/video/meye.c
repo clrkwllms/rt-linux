@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/videodev.h>
 #include <media/v4l2-common.h>
+#include <media/v4l2-ioctl.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -842,17 +843,16 @@ again:
 
 static int meye_open(struct inode *inode, struct file *file)
 {
-	int i, err;
+	int i;
 
-	err = video_exclusive_open(inode, file);
-	if (err < 0)
-		return err;
+	if (test_and_set_bit(0, &meye.in_use))
+		return -EBUSY;
 
 	mchip_hic_stop();
 
 	if (mchip_dma_alloc()) {
 		printk(KERN_ERR "meye: mchip framebuffer allocation failed\n");
-		video_exclusive_release(inode, file);
+		clear_bit(0, &meye.in_use);
 		return -ENOBUFS;
 	}
 
@@ -867,7 +867,7 @@ static int meye_release(struct inode *inode, struct file *file)
 {
 	mchip_hic_stop();
 	mchip_dma_free();
-	video_exclusive_release(inode, file);
+	clear_bit(0, &meye.in_use);
 	return 0;
 }
 
@@ -1697,13 +1697,7 @@ static const struct file_operations meye_fops = {
 	.llseek		= no_llseek,
 };
 
-static struct video_device meye_template = {
-	.owner		= THIS_MODULE,
-	.name		= "meye",
-	.type		= VID_TYPE_CAPTURE,
-	.fops		= &meye_fops,
-	.release	= video_device_release,
-	.minor		= -1,
+static const struct v4l2_ioctl_ops meye_ioctl_ops = {
 	.vidioc_querycap	= vidioc_querycap,
 	.vidioc_enum_input	= vidioc_enum_input,
 	.vidioc_g_input		= vidioc_g_input,
@@ -1722,6 +1716,14 @@ static struct video_device meye_template = {
 	.vidioc_streamon	= vidioc_streamon,
 	.vidioc_streamoff	= vidioc_streamoff,
 	.vidioc_default		= vidioc_default,
+};
+
+static struct video_device meye_template = {
+	.name		= "meye",
+	.fops		= &meye_fops,
+	.ioctl_ops 	= &meye_ioctl_ops,
+	.release	= video_device_release,
+	.minor		= -1,
 };
 
 #ifdef CONFIG_PM
@@ -1771,6 +1773,7 @@ static int __devinit meye_probe(struct pci_dev *pcidev,
 		goto outnotdev;
 	}
 
+	ret = -ENOMEM;
 	meye.mchip_dev = pcidev;
 	meye.video_dev = video_device_alloc();
 	if (!meye.video_dev) {
@@ -1778,7 +1781,6 @@ static int __devinit meye_probe(struct pci_dev *pcidev,
 		goto outnotdev;
 	}
 
-	ret = -ENOMEM;
 	meye.grab_temp = vmalloc(MCHIP_NB_PAGES_MJPEG * PAGE_SIZE);
 	if (!meye.grab_temp) {
 		printk(KERN_ERR "meye: grab buffer allocation failed\n");
@@ -1801,8 +1803,9 @@ static int __devinit meye_probe(struct pci_dev *pcidev,
 	}
 
 	memcpy(meye.video_dev, &meye_template, sizeof(meye_template));
-	meye.video_dev->dev = &meye.mchip_dev->dev;
+	meye.video_dev->parent = &meye.mchip_dev->dev;
 
+	ret = -EIO;
 	if ((ret = sony_pic_camera_command(SONY_PIC_COMMAND_SETCAMERA, 1))) {
 		printk(KERN_ERR "meye: unable to power on the camera\n");
 		printk(KERN_ERR "meye: did you enable the camera in "
@@ -1810,7 +1813,6 @@ static int __devinit meye_probe(struct pci_dev *pcidev,
 		goto outsonypienable;
 	}
 
-	ret = -EIO;
 	if ((ret = pci_enable_device(meye.mchip_dev))) {
 		printk(KERN_ERR "meye: pci_enable_device failed\n");
 		goto outenabledev;

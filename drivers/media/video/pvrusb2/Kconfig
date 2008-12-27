@@ -2,8 +2,6 @@ config VIDEO_PVRUSB2
 	tristate "Hauppauge WinTV-PVR USB2 support"
 	depends on VIDEO_V4L2 && I2C
 	depends on VIDEO_MEDIA	# Avoids pvrusb = Y / DVB = M
-	depends on HOTPLUG	# due to FW_LOADER
-	select FW_LOADER
 	select VIDEO_TUNER
 	select VIDEO_TVEEPROM
 	select VIDEO_CX2341X
@@ -44,7 +42,7 @@ config VIDEO_PVRUSB2_DVB
 	select DVB_S5H1411 if !DVB_FE_CUSTOMISE
 	select DVB_TDA10048 if !DVB_FE_CUSTOMIZE
 	select MEDIA_TUNER_TDA18271 if !DVB_FE_CUSTOMIZE
-	select MEDIA_TUNER_SIMPLE if !DVB_FE_CUSTOMISE
+	select MEDIA_TUNER_SIMPLE if !MEDIA_TUNER_CUSTOMIZE
 	select MEDIA_TUNER_TDA8290 if !DVB_FE_CUSTOMIZE
 	---help---
 

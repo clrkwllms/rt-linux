@@ -61,8 +61,11 @@
 
 #include "audit.h"
 
-/* No auditing will take place until audit_initialized != 0.
+/* No auditing will take place until audit_initialized == AUDIT_INITIALIZED.
  * (Initialization happens after skb_init is called.) */
+#define AUDIT_DISABLED		-1
+#define AUDIT_UNINITIALIZED	0
+#define AUDIT_INITIALIZED	1
 static int	audit_initialized;
 
 #define AUDIT_OFF	0
@@ -707,12 +710,14 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		if (status_get->mask & AUDIT_STATUS_ENABLED) {
 			err = audit_set_enabled(status_get->enabled,
 						loginuid, sessionid, sid);
-			if (err < 0) return err;
+			if (err < 0)
+				return err;
 		}
 		if (status_get->mask & AUDIT_STATUS_FAILURE) {
 			err = audit_set_failure(status_get->failure,
 						loginuid, sessionid, sid);
-			if (err < 0) return err;
+			if (err < 0)
+				return err;
 		}
 		if (status_get->mask & AUDIT_STATUS_PID) {
 			int new_pid = status_get->pid;
@@ -725,9 +730,12 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 			audit_pid = new_pid;
 			audit_nlk_pid = NETLINK_CB(skb).pid;
 		}
-		if (status_get->mask & AUDIT_STATUS_RATE_LIMIT)
+		if (status_get->mask & AUDIT_STATUS_RATE_LIMIT) {
 			err = audit_set_rate_limit(status_get->rate_limit,
 						   loginuid, sessionid, sid);
+			if (err < 0)
+				return err;
+		}
 		if (status_get->mask & AUDIT_STATUS_BACKLOG_LIMIT)
 			err = audit_set_backlog_limit(status_get->backlog_limit,
 						      loginuid, sessionid, sid);
@@ -960,6 +968,9 @@ static int __init audit_init(void)
 {
 	int i;
 
+	if (audit_initialized == AUDIT_DISABLED)
+		return 0;
+
 	printk(KERN_INFO "audit: initializing netlink socket (%s)\n",
 	       audit_default ? "enabled" : "disabled");
 	audit_sock = netlink_kernel_create(&init_net, NETLINK_AUDIT, 0,
@@ -971,7 +982,7 @@ static int __init audit_init(void)
 
 	skb_queue_head_init(&audit_skb_queue);
 	skb_queue_head_init(&audit_skb_hold_queue);
-	audit_initialized = 1;
+	audit_initialized = AUDIT_INITIALIZED;
 	audit_enabled = audit_default;
 	audit_ever_enabled |= !!audit_default;
 
@@ -994,13 +1005,21 @@ __initcall(audit_init);
 static int __init audit_enable(char *str)
 {
 	audit_default = !!simple_strtol(str, NULL, 0);
-	printk(KERN_INFO "audit: %s%s\n",
-	       audit_default ? "enabled" : "disabled",
-	       audit_initialized ? "" : " (after initialization)");
-	if (audit_initialized) {
+	if (!audit_default)
+		audit_initialized = AUDIT_DISABLED;
+
+	printk(KERN_INFO "audit: %s", audit_default ? "enabled" : "disabled");
+
+	if (audit_initialized == AUDIT_INITIALIZED) {
 		audit_enabled = audit_default;
 		audit_ever_enabled |= !!audit_default;
+	} else if (audit_initialized == AUDIT_UNINITIALIZED) {
+		printk(" (after initialization)");
+	} else {
+		printk(" (until reboot)");
 	}
+	printk("\n");
+
 	return 1;
 }
 
@@ -1102,9 +1121,7 @@ unsigned int audit_serial(void)
 static inline void audit_get_stamp(struct audit_context *ctx,
 				   struct timespec *t, unsigned int *serial)
 {
-	if (ctx)
-		auditsc_get_stamp(ctx, t, serial);
-	else {
+	if (!ctx || !auditsc_get_stamp(ctx, t, serial)) {
 		*t = CURRENT_TIME;
 		*serial = audit_serial();
 	}
@@ -1141,7 +1158,7 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 	int reserve;
 	unsigned long timeout_start = jiffies;
 
-	if (!audit_initialized)
+	if (audit_initialized != AUDIT_INITIALIZED)
 		return NULL;
 
 	if (unlikely(audit_filter_type(type)))
@@ -1366,7 +1383,7 @@ int audit_string_contains_control(const char *string, size_t len)
 {
 	const unsigned char *p;
 	for (p = string; p < (const unsigned char *)string + len && *p; p++) {
-		if (*p == '"' || *p < 0x21 || *p > 0x7f)
+		if (*p == '"' || *p < 0x21 || *p > 0x7e)
 			return 1;
 	}
 	return 0;

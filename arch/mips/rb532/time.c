@@ -28,7 +28,6 @@
 #include <linux/timex.h>
 
 #include <asm/mipsregs.h>
-#include <asm/debug.h>
 #include <asm/time.h>
 #include <asm/mach-rc32434/rc32434.h>
 
@@ -49,8 +48,8 @@ static unsigned long __init cal_r4koff(void)
 
 void __init plat_time_init(void)
 {
-	unsigned int est_freq, flags;
-	unsigned long r4k_offset;
+	unsigned int est_freq;
+	unsigned long flags, r4k_offset;
 
 	local_irq_save(flags);
 

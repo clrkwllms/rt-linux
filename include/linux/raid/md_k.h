@@ -115,6 +115,9 @@ struct mdk_rdev_s
 					   * in superblock.
 					   */
 	struct work_struct del_work;	/* used for delayed sysfs removal */
+
+	struct sysfs_dirent *sysfs_state; /* handle for 'state'
+					   * sysfs entry */
 };
 
 struct mddev_s
@@ -237,6 +240,10 @@ struct mddev_s
 							 * starts here */
 	sector_t			resync_max;	/* resync should pause
 							 * when it gets here */
+
+	struct sysfs_dirent		*sysfs_state;	/* handle for 'array_state'
+							 * file in sysfs.
+							 */
 
 	spinlock_t			write_lock;
 	wait_queue_head_t		sb_wait;	/* for waiting on superblock updates */

@@ -74,6 +74,7 @@ static int do_commit(struct ubifs_info *c)
 			goto out_up;
 	}
 
+	c->cmt_no += 1;
 	err = ubifs_gc_start_commit(c);
 	if (err)
 		goto out_up;
@@ -115,7 +116,7 @@ static int do_commit(struct ubifs_info *c)
 		goto out;
 
 	mutex_lock(&c->mst_mutex);
-	c->mst_node->cmt_no      = cpu_to_le64(++c->cmt_no);
+	c->mst_node->cmt_no      = cpu_to_le64(c->cmt_no);
 	c->mst_node->log_lnum    = cpu_to_le32(new_ltail_lnum);
 	c->mst_node->root_lnum   = cpu_to_le32(zroot.lnum);
 	c->mst_node->root_offs   = cpu_to_le32(zroot.offs);
@@ -233,8 +234,8 @@ int ubifs_bg_thread(void *info)
 	int err;
 	struct ubifs_info *c = info;
 
-	ubifs_msg("background thread \"%s\" started, PID %d",
-		  c->bgt_name, current->pid);
+	dbg_msg("background thread \"%s\" started, PID %d",
+		c->bgt_name, current->pid);
 	set_freezable();
 
 	while (1) {

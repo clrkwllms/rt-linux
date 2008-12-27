@@ -267,8 +267,7 @@ static ssize_t dlmfs_file_write(struct file *filp,
 	return writelen;
 }
 
-static void dlmfs_init_once(struct kmem_cache *cachep,
-			    void *foo)
+static void dlmfs_init_once(void *foo)
 {
 	struct dlmfs_inode_private *ip =
 		(struct dlmfs_inode_private *) foo;
@@ -609,8 +608,10 @@ static int __init init_dlmfs_fs(void)
 				0, (SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT|
 					SLAB_MEM_SPREAD),
 				dlmfs_init_once);
-	if (!dlmfs_inode_cache)
+	if (!dlmfs_inode_cache) {
+		status = -ENOMEM;
 		goto bail;
+	}
 	cleanup_inode = 1;
 
 	user_dlm_worker = create_singlethread_workqueue("user_dlm");

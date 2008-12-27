@@ -29,12 +29,11 @@
 #include <linux/mii.h>
 
 #include <asm/io.h>
-#include <asm/hardware.h>
-#include <asm/arch/hardware.h>
-#include <asm/arch/netx-regs.h>
-#include <asm/arch/pfifo.h>
-#include <asm/arch/xc.h>
-#include <asm/arch/eth.h>
+#include <mach/hardware.h>
+#include <mach/netx-regs.h>
+#include <mach/pfifo.h>
+#include <mach/xc.h>
+#include <mach/eth.h>
 
 /* XC Fifo Offsets */
 #define EMPTY_PTR_FIFO(xcno)    (0 + ((xcno) << 3))	/* Index of the empty pointer FIFO */
@@ -190,7 +189,7 @@ netx_eth_interrupt(int irq, void *dev_id)
 
 		if ((status & ISR_CON_HI) || (status & ISR_IND_HI))
 			printk("%s: unexpected status: 0x%08x\n",
-			    __FUNCTION__, status);
+			    __func__, status);
 
 		fill_level =
 		    readl(NETX_PFIFO_FILL_LEVEL(IND_FIFO_PORT_LO(priv->id)));
@@ -401,6 +400,8 @@ static int netx_eth_drv_probe(struct platform_device *pdev)
 	priv->xpec_base = priv->xc->xpec_base;
 	priv->xmac_base = priv->xc->xmac_base;
 	priv->sram_base = priv->xc->sram_base;
+
+	spin_lock_init(&priv->lock);
 
 	ret = pfifo_request(PFIFO_MASK(priv->id));
 	if (ret) {

@@ -505,7 +505,7 @@ mptctl_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 	event = le32_to_cpu(pEvReply->Event) & 0xFF;
 
 	dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s() called\n",
-	    ioc->name, __FUNCTION__));
+	    ioc->name, __func__));
 	if(async_queue == NULL)
 		return 1;
 
@@ -557,12 +557,6 @@ mptctl_fasync(int fd, struct file *filep, int mode)
 	ret = fasync_helper(fd, filep, mode, &async_queue);
 	unlock_kernel();
 	return ret;
-}
-
-static int
-mptctl_release(struct inode *inode, struct file *filep)
-{
-	return fasync_helper(-1, filep, 0, &async_queue);
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -2482,7 +2476,7 @@ mptctl_hp_hostinfo(unsigned long arg, unsigned int data_size)
 	 */
 	if ((mf = mpt_get_msg_frame(mptctl_id, ioc)) == NULL) {
 		dfailprintk(ioc, printk(MYIOC_s_WARN_FMT "%s, no msg frames!!\n",
-		    ioc->name,__FUNCTION__));
+		    ioc->name,__func__));
 		goto out;
 	}
 
@@ -2706,7 +2700,6 @@ mptctl_hp_targetinfo(unsigned long arg)
 static const struct file_operations mptctl_fops = {
 	.owner =	THIS_MODULE,
 	.llseek =	no_llseek,
-	.release =	mptctl_release,
 	.fasync = 	mptctl_fasync,
 	.unlocked_ioctl = mptctl_ioctl,
 #ifdef CONFIG_COMPAT

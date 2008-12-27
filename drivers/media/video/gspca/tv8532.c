@@ -22,9 +22,6 @@
 
 #include "gspca.h"
 
-#define DRIVER_VERSION_NUMBER	KERNEL_VERSION(2, 1, 7)
-static const char version[] = "2.1.7";
-
 MODULE_AUTHOR("Michel Xhaard <mxhaard@users.sourceforge.net>");
 MODULE_DESCRIPTION("TV8532 USB Camera Driver");
 MODULE_LICENSE("GPL");
@@ -249,7 +246,6 @@ static int sd_config(struct gspca_dev *gspca_dev,
 	tv_8532WriteEEprom(gspca_dev);
 
 	cam = &gspca_dev->cam;
-	cam->dev_name = (char *) id->driver_info;
 	cam->epaddr = 1;
 	cam->cam_mode = sif_mode;
 	cam->nmodes = sizeof sif_mode / sizeof sif_mode[0];
@@ -335,8 +331,8 @@ static void tv_8532_PollReg(struct gspca_dev *gspca_dev)
 	}
 }
 
-/* this function is called at open time */
-static int sd_open(struct gspca_dev *gspca_dev)
+/* this function is called at probe and resume time */
+static int sd_init(struct gspca_dev *gspca_dev)
 {
 	reg_w_1(gspca_dev, TV8532_AD_SLOPE, 0x32);
 	reg_w_1(gspca_dev, TV8532_AD_BITCTRL, 0x00);
@@ -394,7 +390,7 @@ static void setbrightness(struct gspca_dev *gspca_dev)
 }
 
 /* -- start the camera -- */
-static void sd_start(struct gspca_dev *gspca_dev)
+static int sd_start(struct gspca_dev *gspca_dev)
 {
 	reg_w_1(gspca_dev, TV8532_AD_SLOPE, 0x32);
 	reg_w_1(gspca_dev, TV8532_AD_BITCTRL, 0x00);
@@ -447,19 +443,12 @@ static void sd_start(struct gspca_dev *gspca_dev)
 	/************************************************/
 	tv_8532_PollReg(gspca_dev);
 	reg_w_1(gspca_dev, TV8532_UDP_UPDATE, 0x00);	/* 0x31 */
+	return 0;
 }
 
 static void sd_stopN(struct gspca_dev *gspca_dev)
 {
 	reg_w_1(gspca_dev, TV8532_GPIO_OE, 0x0b);
-}
-
-static void sd_stop0(struct gspca_dev *gspca_dev)
-{
-}
-
-static void sd_close(struct gspca_dev *gspca_dev)
-{
 }
 
 static void tv8532_preprocess(struct gspca_dev *gspca_dev)
@@ -615,22 +604,19 @@ static const struct sd_desc sd_desc = {
 	.ctrls = sd_ctrls,
 	.nctrls = ARRAY_SIZE(sd_ctrls),
 	.config = sd_config,
-	.open = sd_open,
+	.init = sd_init,
 	.start = sd_start,
 	.stopN = sd_stopN,
-	.stop0 = sd_stop0,
-	.close = sd_close,
 	.pkt_scan = sd_pkt_scan,
 };
 
 /* -- module initialisation -- */
-#define DVNM(name) .driver_info = (kernel_ulong_t) name
 static const __devinitdata struct usb_device_id device_table[] = {
-	{USB_DEVICE(0x046d, 0x0920), DVNM("QC Express")},
-	{USB_DEVICE(0x046d, 0x0921), DVNM("Labtec Webcam")},
-	{USB_DEVICE(0x0545, 0x808b), DVNM("Veo Stingray")},
-	{USB_DEVICE(0x0545, 0x8333), DVNM("Veo Stingray")},
-	{USB_DEVICE(0x0923, 0x010f), DVNM("ICM532 cams")},
+	{USB_DEVICE(0x046d, 0x0920)},
+	{USB_DEVICE(0x046d, 0x0921)},
+	{USB_DEVICE(0x0545, 0x808b)},
+	{USB_DEVICE(0x0545, 0x8333)},
+	{USB_DEVICE(0x0923, 0x010f)},
 	{}
 };
 
@@ -649,6 +635,10 @@ static struct usb_driver sd_driver = {
 	.id_table = device_table,
 	.probe = sd_probe,
 	.disconnect = gspca_disconnect,
+#ifdef CONFIG_PM
+	.suspend = gspca_suspend,
+	.resume = gspca_resume,
+#endif
 };
 
 /* -- module insert / remove -- */
@@ -656,7 +646,7 @@ static int __init sd_mod_init(void)
 {
 	if (usb_register(&sd_driver) < 0)
 		return -1;
-	PDEBUG(D_PROBE, "v%s registered", version);
+	PDEBUG(D_PROBE, "registered");
 	return 0;
 }
 

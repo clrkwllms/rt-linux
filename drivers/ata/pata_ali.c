@@ -1,7 +1,6 @@
 /*
  * pata_ali.c 	- ALI 15x3 PATA for new ATA layer
  *			  (C) 2005 Red Hat Inc
- *			  Alan Cox <alan@redhat.com>
  *
  * based in part upon
  * linux/drivers/ide/pci/alim15x3.c		Version 0.17	2003/01/02
@@ -550,8 +549,9 @@ static int ali_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		pci_read_config_byte(isa_bridge, 0x5E, &tmp);
 		if ((tmp & 0x1E) == 0x12)
 	        	ppi[0] = &info_20_udma;
-		pci_dev_put(isa_bridge);
 	}
+	pci_dev_put(isa_bridge);
+
 	return ata_pci_sff_init_one(pdev, ppi, &ali_sht, NULL);
 }
 

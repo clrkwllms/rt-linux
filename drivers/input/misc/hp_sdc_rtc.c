@@ -44,6 +44,7 @@
 #include <linux/proc_fs.h>
 #include <linux/poll.h>
 #include <linux/rtc.h>
+#include <linux/semaphore.h>
 
 MODULE_AUTHOR("Brian S. Julin <bri@calyx.com>");
 MODULE_DESCRIPTION("HP i8042 SDC + MSM-58321 RTC Driver");
@@ -70,7 +71,6 @@ static int hp_sdc_rtc_ioctl(struct inode *inode, struct file *file,
 static unsigned int hp_sdc_rtc_poll(struct file *file, poll_table *wait);
 
 static int hp_sdc_rtc_open(struct inode *inode, struct file *file);
-static int hp_sdc_rtc_release(struct inode *inode, struct file *file);
 static int hp_sdc_rtc_fasync (int fd, struct file *filp, int on);
 
 static int hp_sdc_rtc_read_proc(char *page, char **start, off_t off,
@@ -413,17 +413,6 @@ static int hp_sdc_rtc_open(struct inode *inode, struct file *file)
         return 0;
 }
 
-static int hp_sdc_rtc_release(struct inode *inode, struct file *file)
-{
-	/* Turn off interrupts? */
-
-        if (file->f_flags & FASYNC) {
-                hp_sdc_rtc_fasync (-1, file, 0);
-        }
-
-        return 0;
-}
-
 static int hp_sdc_rtc_fasync (int fd, struct file *filp, int on)
 {
         return fasync_helper (fd, filp, on, &hp_sdc_rtc_async_queue);
@@ -457,35 +446,35 @@ static int hp_sdc_rtc_proc_output (char *buf)
 		p += sprintf(p, "i8042 rtc\t: READ FAILED!\n");
 	} else {
 		p += sprintf(p, "i8042 rtc\t: %ld.%02d seconds\n", 
-			     tv.tv_sec, tv.tv_usec/1000);
+			     tv.tv_sec, (int)tv.tv_usec/1000);
 	}
 
 	if (hp_sdc_rtc_read_fhs(&tv)) {
 		p += sprintf(p, "handshake\t: READ FAILED!\n");
 	} else {
         	p += sprintf(p, "handshake\t: %ld.%02d seconds\n", 
-			     tv.tv_sec, tv.tv_usec/1000);
+			     tv.tv_sec, (int)tv.tv_usec/1000);
 	}
 
 	if (hp_sdc_rtc_read_mt(&tv)) {
 		p += sprintf(p, "alarm\t\t: READ FAILED!\n");
 	} else {
 		p += sprintf(p, "alarm\t\t: %ld.%02d seconds\n", 
-			     tv.tv_sec, tv.tv_usec/1000);
+			     tv.tv_sec, (int)tv.tv_usec/1000);
 	}
 
 	if (hp_sdc_rtc_read_dt(&tv)) {
 		p += sprintf(p, "delay\t\t: READ FAILED!\n");
 	} else {
 		p += sprintf(p, "delay\t\t: %ld.%02d seconds\n", 
-			     tv.tv_sec, tv.tv_usec/1000);
+			     tv.tv_sec, (int)tv.tv_usec/1000);
 	}
 
 	if (hp_sdc_rtc_read_ct(&tv)) {
 		p += sprintf(p, "periodic\t: READ FAILED!\n");
 	} else {
 		p += sprintf(p, "periodic\t: %ld.%02d seconds\n", 
-			     tv.tv_sec, tv.tv_usec/1000);
+			     tv.tv_sec, (int)tv.tv_usec/1000);
 	}
 
         p += sprintf(p,
@@ -679,7 +668,6 @@ static const struct file_operations hp_sdc_rtc_fops = {
         .poll =		hp_sdc_rtc_poll,
         .ioctl =	hp_sdc_rtc_ioctl,
         .open =		hp_sdc_rtc_open,
-        .release =	hp_sdc_rtc_release,
         .fasync =	hp_sdc_rtc_fasync,
 };
 

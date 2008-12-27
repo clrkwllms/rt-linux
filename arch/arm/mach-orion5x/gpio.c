@@ -15,9 +15,9 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <linux/bitops.h>
+#include <linux/io.h>
 #include <asm/gpio.h>
-#include <asm/io.h>
-#include <asm/arch/orion5x.h>
+#include <mach/orion5x.h>
 #include "common.h"
 
 static DEFINE_SPINLOCK(gpio_lock);
@@ -165,6 +165,8 @@ EXPORT_SYMBOL(gpio_request);
 
 void gpio_free(unsigned pin)
 {
+	might_sleep();
+
 	if (pin >= GPIO_MAX || !test_bit(pin, gpio_valid)) {
 		pr_debug("%s: invalid GPIO %d\n", __func__, pin);
 		return;

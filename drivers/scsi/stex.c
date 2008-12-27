@@ -467,7 +467,7 @@ stex_slave_alloc(struct scsi_device *sdev)
 	/* Cheat: usually extracted from Inquiry data */
 	sdev->tagged_supported = 1;
 
-	scsi_activate_tcq(sdev, sdev->host->can_queue);
+	scsi_activate_tcq(sdev, ST_CMD_PER_LUN);
 
 	return 0;
 }
@@ -477,7 +477,7 @@ stex_slave_config(struct scsi_device *sdev)
 {
 	sdev->use_10_for_rw = 1;
 	sdev->use_10_for_ms = 1;
-	sdev->timeout = 60 * HZ;
+	blk_queue_rq_timeout(sdev->request_queue, 60 * HZ);
 	sdev->tagged_supported = 1;
 
 	return 0;

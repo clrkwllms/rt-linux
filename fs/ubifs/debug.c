@@ -101,21 +101,24 @@ static void sprintf_key(const struct ubifs_info *c, const union ubifs_key *key,
 	if (c->key_fmt == UBIFS_SIMPLE_KEY_FMT) {
 		switch (type) {
 		case UBIFS_INO_KEY:
-			sprintf(p, "(%lu, %s)", key_inum(c, key),
+			sprintf(p, "(%lu, %s)", (unsigned long)key_inum(c, key),
 			       get_key_type(type));
 			break;
 		case UBIFS_DENT_KEY:
 		case UBIFS_XENT_KEY:
-			sprintf(p, "(%lu, %s, %#08x)", key_inum(c, key),
+			sprintf(p, "(%lu, %s, %#08x)",
+				(unsigned long)key_inum(c, key),
 				get_key_type(type), key_hash(c, key));
 			break;
 		case UBIFS_DATA_KEY:
-			sprintf(p, "(%lu, %s, %u)", key_inum(c, key),
+			sprintf(p, "(%lu, %s, %u)",
+				(unsigned long)key_inum(c, key),
 				get_key_type(type), key_block(c, key));
 			break;
 		case UBIFS_TRUN_KEY:
 			sprintf(p, "(%lu, %s)",
-				key_inum(c, key), get_key_type(type));
+				(unsigned long)key_inum(c, key),
+				get_key_type(type));
 			break;
 		default:
 			sprintf(p, "(bad key type: %#08x, %#08x)",
@@ -222,30 +225,38 @@ void dbg_dump_inode(const struct ubifs_info *c, const struct inode *inode)
 {
 	const struct ubifs_inode *ui = ubifs_inode(inode);
 
-	printk(KERN_DEBUG "inode      %lu\n", inode->i_ino);
-	printk(KERN_DEBUG "size       %llu\n",
+	printk(KERN_DEBUG "Dump in-memory inode:");
+	printk(KERN_DEBUG "\tinode          %lu\n", inode->i_ino);
+	printk(KERN_DEBUG "\tsize           %llu\n",
 	       (unsigned long long)i_size_read(inode));
-	printk(KERN_DEBUG "nlink      %u\n", inode->i_nlink);
-	printk(KERN_DEBUG "uid        %u\n", (unsigned int)inode->i_uid);
-	printk(KERN_DEBUG "gid        %u\n", (unsigned int)inode->i_gid);
-	printk(KERN_DEBUG "atime      %u.%u\n",
+	printk(KERN_DEBUG "\tnlink          %u\n", inode->i_nlink);
+	printk(KERN_DEBUG "\tuid            %u\n", (unsigned int)inode->i_uid);
+	printk(KERN_DEBUG "\tgid            %u\n", (unsigned int)inode->i_gid);
+	printk(KERN_DEBUG "\tatime          %u.%u\n",
 	       (unsigned int)inode->i_atime.tv_sec,
 	       (unsigned int)inode->i_atime.tv_nsec);
-	printk(KERN_DEBUG "mtime      %u.%u\n",
+	printk(KERN_DEBUG "\tmtime          %u.%u\n",
 	       (unsigned int)inode->i_mtime.tv_sec,
 	       (unsigned int)inode->i_mtime.tv_nsec);
-	printk(KERN_DEBUG "ctime       %u.%u\n",
+	printk(KERN_DEBUG "\tctime          %u.%u\n",
 	       (unsigned int)inode->i_ctime.tv_sec,
 	       (unsigned int)inode->i_ctime.tv_nsec);
-	printk(KERN_DEBUG "creat_sqnum %llu\n", ui->creat_sqnum);
-	printk(KERN_DEBUG "xattr_size  %u\n", ui->xattr_size);
-	printk(KERN_DEBUG "xattr_cnt   %u\n", ui->xattr_cnt);
-	printk(KERN_DEBUG "xattr_names %u\n", ui->xattr_names);
-	printk(KERN_DEBUG "dirty       %u\n", ui->dirty);
-	printk(KERN_DEBUG "xattr       %u\n", ui->xattr);
-	printk(KERN_DEBUG "flags       %d\n", ui->flags);
-	printk(KERN_DEBUG "compr_type  %d\n", ui->compr_type);
-	printk(KERN_DEBUG "data_len    %d\n", ui->data_len);
+	printk(KERN_DEBUG "\tcreat_sqnum    %llu\n", ui->creat_sqnum);
+	printk(KERN_DEBUG "\txattr_size     %u\n", ui->xattr_size);
+	printk(KERN_DEBUG "\txattr_cnt      %u\n", ui->xattr_cnt);
+	printk(KERN_DEBUG "\txattr_names    %u\n", ui->xattr_names);
+	printk(KERN_DEBUG "\tdirty          %u\n", ui->dirty);
+	printk(KERN_DEBUG "\txattr          %u\n", ui->xattr);
+	printk(KERN_DEBUG "\tbulk_read      %u\n", ui->xattr);
+	printk(KERN_DEBUG "\tsynced_i_size  %llu\n",
+	       (unsigned long long)ui->synced_i_size);
+	printk(KERN_DEBUG "\tui_size        %llu\n",
+	       (unsigned long long)ui->ui_size);
+	printk(KERN_DEBUG "\tflags          %d\n", ui->flags);
+	printk(KERN_DEBUG "\tcompr_type     %d\n", ui->compr_type);
+	printk(KERN_DEBUG "\tlast_page_read %lu\n", ui->last_page_read);
+	printk(KERN_DEBUG "\tread_in_a_row  %lu\n", ui->read_in_a_row);
+	printk(KERN_DEBUG "\tdata_len       %d\n", ui->data_len);
 }
 
 void dbg_dump_node(const struct ubifs_info *c, const void *node)
@@ -356,8 +367,8 @@ void dbg_dump_node(const struct ubifs_info *c, const void *node)
 		       le32_to_cpu(mst->ihead_lnum));
 		printk(KERN_DEBUG "\tihead_offs     %u\n",
 		       le32_to_cpu(mst->ihead_offs));
-		printk(KERN_DEBUG "\tindex_size     %u\n",
-		       le32_to_cpu(mst->index_size));
+		printk(KERN_DEBUG "\tindex_size     %llu\n",
+		       (unsigned long long)le64_to_cpu(mst->index_size));
 		printk(KERN_DEBUG "\tlpt_lnum       %u\n",
 		       le32_to_cpu(mst->lpt_lnum));
 		printk(KERN_DEBUG "\tlpt_offs       %u\n",
@@ -538,7 +549,7 @@ void dbg_dump_node(const struct ubifs_info *c, const void *node)
 		printk(KERN_DEBUG "\t%d orphan inode numbers:\n", n);
 		for (i = 0; i < n; i++)
 			printk(KERN_DEBUG "\t  ino %llu\n",
-			       le64_to_cpu(orph->inos[i]));
+			       (unsigned long long)le64_to_cpu(orph->inos[i]));
 		break;
 	}
 	default:
@@ -568,8 +579,8 @@ void dbg_dump_budget_req(const struct ubifs_budget_req *req)
 void dbg_dump_lstats(const struct ubifs_lp_stats *lst)
 {
 	spin_lock(&dbg_lock);
-	printk(KERN_DEBUG "Lprops statistics: empty_lebs %d, idx_lebs  %d\n",
-	       lst->empty_lebs, lst->idx_lebs);
+	printk(KERN_DEBUG "(pid %d) Lprops statistics: empty_lebs %d, "
+	       "idx_lebs  %d\n", current->pid, lst->empty_lebs, lst->idx_lebs);
 	printk(KERN_DEBUG "\ttaken_empty_lebs %d, total_free %lld, "
 	       "total_dirty %lld\n", lst->taken_empty_lebs, lst->total_free,
 	       lst->total_dirty);
@@ -587,8 +598,8 @@ void dbg_dump_budg(struct ubifs_info *c)
 	struct ubifs_gced_idx_leb *idx_gc;
 
 	spin_lock(&dbg_lock);
-	printk(KERN_DEBUG "Budgeting info: budg_data_growth %lld, "
-	       "budg_dd_growth %lld, budg_idx_growth %lld\n",
+	printk(KERN_DEBUG "(pid %d) Budgeting info: budg_data_growth %lld, "
+	       "budg_dd_growth %lld, budg_idx_growth %lld\n", current->pid,
 	       c->budg_data_growth, c->budg_dd_growth, c->budg_idx_growth);
 	printk(KERN_DEBUG "\tdata budget sum %lld, total budget sum %lld, "
 	       "freeable_cnt %d\n", c->budg_data_growth + c->budg_dd_growth,
@@ -634,7 +645,7 @@ void dbg_dump_lprops(struct ubifs_info *c)
 	struct ubifs_lprops lp;
 	struct ubifs_lp_stats lst;
 
-	printk(KERN_DEBUG "Dumping LEB properties\n");
+	printk(KERN_DEBUG "(pid %d) Dumping LEB properties\n", current->pid);
 	ubifs_get_lp_stats(c, &lst);
 	dbg_dump_lstats(&lst);
 
@@ -647,6 +658,43 @@ void dbg_dump_lprops(struct ubifs_info *c)
 	}
 }
 
+void dbg_dump_lpt_info(struct ubifs_info *c)
+{
+	int i;
+
+	spin_lock(&dbg_lock);
+	printk(KERN_DEBUG "\tlpt_sz:        %lld\n", c->lpt_sz);
+	printk(KERN_DEBUG "\tpnode_sz:      %d\n", c->pnode_sz);
+	printk(KERN_DEBUG "\tnnode_sz:      %d\n", c->nnode_sz);
+	printk(KERN_DEBUG "\tltab_sz:       %d\n", c->ltab_sz);
+	printk(KERN_DEBUG "\tlsave_sz:      %d\n", c->lsave_sz);
+	printk(KERN_DEBUG "\tbig_lpt:       %d\n", c->big_lpt);
+	printk(KERN_DEBUG "\tlpt_hght:      %d\n", c->lpt_hght);
+	printk(KERN_DEBUG "\tpnode_cnt:     %d\n", c->pnode_cnt);
+	printk(KERN_DEBUG "\tnnode_cnt:     %d\n", c->nnode_cnt);
+	printk(KERN_DEBUG "\tdirty_pn_cnt:  %d\n", c->dirty_pn_cnt);
+	printk(KERN_DEBUG "\tdirty_nn_cnt:  %d\n", c->dirty_nn_cnt);
+	printk(KERN_DEBUG "\tlsave_cnt:     %d\n", c->lsave_cnt);
+	printk(KERN_DEBUG "\tspace_bits:    %d\n", c->space_bits);
+	printk(KERN_DEBUG "\tlpt_lnum_bits: %d\n", c->lpt_lnum_bits);
+	printk(KERN_DEBUG "\tlpt_offs_bits: %d\n", c->lpt_offs_bits);
+	printk(KERN_DEBUG "\tlpt_spc_bits:  %d\n", c->lpt_spc_bits);
+	printk(KERN_DEBUG "\tpcnt_bits:     %d\n", c->pcnt_bits);
+	printk(KERN_DEBUG "\tlnum_bits:     %d\n", c->lnum_bits);
+	printk(KERN_DEBUG "\tLPT root is at %d:%d\n", c->lpt_lnum, c->lpt_offs);
+	printk(KERN_DEBUG "\tLPT head is at %d:%d\n",
+	       c->nhead_lnum, c->nhead_offs);
+	printk(KERN_DEBUG "\tLPT ltab is at %d:%d\n", c->ltab_lnum, c->ltab_offs);
+	if (c->big_lpt)
+		printk(KERN_DEBUG "\tLPT lsave is at %d:%d\n",
+		       c->lsave_lnum, c->lsave_offs);
+	for (i = 0; i < c->lpt_lebs; i++)
+		printk(KERN_DEBUG "\tLPT LEB %d free %d dirty %d tgc %d "
+		       "cmt %d\n", i + c->lpt_first, c->ltab[i].free,
+		       c->ltab[i].dirty, c->ltab[i].tgc, c->ltab[i].cmt);
+	spin_unlock(&dbg_lock);
+}
+
 void dbg_dump_leb(const struct ubifs_info *c, int lnum)
 {
 	struct ubifs_scan_leb *sleb;
@@ -655,7 +703,7 @@ void dbg_dump_leb(const struct ubifs_info *c, int lnum)
 	if (dbg_failure_mode)
 		return;
 
-	printk(KERN_DEBUG "Dumping LEB %d\n", lnum);
+	printk(KERN_DEBUG "(pid %d) Dumping LEB %d\n", current->pid, lnum);
 
 	sleb = ubifs_scan(c, lnum, 0, c->dbg_buf);
 	if (IS_ERR(sleb)) {
@@ -720,8 +768,8 @@ void dbg_dump_heap(struct ubifs_info *c, struct ubifs_lpt_heap *heap, int cat)
 {
 	int i;
 
-	printk(KERN_DEBUG "Dumping heap cat %d (%d elements)\n",
-	       cat, heap->cnt);
+	printk(KERN_DEBUG "(pid %d) Dumping heap cat %d (%d elements)\n",
+	       current->pid, cat, heap->cnt);
 	for (i = 0; i < heap->cnt; i++) {
 		struct ubifs_lprops *lprops = heap->arr[i];
 
@@ -736,7 +784,7 @@ void dbg_dump_pnode(struct ubifs_info *c, struct ubifs_pnode *pnode,
 {
 	int i;
 
-	printk(KERN_DEBUG "Dumping pnode:\n");
+	printk(KERN_DEBUG "(pid %d) Dumping pnode:\n", current->pid);
 	printk(KERN_DEBUG "\taddress %zx parent %zx cnext %zx\n",
 	       (size_t)pnode, (size_t)parent, (size_t)pnode->cnext);
 	printk(KERN_DEBUG "\tflags %lu iip %d level %d num %d\n",
@@ -755,7 +803,7 @@ void dbg_dump_tnc(struct ubifs_info *c)
 	int level;
 
 	printk(KERN_DEBUG "\n");
-	printk(KERN_DEBUG "Dumping the TNC tree\n");
+	printk(KERN_DEBUG "(pid %d) Dumping the TNC tree\n", current->pid);
 	znode = ubifs_tnc_levelorder_next(c->zroot.znode, NULL);
 	level = znode->level;
 	printk(KERN_DEBUG "== Level %d ==\n", level);
@@ -1544,7 +1592,7 @@ static struct fsck_inode *add_inode(struct ubifs_info *c,
 
 	if (inum > c->highest_inum) {
 		ubifs_err("too high inode number, max. is %lu",
-			  c->highest_inum);
+			  (unsigned long)c->highest_inum);
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -1623,16 +1671,18 @@ static struct fsck_inode *read_add_inode(struct ubifs_info *c,
 	ino_key_init(c, &key, inum);
 	err = ubifs_lookup_level0(c, &key, &znode, &n);
 	if (!err) {
-		ubifs_err("inode %lu not found in index", inum);
+		ubifs_err("inode %lu not found in index", (unsigned long)inum);
 		return ERR_PTR(-ENOENT);
 	} else if (err < 0) {
-		ubifs_err("error %d while looking up inode %lu", err, inum);
+		ubifs_err("error %d while looking up inode %lu",
+			  err, (unsigned long)inum);
 		return ERR_PTR(err);
 	}
 
 	zbr = &znode->zbranch[n];
 	if (zbr->len < UBIFS_INO_NODE_SZ) {
-		ubifs_err("bad node %lu node length %d", inum, zbr->len);
+		ubifs_err("bad node %lu node length %d",
+			  (unsigned long)inum, zbr->len);
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -1652,7 +1702,7 @@ static struct fsck_inode *read_add_inode(struct ubifs_info *c,
 	kfree(ino);
 	if (IS_ERR(fscki)) {
 		ubifs_err("error %ld while adding inode %lu node",
-			  PTR_ERR(fscki), inum);
+			  PTR_ERR(fscki), (unsigned long)inum);
 		return fscki;
 	}
 
@@ -1741,7 +1791,8 @@ static int check_leaf(struct ubifs_info *c, struct ubifs_zbranch *zbr,
 		if (IS_ERR(fscki)) {
 			err = PTR_ERR(fscki);
 			ubifs_err("error %d while processing data node and "
-				  "trying to find inode node %lu", err, inum);
+				  "trying to find inode node %lu",
+				  err, (unsigned long)inum);
 			goto out_dump;
 		}
 
@@ -1774,7 +1825,8 @@ static int check_leaf(struct ubifs_info *c, struct ubifs_zbranch *zbr,
 		if (IS_ERR(fscki)) {
 			err = PTR_ERR(fscki);
 			ubifs_err("error %d while processing entry node and "
-				  "trying to find inode node %lu", err, inum);
+				  "trying to find inode node %lu",
+				  err, (unsigned long)inum);
 			goto out_dump;
 		}
 
@@ -1787,7 +1839,7 @@ static int check_leaf(struct ubifs_info *c, struct ubifs_zbranch *zbr,
 			err = PTR_ERR(fscki);
 			ubifs_err("error %d while processing entry node and "
 				  "trying to find parent inode node %lu",
-				  err, inum);
+				  err, (unsigned long)inum);
 			goto out_dump;
 		}
 
@@ -1878,7 +1930,8 @@ static int check_inodes(struct ubifs_info *c, struct fsck_data *fsckd)
 			    fscki->references != 1) {
 				ubifs_err("directory inode %lu has %d "
 					  "direntries which refer it, but "
-					  "should be 1", fscki->inum,
+					  "should be 1",
+					  (unsigned long)fscki->inum,
 					  fscki->references);
 				goto out_dump;
 			}
@@ -1886,27 +1939,29 @@ static int check_inodes(struct ubifs_info *c, struct fsck_data *fsckd)
 			    fscki->references != 0) {
 				ubifs_err("root inode %lu has non-zero (%d) "
 					  "direntries which refer it",
-					  fscki->inum, fscki->references);
+					  (unsigned long)fscki->inum,
+					  fscki->references);
 				goto out_dump;
 			}
 			if (fscki->calc_sz != fscki->size) {
 				ubifs_err("directory inode %lu size is %lld, "
 					  "but calculated size is %lld",
-					  fscki->inum, fscki->size,
-					  fscki->calc_sz);
+					  (unsigned long)fscki->inum,
+					  fscki->size, fscki->calc_sz);
 				goto out_dump;
 			}
 			if (fscki->calc_cnt != fscki->nlink) {
 				ubifs_err("directory inode %lu nlink is %d, "
 					  "but calculated nlink is %d",
-					  fscki->inum, fscki->nlink,
-					  fscki->calc_cnt);
+					  (unsigned long)fscki->inum,
+					  fscki->nlink, fscki->calc_cnt);
 				goto out_dump;
 			}
 		} else {
 			if (fscki->references != fscki->nlink) {
 				ubifs_err("inode %lu nlink is %d, but "
-					  "calculated nlink is %d", fscki->inum,
+					  "calculated nlink is %d",
+					  (unsigned long)fscki->inum,
 					  fscki->nlink, fscki->references);
 				goto out_dump;
 			}
@@ -1914,20 +1969,21 @@ static int check_inodes(struct ubifs_info *c, struct fsck_data *fsckd)
 		if (fscki->xattr_sz != fscki->calc_xsz) {
 			ubifs_err("inode %lu has xattr size %u, but "
 				  "calculated size is %lld",
-				  fscki->inum, fscki->xattr_sz,
+				  (unsigned long)fscki->inum, fscki->xattr_sz,
 				  fscki->calc_xsz);
 			goto out_dump;
 		}
 		if (fscki->xattr_cnt != fscki->calc_xcnt) {
 			ubifs_err("inode %lu has %u xattrs, but "
-				  "calculated count is %lld", fscki->inum,
+				  "calculated count is %lld",
+				  (unsigned long)fscki->inum,
 				  fscki->xattr_cnt, fscki->calc_xcnt);
 			goto out_dump;
 		}
 		if (fscki->xattr_nms != fscki->calc_xnms) {
 			ubifs_err("inode %lu has xattr names' size %u, but "
 				  "calculated names' size is %lld",
-				  fscki->inum, fscki->xattr_nms,
+				  (unsigned long)fscki->inum, fscki->xattr_nms,
 				  fscki->calc_xnms);
 			goto out_dump;
 		}
@@ -1940,11 +1996,12 @@ out_dump:
 	ino_key_init(c, &key, fscki->inum);
 	err = ubifs_lookup_level0(c, &key, &znode, &n);
 	if (!err) {
-		ubifs_err("inode %lu not found in index", fscki->inum);
+		ubifs_err("inode %lu not found in index",
+			  (unsigned long)fscki->inum);
 		return -ENOENT;
 	} else if (err < 0) {
 		ubifs_err("error %d while looking up inode %lu",
-			  err, fscki->inum);
+			  err, (unsigned long)fscki->inum);
 		return err;
 	}
 
@@ -1962,7 +2019,7 @@ out_dump:
 	}
 
 	ubifs_msg("dump of the inode %lu sitting in LEB %d:%d",
-		  fscki->inum, zbr->lnum, zbr->offs);
+		  (unsigned long)fscki->inum, zbr->lnum, zbr->offs);
 	dbg_dump_node(c, ino);
 	kfree(ino);
 	return -EINVAL;
@@ -2208,16 +2265,17 @@ int dbg_leb_read(struct ubi_volume_desc *desc, int lnum, char *buf, int offset,
 int dbg_leb_write(struct ubi_volume_desc *desc, int lnum, const void *buf,
 		  int offset, int len, int dtype)
 {
-	int err;
+	int err, failing;
 
 	if (in_failure_mode(desc))
 		return -EIO;
-	if (do_fail(desc, lnum, 1))
+	failing = do_fail(desc, lnum, 1);
+	if (failing)
 		cut_data(buf, len);
 	err = ubi_leb_write(desc, lnum, buf, offset, len, dtype);
 	if (err)
 		return err;
-	if (in_failure_mode(desc))
+	if (failing)
 		return -EIO;
 	return 0;
 }

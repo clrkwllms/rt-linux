@@ -212,7 +212,7 @@ xfs_rename(
 	if (unlikely((target_dp->i_d.di_flags & XFS_DIFLAG_PROJINHERIT) &&
 		     (target_dp->i_d.di_projid != src_ip->i_d.di_projid))) {
 		error = XFS_ERROR(EXDEV);
-		xfs_rename_unlock4(inodes, XFS_ILOCK_SHARED);
+		xfs_rename_unlock4(inodes, XFS_ILOCK_EXCL);
 		xfs_trans_cancel(tp, cancel_flags);
 		goto std_return;
 	}
@@ -336,20 +336,16 @@ xfs_rename(
 		ASSERT(error != EEXIST);
 		if (error)
 			goto abort_return;
-		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
-
-	} else {
-		/*
-		 * We always want to hit the ctime on the source inode.
-		 * We do it in the if clause above for the 'new_parent &&
-		 * src_is_directory' case, and here we get all the other
-		 * cases.  This isn't strictly required by the standards
-		 * since the source inode isn't really being changed,
-		 * but old unix file systems did it and some incremental
-		 * backup programs won't work without it.
-		 */
-		xfs_ichgtime(src_ip, XFS_ICHGTIME_CHG);
 	}
+
+	/*
+	 * We always want to hit the ctime on the source inode.
+	 *
+	 * This isn't strictly required by the standards since the source
+	 * inode isn't really being changed, but old unix file systems did
+	 * it and some incremental backup programs won't work without it.
+	 */
+	xfs_ichgtime(src_ip, XFS_ICHGTIME_CHG);
 
 	/*
 	 * Adjust the link count on src_dp.  This is necessary when

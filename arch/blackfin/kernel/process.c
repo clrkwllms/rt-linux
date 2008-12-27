@@ -105,7 +105,7 @@ void cpu_idle(void)
 #endif
 		if (!idle)
 			idle = default_idle;
-		tick_nohz_stop_sched_tick();
+		tick_nohz_stop_sched_tick(1);
 		while (!need_resched())
 			idle();
 		tick_nohz_restart_sched_tick();
@@ -351,8 +351,13 @@ int _access_ok(unsigned long addr, unsigned long size)
 		return 1;
 #endif
 #if L1_DATA_B_LENGTH != 0
-	if (addr >= L1_DATA_B_START
+	if (addr >= L1_DATA_B_START + (_ebss_b_l1 - _sdata_b_l1)
 	    && addr + size <= L1_DATA_B_START + L1_DATA_B_LENGTH)
+		return 1;
+#endif
+#if L2_LENGTH != 0
+	if (addr >= L2_START + (_ebss_l2 - _stext_l2)
+	    && addr + size <= L2_START + L2_LENGTH)
 		return 1;
 #endif
 	return 0;

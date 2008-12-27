@@ -102,6 +102,13 @@ config EDAC_I3000
 	  Support for error detection and correction on the Intel
 	  3000 and 3010 server chipsets.
 
+config EDAC_X38
+	tristate "Intel X38"
+	depends on EDAC_MM_EDAC && PCI && X86
+	help
+	  Support for error detection and correction on the Intel
+	  X38 server chipsets.
+
 config EDAC_I82860
 	tristate "Intel 82860"
 	depends on EDAC_MM_EDAC && PCI && X86_32
@@ -122,6 +129,13 @@ config EDAC_I5000
 	help
 	  Support for error detection and correction the Intel
 	  Greekcreek/Blackford chipsets.
+
+config EDAC_I5100
+	tristate "Intel San Clemente MCH"
+	depends on EDAC_MM_EDAC && X86 && PCI
+	help
+	  Support for error detection and correction the Intel
+	  San Clemente MCH.
 
 config EDAC_MPC85XX
 	tristate "Freescale MPC85xx"

@@ -101,18 +101,15 @@ void ivtv_expand_service_set(struct v4l2_sliced_vbi_format *fmt, int is_pal)
 	}
 }
 
-static int check_service_set(struct v4l2_sliced_vbi_format *fmt, int is_pal)
+static void check_service_set(struct v4l2_sliced_vbi_format *fmt, int is_pal)
 {
 	int f, l;
-	u16 set = 0;
 
 	for (f = 0; f < 2; f++) {
 		for (l = 0; l < 24; l++) {
 			fmt->service_lines[f][l] = select_service_from_set(f, l, fmt->service_lines[f][l], is_pal);
-			set |= fmt->service_lines[f][l];
 		}
 	}
-	return set != 0;
 }
 
 u16 ivtv_get_service_set(struct v4l2_sliced_vbi_format *fmt)
@@ -474,7 +471,7 @@ static int ivtv_try_fmt_vid_cap(struct file *file, void *fh, struct v4l2_format 
 	int h = fmt->fmt.pix.height;
 
 	w = min(w, 720);
-	w = max(w, 1);
+	w = max(w, 2);
 	h = min(h, itv->is_50hz ? 576 : 480);
 	h = max(h, 2);
 	ivtv_g_fmt_vid_cap(file, fh, fmt);
@@ -512,27 +509,34 @@ static int ivtv_try_fmt_sliced_vbi_cap(struct file *file, void *fh, struct v4l2_
 static int ivtv_try_fmt_vid_out(struct file *file, void *fh, struct v4l2_format *fmt)
 {
 	struct ivtv_open_id *id = fh;
-	s32 w, h;
-	int field;
-	int ret;
+	s32 w = fmt->fmt.pix.width;
+	s32 h = fmt->fmt.pix.height;
+	int field = fmt->fmt.pix.field;
+	int ret = ivtv_g_fmt_vid_out(file, fh, fmt);
 
-	w = fmt->fmt.pix.width;
-	h = fmt->fmt.pix.height;
-	field = fmt->fmt.pix.field;
-	ret = ivtv_g_fmt_vid_out(file, fh, fmt);
+	w = min(w, 720);
+	w = max(w, 2);
+	/* Why can the height be 576 even when the output is NTSC?
+
+	   Internally the buffers of the PVR350 are always set to 720x576. The
+	   decoded video frame will always be placed in the top left corner of
+	   this buffer. For any video which is not 720x576, the buffer will
+	   then be cropped to remove the unused right and lower areas, with
+	   the remaining image being scaled by the hardware to fit the display
+	   area. The video can be scaled both up and down, so a 720x480 video
+	   can be displayed full-screen on PAL and a 720x576 video can be
+	   displayed without cropping on NTSC.
+
+	   Note that the scaling only occurs on the video stream, the osd
+	   resolution is locked to the broadcast standard and not scaled.
+
+	   Thanks to Ian Armstrong for this explanation. */
+	h = min(h, 576);
+	h = max(h, 2);
+	if (id->type == IVTV_DEC_STREAM_TYPE_YUV)
+		fmt->fmt.pix.field = field;
 	fmt->fmt.pix.width = w;
 	fmt->fmt.pix.height = h;
-	if (!ret && id->type == IVTV_DEC_STREAM_TYPE_YUV) {
-		fmt->fmt.pix.field = field;
-		if (fmt->fmt.pix.width < 2)
-			fmt->fmt.pix.width = 2;
-		if (fmt->fmt.pix.width > 720)
-			fmt->fmt.pix.width = 720;
-		if (fmt->fmt.pix.height < 2)
-			fmt->fmt.pix.height = 2;
-		if (fmt->fmt.pix.height > 576)
-			fmt->fmt.pix.height = 576;
-	}
 	return ret;
 }
 
@@ -560,9 +564,9 @@ static int ivtv_s_fmt_vid_cap(struct file *file, void *fh, struct v4l2_format *f
 	struct ivtv_open_id *id = fh;
 	struct ivtv *itv = id->itv;
 	struct cx2341x_mpeg_params *p = &itv->params;
+	int ret = ivtv_try_fmt_vid_cap(file, fh, fmt);
 	int w = fmt->fmt.pix.width;
 	int h = fmt->fmt.pix.height;
-	int ret = ivtv_try_fmt_vid_cap(file, fh, fmt);
 
 	if (ret)
 		return ret;
@@ -585,8 +589,11 @@ static int ivtv_s_fmt_vbi_cap(struct file *file, void *fh, struct v4l2_format *f
 {
 	struct ivtv *itv = ((struct ivtv_open_id *)fh)->itv;
 
+	if (!ivtv_raw_vbi(itv) && atomic_read(&itv->capturing) > 0)
+		return -EBUSY;
 	itv->vbi.sliced_in->service_set = 0;
-	itv->video_dec_func(itv, VIDIOC_S_FMT, &itv->vbi.in);
+	itv->vbi.in.type = V4L2_BUF_TYPE_VBI_CAPTURE;
+	itv->video_dec_func(itv, VIDIOC_S_FMT, fmt);
 	return ivtv_g_fmt_vbi_cap(file, fh, fmt);
 }
 
@@ -600,10 +607,10 @@ static int ivtv_s_fmt_sliced_vbi_cap(struct file *file, void *fh, struct v4l2_fo
 	if (ret || id->type == IVTV_DEC_STREAM_TYPE_VBI)
 		return ret;
 
-	if (check_service_set(vbifmt, itv->is_50hz) == 0)
-		return -EINVAL;
-	if (atomic_read(&itv->capturing) > 0)
+	check_service_set(vbifmt, itv->is_50hz);
+	if (ivtv_raw_vbi(itv) && atomic_read(&itv->capturing) > 0)
 		return -EBUSY;
+	itv->vbi.in.type = V4L2_BUF_TYPE_SLICED_VBI_CAPTURE;
 	itv->video_dec_func(itv, VIDIOC_S_FMT, fmt);
 	memcpy(itv->vbi.sliced_in, vbifmt, sizeof(*itv->vbi.sliced_in));
 	return 0;
@@ -651,8 +658,6 @@ static int ivtv_s_fmt_vid_out(struct file *file, void *fh, struct v4l2_format *f
 		itv->dma_data_req_size =
 			1080 * ((yi->v4l2_src_h + 31) & ~31);
 
-	/* Force update of yuv registers */
-	yi->yuv_forced_update = 1;
 	return 0;
 }
 
@@ -761,7 +766,7 @@ static int ivtv_querycap(struct file *file, void *fh, struct v4l2_capability *vc
 
 	strlcpy(vcap->driver, IVTV_DRIVER_NAME, sizeof(vcap->driver));
 	strlcpy(vcap->card, itv->card_name, sizeof(vcap->card));
-	strlcpy(vcap->bus_info, pci_name(itv->dev), sizeof(vcap->bus_info));
+	snprintf(vcap->bus_info, sizeof(vcap->bus_info), "PCI:%s", pci_name(itv->dev));
 	vcap->version = IVTV_DRIVER_VERSION; 	    /* version */
 	vcap->capabilities = itv->v4l2_cap; 	    /* capabilities */
 	return 0;
@@ -1370,6 +1375,9 @@ static int ivtv_g_fbuf(struct file *file, void *fh, struct v4l2_framebuffer *fb)
 	if (itv->osd_global_alpha_state)
 		fb->flags |= V4L2_FBUF_FLAG_GLOBAL_ALPHA;
 
+	if (yi->track_osd)
+		fb->flags |= V4L2_FBUF_FLAG_OVERLAY;
+
 	pixfmt &= 7;
 
 	/* no local alpha for RGB565 or unknown formats */
@@ -1389,8 +1397,6 @@ static int ivtv_g_fbuf(struct file *file, void *fh, struct v4l2_framebuffer *fb)
 		else
 			fb->flags |= V4L2_FBUF_FLAG_LOCAL_ALPHA;
 	}
-	if (yi->track_osd)
-		fb->flags |= V4L2_FBUF_FLAG_OVERLAY;
 
 	return 0;
 }
@@ -1750,12 +1756,12 @@ static int ivtv_default(struct file *file, void *fh, int cmd, void *arg)
 	return 0;
 }
 
-static int ivtv_serialized_ioctl(struct ivtv *itv, struct inode *inode, struct file *filp,
+static long ivtv_serialized_ioctl(struct ivtv *itv, struct file *filp,
 		unsigned int cmd, unsigned long arg)
 {
 	struct video_device *vfd = video_devdata(filp);
 	struct ivtv_open_id *id = (struct ivtv_open_id *)filp->private_data;
-	int ret;
+	long ret;
 
 	/* Filter dvb ioctls that cannot be handled by the v4l ioctl framework */
 	switch (cmd) {
@@ -1824,87 +1830,90 @@ static int ivtv_serialized_ioctl(struct ivtv *itv, struct inode *inode, struct f
 
 	if (ivtv_debug & IVTV_DBGFLG_IOCTL)
 		vfd->debug = V4L2_DEBUG_IOCTL | V4L2_DEBUG_IOCTL_ARG;
-	ret = video_ioctl2(inode, filp, cmd, arg);
+	ret = __video_ioctl2(filp, cmd, arg);
 	vfd->debug = 0;
 	return ret;
 }
 
-int ivtv_v4l2_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
-		    unsigned long arg)
+long ivtv_v4l2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct ivtv_open_id *id = (struct ivtv_open_id *)filp->private_data;
 	struct ivtv *itv = id->itv;
-	int res;
+	long res;
 
 	mutex_lock(&itv->serialize_lock);
-	res = ivtv_serialized_ioctl(itv, inode, filp, cmd, arg);
+	res = ivtv_serialized_ioctl(itv, filp, cmd, arg);
 	mutex_unlock(&itv->serialize_lock);
 	return res;
 }
 
+static const struct v4l2_ioctl_ops ivtv_ioctl_ops = {
+	.vidioc_querycap    		    = ivtv_querycap,
+	.vidioc_g_priority  		    = ivtv_g_priority,
+	.vidioc_s_priority  		    = ivtv_s_priority,
+	.vidioc_s_audio     		    = ivtv_s_audio,
+	.vidioc_g_audio     		    = ivtv_g_audio,
+	.vidioc_enumaudio   		    = ivtv_enumaudio,
+	.vidioc_s_audout     		    = ivtv_s_audout,
+	.vidioc_g_audout     		    = ivtv_g_audout,
+	.vidioc_enum_input   		    = ivtv_enum_input,
+	.vidioc_enum_output   		    = ivtv_enum_output,
+	.vidioc_enumaudout   		    = ivtv_enumaudout,
+	.vidioc_cropcap       		    = ivtv_cropcap,
+	.vidioc_s_crop       		    = ivtv_s_crop,
+	.vidioc_g_crop       		    = ivtv_g_crop,
+	.vidioc_g_input      		    = ivtv_g_input,
+	.vidioc_s_input      		    = ivtv_s_input,
+	.vidioc_g_output     		    = ivtv_g_output,
+	.vidioc_s_output     		    = ivtv_s_output,
+	.vidioc_g_frequency 		    = ivtv_g_frequency,
+	.vidioc_s_frequency  		    = ivtv_s_frequency,
+	.vidioc_s_tuner      		    = ivtv_s_tuner,
+	.vidioc_g_tuner      		    = ivtv_g_tuner,
+	.vidioc_g_enc_index 		    = ivtv_g_enc_index,
+	.vidioc_g_fbuf			    = ivtv_g_fbuf,
+	.vidioc_s_fbuf			    = ivtv_s_fbuf,
+	.vidioc_g_std 			    = ivtv_g_std,
+	.vidioc_s_std 			    = ivtv_s_std,
+	.vidioc_overlay			    = ivtv_overlay,
+	.vidioc_log_status		    = ivtv_log_status,
+	.vidioc_enum_fmt_vid_cap 	    = ivtv_enum_fmt_vid_cap,
+	.vidioc_encoder_cmd  		    = ivtv_encoder_cmd,
+	.vidioc_try_encoder_cmd 	    = ivtv_try_encoder_cmd,
+	.vidioc_enum_fmt_vid_out 	    = ivtv_enum_fmt_vid_out,
+	.vidioc_g_fmt_vid_cap 		    = ivtv_g_fmt_vid_cap,
+	.vidioc_g_fmt_vbi_cap		    = ivtv_g_fmt_vbi_cap,
+	.vidioc_g_fmt_sliced_vbi_cap        = ivtv_g_fmt_sliced_vbi_cap,
+	.vidioc_g_fmt_vid_out               = ivtv_g_fmt_vid_out,
+	.vidioc_g_fmt_vid_out_overlay       = ivtv_g_fmt_vid_out_overlay,
+	.vidioc_g_fmt_sliced_vbi_out        = ivtv_g_fmt_sliced_vbi_out,
+	.vidioc_s_fmt_vid_cap  		    = ivtv_s_fmt_vid_cap,
+	.vidioc_s_fmt_vbi_cap 		    = ivtv_s_fmt_vbi_cap,
+	.vidioc_s_fmt_sliced_vbi_cap        = ivtv_s_fmt_sliced_vbi_cap,
+	.vidioc_s_fmt_vid_out               = ivtv_s_fmt_vid_out,
+	.vidioc_s_fmt_vid_out_overlay       = ivtv_s_fmt_vid_out_overlay,
+	.vidioc_s_fmt_sliced_vbi_out        = ivtv_s_fmt_sliced_vbi_out,
+	.vidioc_try_fmt_vid_cap  	    = ivtv_try_fmt_vid_cap,
+	.vidioc_try_fmt_vbi_cap		    = ivtv_try_fmt_vbi_cap,
+	.vidioc_try_fmt_sliced_vbi_cap      = ivtv_try_fmt_sliced_vbi_cap,
+	.vidioc_try_fmt_vid_out 	    = ivtv_try_fmt_vid_out,
+	.vidioc_try_fmt_vid_out_overlay     = ivtv_try_fmt_vid_out_overlay,
+	.vidioc_try_fmt_sliced_vbi_out 	    = ivtv_try_fmt_sliced_vbi_out,
+	.vidioc_g_sliced_vbi_cap 	    = ivtv_g_sliced_vbi_cap,
+	.vidioc_g_chip_ident 		    = ivtv_g_chip_ident,
+#ifdef CONFIG_VIDEO_ADV_DEBUG
+	.vidioc_g_register 		    = ivtv_g_register,
+	.vidioc_s_register 		    = ivtv_s_register,
+#endif
+	.vidioc_default 		    = ivtv_default,
+	.vidioc_queryctrl 		    = ivtv_queryctrl,
+	.vidioc_querymenu 		    = ivtv_querymenu,
+	.vidioc_g_ext_ctrls 		    = ivtv_g_ext_ctrls,
+	.vidioc_s_ext_ctrls 		    = ivtv_s_ext_ctrls,
+	.vidioc_try_ext_ctrls    	    = ivtv_try_ext_ctrls,
+};
+
 void ivtv_set_funcs(struct video_device *vdev)
 {
-	vdev->vidioc_querycap     	    = ivtv_querycap;
-	vdev->vidioc_g_priority   	    = ivtv_g_priority;
-	vdev->vidioc_s_priority   	    = ivtv_s_priority;
-	vdev->vidioc_s_audio      	    = ivtv_s_audio;
-	vdev->vidioc_g_audio      	    = ivtv_g_audio;
-	vdev->vidioc_enumaudio   	    = ivtv_enumaudio;
-	vdev->vidioc_s_audout     	    = ivtv_s_audout;
-	vdev->vidioc_g_audout     	    = ivtv_g_audout;
-	vdev->vidioc_enum_input   	    = ivtv_enum_input;
-	vdev->vidioc_enum_output   	    = ivtv_enum_output;
-	vdev->vidioc_enumaudout   	    = ivtv_enumaudout;
-	vdev->vidioc_cropcap       	    = ivtv_cropcap;
-	vdev->vidioc_s_crop       	    = ivtv_s_crop;
-	vdev->vidioc_g_crop       	    = ivtv_g_crop;
-	vdev->vidioc_g_input      	    = ivtv_g_input;
-	vdev->vidioc_s_input      	    = ivtv_s_input;
-	vdev->vidioc_g_output     	    = ivtv_g_output;
-	vdev->vidioc_s_output     	    = ivtv_s_output;
-	vdev->vidioc_g_frequency 	    = ivtv_g_frequency;
-	vdev->vidioc_s_frequency  	    = ivtv_s_frequency;
-	vdev->vidioc_s_tuner      	    = ivtv_s_tuner;
-	vdev->vidioc_g_tuner      	    = ivtv_g_tuner;
-	vdev->vidioc_g_enc_index 	    = ivtv_g_enc_index;
-	vdev->vidioc_g_fbuf		    = ivtv_g_fbuf;
-	vdev->vidioc_s_fbuf		    = ivtv_s_fbuf;
-	vdev->vidioc_g_std 		    = ivtv_g_std;
-	vdev->vidioc_s_std 		    = ivtv_s_std;
-	vdev->vidioc_overlay		    = ivtv_overlay;
-	vdev->vidioc_log_status		    = ivtv_log_status;
-	vdev->vidioc_enum_fmt_vid_cap 	    = ivtv_enum_fmt_vid_cap;
-	vdev->vidioc_encoder_cmd  	    = ivtv_encoder_cmd;
-	vdev->vidioc_try_encoder_cmd 	    = ivtv_try_encoder_cmd;
-	vdev->vidioc_enum_fmt_vid_out       = ivtv_enum_fmt_vid_out;
-	vdev->vidioc_g_fmt_vid_cap  	    = ivtv_g_fmt_vid_cap;
-	vdev->vidioc_g_fmt_vbi_cap	    = ivtv_g_fmt_vbi_cap;
-	vdev->vidioc_g_fmt_sliced_vbi_cap   = ivtv_g_fmt_sliced_vbi_cap;
-	vdev->vidioc_g_fmt_vid_out          = ivtv_g_fmt_vid_out;
-	vdev->vidioc_g_fmt_vid_out_overlay  = ivtv_g_fmt_vid_out_overlay;
-	vdev->vidioc_g_fmt_sliced_vbi_out   = ivtv_g_fmt_sliced_vbi_out;
-	vdev->vidioc_s_fmt_vid_cap  	    = ivtv_s_fmt_vid_cap;
-	vdev->vidioc_s_fmt_vbi_cap 	    = ivtv_s_fmt_vbi_cap;
-	vdev->vidioc_s_fmt_sliced_vbi_cap   = ivtv_s_fmt_sliced_vbi_cap;
-	vdev->vidioc_s_fmt_vid_out          = ivtv_s_fmt_vid_out;
-	vdev->vidioc_s_fmt_vid_out_overlay  = ivtv_s_fmt_vid_out_overlay;
-	vdev->vidioc_s_fmt_sliced_vbi_out   = ivtv_s_fmt_sliced_vbi_out;
-	vdev->vidioc_try_fmt_vid_cap  	    = ivtv_try_fmt_vid_cap;
-	vdev->vidioc_try_fmt_vbi_cap	    = ivtv_try_fmt_vbi_cap;
-	vdev->vidioc_try_fmt_sliced_vbi_cap = ivtv_try_fmt_sliced_vbi_cap;
-	vdev->vidioc_try_fmt_vid_out        = ivtv_try_fmt_vid_out;
-	vdev->vidioc_try_fmt_vid_out_overlay = ivtv_try_fmt_vid_out_overlay;
-	vdev->vidioc_try_fmt_sliced_vbi_out = ivtv_try_fmt_sliced_vbi_out;
-	vdev->vidioc_g_sliced_vbi_cap 	    = ivtv_g_sliced_vbi_cap;
-	vdev->vidioc_g_chip_ident 	    = ivtv_g_chip_ident;
-#ifdef CONFIG_VIDEO_ADV_DEBUG
-	vdev->vidioc_g_register 	    = ivtv_g_register;
-	vdev->vidioc_s_register 	    = ivtv_s_register;
-#endif
-	vdev->vidioc_default 		    = ivtv_default;
-	vdev->vidioc_queryctrl 		    = ivtv_queryctrl;
-	vdev->vidioc_querymenu 		    = ivtv_querymenu;
-	vdev->vidioc_g_ext_ctrls    	    = ivtv_g_ext_ctrls;
-	vdev->vidioc_s_ext_ctrls    	    = ivtv_s_ext_ctrls;
-	vdev->vidioc_try_ext_ctrls    	    = ivtv_try_ext_ctrls;
+	vdev->ioctl_ops = &ivtv_ioctl_ops;
 }

@@ -452,7 +452,7 @@ spider_net_prepare_rx_descr(struct spider_net_card *card,
 	/* iommu-map the skb */
 	buf = pci_map_single(card->pdev, descr->skb->data,
 			SPIDER_NET_MAX_FRAME, PCI_DMA_FROMDEVICE);
-	if (pci_dma_mapping_error(buf)) {
+	if (pci_dma_mapping_error(card->pdev, buf)) {
 		dev_kfree_skb_any(descr->skb);
 		descr->skb = NULL;
 		if (netif_msg_rx_err(card) && net_ratelimit())
@@ -672,7 +672,6 @@ write_hash:
 /**
  * spider_net_prepare_tx_descr - fill tx descriptor with skb data
  * @card: card structure
- * @descr: descriptor structure to fill out
  * @skb: packet to use
  *
  * returns 0 on success, <0 on failure.
@@ -691,7 +690,7 @@ spider_net_prepare_tx_descr(struct spider_net_card *card,
 	unsigned long flags;
 
 	buf = pci_map_single(card->pdev, skb->data, skb->len, PCI_DMA_TODEVICE);
-	if (pci_dma_mapping_error(buf)) {
+	if (pci_dma_mapping_error(card->pdev, buf)) {
 		if (netif_msg_tx_err(card) && net_ratelimit())
 			dev_err(&card->netdev->dev, "could not iommu-map packet (%p, %i). "
 				  "Dropping packet\n", skb->data, skb->len);
@@ -867,7 +866,6 @@ spider_net_release_tx_chain(struct spider_net_card *card, int brutal)
 /**
  * spider_net_kick_tx_dma - enables TX DMA processing
  * @card: card structure
- * @descr: descriptor address to enable TX processing at
  *
  * This routine will start the transmit DMA running if
  * it is not already running. This routine ned only be
@@ -1637,7 +1635,6 @@ spider_net_handle_error_irq(struct spider_net_card *card, u32 status_reg,
  * spider_net_interrupt - interrupt handler for spider_net
  * @irq: interrupt number
  * @ptr: pointer to net_device
- * @regs: PU registers
  *
  * returns IRQ_HANDLED, if interrupt was for driver, or IRQ_NONE, if no
  * interrupt found raised by card.
@@ -2419,7 +2416,6 @@ spider_net_undo_pci_setup(struct spider_net_card *card)
 
 /**
  * spider_net_setup_pci_dev - sets up the device in terms of PCI operations
- * @card: card structure
  * @pdev: PCI device
  *
  * Returns the card structure or NULL if any errors occur

@@ -22,7 +22,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
-#include <linux/version.h>
 #include <linux/errno.h>
 #include <linux/platform_device.h>
 #include <linux/delay.h>
@@ -33,13 +32,13 @@
 #include <linux/irq.h>
 
 #include <asm/byteorder.h>
-#include <asm/hardware.h>
+#include <mach/hardware.h>
 
 #include <linux/usb.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
-#include <asm/arch/pxa2xx-regs.h> /* FIXME: for PSSR */
-#include <asm/arch/udc.h>
+#include <mach/pxa2xx-regs.h> /* FIXME: for PSSR */
+#include <mach/udc.h>
 
 #include "pxa27x_udc.h"
 
@@ -651,7 +650,7 @@ pxa_ep_alloc_request(struct usb_ep *_ep, gfp_t gfp_flags)
 	struct pxa27x_request *req;
 
 	req = kzalloc(sizeof *req, gfp_flags);
-	if (!req || !_ep)
+	if (!req)
 		return NULL;
 
 	INIT_LIST_HEAD(&req->queue);
@@ -1622,7 +1621,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 	struct pxa_udc *udc = the_controller;
 	int retval;
 
-	if (!driver || driver->speed != USB_SPEED_FULL || !driver->bind
+	if (!driver || driver->speed < USB_SPEED_FULL || !driver->bind
 			|| !driver->disconnect || !driver->setup)
 		return -EINVAL;
 	if (!udc)

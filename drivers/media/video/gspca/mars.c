@@ -24,9 +24,6 @@
 #include "gspca.h"
 #include "jpeg.h"
 
-#define DRIVER_VERSION_NUMBER	KERNEL_VERSION(2, 1, 7)
-static const char version[] = "2.1.7";
-
 MODULE_AUTHOR("Michel Xhaard <mxhaard@users.sourceforge.net>");
 MODULE_DESCRIPTION("GSPCA/Mars USB Camera Driver");
 MODULE_LICENSE("GPL");
@@ -103,22 +100,6 @@ static int reg_w(struct gspca_dev *gspca_dev,
 	return rc;
 }
 
-static int reg_w_buf(struct gspca_dev *gspca_dev,
-			__u16 index, __u8 *buf, int len)
-{
-	int rc;
-
-	rc = usb_control_msg(gspca_dev->dev,
-			 usb_sndbulkpipe(gspca_dev->dev, 4),
-			 0x12,
-			 0xc8,		/* ?? */
-			 0,		/* value */
-			 index, buf, len, 500);
-	if (rc < 0)
-		PDEBUG(D_ERR, "reg write [%02x] error %d", index, rc);
-	return rc;
-}
-
 static void bulk_w(struct gspca_dev *gspca_dev,
 		   __u16 *pch,
 		   __u16 Address)
@@ -140,7 +121,6 @@ static int sd_config(struct gspca_dev *gspca_dev,
 	struct cam *cam;
 
 	cam = &gspca_dev->cam;
-	cam->dev_name = (char *) id->driver_info;
 	cam->epaddr = 0x01;
 	cam->cam_mode = vga_mode;
 	cam->nmodes = sizeof vga_mode / sizeof vga_mode[0];
@@ -148,13 +128,13 @@ static int sd_config(struct gspca_dev *gspca_dev,
 	return 0;
 }
 
-/* this function is called at open time */
-static int sd_open(struct gspca_dev *gspca_dev)
+/* this function is called at probe and resume time */
+static int sd_init(struct gspca_dev *gspca_dev)
 {
 	return 0;
 }
 
-static void sd_start(struct gspca_dev *gspca_dev)
+static int sd_start(struct gspca_dev *gspca_dev)
 {
 	int err_code;
 	__u8 *data;
@@ -163,9 +143,10 @@ static void sd_start(struct gspca_dev *gspca_dev)
 	int intpipe;
 
 	PDEBUG(D_STREAM, "camera start, iface %d, alt 8", gspca_dev->iface);
-	if (usb_set_interface(gspca_dev->dev, gspca_dev->iface, 8) < 0) {
+	err_code = usb_set_interface(gspca_dev->dev, gspca_dev->iface, 8);
+	if (err_code < 0) {
 		PDEBUG(D_ERR|D_STREAM, "Set packet size: set interface error");
-		return;
+		return err_code;
 	}
 
 	data = gspca_dev->usb_buf;
@@ -174,12 +155,11 @@ static void sd_start(struct gspca_dev *gspca_dev)
 
 	err_code = reg_w(gspca_dev, data[0], 2);
 	if (err_code < 0)
-		return;
+		return err_code;
 
 	/*
 	   Initialize the MR97113 chip register
 	 */
-	data = kmalloc(16, GFP_KERNEL);
 	data[0] = 0x00;		/* address */
 	data[1] = 0x0c | 0x01;	/* reg 0 */
 	data[2] = 0x01;		/* reg 1 */
@@ -199,18 +179,16 @@ static void sd_start(struct gspca_dev *gspca_dev)
 	data[10] = 0x5d;	/* reg 9, I2C device address
 				 *	[for PAS5101 (0x40)] [for MI (0x5d)] */
 
-	err_code = reg_w_buf(gspca_dev, data[0], data, 11);
-	kfree(data);
+	err_code = reg_w(gspca_dev, data[0], 11);
 	if (err_code < 0)
-		return;
+		return err_code;
 
-	data = gspca_dev->usb_buf;
 	data[0] = 0x23;		/* address */
 	data[1] = 0x09;		/* reg 35, append frame header */
 
 	err_code = reg_w(gspca_dev, data[0], 2);
 	if (err_code < 0)
-		return;
+		return err_code;
 
 	data[0] = 0x3c;		/* address */
 /*	if (gspca_dev->width == 1280) */
@@ -221,7 +199,7 @@ static void sd_start(struct gspca_dev *gspca_dev)
 				 *	(unit: 4KB) 200KB */
 	err_code = reg_w(gspca_dev, data[0], 2);
 	if (err_code < 0)
-		return;
+		return err_code;
 
 	if (0) {			/* fixed dark-gain */
 		data[1] = 0;		/* reg 94, Y Gain (1.75) */
@@ -263,13 +241,13 @@ static void sd_start(struct gspca_dev *gspca_dev)
 
 	err_code = reg_w(gspca_dev, data[0], 6);
 	if (err_code < 0)
-		return;
+		return err_code;
 
 	data[0] = 0x67;
 	data[1] = 0x13;		/* reg 103, first pixel B, disable sharpness */
 	err_code = reg_w(gspca_dev, data[0], 2);
 	if (err_code < 0)
-		return;
+		return err_code;
 
 	/*
 	 * initialize the value of MI sensor...
@@ -349,6 +327,7 @@ static void sd_start(struct gspca_dev *gspca_dev)
 	data[0] = 0x00;
 	data[1] = 0x4d;		/* ISOC transfering enable... */
 	reg_w(gspca_dev, data[0], 2);
+	return err_code;
 }
 
 static void sd_stopN(struct gspca_dev *gspca_dev)
@@ -360,14 +339,6 @@ static void sd_stopN(struct gspca_dev *gspca_dev)
 	result = reg_w(gspca_dev, gspca_dev->usb_buf[0], 2);
 	if (result < 0)
 		PDEBUG(D_ERR, "Camera Stop failed");
-}
-
-static void sd_stop0(struct gspca_dev *gspca_dev)
-{
-}
-
-static void sd_close(struct gspca_dev *gspca_dev)
-{
 }
 
 static void sd_pkt_scan(struct gspca_dev *gspca_dev,
@@ -415,18 +386,15 @@ static const struct sd_desc sd_desc = {
 	.ctrls = sd_ctrls,
 	.nctrls = ARRAY_SIZE(sd_ctrls),
 	.config = sd_config,
-	.open = sd_open,
+	.init = sd_init,
 	.start = sd_start,
 	.stopN = sd_stopN,
-	.stop0 = sd_stop0,
-	.close = sd_close,
 	.pkt_scan = sd_pkt_scan,
 };
 
 /* -- module initialisation -- */
-#define DVNM(name) .driver_info = (kernel_ulong_t) name
 static const __devinitdata struct usb_device_id device_table[] = {
-	{USB_DEVICE(0x093a, 0x050f), DVNM("Mars-Semi Pc-Camera")},
+	{USB_DEVICE(0x093a, 0x050f)},
 	{}
 };
 MODULE_DEVICE_TABLE(usb, device_table);
@@ -444,6 +412,10 @@ static struct usb_driver sd_driver = {
 	.id_table = device_table,
 	.probe = sd_probe,
 	.disconnect = gspca_disconnect,
+#ifdef CONFIG_PM
+	.suspend = gspca_suspend,
+	.resume = gspca_resume,
+#endif
 };
 
 /* -- module insert / remove -- */
@@ -451,7 +423,7 @@ static int __init sd_mod_init(void)
 {
 	if (usb_register(&sd_driver) < 0)
 		return -1;
-	PDEBUG(D_PROBE, "v%s registered", version);
+	PDEBUG(D_PROBE, "registered");
 	return 0;
 }
 static void __exit sd_mod_exit(void)

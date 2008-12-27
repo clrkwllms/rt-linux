@@ -324,6 +324,9 @@ static int do_assign_storage(sclp_cmdw_t cmd, u16 rn)
 	case 0x0120:
 		break;
 	default:
+		pr_warning("assign storage failed (cmd=0x%08x, "
+			   "response=0x%04x, rn=0x%04x)\n", cmd,
+			   sccb->header.response_code, rn);
 		rc = -EIO;
 		break;
 	}
@@ -427,11 +430,16 @@ static int sclp_mem_notifier(struct notifier_block *nb,
 			sclp_attach_storage(id);
 	switch (action) {
 	case MEM_ONLINE:
+	case MEM_GOING_OFFLINE:
+	case MEM_CANCEL_OFFLINE:
 		break;
 	case MEM_GOING_ONLINE:
 		rc = sclp_mem_change_state(start, size, 1);
 		break;
 	case MEM_CANCEL_ONLINE:
+		sclp_mem_change_state(start, size, 0);
+		break;
+	case MEM_OFFLINE:
 		sclp_mem_change_state(start, size, 0);
 		break;
 	default:

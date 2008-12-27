@@ -11,12 +11,12 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/io.h>
 
 #include <asm/tlb.h>
 #include <asm/mach/map.h>
-#include <asm/io.h>
-#include <asm/arch/mux.h>
-#include <asm/arch/tc.h>
+#include <mach/mux.h>
+#include <mach/tc.h>
 
 extern int omap1_clk_init(void);
 extern void omap_check_revision(void);
@@ -128,7 +128,7 @@ void __init omap1_map_common_io(void)
  * Common low-level hardware init for omap1. This should only get called from
  * board specific init.
  */
-void __init omap1_init_common_hw()
+void __init omap1_init_common_hw(void)
 {
 	/* REVISIT: Refer to OMAP5910 Errata, Advisory SYS_1: "Timeout Abort
 	 * on a Posted Write in the TIPB Bridge".

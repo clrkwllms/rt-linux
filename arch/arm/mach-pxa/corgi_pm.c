@@ -20,14 +20,13 @@
 
 #include <asm/irq.h>
 #include <asm/mach-types.h>
-#include <asm/hardware.h>
-#include <asm/hardware/scoop.h>
+#include <mach/hardware.h>
 
-#include <asm/arch/sharpsl.h>
-#include <asm/arch/corgi.h>
-#include <asm/arch/pxa-regs.h>
-#include <asm/arch/pxa2xx-regs.h>
-#include <asm/arch/pxa2xx-gpio.h>
+#include <mach/sharpsl.h>
+#include <mach/corgi.h>
+#include <mach/pxa-regs.h>
+#include <mach/pxa2xx-regs.h>
+#include <mach/pxa2xx-gpio.h>
 #include "sharpsl.h"
 
 #define SHARPSL_CHARGE_ON_VOLT         0x99  /* 2.9V */
@@ -205,7 +204,9 @@ static struct sharpsl_charger_machinfo corgi_pm_machinfo = {
 	.read_devdata    = corgipm_read_devdata,
 	.charger_wakeup  = corgi_charger_wakeup,
 	.should_wakeup   = corgi_should_wakeup,
-#ifdef CONFIG_BACKLIGHT_CORGI
+#if defined(CONFIG_LCD_CORGI)
+	.backlight_limit = corgi_lcd_limit_intensity,
+#elif defined(CONFIG_BACKLIGHT_CORGI)
 	.backlight_limit = corgibl_limit_intensity,
 #endif
 	.charge_on_volt	  = SHARPSL_CHARGE_ON_VOLT,

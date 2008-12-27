@@ -39,32 +39,20 @@ I2C_CLIENT_INSMOD_1(adt7473);
 #define ADT7473_REG_BASE_ADDR			0x20
 
 #define ADT7473_REG_VOLT_BASE_ADDR		0x21
-#define ADT7473_REG_VOLT_MAX_ADDR		0x22
 #define ADT7473_REG_VOLT_MIN_BASE_ADDR		0x46
-#define ADT7473_REG_VOLT_MIN_MAX_ADDR		0x49
 
 #define ADT7473_REG_TEMP_BASE_ADDR		0x25
-#define ADT7473_REG_TEMP_MAX_ADDR		0x27
 #define ADT7473_REG_TEMP_LIMITS_BASE_ADDR	0x4E
-#define ADT7473_REG_TEMP_LIMITS_MAX_ADDR	0x53
 #define ADT7473_REG_TEMP_TMIN_BASE_ADDR		0x67
-#define ADT7473_REG_TEMP_TMIN_MAX_ADDR		0x69
 #define ADT7473_REG_TEMP_TMAX_BASE_ADDR		0x6A
-#define ADT7473_REG_TEMP_TMAX_MAX_ADDR		0x6C
 
 #define ADT7473_REG_FAN_BASE_ADDR		0x28
-#define ADT7473_REG_FAN_MAX_ADDR		0x2F
 #define ADT7473_REG_FAN_MIN_BASE_ADDR		0x54
-#define ADT7473_REG_FAN_MIN_MAX_ADDR		0x5B
 
 #define ADT7473_REG_PWM_BASE_ADDR		0x30
-#define ADT7473_REG_PWM_MAX_ADDR		0x32
 #define	ADT7473_REG_PWM_MIN_BASE_ADDR		0x64
-#define ADT7473_REG_PWM_MIN_MAX_ADDR		0x66
 #define ADT7473_REG_PWM_MAX_BASE_ADDR		0x38
-#define ADT7473_REG_PWM_MAX_MAX_ADDR		0x3A
 #define ADT7473_REG_PWM_BHVR_BASE_ADDR		0x5C
-#define ADT7473_REG_PWM_BHVR_MAX_ADDR		0x5E
 #define		ADT7473_PWM_BHVR_MASK		0xE0
 #define		ADT7473_PWM_BHVR_SHIFT		5
 
@@ -102,7 +90,6 @@ I2C_CLIENT_INSMOD_1(adt7473);
 #define		ADT7473_FAN4_ALARM		0x20
 #define		ADT7473_R1T_SHORT		0x40
 #define		ADT7473_R2T_SHORT		0x80
-#define ADT7473_REG_MAX_ADDR			0x80
 
 #define ALARM2(x)	((x) << 8)
 
@@ -141,6 +128,8 @@ I2C_CLIENT_INSMOD_1(adt7473);
 #define FAN_RPM_TO_PERIOD	FAN_PERIOD_TO_RPM
 #define FAN_PERIOD_INVALID	65535
 #define FAN_DATA_VALID(x)	((x) && (x) != FAN_PERIOD_INVALID)
+
+#define ROUND_DIV(x, divisor)	(((x) + ((divisor) / 2)) / (divisor))
 
 struct adt7473_data {
 	struct device		*hwmon_dev;
@@ -332,35 +321,24 @@ out:
 }
 
 /*
- * On this chip, voltages are given as a count of steps between a minimum
- * and maximum voltage, not a direct voltage.
+ * Conversions
  */
-static const int volt_convert_table[][2] = {
-	{2997, 3},
-	{4395, 4},
+
+/* IN are scaled acording to built-in resistors */
+static const int adt7473_scaling[] = {  /* .001 Volts */
+	2250, 3300
 };
+#define SCALE(val, from, to)	(((val) * (to) + ((from) / 2)) / (from))
 
 static int decode_volt(int volt_index, u8 raw)
 {
-	int cmax = volt_convert_table[volt_index][0];
-	int cmin = volt_convert_table[volt_index][1];
-	return ((raw * (cmax - cmin)) / 255) + cmin;
+	return SCALE(raw, 192, adt7473_scaling[volt_index]);
 }
 
 static u8 encode_volt(int volt_index, int cooked)
 {
-	int cmax = volt_convert_table[volt_index][0];
-	int cmin = volt_convert_table[volt_index][1];
-	u8 x;
-
-	if (cooked > cmax)
-		cooked = cmax;
-	else if (cooked < cmin)
-		cooked = cmin;
-
-	x = ((cooked - cmin) * 255) / (cmax - cmin);
-
-	return x;
+	int raw = SCALE(cooked, adt7473_scaling[volt_index], 192);
+	return SENSORS_LIMIT(raw, 0, 255);
 }
 
 static ssize_t show_volt_min(struct device *dev,
@@ -381,7 +359,12 @@ static ssize_t set_volt_min(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int volt = encode_volt(attr->index, simple_strtol(buf, NULL, 10));
+	long volt;
+
+	if (strict_strtol(buf, 10, &volt))
+		return -EINVAL;
+
+	volt = encode_volt(attr->index, volt);
 
 	mutex_lock(&data->lock);
 	data->volt_min[attr->index] = volt;
@@ -410,7 +393,12 @@ static ssize_t set_volt_max(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int volt = encode_volt(attr->index, simple_strtol(buf, NULL, 10));
+	long volt;
+
+	if (strict_strtol(buf, 10, &volt))
+		return -EINVAL;
+
+	volt = encode_volt(attr->index, volt);
 
 	mutex_lock(&data->lock);
 	data->volt_max[attr->index] = volt;
@@ -443,7 +431,8 @@ static int decode_temp(u8 twos_complement, u8 raw)
 
 static u8 encode_temp(u8 twos_complement, int cooked)
 {
-	return twos_complement ? cooked & 0xFF : cooked + 64;
+	u8 ret = twos_complement ? cooked & 0xFF : cooked + 64;
+	return SENSORS_LIMIT(ret, 0, 255);
 }
 
 static ssize_t show_temp_min(struct device *dev,
@@ -465,7 +454,12 @@ static ssize_t set_temp_min(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int temp = simple_strtol(buf, NULL, 10) / 1000;
+	long temp;
+
+	if (strict_strtol(buf, 10, &temp))
+		return -EINVAL;
+
+	temp = ROUND_DIV(temp, 1000);
 	temp = encode_temp(data->temp_twos_complement, temp);
 
 	mutex_lock(&data->lock);
@@ -496,7 +490,12 @@ static ssize_t set_temp_max(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int temp = simple_strtol(buf, NULL, 10) / 1000;
+	long temp;
+
+	if (strict_strtol(buf, 10, &temp))
+		return -EINVAL;
+
+	temp = ROUND_DIV(temp, 1000);
 	temp = encode_temp(data->temp_twos_complement, temp);
 
 	mutex_lock(&data->lock);
@@ -539,11 +538,13 @@ static ssize_t set_fan_min(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int temp = simple_strtol(buf, NULL, 10);
+	long temp;
 
-	if (!temp)
+	if (strict_strtol(buf, 10, &temp) || !temp)
 		return -EINVAL;
+
 	temp = FAN_RPM_TO_PERIOD(temp);
+	temp = SENSORS_LIMIT(temp, 1, 65534);
 
 	mutex_lock(&data->lock);
 	data->fan_min[attr->index] = temp;
@@ -582,11 +583,13 @@ static ssize_t set_max_duty_at_crit(struct device *dev,
 	u8 reg;
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int temp = simple_strtol(buf, NULL, 10);
-	temp = temp && 0xFF;
+	long temp;
+
+	if (strict_strtol(buf, 10, &temp))
+		return -EINVAL;
 
 	mutex_lock(&data->lock);
-	data->max_duty_at_overheat = temp;
+	data->max_duty_at_overheat = !!temp;
 	reg = i2c_smbus_read_byte_data(client, ADT7473_REG_CFG4);
 	if (temp)
 		reg |= ADT7473_CFG4_MAX_DUTY_AT_OVT;
@@ -612,7 +615,12 @@ static ssize_t set_pwm(struct device *dev, struct device_attribute *devattr,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int temp = simple_strtol(buf, NULL, 10);
+	long temp;
+
+	if (strict_strtol(buf, 10, &temp))
+		return -EINVAL;
+
+	temp = SENSORS_LIMIT(temp, 0, 255);
 
 	mutex_lock(&data->lock);
 	data->pwm[attr->index] = temp;
@@ -639,7 +647,12 @@ static ssize_t set_pwm_max(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int temp = simple_strtol(buf, NULL, 10);
+	long temp;
+
+	if (strict_strtol(buf, 10, &temp))
+		return -EINVAL;
+
+	temp = SENSORS_LIMIT(temp, 0, 255);
 
 	mutex_lock(&data->lock);
 	data->pwm_max[attr->index] = temp;
@@ -667,7 +680,12 @@ static ssize_t set_pwm_min(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int temp = simple_strtol(buf, NULL, 10);
+	long temp;
+
+	if (strict_strtol(buf, 10, &temp))
+		return -EINVAL;
+
+	temp = SENSORS_LIMIT(temp, 0, 255);
 
 	mutex_lock(&data->lock);
 	data->pwm_min[attr->index] = temp;
@@ -697,7 +715,12 @@ static ssize_t set_temp_tmax(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int temp = simple_strtol(buf, NULL, 10) / 1000;
+	long temp;
+
+	if (strict_strtol(buf, 10, &temp))
+		return -EINVAL;
+
+	temp = ROUND_DIV(temp, 1000);
 	temp = encode_temp(data->temp_twos_complement, temp);
 
 	mutex_lock(&data->lock);
@@ -728,7 +751,12 @@ static ssize_t set_temp_tmin(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int temp = simple_strtol(buf, NULL, 10) / 1000;
+	long temp;
+
+	if (strict_strtol(buf, 10, &temp))
+		return -EINVAL;
+
+	temp = ROUND_DIV(temp, 1000);
 	temp = encode_temp(data->temp_twos_complement, temp);
 
 	mutex_lock(&data->lock);
@@ -766,7 +794,10 @@ static ssize_t set_pwm_enable(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int temp = simple_strtol(buf, NULL, 10);
+	long temp;
+
+	if (strict_strtol(buf, 10, &temp))
+		return -EINVAL;
 
 	switch (temp) {
 	case 0:
@@ -830,7 +861,10 @@ static ssize_t set_pwm_auto_temp(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7473_data *data = i2c_get_clientdata(client);
-	int temp = simple_strtol(buf, NULL, 10);
+	long temp;
+
+	if (strict_strtol(buf, 10, &temp))
+		return -EINVAL;
 
 	switch (temp) {
 	case 1:

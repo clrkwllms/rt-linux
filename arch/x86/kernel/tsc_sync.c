@@ -46,7 +46,9 @@ static __cpuinit void check_tsc_warp(void)
 	cycles_t start, now, prev, end;
 	int i;
 
+	rdtsc_barrier();
 	start = get_cycles();
+	rdtsc_barrier();
 	/*
 	 * The measurement runs for 20 msecs:
 	 */
@@ -61,7 +63,9 @@ static __cpuinit void check_tsc_warp(void)
 		 */
 		__raw_spin_lock(&sync_lock);
 		prev = last_tsc;
+		rdtsc_barrier();
 		now = get_cycles();
+		rdtsc_barrier();
 		last_tsc = now;
 		__raw_spin_unlock(&sync_lock);
 
@@ -88,11 +92,9 @@ static __cpuinit void check_tsc_warp(void)
 			__raw_spin_unlock(&sync_lock);
 		}
 	}
-	if (!(now-start)) {
-		printk("Warning: zero tsc calibration delta: %Ld [max: %Ld]\n",
+	WARN(!(now-start),
+		"Warning: zero tsc calibration delta: %Ld [max: %Ld]\n",
 			now-start, end-start);
-		WARN_ON(1);
-	}
 }
 
 /*

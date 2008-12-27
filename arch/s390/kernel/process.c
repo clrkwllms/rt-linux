@@ -75,7 +75,9 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
 	return sf->gprs[8];
 }
 
-DEFINE_PER_CPU(struct s390_idle_data, s390_idle);
+DEFINE_PER_CPU(struct s390_idle_data, s390_idle) = {
+	.lock = __SPIN_LOCK_UNLOCKED(s390_idle.lock)
+};
 
 static int s390_idle_enter(void)
 {
@@ -134,15 +136,18 @@ static void default_idle(void)
 		return;
 	}
 	trace_hardirqs_on();
+	/* Don't trace preempt off for idle. */
+	stop_critical_timings();
 	/* Wait for external, I/O or machine check interrupt. */
 	__load_psw_mask(psw_kernel_bits | PSW_MASK_WAIT |
 			PSW_MASK_IO | PSW_MASK_EXT);
+	start_critical_timings();
 }
 
 void cpu_idle(void)
 {
 	for (;;) {
-		tick_nohz_stop_sched_tick();
+		tick_nohz_stop_sched_tick(1);
 		while (!need_resched())
 			default_idle();
 		tick_nohz_restart_sched_tick();

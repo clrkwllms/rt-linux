@@ -67,9 +67,9 @@
 #include <linux/module.h>
 #include <linux/ioport.h>
 #include <linux/time.h>
+#include <linux/semaphore.h>
 #include <linux/slab.h>
 #include <linux/hil.h>
-#include <linux/semaphore.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
@@ -323,7 +323,7 @@ static void hp_sdc_tasklet(unsigned long foo)
 			 * it back to the application. and be less verbose.
 			 */
 			printk(KERN_WARNING PREFIX "read timeout (%ius)!\n",
-			       tv.tv_usec - hp_sdc.rtv.tv_usec);
+			       (int)(tv.tv_usec - hp_sdc.rtv.tv_usec));
 			curr->idx += hp_sdc.rqty;
 			hp_sdc.rqty = 0;
 			tmp = curr->seq[curr->actidx];

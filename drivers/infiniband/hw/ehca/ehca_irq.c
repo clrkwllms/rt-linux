@@ -178,6 +178,10 @@ static void dispatch_qp_event(struct ehca_shca *shca, struct ehca_qp *qp,
 {
 	struct ib_event event;
 
+	/* PATH_MIG without the QP ever having been armed is false alarm */
+	if (event_type == IB_EVENT_PATH_MIG && !qp->mig_armed)
+		return;
+
 	event.device = &shca->ib_device;
 	event.event = event_type;
 
@@ -355,36 +359,48 @@ static void notify_port_conf_change(struct ehca_shca *shca, int port_num)
 	*old_attr = new_attr;
 }
 
+/* replay modify_qp for sqps -- return 0 if all is well, 1 if AQP1 destroyed */
+static int replay_modify_qp(struct ehca_sport *sport)
+{
+	int aqp1_destroyed;
+	unsigned long flags;
+
+	spin_lock_irqsave(&sport->mod_sqp_lock, flags);
+
+	aqp1_destroyed = !sport->ibqp_sqp[IB_QPT_GSI];
+
+	if (sport->ibqp_sqp[IB_QPT_SMI])
+		ehca_recover_sqp(sport->ibqp_sqp[IB_QPT_SMI]);
+	if (!aqp1_destroyed)
+		ehca_recover_sqp(sport->ibqp_sqp[IB_QPT_GSI]);
+
+	spin_unlock_irqrestore(&sport->mod_sqp_lock, flags);
+
+	return aqp1_destroyed;
+}
+
 static void parse_ec(struct ehca_shca *shca, u64 eqe)
 {
 	u8 ec   = EHCA_BMASK_GET(NEQE_EVENT_CODE, eqe);
 	u8 port = EHCA_BMASK_GET(NEQE_PORT_NUMBER, eqe);
 	u8 spec_event;
 	struct ehca_sport *sport = &shca->sport[port - 1];
-	unsigned long flags;
 
 	switch (ec) {
 	case 0x30: /* port availability change */
 		if (EHCA_BMASK_GET(NEQE_PORT_AVAILABILITY, eqe)) {
-			int suppress_event;
-			/* replay modify_qp for sqps */
-			spin_lock_irqsave(&sport->mod_sqp_lock, flags);
-			suppress_event = !sport->ibqp_sqp[IB_QPT_GSI];
-			if (sport->ibqp_sqp[IB_QPT_SMI])
-				ehca_recover_sqp(sport->ibqp_sqp[IB_QPT_SMI]);
-			if (!suppress_event)
-				ehca_recover_sqp(sport->ibqp_sqp[IB_QPT_GSI]);
-			spin_unlock_irqrestore(&sport->mod_sqp_lock, flags);
-
-			/* AQP1 was destroyed, ignore this event */
-			if (suppress_event)
-				break;
+			/* only replay modify_qp calls in autodetect mode;
+			 * if AQP1 was destroyed, the port is already down
+			 * again and we can drop the event.
+			 */
+			if (ehca_nr_ports < 0)
+				if (replay_modify_qp(sport))
+					break;
 
 			sport->port_state = IB_PORT_ACTIVE;
 			dispatch_port_event(shca, port, IB_EVENT_PORT_ACTIVE,
 					    "is active");
-			ehca_query_sma_attr(shca, port,
-					    &sport->saved_attr);
+			ehca_query_sma_attr(shca, port, &sport->saved_attr);
 		} else {
 			sport->port_state = IB_PORT_DOWN;
 			dispatch_port_event(shca, port, IB_EVENT_PORT_ERR,
@@ -646,8 +662,8 @@ static inline int find_next_online_cpu(struct ehca_comp_pool *pool)
 		ehca_dmp(&cpu_online_map, sizeof(cpumask_t), "");
 
 	spin_lock_irqsave(&pool->last_cpu_lock, flags);
-	cpu = next_cpu(pool->last_cpu, cpu_online_map);
-	if (cpu == NR_CPUS)
+	cpu = next_cpu_nr(pool->last_cpu, cpu_online_map);
+	if (cpu >= nr_cpu_ids)
 		cpu = first_cpu(cpu_online_map);
 	pool->last_cpu = cpu;
 	spin_unlock_irqrestore(&pool->last_cpu_lock, flags);

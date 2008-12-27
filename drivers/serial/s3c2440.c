@@ -19,10 +19,10 @@
 #include <linux/serial.h>
 
 #include <asm/irq.h>
-#include <asm/hardware.h>
+#include <mach/hardware.h>
 
-#include <asm/plat-s3c/regs-serial.h>
-#include <asm/arch/regs-gpio.h>
+#include <plat/regs-serial.h>
+#include <mach/regs-gpio.h>
 
 #include "samsung.h"
 
@@ -177,5 +177,5 @@ module_exit(s3c2440_serial_exit);
 
 MODULE_DESCRIPTION("Samsung S3C2440,S3C2442 SoC Serial port driver");
 MODULE_AUTHOR("Ben Dooks <ben@simtec.co.uk>");
-MODULE_LICENSE("GPLi v2");
+MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("platform:s3c2440-uart");

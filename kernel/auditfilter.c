@@ -1022,8 +1022,11 @@ static void audit_update_watch(struct audit_parent *parent,
 			struct audit_buffer *ab;
 			ab = audit_log_start(NULL, GFP_KERNEL,
 				AUDIT_CONFIG_CHANGE);
+			audit_log_format(ab, "auid=%u ses=%u",
+				audit_get_loginuid(current),
+				audit_get_sessionid(current));
 			audit_log_format(ab,
-				"op=updated rules specifying path=");
+				" op=updated rules specifying path=");
 			audit_log_untrustedstring(ab, owatch->path);
 			audit_log_format(ab, " with dev=%u ino=%lu\n",
 				 dev, ino);
@@ -1058,7 +1061,10 @@ static void audit_remove_parent_watches(struct audit_parent *parent)
 				struct audit_buffer *ab;
 				ab = audit_log_start(NULL, GFP_KERNEL,
 					AUDIT_CONFIG_CHANGE);
-				audit_log_format(ab, "op=remove rule path=");
+				audit_log_format(ab, "auid=%u ses=%u",
+					audit_get_loginuid(current),
+					audit_get_sessionid(current));
+				audit_log_format(ab, " op=remove rule path=");
 				audit_log_untrustedstring(ab, w->path);
 				if (r->filterkey) {
 					audit_log_format(ab, " key=");
@@ -1088,8 +1094,8 @@ static void audit_inotify_unregister(struct list_head *in_list)
 	list_for_each_entry_safe(p, n, in_list, ilist) {
 		list_del(&p->ilist);
 		inotify_rm_watch(audit_ih, &p->wdata);
-		/* the put matching the get in audit_do_del_rule() */
-		put_inotify_watch(&p->wdata);
+		/* the unpin matching the pin in audit_do_del_rule() */
+		unpin_inotify_watch(&p->wdata);
 	}
 }
 
@@ -1383,9 +1389,13 @@ static inline int audit_del_rule(struct audit_entry *entry,
 				/* Put parent on the inotify un-registration
 				 * list.  Grab a reference before releasing
 				 * audit_filter_mutex, to be released in
-				 * audit_inotify_unregister(). */
-				list_add(&parent->ilist, &inotify_list);
-				get_inotify_watch(&parent->wdata);
+				 * audit_inotify_unregister().
+				 * If filesystem is going away, just leave
+				 * the sucker alone, eviction will take
+				 * care of it.
+				 */
+				if (pin_inotify_watch(&parent->wdata))
+					list_add(&parent->ilist, &inotify_list);
 			}
 		}
 	}

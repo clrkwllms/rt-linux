@@ -1,7 +1,7 @@
 /*
  *	ACPI PATA driver
  *
- *	(c) 2007 Red Hat  <alan@redhat.com>
+ *	(c) 2007 Red Hat
  */
 
 #include <linux/kernel.h>
@@ -181,7 +181,7 @@ static unsigned int pacpi_qc_issue(struct ata_queued_cmd *qc)
 
 	if (adev != acpi->last) {
 		pacpi_set_piomode(ap, adev);
-		if (adev->dma_mode)
+		if (ata_dma_enabled(adev))
 			pacpi_set_dmamode(ap, adev);
 		acpi->last = adev;
 	}

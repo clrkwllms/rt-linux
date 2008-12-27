@@ -59,7 +59,7 @@
 
 static ext_int_info_t ext_int_info_cc;
 static ext_int_info_t ext_int_etr_cc;
-static u64 jiffies_timer_cc;
+static u64 sched_clock_base_cc;
 
 static DEFINE_PER_CPU(struct clock_event_device, comparators);
 
@@ -68,7 +68,7 @@ static DEFINE_PER_CPU(struct clock_event_device, comparators);
  */
 unsigned long long sched_clock(void)
 {
-	return ((get_clock_xt() - jiffies_timer_cc) * 125) >> 9;
+	return ((get_clock_xt() - sched_clock_base_cc) * 125) >> 9;
 }
 
 /*
@@ -169,6 +169,8 @@ void init_cpu_timer(void)
 
 static void clock_comparator_interrupt(__u16 code)
 {
+	if (S390_lowcore.clock_comparator == -1ULL)
+		set_clock_comparator(S390_lowcore.clock_comparator);
 }
 
 static void etr_timing_alert(struct etr_irq_parm *);
@@ -227,13 +229,10 @@ static struct clocksource clocksource_tod = {
  */
 void __init time_init(void)
 {
-	u64 init_timer_cc;
-
-	init_timer_cc = reset_tod_clock();
-	jiffies_timer_cc = init_timer_cc - jiffies_64 * CLK_TICKS_PER_JIFFY;
+	sched_clock_base_cc = reset_tod_clock();
 
 	/* set xtime */
-	tod_to_timeval(init_timer_cc - TOD_UNIX_EPOCH, &xtime);
+	tod_to_timeval(sched_clock_base_cc - TOD_UNIX_EPOCH, &xtime);
         set_normalized_timespec(&wall_to_monotonic,
                                 -xtime.tv_sec, -xtime.tv_nsec);
 
@@ -287,7 +286,7 @@ static unsigned long long adjust_time(unsigned long long old,
 		delta = -delta;
 		adjust.offset = -ticks * (1000000 / HZ);
 	}
-	jiffies_timer_cc += delta;
+	sched_clock_base_cc += delta;
 	if (adjust.offset != 0) {
 		printk(KERN_NOTICE "etr: time adjusted by %li micro-seconds\n",
 		       adjust.offset);
@@ -1100,7 +1099,9 @@ static inline struct etr_aib *etr_aib_from_dev(struct sys_device *dev)
 		return etr_port1_online ? &etr_port1 : NULL;
 }
 
-static ssize_t etr_online_show(struct sys_device *dev, char *buf)
+static ssize_t etr_online_show(struct sys_device *dev,
+				struct sysdev_attribute *attr,
+				char *buf)
 {
 	unsigned int online;
 
@@ -1109,7 +1110,8 @@ static ssize_t etr_online_show(struct sys_device *dev, char *buf)
 }
 
 static ssize_t etr_online_store(struct sys_device *dev,
-			      const char *buf, size_t count)
+				struct sysdev_attribute *attr,
+				const char *buf, size_t count)
 {
 	unsigned int value;
 
@@ -1136,7 +1138,9 @@ static ssize_t etr_online_store(struct sys_device *dev,
 
 static SYSDEV_ATTR(online, 0600, etr_online_show, etr_online_store);
 
-static ssize_t etr_stepping_control_show(struct sys_device *dev, char *buf)
+static ssize_t etr_stepping_control_show(struct sys_device *dev,
+					struct sysdev_attribute *attr,
+					char *buf)
 {
 	return sprintf(buf, "%i\n", (dev == &etr_port0_dev) ?
 		       etr_eacr.e0 : etr_eacr.e1);
@@ -1144,7 +1148,8 @@ static ssize_t etr_stepping_control_show(struct sys_device *dev, char *buf)
 
 static SYSDEV_ATTR(stepping_control, 0400, etr_stepping_control_show, NULL);
 
-static ssize_t etr_mode_code_show(struct sys_device *dev, char *buf)
+static ssize_t etr_mode_code_show(struct sys_device *dev,
+				struct sysdev_attribute *attr, char *buf)
 {
 	if (!etr_port0_online && !etr_port1_online)
 		/* Status word is not uptodate if both ports are offline. */
@@ -1155,7 +1160,8 @@ static ssize_t etr_mode_code_show(struct sys_device *dev, char *buf)
 
 static SYSDEV_ATTR(state_code, 0400, etr_mode_code_show, NULL);
 
-static ssize_t etr_untuned_show(struct sys_device *dev, char *buf)
+static ssize_t etr_untuned_show(struct sys_device *dev,
+				struct sysdev_attribute *attr, char *buf)
 {
 	struct etr_aib *aib = etr_aib_from_dev(dev);
 
@@ -1166,7 +1172,8 @@ static ssize_t etr_untuned_show(struct sys_device *dev, char *buf)
 
 static SYSDEV_ATTR(untuned, 0400, etr_untuned_show, NULL);
 
-static ssize_t etr_network_id_show(struct sys_device *dev, char *buf)
+static ssize_t etr_network_id_show(struct sys_device *dev,
+				struct sysdev_attribute *attr, char *buf)
 {
 	struct etr_aib *aib = etr_aib_from_dev(dev);
 
@@ -1177,7 +1184,8 @@ static ssize_t etr_network_id_show(struct sys_device *dev, char *buf)
 
 static SYSDEV_ATTR(network, 0400, etr_network_id_show, NULL);
 
-static ssize_t etr_id_show(struct sys_device *dev, char *buf)
+static ssize_t etr_id_show(struct sys_device *dev,
+			struct sysdev_attribute *attr, char *buf)
 {
 	struct etr_aib *aib = etr_aib_from_dev(dev);
 
@@ -1188,7 +1196,8 @@ static ssize_t etr_id_show(struct sys_device *dev, char *buf)
 
 static SYSDEV_ATTR(id, 0400, etr_id_show, NULL);
 
-static ssize_t etr_port_number_show(struct sys_device *dev, char *buf)
+static ssize_t etr_port_number_show(struct sys_device *dev,
+			struct sysdev_attribute *attr, char *buf)
 {
 	struct etr_aib *aib = etr_aib_from_dev(dev);
 
@@ -1199,7 +1208,8 @@ static ssize_t etr_port_number_show(struct sys_device *dev, char *buf)
 
 static SYSDEV_ATTR(port, 0400, etr_port_number_show, NULL);
 
-static ssize_t etr_coupled_show(struct sys_device *dev, char *buf)
+static ssize_t etr_coupled_show(struct sys_device *dev,
+			struct sysdev_attribute *attr, char *buf)
 {
 	struct etr_aib *aib = etr_aib_from_dev(dev);
 
@@ -1210,7 +1220,8 @@ static ssize_t etr_coupled_show(struct sys_device *dev, char *buf)
 
 static SYSDEV_ATTR(coupled, 0400, etr_coupled_show, NULL);
 
-static ssize_t etr_local_time_show(struct sys_device *dev, char *buf)
+static ssize_t etr_local_time_show(struct sys_device *dev,
+			struct sysdev_attribute *attr, char *buf)
 {
 	struct etr_aib *aib = etr_aib_from_dev(dev);
 
@@ -1221,7 +1232,8 @@ static ssize_t etr_local_time_show(struct sys_device *dev, char *buf)
 
 static SYSDEV_ATTR(local_time, 0400, etr_local_time_show, NULL);
 
-static ssize_t etr_utc_offset_show(struct sys_device *dev, char *buf)
+static ssize_t etr_utc_offset_show(struct sys_device *dev,
+			struct sysdev_attribute *attr, char *buf)
 {
 	struct etr_aib *aib = etr_aib_from_dev(dev);
 
@@ -1335,13 +1347,13 @@ early_param("stp", early_parse_stp);
 /*
  * Reset STP attachment.
  */
-static void stp_reset(void)
+static void __init stp_reset(void)
 {
 	int rc;
 
 	stp_page = alloc_bootmem_pages(PAGE_SIZE);
 	rc = chsc_sstpc(stp_page, STP_OP_CTRL, 0x0000);
-	if (rc == 1)
+	if (rc == 0)
 		set_bit(CLOCK_SYNC_HAS_STP, &clock_sync_flags);
 	else if (stp_online) {
 		printk(KERN_WARNING "Running on non STP capable machine.\n");

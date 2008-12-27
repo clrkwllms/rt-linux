@@ -26,6 +26,7 @@
 #include <linux/module.h>
 #include <linux/notifier.h>
 #include <linux/memcontrol.h>
+#include <linux/security.h>
 
 int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
@@ -37,7 +38,6 @@ static DEFINE_SPINLOCK(zone_scan_mutex);
  * badness - calculate a numeric value for how bad this task has been
  * @p: task struct of which task we should calculate
  * @uptime: current uptime in seconds
- * @mem: target memory controller
  *
  * The formula used is relatively simple and documented inline in the
  * function. The main rationale is that we want to select a good task
@@ -128,7 +128,8 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 	 * Superuser processes are usually more important, so we make it
 	 * less likely that we kill those.
 	 */
-	if (__capable(p, CAP_SYS_ADMIN) || __capable(p, CAP_SYS_RESOURCE))
+	if (has_capability(p, CAP_SYS_ADMIN) ||
+	    has_capability(p, CAP_SYS_RESOURCE))
 		points /= 4;
 
 	/*
@@ -137,7 +138,7 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 	 * tend to only have this flag set on applications they think
 	 * of as important.
 	 */
-	if (__capable(p, CAP_SYS_RAWIO))
+	if (has_capability(p, CAP_SYS_RAWIO))
 		points /= 4;
 
 	/*
@@ -292,6 +293,8 @@ static void dump_tasks(const struct mem_cgroup *mem)
 		if (!p->mm)
 			continue;
 		if (mem && !task_in_mem_cgroup(p, mem))
+			continue;
+		if (!thread_group_leader(p))
 			continue;
 
 		task_lock(p);

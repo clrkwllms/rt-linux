@@ -171,7 +171,6 @@ struct iso_context {
 struct fw_ohci {
 	struct fw_card card;
 
-	u32 version;
 	__iomem char *registers;
 	dma_addr_t self_id_bus;
 	__le32 *self_id_cpu;
@@ -180,6 +179,8 @@ struct fw_ohci {
 	int generation;
 	int request_generation;	/* for timestamping incoming requests */
 	u32 bus_seconds;
+
+	bool use_dualbuffer;
 	bool old_uninorth;
 	bool bus_reset_packet_quirk;
 
@@ -475,6 +476,7 @@ static int ar_context_add_page(struct ar_context *ctx)
 	if (ab == NULL)
 		return -ENOMEM;
 
+	ab->next = NULL;
 	memset(&ab->descriptor, 0, sizeof(ab->descriptor));
 	ab->descriptor.control        = cpu_to_le16(DESCRIPTOR_INPUT_MORE |
 						    DESCRIPTOR_STATUS |
@@ -493,6 +495,21 @@ static int ar_context_add_page(struct ar_context *ctx)
 	flush_writes(ctx->ohci);
 
 	return 0;
+}
+
+static void ar_context_release(struct ar_context *ctx)
+{
+	struct ar_buffer *ab, *ab_next;
+	size_t offset;
+	dma_addr_t ab_bus;
+
+	for (ab = ctx->current_buffer; ab; ab = ab_next) {
+		ab_next = ab->next;
+		offset = offsetof(struct ar_buffer, data);
+		ab_bus = le32_to_cpu(ab->descriptor.data_address) - offset;
+		dma_free_coherent(ctx->ohci->card.device, PAGE_SIZE,
+				  ab, ab_bus);
+	}
 }
 
 #if defined(CONFIG_PPC_PMAC) && defined(CONFIG_PPC32)
@@ -953,10 +970,11 @@ at_context_queue_packet(struct context *ctx, struct fw_packet *packet)
 		payload_bus =
 			dma_map_single(ohci->card.device, packet->payload,
 				       packet->payload_length, DMA_TO_DEVICE);
-		if (dma_mapping_error(payload_bus)) {
+		if (dma_mapping_error(ohci->card.device, payload_bus)) {
 			packet->ack = RCODE_SEND_ERROR;
 			return -1;
 		}
+		packet->payload_bus = payload_bus;
 
 		d[2].req_count    = cpu_to_le16(packet->payload_length);
 		d[2].data_address = cpu_to_le32(payload_bus);
@@ -1008,7 +1026,6 @@ static int handle_at_packet(struct context *context,
 	struct driver_data *driver_data;
 	struct fw_packet *packet;
 	struct fw_ohci *ohci = context->ohci;
-	dma_addr_t payload_bus;
 	int evt;
 
 	if (last->transfer_status == 0)
@@ -1021,9 +1038,8 @@ static int handle_at_packet(struct context *context,
 		/* This packet was cancelled, just continue. */
 		return 1;
 
-	payload_bus = le32_to_cpu(last->data_address);
-	if (payload_bus != 0)
-		dma_unmap_single(ohci->card.device, payload_bus,
+	if (packet->payload_bus)
+		dma_unmap_single(ohci->card.device, packet->payload_bus,
 				 packet->payload_length, DMA_TO_DEVICE);
 
 	evt = le16_to_cpu(last->transfer_status) & 0x1f;
@@ -1680,6 +1696,10 @@ static int ohci_cancel_packet(struct fw_card *card, struct fw_packet *packet)
 	if (packet->ack != 0)
 		goto out;
 
+	if (packet->payload_bus)
+		dma_unmap_single(ohci->card.device, packet->payload_bus,
+				 packet->payload_length, DMA_TO_DEVICE);
+
 	log_ar_at_event('T', packet->speed, packet->header, 0x20);
 	driver_data->packet = NULL;
 	packet->ack = RCODE_CANCELLED;
@@ -1885,7 +1905,7 @@ ohci_allocate_iso_context(struct fw_card *card, int type, size_t header_size)
 	} else {
 		mask = &ohci->ir_context_mask;
 		list = ohci->ir_context_list;
-		if (ohci->version >= OHCI_VERSION_1_1)
+		if (ohci->use_dualbuffer)
 			callback = handle_ir_dualbuffer_packet;
 		else
 			callback = handle_ir_packet_per_buffer;
@@ -1949,7 +1969,7 @@ static int ohci_start_iso(struct fw_iso_context *base,
 	} else {
 		index = ctx - ohci->ir_context_list;
 		control = IR_CONTEXT_ISOCH_HEADER;
-		if (ohci->version >= OHCI_VERSION_1_1)
+		if (ohci->use_dualbuffer)
 			control |= IR_CONTEXT_DUAL_BUFFER_MODE;
 		match = (tags << 28) | (sync << 8) | ctx->base.channel;
 		if (cycle >= 0) {
@@ -2279,7 +2299,7 @@ ohci_queue_iso(struct fw_iso_context *base,
 	spin_lock_irqsave(&ctx->context.ohci->lock, flags);
 	if (base->type == FW_ISO_CONTEXT_TRANSMIT)
 		retval = ohci_queue_iso_transmit(base, packet, buffer, payload);
-	else if (ctx->context.ohci->version >= OHCI_VERSION_1_1)
+	else if (ctx->context.ohci->use_dualbuffer)
 		retval = ohci_queue_iso_receive_dualbuffer(base, packet,
 							 buffer, payload);
 	else
@@ -2341,15 +2361,15 @@ static int __devinit
 pci_probe(struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	struct fw_ohci *ohci;
-	u32 bus_options, max_receive, link_speed;
+	u32 bus_options, max_receive, link_speed, version;
 	u64 guid;
 	int err;
 	size_t size;
 
 	ohci = kzalloc(sizeof(*ohci), GFP_KERNEL);
 	if (ohci == NULL) {
-		fw_error("Could not malloc fw_ohci data.\n");
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto fail;
 	}
 
 	fw_card_initialize(&ohci->card, &ohci_driver, &dev->dev);
@@ -2358,19 +2378,13 @@ pci_probe(struct pci_dev *dev, const struct pci_device_id *ent)
 
 	err = pci_enable_device(dev);
 	if (err) {
-		fw_error("Failed to enable OHCI hardware.\n");
+		fw_error("Failed to enable OHCI hardware\n");
 		goto fail_free;
 	}
 
 	pci_set_master(dev);
 	pci_write_config_dword(dev, OHCI1394_PCI_HCI_Control, 0);
 	pci_set_drvdata(dev, ohci);
-
-#if defined(CONFIG_PPC_PMAC) && defined(CONFIG_PPC32)
-	ohci->old_uninorth = dev->vendor == PCI_VENDOR_ID_APPLE &&
-			     dev->device == PCI_DEVICE_ID_APPLE_UNI_N_FW;
-#endif
-	ohci->bus_reset_packet_quirk = dev->vendor == PCI_VENDOR_ID_TI;
 
 	spin_lock_init(&ohci->lock);
 
@@ -2389,6 +2403,23 @@ pci_probe(struct pci_dev *dev, const struct pci_device_id *ent)
 		err = -ENXIO;
 		goto fail_iomem;
 	}
+
+	version = reg_read(ohci, OHCI1394_Version) & 0x00ff00ff;
+	ohci->use_dualbuffer = version >= OHCI_VERSION_1_1;
+
+/* x86-32 currently doesn't use highmem for dma_alloc_coherent */
+#if !defined(CONFIG_X86_32)
+	/* dual-buffer mode is broken with descriptor addresses above 2G */
+	if (dev->vendor == PCI_VENDOR_ID_TI &&
+	    dev->device == PCI_DEVICE_ID_TI_TSB43AB22)
+		ohci->use_dualbuffer = false;
+#endif
+
+#if defined(CONFIG_PPC_PMAC) && defined(CONFIG_PPC32)
+	ohci->old_uninorth = dev->vendor == PCI_VENDOR_ID_APPLE &&
+			     dev->device == PCI_DEVICE_ID_APPLE_UNI_N_FW;
+#endif
+	ohci->bus_reset_packet_quirk = dev->vendor == PCI_VENDOR_ID_TI;
 
 	ar_context_init(&ohci->ar_request_ctx, ohci,
 			OHCI1394_AsReqRcvContextControlSet);
@@ -2415,9 +2446,8 @@ pci_probe(struct pci_dev *dev, const struct pci_device_id *ent)
 	ohci->ir_context_list = kzalloc(size, GFP_KERNEL);
 
 	if (ohci->it_context_list == NULL || ohci->ir_context_list == NULL) {
-		fw_error("Out of memory for it/ir contexts.\n");
 		err = -ENOMEM;
-		goto fail_registers;
+		goto fail_contexts;
 	}
 
 	/* self-id dma buffer allocation */
@@ -2426,9 +2456,8 @@ pci_probe(struct pci_dev *dev, const struct pci_device_id *ent)
 					       &ohci->self_id_bus,
 					       GFP_KERNEL);
 	if (ohci->self_id_cpu == NULL) {
-		fw_error("Out of memory for self ID buffer.\n");
 		err = -ENOMEM;
-		goto fail_registers;
+		goto fail_contexts;
 	}
 
 	bus_options = reg_read(ohci, OHCI1394_BusOptions);
@@ -2441,17 +2470,20 @@ pci_probe(struct pci_dev *dev, const struct pci_device_id *ent)
 	if (err < 0)
 		goto fail_self_id;
 
-	ohci->version = reg_read(ohci, OHCI1394_Version) & 0x00ff00ff;
 	fw_notify("Added fw-ohci device %s, OHCI version %x.%x\n",
-		  dev->dev.bus_id, ohci->version >> 16, ohci->version & 0xff);
+		  dev_name(&dev->dev), version >> 16, version & 0xff);
 	return 0;
 
  fail_self_id:
 	dma_free_coherent(ohci->card.device, SELF_ID_BUF_SIZE,
 			  ohci->self_id_cpu, ohci->self_id_bus);
- fail_registers:
-	kfree(ohci->it_context_list);
+ fail_contexts:
 	kfree(ohci->ir_context_list);
+	kfree(ohci->it_context_list);
+	context_release(&ohci->at_response_ctx);
+	context_release(&ohci->at_request_ctx);
+	ar_context_release(&ohci->ar_response_ctx);
+	ar_context_release(&ohci->ar_request_ctx);
 	pci_iounmap(dev, ohci->registers);
  fail_iomem:
 	pci_release_region(dev, 0);
@@ -2460,6 +2492,9 @@ pci_probe(struct pci_dev *dev, const struct pci_device_id *ent)
  fail_free:
 	kfree(&ohci->card);
 	ohci_pmac_off(dev);
+ fail:
+	if (err == -ENOMEM)
+		fw_error("Out of memory\n");
 
 	return err;
 }
@@ -2480,8 +2515,19 @@ static void pci_remove(struct pci_dev *dev)
 
 	software_reset(ohci);
 	free_irq(dev->irq, ohci);
+
+	if (ohci->next_config_rom && ohci->next_config_rom != ohci->config_rom)
+		dma_free_coherent(ohci->card.device, CONFIG_ROM_SIZE,
+				  ohci->next_config_rom, ohci->next_config_rom_bus);
+	if (ohci->config_rom)
+		dma_free_coherent(ohci->card.device, CONFIG_ROM_SIZE,
+				  ohci->config_rom, ohci->config_rom_bus);
 	dma_free_coherent(ohci->card.device, SELF_ID_BUF_SIZE,
 			  ohci->self_id_cpu, ohci->self_id_bus);
+	ar_context_release(&ohci->ar_request_ctx);
+	ar_context_release(&ohci->ar_response_ctx);
+	context_release(&ohci->at_request_ctx);
+	context_release(&ohci->at_response_ctx);
 	kfree(ohci->it_context_list);
 	kfree(ohci->ir_context_list);
 	pci_iounmap(dev, ohci->registers);

@@ -4,7 +4,7 @@
  *
  *    (c) 2004 Jelle Foks <jelle@foks.8m.com>
  *    (c) 2004 Gerd Knorr <kraxel@bytesex.org>
- *    (c) 2008 Steven Toth <stoth@hauppauge.com>
+ *    (c) 2008 Steven Toth <stoth@linuxtv.org>
  *      - CX23885/7/8 support
  *
  *  Includes parts from the ivtv driver( http://ivtv.sourceforge.net/),
@@ -32,10 +32,10 @@
 #include <linux/device.h>
 #include <linux/firmware.h>
 #include <media/v4l2-common.h>
+#include <media/v4l2-ioctl.h>
 #include <media/cx2341x.h>
 
 #include "cx23885.h"
-#include "media/cx2341x.h"
 
 #define CX23885_FIRM_IMAGE_SIZE 376836
 #define CX23885_FIRM_IMAGE_NAME "v4l-cx23885-enc.fw"
@@ -631,7 +631,7 @@ int mc417_memory_read(struct cx23885_dev *dev, u32 address, u32 *value)
 /* ------------------------------------------------------------------ */
 
 /* MPEG encoder API */
-char *cmd_to_str(int cmd)
+static char *cmd_to_str(int cmd)
 {
 	switch (cmd) {
 	case CX2341X_ENC_PING_FW:
@@ -1582,6 +1582,7 @@ static int mpeg_open(struct inode *inode, struct file *file)
 
 	dprintk(2, "%s()\n", __func__);
 
+	lock_kernel();
 	list_for_each(list, &cx23885_devlist) {
 		h = list_entry(list, struct cx23885_dev, devlist);
 		if (h->v4l_device->minor == minor) {
@@ -1590,13 +1591,17 @@ static int mpeg_open(struct inode *inode, struct file *file)
 		}
 	}
 
-	if (dev == NULL)
+	if (dev == NULL) {
+		unlock_kernel();
 		return -ENODEV;
+	}
 
 	/* allocate + initialize per filehandle data */
 	fh = kzalloc(sizeof(*fh), GFP_KERNEL);
-	if (NULL == fh)
+	if (NULL == fh) {
+		unlock_kernel();
 		return -ENOMEM;
+	}
 
 	file->private_data = fh;
 	fh->dev      = dev;
@@ -1607,6 +1612,7 @@ static int mpeg_open(struct inode *inode, struct file *file)
 			    V4L2_FIELD_INTERLACED,
 			    sizeof(struct cx23885_buffer),
 			    fh);
+	unlock_kernel();
 
 	return 0;
 }
@@ -1699,14 +1705,7 @@ static struct file_operations mpeg_fops = {
 	.llseek        = no_llseek,
 };
 
-static struct video_device cx23885_mpeg_template = {
-	.name          = "cx23885",
-	.type          = VID_TYPE_CAPTURE |
-				VID_TYPE_TUNER |
-				VID_TYPE_SCALES |
-				VID_TYPE_MPEG_ENCODER,
-	.fops          = &mpeg_fops,
-	.minor         = -1,
+static const struct v4l2_ioctl_ops mpeg_ioctl_ops = {
 	.vidioc_s_std		 = vidioc_s_std,
 	.vidioc_enum_input	 = vidioc_enum_input,
 	.vidioc_g_input		 = vidioc_g_input,
@@ -1733,6 +1732,13 @@ static struct video_device cx23885_mpeg_template = {
 	.vidioc_log_status	 = vidioc_log_status,
 	.vidioc_querymenu	 = vidioc_querymenu,
 	.vidioc_queryctrl	 = vidioc_queryctrl,
+};
+
+static struct video_device cx23885_mpeg_template = {
+	.name          = "cx23885",
+	.fops          = &mpeg_fops,
+	.ioctl_ops     = &mpeg_ioctl_ops,
+	.minor         = -1,
 };
 
 void cx23885_417_unregister(struct cx23885_dev *dev)
@@ -1766,7 +1772,7 @@ static struct video_device *cx23885_video_dev_alloc(
 	vfd->minor   = -1;
 	snprintf(vfd->name, sizeof(vfd->name), "%s %s (%s)", dev->name,
 		type, cx23885_boards[tsport->dev->board].name);
-	vfd->dev     = &pci->dev;
+	vfd->parent  = &pci->dev;
 	vfd->release = video_device_release;
 	return vfd;
 }
@@ -1809,7 +1815,7 @@ int cx23885_417_register(struct cx23885_dev *dev)
 	cx23885_mc417_init(dev);
 
 	printk(KERN_INFO "%s: registered device video%d [mpeg]\n",
-	       dev->name, dev->v4l_device->minor & 0x1f);
+	       dev->name, dev->v4l_device->num);
 
 	return 0;
 }

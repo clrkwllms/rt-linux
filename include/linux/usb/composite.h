@@ -130,6 +130,9 @@ struct usb_function {
 
 int usb_add_function(struct usb_configuration *, struct usb_function *);
 
+int usb_function_deactivate(struct usb_function *);
+int usb_function_activate(struct usb_function *);
+
 int usb_interface_id(struct usb_configuration *, struct usb_function *);
 
 /**
@@ -316,9 +319,13 @@ struct usb_composite_dev {
 	struct usb_composite_driver	*driver;
 	u8				next_string_id;
 
-	spinlock_t			lock;
+	/* the gadget driver won't enable the data pullup
+	 * while the deactivation count is nonzero.
+	 */
+	unsigned			deactivations;
 
-	/* REVISIT use and existence of lock ... */
+	/* protects at least deactivation count */
+	spinlock_t			lock;
 };
 
 extern int usb_string_id(struct usb_composite_dev *c);
@@ -330,7 +337,7 @@ extern int usb_string_id(struct usb_composite_dev *c);
 	dev_vdbg(&(d)->gadget->dev , fmt , ## args)
 #define ERROR(d, fmt, args...) \
 	dev_err(&(d)->gadget->dev , fmt , ## args)
-#define WARN(d, fmt, args...) \
+#define WARNING(d, fmt, args...) \
 	dev_warn(&(d)->gadget->dev , fmt , ## args)
 #define INFO(d, fmt, args...) \
 	dev_info(&(d)->gadget->dev , fmt , ## args)

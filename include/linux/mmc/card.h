@@ -111,6 +111,8 @@ struct mmc_card {
 	unsigned		num_info;	/* number of info strings */
 	const char		**info;		/* info strings */
 	struct sdio_func_tuple	*tuples;	/* unknown common tuples */
+
+	struct dentry		*debugfs_root;
 };
 
 #define mmc_card_mmc(c)		((c)->type == MMC_TYPE_MMC)
@@ -128,7 +130,7 @@ struct mmc_card {
 #define mmc_card_set_blockaddr(c) ((c)->state |= MMC_STATE_BLOCKADDR)
 
 #define mmc_card_name(c)	((c)->cid.prod_name)
-#define mmc_card_id(c)		((c)->dev.bus_id)
+#define mmc_card_id(c)		(dev_name(&(c)->dev))
 
 #define mmc_list_to_card(l)	container_of(l, struct mmc_card, node)
 #define mmc_get_drvdata(c)	dev_get_drvdata(&(c)->dev)

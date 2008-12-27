@@ -121,6 +121,7 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 {
 #ifdef CONFIG_MMC_DEBUG
 	unsigned int i, sz;
+	struct scatterlist *sg;
 #endif
 
 	pr_debug("%s: starting CMD%u arg %08x flags %08x\n",
@@ -156,8 +157,8 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 
 #ifdef CONFIG_MMC_DEBUG
 		sz = 0;
-		for (i = 0;i < mrq->data->sg_len;i++)
-			sz += mrq->data->sg[i].length;
+		for_each_sg(mrq->data->sg, sg, mrq->data->sg_len, i)
+			sz += sg->length;
 		BUG_ON(sz != mrq->data->blocks * mrq->data->blksz);
 #endif
 
@@ -279,7 +280,11 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 			(card->host->ios.clock / 1000);
 
 		if (data->flags & MMC_DATA_WRITE)
-			limit_us = 250000;
+			/*
+			 * The limit is really 250 ms, but that is
+			 * insufficient for some crappy cards.
+			 */
+			limit_us = 300000;
 		else
 			limit_us = 100000;
 

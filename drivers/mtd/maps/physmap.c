@@ -1,6 +1,4 @@
 /*
- * $Id: physmap.c,v 1.39 2005/11/29 14:49:36 gleixner Exp $
- *
  * Normal mappings of chips in physical memory
  *
  * Copyright (C) 2003 MontaVista Software Inc.
@@ -21,7 +19,7 @@
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/physmap.h>
 #include <linux/mtd/concat.h>
-#include <asm/io.h>
+#include <linux/io.h>
 
 #define MAX_RESOURCES		4
 
@@ -29,7 +27,6 @@ struct physmap_flash_info {
 	struct mtd_info		*mtd[MAX_RESOURCES];
 	struct mtd_info		*cmtd;
 	struct map_info		map[MAX_RESOURCES];
-	struct resource		*res;
 #ifdef CONFIG_MTD_PARTITIONS
 	int			nr_parts;
 	struct mtd_partition	*parts;
@@ -72,16 +69,7 @@ static int physmap_flash_remove(struct platform_device *dev)
 #endif
 			map_destroy(info->mtd[i]);
 		}
-
-		if (info->map[i].virt != NULL)
-			iounmap(info->map[i].virt);
 	}
-
-	if (info->res != NULL) {
-		release_resource(info->res);
-		kfree(info->res);
-	}
-
 	return 0;
 }
 
@@ -103,7 +91,8 @@ static int physmap_flash_probe(struct platform_device *dev)
 	if (physmap_data == NULL)
 		return -ENODEV;
 
-	info = kzalloc(sizeof(struct physmap_flash_info), GFP_KERNEL);
+	info = devm_kzalloc(&dev->dev, sizeof(struct physmap_flash_info),
+			    GFP_KERNEL);
 	if (info == NULL) {
 		err = -ENOMEM;
 		goto err_out;
@@ -116,10 +105,10 @@ static int physmap_flash_probe(struct platform_device *dev)
 		       (unsigned long long)(dev->resource[i].end - dev->resource[i].start + 1),
 		       (unsigned long long)dev->resource[i].start);
 
-		info->res = request_mem_region(dev->resource[i].start,
-					       dev->resource[i].end - dev->resource[i].start + 1,
-					       dev->dev.bus_id);
-		if (info->res == NULL) {
+		if (!devm_request_mem_region(&dev->dev,
+			dev->resource[i].start,
+			dev->resource[i].end - dev->resource[i].start + 1,
+			dev->dev.bus_id)) {
 			dev_err(&dev->dev, "Could not reserve memory region\n");
 			err = -ENOMEM;
 			goto err_out;
@@ -131,7 +120,8 @@ static int physmap_flash_probe(struct platform_device *dev)
 		info->map[i].bankwidth = physmap_data->width;
 		info->map[i].set_vpp = physmap_data->set_vpp;
 
-		info->map[i].virt = ioremap(info->map[i].phys, info->map[i].size);
+		info->map[i].virt = devm_ioremap(&dev->dev, info->map[i].phys,
+						 info->map[i].size);
 		if (info->map[i].virt == NULL) {
 			dev_err(&dev->dev, "Failed to ioremap flash region\n");
 			err = EIO;
@@ -203,7 +193,19 @@ static int physmap_flash_suspend(struct platform_device *dev, pm_message_t state
 	int i;
 
 	for (i = 0; i < MAX_RESOURCES && info->mtd[i]; i++)
-		ret |= info->mtd[i]->suspend(info->mtd[i]);
+		if (info->mtd[i]->suspend) {
+			ret = info->mtd[i]->suspend(info->mtd[i]);
+			if (ret)
+				goto fail;
+		}
+
+	return 0;
+fail:
+	for (--i; i >= 0; --i)
+		if (info->mtd[i]->suspend) {
+			BUG_ON(!info->mtd[i]->resume);
+			info->mtd[i]->resume(info->mtd[i]);
+		}
 
 	return ret;
 }
@@ -214,7 +216,8 @@ static int physmap_flash_resume(struct platform_device *dev)
 	int i;
 
 	for (i = 0; i < MAX_RESOURCES && info->mtd[i]; i++)
-		info->mtd[i]->resume(info->mtd[i]);
+		if (info->mtd[i]->resume)
+			info->mtd[i]->resume(info->mtd[i]);
 
 	return 0;
 }
@@ -225,8 +228,9 @@ static void physmap_flash_shutdown(struct platform_device *dev)
 	int i;
 
 	for (i = 0; i < MAX_RESOURCES && info->mtd[i]; i++)
-		if (info->mtd[i]->suspend(info->mtd[i]) == 0)
-			info->mtd[i]->resume(info->mtd[i]);
+		if (info->mtd[i]->suspend && info->mtd[i]->resume)
+			if (info->mtd[i]->suspend(info->mtd[i]) == 0)
+				info->mtd[i]->resume(info->mtd[i]);
 }
 #else
 #define physmap_flash_suspend NULL

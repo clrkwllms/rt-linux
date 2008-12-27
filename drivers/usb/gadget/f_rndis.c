@@ -85,9 +85,7 @@ struct f_rndis {
 	u8				ethaddr[ETH_ALEN];
 	int				config;
 
-	struct usb_descriptor_header	**fs_function;
 	struct rndis_ep_descs		fs;
-	struct usb_descriptor_header	**hs_function;
 	struct rndis_ep_descs		hs;
 
 	struct usb_ep			*notify;
@@ -174,7 +172,6 @@ static struct usb_interface_descriptor rndis_data_intf __initdata = {
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	/* .bInterfaceNumber = DYNAMIC */
-	.bAlternateSetting =	1,
 	.bNumEndpoints =	2,
 	.bInterfaceClass =	USB_CLASS_CDC_DATA,
 	.bInterfaceSubClass =	0,
@@ -305,7 +302,7 @@ static void rndis_response_available(void *_rndis)
 	__le32				*data = req->buf;
 	int				status;
 
-	if (atomic_inc_return(&rndis->notify_count))
+	if (atomic_inc_return(&rndis->notify_count) != 1)
 		return;
 
 	/* Send RNDIS RESPONSE_AVAILABLE notification; a
@@ -654,6 +651,8 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 				fs_in_desc.bEndpointAddress;
 		hs_out_desc.bEndpointAddress =
 				fs_out_desc.bEndpointAddress;
+		hs_notify_desc.bEndpointAddress =
+				fs_notify_desc.bEndpointAddress;
 
 		/* copy descriptors, and track endpoint copies */
 		f->hs_descriptors = usb_copy_descriptors(eth_hs_function);
@@ -665,6 +664,8 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 				f->hs_descriptors, &hs_in_desc);
 		rndis->hs.out = usb_find_endpoint(eth_hs_function,
 				f->hs_descriptors, &hs_out_desc);
+		rndis->hs.notify = usb_find_endpoint(eth_hs_function,
+				f->hs_descriptors, &hs_notify_desc);
 	}
 
 	rndis->port.open = rndis_open;

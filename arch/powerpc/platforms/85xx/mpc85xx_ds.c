@@ -78,7 +78,8 @@ void __init mpc85xx_ds_pic_init(void)
 
 	mpic = mpic_alloc(np, r.start,
 			  MPIC_PRIMARY | MPIC_WANTS_RESET |
-			  MPIC_BIG_ENDIAN | MPIC_BROKEN_FRR_NIRQS,
+			  MPIC_BIG_ENDIAN | MPIC_BROKEN_FRR_NIRQS |
+			  MPIC_SINGLE_DEST_CPU,
 			0, 256, " OpenPIC  ");
 	BUG_ON(mpic == NULL);
 	of_node_put(np);
@@ -115,7 +116,6 @@ void __init mpc85xx_ds_pic_init(void)
 
 #ifdef CONFIG_PCI
 static int primary_phb_addr;
-extern int uses_fsl_uli_m1575;
 extern int uli_exclude_device(struct pci_controller *hose,
 				u_char bus, u_char devfn);
 
@@ -161,7 +161,6 @@ static void __init mpc85xx_ds_setup_arch(void)
 		}
 	}
 
-	uses_fsl_uli_m1575 = 1;
 	ppc_md.pci_exclude_device = mpc85xx_exclude_device;
 #endif
 
@@ -188,6 +187,7 @@ static int __init mpc8544_ds_probe(void)
 static struct of_device_id __initdata mpc85xxds_ids[] = {
 	{ .type = "soc", },
 	{ .compatible = "soc", },
+	{ .compatible = "simple-bus", },
 	{},
 };
 
