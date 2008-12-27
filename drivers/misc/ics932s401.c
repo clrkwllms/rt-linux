@@ -374,7 +374,7 @@ static ssize_t show_value(struct device *dev,
 			  struct device_attribute *devattr,
 			  char *buf)
 {
-	int x;
+	int x = 0;
 
 	if (devattr == &dev_attr_usb_clock)
 		x = 48000;
@@ -392,7 +392,7 @@ static ssize_t show_spread(struct device *dev,
 {
 	struct ics932s401_data *data = ics932s401_update_device(dev);
 	int reg;
-	unsigned long val;
+	unsigned long val = 0;
 
 	if (!(data->regs[ICS932S401_REG_CFG2] & ICS932S401_CFG1_SPREAD))
 		return sprintf(buf, "0%%\n");
