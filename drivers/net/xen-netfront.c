@@ -196,7 +196,7 @@ static void rx_refill_timeout(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	struct netfront_info *np = netdev_priv(dev);
-	netif_rx_schedule(dev, &np->napi);
+	netif_rx_schedule(&np->napi);
 }
 
 static int netfront_tx_slot_available(struct netfront_info *np)
@@ -328,7 +328,7 @@ static int xennet_open(struct net_device *dev)
 		xennet_alloc_rx_buffers(dev);
 		np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
 		if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
-			netif_rx_schedule(dev, &np->napi);
+			netif_rx_schedule(&np->napi);
 	}
 	spin_unlock_bh(&np->rx_lock);
 
@@ -841,7 +841,6 @@ static int handle_incoming_queue(struct net_device *dev,
 
 		/* Pass it up. */
 		netif_receive_skb(skb);
-		dev->last_rx = jiffies;
 	}
 
 	return packets_dropped;
@@ -980,7 +979,7 @@ err:
 
 		RING_FINAL_CHECK_FOR_RESPONSES(&np->rx, more_to_do);
 		if (!more_to_do)
-			__netif_rx_complete(dev, napi);
+			__netif_rx_complete(napi);
 
 		local_irq_restore(flags);
 	}
@@ -1311,7 +1310,7 @@ static irqreturn_t xennet_interrupt(int irq, void *dev_id)
 		xennet_tx_buf_gc(dev);
 		/* Under tx_lock: protects access to rx shared-ring indexes. */
 		if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
-			netif_rx_schedule(dev, &np->napi);
+			netif_rx_schedule(&np->napi);
 	}
 
 	spin_unlock_irqrestore(&np->tx_lock, flags);
@@ -1785,7 +1784,7 @@ static int __devexit xennet_remove(struct xenbus_device *dev)
 	return 0;
 }
 
-static struct xenbus_driver netfront = {
+static struct xenbus_driver netfront_driver = {
 	.name = "vif",
 	.owner = THIS_MODULE,
 	.ids = netfront_ids,
@@ -1805,7 +1804,7 @@ static int __init netif_init(void)
 
 	printk(KERN_INFO "Initialising Xen virtual ethernet driver.\n");
 
-	return xenbus_register_frontend(&netfront);
+	return xenbus_register_frontend(&netfront_driver);
 }
 module_init(netif_init);
 
@@ -1815,7 +1814,7 @@ static void __exit netif_exit(void)
 	if (xen_initial_domain())
 		return;
 
-	xenbus_unregister_driver(&netfront);
+	xenbus_unregister_driver(&netfront_driver);
 }
 module_exit(netif_exit);
 

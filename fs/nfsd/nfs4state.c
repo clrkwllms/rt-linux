@@ -719,8 +719,8 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 		status = nfserr_clid_inuse;
 		if (!same_creds(&conf->cl_cred, &rqstp->rq_cred)
 				|| conf->cl_addr != sin->sin_addr.s_addr) {
-			dprintk("NFSD: setclientid: string in use by client"
-				"at %u.%u.%u.%u\n", NIPQUAD(conf->cl_addr));
+			dprintk("NFSD: setclientid: string in use by clientat %pI4\n",
+				&conf->cl_addr);
 			goto out;
 		}
 	}
@@ -3261,6 +3261,7 @@ nfs4_state_shutdown(void)
 {
 	cancel_rearming_delayed_workqueue(laundry_wq, &laundromat_work);
 	destroy_workqueue(laundry_wq);
+	locks_end_grace(&nfsd4_manager);
 	nfs4_lock_state();
 	nfs4_release_reclaim();
 	__nfs4_state_shutdown();

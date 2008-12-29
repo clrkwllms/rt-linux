@@ -6,6 +6,9 @@
  * Copyright IBM Corporation 2002, 2008
  */
 
+#define KMSG_COMPONENT "zfcp"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
+
 #include "zfcp_ext.h"
 
 #define ZFCP_MAX_ERPS                   3
@@ -720,7 +723,6 @@ static int zfcp_erp_adapter_strategy_generic(struct zfcp_erp_action *act,
 		goto failed_openfcp;
 
 	atomic_set_mask(ZFCP_STATUS_COMMON_OPEN, &act->adapter->status);
-	schedule_work(&act->adapter->scan_work);
 
 	return ZFCP_ERP_SUCCEEDED;
 
@@ -1186,7 +1188,9 @@ static void zfcp_erp_scsi_scan(struct work_struct *work)
 		container_of(work, struct zfcp_erp_add_work, work);
 	struct zfcp_unit *unit = p->unit;
 	struct fc_rport *rport = unit->port->rport;
-	scsi_scan_target(&rport->dev, 0, rport->scsi_target_id,
+
+	if (rport && rport->port_state == FC_PORTSTATE_ONLINE)
+		scsi_scan_target(&rport->dev, 0, rport->scsi_target_id,
 			 scsilun_to_int((struct scsi_lun *)&unit->fcp_lun), 0);
 	atomic_clear_mask(ZFCP_STATUS_UNIT_SCSI_WORK_PENDING, &unit->status);
 	zfcp_unit_put(unit);
@@ -1280,8 +1284,13 @@ static void zfcp_erp_action_cleanup(struct zfcp_erp_action *act, int result)
 		break;
 
 	case ZFCP_ERP_ACTION_REOPEN_ADAPTER:
-		if (result != ZFCP_ERP_SUCCEEDED)
+		if (result != ZFCP_ERP_SUCCEEDED) {
+			unregister_service_level(&adapter->service_level);
 			zfcp_erp_rports_del(adapter);
+		} else {
+			register_service_level(&adapter->service_level);
+			schedule_work(&adapter->scan_work);
+		}
 		zfcp_adapter_put(adapter);
 		break;
 	}
