@@ -1030,7 +1030,7 @@ static u8 ath_rc_rate_getidx(struct ath_softc *sc,
 			     u16 min_rate)
 {
 	u32 j;
-	u8 uninitialized_var(nextindex);
+	u8 nextindex;
 	struct ath_tx_ratectrl *rate_ctrl =
 		(struct ath_tx_ratectrl *)(ath_rc_priv);
 
