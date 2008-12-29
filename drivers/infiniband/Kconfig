@@ -36,7 +36,7 @@ config INFINIBAND_USER_MEM
 
 config INFINIBAND_ADDR_TRANS
 	bool
-	depends on INET
+	depends on INET && IPV6
 	default y
 
 source "drivers/infiniband/hw/mthca/Kconfig"
