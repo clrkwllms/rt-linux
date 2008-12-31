@@ -248,7 +248,6 @@ static int nfs_sockaddr_match_ipaddr(const struct sockaddr *sa1,
 				(const struct sockaddr_in6 *)sa2);
 	}
 	BUG();
-	return 0;
 }
 
 /*
