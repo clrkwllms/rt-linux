@@ -36,25 +36,12 @@ extern void __chk_io_ptr(const volatile void __iomem *);
 
 #ifdef __KERNEL__
 
-/*
- * GCC 4.1.0 and 4.1.1 has a bug that can miscompile __weak symbols,
- * by inlining __weak functions into same-file call sites - breaking the
- * kernel if the __weak symbol is overriden later on.
- *
- * We have not found a clean way to work around this bug on the source
- * code level, so we do not allow these compilers (which are quite
- * rare these days, have other bugs and are superceded by the 4.1.2
- * bugfix release anyway):
- */
-#define gcc41_inlining_bug \
-	(__GNUC__ == 4 && __GNUC_MINOR__ == 1 && __GNUC_PATCHLEVEL__ <= 1)
-
-#if __GNUC__ >= 4 && !gcc41_inlining_bug
+#if __GNUC__ >= 4
 # include <linux/compiler-gcc4.h>
 #elif __GNUC__ == 3 && __GNUC_MINOR__ >= 2
 # include <linux/compiler-gcc3.h>
 #else
-# error Sorry, your compiler is too old, too buggy or not recognized.
+# error Sorry, your compiler is too old/not recognized.
 #endif
 
 #define notrace __attribute__((no_instrument_function))
