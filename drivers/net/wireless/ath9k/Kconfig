@@ -1,6 +1,8 @@
 config ATH9K
 	tristate "Atheros 802.11n wireless cards support"
 	depends on PCI && MAC80211 && WLAN_80211
+	# build failures
+	depends on 0
 	select MAC80211_LEDS
 	select LEDS_CLASS
 	select NEW_LEDS
