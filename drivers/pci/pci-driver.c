@@ -353,7 +353,7 @@ static int pci_default_pm_resume_late(struct pci_dev *pci_dev)
 	return retval;
 }
 
-static inline int pci_legacy_suspend(struct device *dev, pm_message_t state)
+static int pci_legacy_suspend(struct device *dev, pm_message_t state)
 {
 	struct pci_dev * pci_dev = to_pci_dev(dev);
 	struct pci_driver * drv = pci_dev->driver;
@@ -368,8 +368,7 @@ static inline int pci_legacy_suspend(struct device *dev, pm_message_t state)
 	return i;
 }
 
-static inline int
-pci_legacy_suspend_late(struct device *dev, pm_message_t state)
+static int pci_legacy_suspend_late(struct device *dev, pm_message_t state)
 {
 	struct pci_dev * pci_dev = to_pci_dev(dev);
 	struct pci_driver * drv = pci_dev->driver;
@@ -382,7 +381,7 @@ pci_legacy_suspend_late(struct device *dev, pm_message_t state)
 	return i;
 }
 
-static inline int pci_legacy_resume(struct device *dev)
+static int pci_legacy_resume(struct device *dev)
 {
 	int error;
 	struct pci_dev * pci_dev = to_pci_dev(dev);
@@ -397,7 +396,7 @@ static inline int pci_legacy_resume(struct device *dev)
 	return error;
 }
 
-static inline int pci_legacy_resume_early(struct device *dev)
+static int pci_legacy_resume_early(struct device *dev)
 {
 	int error = 0;
 	struct pci_dev * pci_dev = to_pci_dev(dev);
