@@ -1360,6 +1360,11 @@ P:	Maciej W. Rozycki
 M:	macro@linux-mips.org
 S:	Maintained
 
+DELL LAPTOP DRIVER
+P:	Matthew Garrett
+M:	mjg59@srcf.ucam.org
+S:	Maintained
+
 DELL LAPTOP SMM DRIVER
 P:	Massimo Dal Zotto
 M:	dz@debian.org
@@ -3483,6 +3488,12 @@ M:	geoffrey.levand@am.sony.com
 L:	linuxppc-dev@ozlabs.org
 L:	cbe-oss-dev@ozlabs.org
 S:	Supported
+
+PS3VRAM DRIVER
+P:	Jim Paris
+M:	jim@jtan.com
+L:	cbe-oss-dev@ozlabs.org
+S:	Maintained
 
 PVRUSB2 VIDEO4LINUX DRIVER
 P:	Mike Isely
