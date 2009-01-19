@@ -1029,10 +1029,6 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 				case 0x09: /* self test in progress */
 					action = ACTION_DELAYED_RETRY;
 					break;
-				default:
-					description = "Device not ready";
-					action = ACTION_FAIL;
-					break;
 				}
 			} else {
 				description = "Device not ready";
@@ -1058,7 +1054,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 		/* Give up and fail the remainder of the request */
 		if (!(req->cmd_flags & REQ_QUIET)) {
 			if (description)
-				scmd_printk(KERN_INFO, cmd, "%s\n",
+				scmd_printk(KERN_INFO, cmd, "%s",
 					    description);
 			scsi_print_result(cmd);
 			if (driver_byte(result) & DRIVER_SENSE)
