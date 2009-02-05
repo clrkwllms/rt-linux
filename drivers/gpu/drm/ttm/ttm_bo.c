@@ -90,6 +90,7 @@ int ttm_bo_wait_unreserved(struct ttm_buffer_object *bo, bool interruptible)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(ttm_bo_wait_unreserved);
 
 static void ttm_bo_add_to_lru(struct ttm_buffer_object *bo)
 {

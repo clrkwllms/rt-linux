@@ -142,3 +142,22 @@ config DRM_SAVAGE
 	help
 	  Choose this option if you have a Savage3D/4/SuperSavage/Pro/Twister
 	  chipset. If M is selected the module will be called savage.
+
+config DRM_NOUVEAU
+	tristate "Nouveau (nVidia) cards"
+	depends on DRM
+	select DRM_TTM
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	help
+	  Choose this option for open-source nVidia support.
+
+config DRM_NOUVEAU_KMS
+	bool "Enable modesetting on nouveau by default"
+	depends on DRM_NOUVEAU
+	help
+	Choose this option if you want kernel modesetting enabled by default,
+	and you have a new enough userspace to support this. Running old
+	userspaces with this enabled will cause pain.
+
