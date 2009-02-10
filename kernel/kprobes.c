@@ -123,7 +123,7 @@ static int collect_garbage_slots(void);
 static int __kprobes check_safety(void)
 {
 	int ret = 0;
-#if defined(CONFIG_PREEMPT) && defined(CONFIG_FREEZER)
+#if defined(CONFIG_PREEMPT) && defined(CONFIG_PM)
 	ret = freeze_processes();
 	if (ret == 0) {
 		struct task_struct *p, *q;
