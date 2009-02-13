@@ -26,6 +26,7 @@
 #include <linux/kprobes.h>
 #include <linux/uaccess.h>
 #include <linux/kdebug.h>
+#include <linux/magic.h>
 
 #include <asm/system.h>
 #include <asm/desc.h>
@@ -433,6 +434,8 @@ static noinline void no_context(struct pt_regs *regs,
 			unsigned long error_code, unsigned long address)
 {
 	struct task_struct *tsk = current;
+	unsigned long *stackend;
+
 #ifdef CONFIG_X86_64
 	unsigned long flags;
 	int sig;
@@ -468,6 +471,10 @@ static noinline void no_context(struct pt_regs *regs,
 #endif
 
 	show_fault_oops(regs, error_code, address);
+
+ 	stackend = end_of_stack(tsk);
+	if (*stackend != STACK_END_MAGIC)
+		printk(KERN_ALERT "Thread overran stack, or stack corrupted\n");
 
 	tsk->thread.cr2 = address;
 	tsk->thread.trap_no = 14;
@@ -856,6 +863,7 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		return;
 	}
 
+	/* kprobes don't want to hook the spurious faults. */
 	if (unlikely(notify_page_fault(regs)))
 		return;
 	/*
