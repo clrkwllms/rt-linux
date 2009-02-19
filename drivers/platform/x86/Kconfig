@@ -303,8 +303,6 @@ config EEEPC_LAPTOP
 	tristate "Eee PC Hotkey Driver (EXPERIMENTAL)"
 	depends on ACPI
 	depends on EXPERIMENTAL
-	# broken build with: config-Wed_Jan_14_14_52_46_CET_2009.bad
-	depends on 0
 	select BACKLIGHT_CLASS_DEVICE
 	select HWMON
 	select RFKILL
