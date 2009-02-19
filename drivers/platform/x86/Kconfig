@@ -62,7 +62,6 @@ config DELL_LAPTOP
 	depends on EXPERIMENTAL
 	depends on BACKLIGHT_CLASS_DEVICE
 	depends on RFKILL
-	depends on 0
 	default n
 	---help---
 	This driver adds support for rfkill and backlight control to Dell
