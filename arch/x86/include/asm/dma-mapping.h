@@ -117,7 +117,12 @@ dma_map_sg(struct device *hwdev, struct scatterlist *sg,
 {
 	struct dma_mapping_ops *ops = get_dma_ops(hwdev);
 
+	struct scatterlist *s;
+	int i;
+
 	BUG_ON(!valid_dma_direction(direction));
+	for_each_sg(sg, s, nents, i)
+		kmemcheck_mark_initialized(sg_virt(s), s->length);
 	return ops->map_sg(hwdev, sg, nents, direction);
 }
 
@@ -215,6 +220,7 @@ static inline dma_addr_t dma_map_page(struct device *dev, struct page *page,
 	struct dma_mapping_ops *ops = get_dma_ops(dev);
 
 	BUG_ON(!valid_dma_direction(direction));
+	kmemcheck_mark_initialized(page_address(page) + offset, size);
 	return ops->map_single(dev, page_to_phys(page) + offset,
 			       size, direction);
 }
