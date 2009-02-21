@@ -27,30 +27,20 @@ static bool opcode_is_rex_prefix(uint8_t b)
  * that we care about. Moreover, the ones who invented this instruction set
  * should be shot.
  */
-void kmemcheck_opcode_decode(const uint8_t *op,
-	const uint8_t **rep_prefix, const uint8_t **rex_prefix,
-	unsigned int *size)
+void kmemcheck_opcode_decode(const uint8_t *op, unsigned int *size)
 {
 	/* Default operand size */
 	int operand_size_override = 4;
 
-	*rep_prefix = NULL;
-
 	/* prefixes */
 	for (; opcode_is_prefix(*op); ++op) {
-		if (*op == 0xf2 || *op == 0xf3)
-			*rep_prefix = op;
 		if (*op == 0x66)
 			operand_size_override = 2;
 	}
 
-	*rex_prefix = NULL;
-
 #ifdef CONFIG_X86_64
 	/* REX prefix */
 	if (opcode_is_rex_prefix(*op)) {
-		*rex_prefix = op;
-
 		if (*op & 0x08) {
 			*size = 8;
 			return;
@@ -87,4 +77,3 @@ const uint8_t *kmemcheck_opcode_get_primary(const uint8_t *op)
 		++op;
 	return op;
 }
-
