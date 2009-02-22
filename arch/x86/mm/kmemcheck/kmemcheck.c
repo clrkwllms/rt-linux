@@ -131,9 +131,8 @@ static void kmemcheck_save_addr(unsigned long addr)
 {
 	struct kmemcheck_context *data = &__get_cpu_var(kmemcheck_context);
 
-	data->addr[data->n_addrs++] = addr;
-
 	BUG_ON(data->n_addrs >= ARRAY_SIZE(data->addr));
+	data->addr[data->n_addrs++] = addr;
 }
 
 static unsigned int kmemcheck_show_all(void)
