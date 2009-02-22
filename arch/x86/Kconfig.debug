@@ -279,6 +279,7 @@ menuconfig KMEMCHECK
 	depends on (SLUB && !SLUB_DEBUG_ON) || (SLAB && !DEBUG_SLAB)
 	depends on !CC_OPTIMIZE_FOR_SIZE
 	depends on !DEBUG_PAGEALLOC
+	depends on !FUNCTION_TRACER
 	select FRAME_POINTER
 	select STACKTRACE
 	default n
