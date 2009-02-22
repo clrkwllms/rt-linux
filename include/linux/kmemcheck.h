@@ -80,8 +80,7 @@ static inline void kmemcheck_init(void)
 }
 
 static inline void
-kmemcheck_alloc_shadow(int ctor, gfp_t flags, int node,
-		       struct page *page, int order)
+kmemcheck_alloc_shadow(struct page *page, int order, gfp_t flags, int node)
 {
 }
 
