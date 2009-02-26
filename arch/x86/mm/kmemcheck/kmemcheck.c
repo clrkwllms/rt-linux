@@ -33,7 +33,7 @@
 
 void __init kmemcheck_init(void)
 {
-	printk(KERN_INFO "kmemcheck: \"Bugs, beware!\"\n");
+	printk(KERN_INFO "kmemcheck: Initialized\n");
 
 #ifdef CONFIG_SMP
 	/*
@@ -49,16 +49,18 @@ void __init kmemcheck_init(void)
 }
 
 #ifdef CONFIG_KMEMCHECK_DISABLED_BY_DEFAULT
-int kmemcheck_enabled = 0;
+#  define KMEMCHECK_ENABLED 0
 #endif
 
 #ifdef CONFIG_KMEMCHECK_ENABLED_BY_DEFAULT
-int kmemcheck_enabled = 1;
+#  define KMEMCHECK_ENABLED 1
 #endif
 
 #ifdef CONFIG_KMEMCHECK_ONESHOT_BY_DEFAULT
-int kmemcheck_enabled = 2;
+#  define KMEMCHECK_ENABLED 2
 #endif
+
+int kmemcheck_enabled = KMEMCHECK_ENABLED;
 
 /*
  * We need to parse the kmemcheck= option before any memory is allocated.
@@ -591,7 +593,6 @@ bool kmemcheck_fault(struct pt_regs *regs, unsigned long address,
 	unsigned long error_code)
 {
 	pte_t *pte;
-	unsigned int level;
 
 	/*
 	 * XXX: Is it safe to assume that memory accesses from virtual 86
@@ -604,12 +605,8 @@ bool kmemcheck_fault(struct pt_regs *regs, unsigned long address,
 	if (regs->cs != __KERNEL_CS)
 		return false;
 
-	pte = lookup_address(address, &level);
+	pte = kmemcheck_pte_lookup(address);
 	if (!pte)
-		return false;
-	if (level != PG_LEVEL_4K)
-		return false;
-	if (!pte_hidden(*pte))
 		return false;
 
 	if (error_code & 2)

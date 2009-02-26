@@ -15,6 +15,7 @@
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
+#include <linux/kmemcheck.h>
 #include <linux/ctype.h>
 #include <linux/delay.h>
 #include <linux/idr.h>
@@ -893,6 +894,7 @@ struct c2port_device *c2port_device_register(char *name,
 	c2dev = kmalloc(sizeof(struct c2port_device), GFP_KERNEL);
 	if (unlikely(!c2dev))
 		return ERR_PTR(-ENOMEM);
+	kmemcheck_annotate_bitfield(c2dev->flags);
 
 	ret = idr_pre_get(&c2port_idr, GFP_KERNEL);
 	if (!ret) {

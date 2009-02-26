@@ -68,9 +68,9 @@ void kmemcheck_mark_initialized_pages(struct page *p, unsigned int n);
 int kmemcheck_show_addr(unsigned long address);
 int kmemcheck_hide_addr(unsigned long address);
 
-#define kmemcheck_annotate_bitfield(field)		\
-	do {						\
-		memset(&(field), 0, sizeof(field));	\
+#define kmemcheck_annotate_bitfield(field)				\
+	do {								\
+		kmemcheck_mark_initialized(&(field), sizeof(field));	\
 	} while (0)
 #else
 #define kmemcheck_enabled 0

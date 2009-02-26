@@ -75,6 +75,7 @@ config DEBUG_STACK_USAGE
 config DEBUG_PAGEALLOC
 	bool "Debug page memory allocations"
 	depends on DEBUG_KERNEL
+	depends on !KMEMCHECK
 	---help---
 	  Unmap pages from the kernel linear mapping after free_pages().
 	  This results in a large slowdown, but helps to find certain types
@@ -254,11 +255,10 @@ endif
 
 menuconfig KMEMCHECK
 	bool "kmemcheck: trap use of uninitialized memory"
-	depends on X86
+	depends on DEBUG_KERNEL
 	depends on !X86_USE_3DNOW
-	depends on (SLUB && !SLUB_DEBUG_ON) || (SLAB && !DEBUG_SLAB)
+	depends on SLUB || SLAB
 	depends on !CC_OPTIMIZE_FOR_SIZE
-	depends on !DEBUG_PAGEALLOC
 	depends on !FUNCTION_TRACER
 	select FRAME_POINTER
 	select STACKTRACE
