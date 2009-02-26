@@ -1,6 +1,7 @@
 config DVB_FIREDTV
 	tristate "FireDTV and FloppyDTV"
 	depends on DVB_CORE && IEEE1394
+	depends on 0
 	help
 	  Support for DVB receivers from Digital Everywhere
 	  which are connected via IEEE 1394 (FireWire).
