@@ -905,3 +905,5 @@ config DYNAMIC_PRINTK_DEBUG
 source "samples/Kconfig"
 
 source "lib/Kconfig.kgdb"
+
+source "lib/Kconfig.kmemcheck"
