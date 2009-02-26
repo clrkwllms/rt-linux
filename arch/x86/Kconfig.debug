@@ -275,7 +275,7 @@ endif
 
 menuconfig KMEMCHECK
 	bool "kmemcheck: trap use of uninitialized memory"
-	depends on X86
+	depends on DEBUG_KERNEL
 	depends on !X86_USE_3DNOW
 	depends on SLUB || SLAB
 	depends on !CC_OPTIMIZE_FOR_SIZE
