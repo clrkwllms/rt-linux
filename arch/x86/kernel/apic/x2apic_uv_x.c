@@ -22,8 +22,8 @@
 #include <linux/proc_fs.h>
 #include <asm/current.h>
 #include <asm/smp.h>
+#include <asm/apic.h>
 #include <asm/ipi.h>
-#include <asm/genapic.h>
 #include <asm/pgtable.h>
 #include <asm/uv/uv.h>
 #include <asm/uv/uv_mmrs.h>
@@ -240,7 +240,7 @@ static void uv_send_IPI_self(int vector)
 	apic_write(APIC_SELF_IPI, vector);
 }
 
-struct genapic apic_x2apic_uv_x = {
+struct apic apic_x2apic_uv_x = {
 
 	.name				= "UV large system",
 	.probe				= NULL,
@@ -290,8 +290,14 @@ struct genapic apic_x2apic_uv_x = {
 	.trampoline_phys_high		= DEFAULT_TRAMPOLINE_PHYS_HIGH,
 	.wait_for_init_deassert		= NULL,
 	.smp_callin_clear_local_apic	= NULL,
-	.store_NMI_vector		= NULL,
 	.inquire_remote_apic		= NULL,
+
+	.read				= native_apic_msr_read,
+	.write				= native_apic_msr_write,
+	.icr_read			= native_x2apic_icr_read,
+	.icr_write			= native_x2apic_icr_write,
+	.wait_icr_idle			= native_x2apic_wait_icr_idle,
+	.safe_wait_icr_idle		= native_safe_x2apic_wait_icr_idle,
 };
 
 static __cpuinit void set_x2apic_extra_bits(int pnode)

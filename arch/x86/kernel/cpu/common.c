@@ -23,11 +23,9 @@
 #include <asm/smp.h>
 #include <asm/cpu.h>
 #include <asm/cpumask.h>
-#ifdef CONFIG_X86_LOCAL_APIC
-#include <asm/mpspec.h>
 #include <asm/apic.h>
-#include <asm/genapic.h>
-#include <asm/genapic.h>
+
+#ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/uv/uv.h>
 #endif
 
@@ -1051,7 +1049,7 @@ void __cpuinit cpu_init(void)
 	barrier();
 
 	check_efer();
-	if (cpu != 0 && x2apic)
+	if (cpu != 0)
 		enable_x2apic();
 
 	/*

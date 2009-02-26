@@ -8,6 +8,7 @@
  */
 #include <linux/threads.h>
 #include <linux/cpumask.h>
+#include <linux/module.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/ctype.h>
@@ -16,31 +17,26 @@
 #include <asm/fixmap.h>
 #include <asm/mpspec.h>
 #include <asm/apicdef.h>
-#include <asm/genapic.h>
+#include <asm/apic.h>
 #include <asm/setup.h>
 
 #include <linux/threads.h>
 #include <linux/cpumask.h>
 #include <asm/mpspec.h>
-#include <asm/genapic.h>
 #include <asm/fixmap.h>
 #include <asm/apicdef.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/smp.h>
 #include <linux/init.h>
-#include <asm/genapic.h>
 #include <asm/ipi.h>
 
 #include <linux/smp.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <asm/acpi.h>
-#include <asm/arch_hooks.h>
 #include <asm/e820.h>
 #include <asm/setup.h>
-
-#include <asm/genapic.h>
 
 #ifdef CONFIG_HOTPLUG_CPU
 #define DEFAULT_SEND_IPI	(1)
@@ -50,7 +46,31 @@
 
 int no_broadcast = DEFAULT_SEND_IPI;
 
-#ifdef CONFIG_X86_LOCAL_APIC
+static __init int no_ipi_broadcast(char *str)
+{
+	get_option(&str, &no_broadcast);
+	pr_info("Using %s mode\n",
+		no_broadcast ? "No IPI Broadcast" : "IPI Broadcast");
+	return 1;
+}
+__setup("no_ipi_broadcast=", no_ipi_broadcast);
+
+static int __init print_ipi_mode(void)
+{
+	pr_info("Using IPI %s mode\n",
+		no_broadcast ? "No-Shortcut" : "Shortcut");
+	return 0;
+}
+late_initcall(print_ipi_mode);
+
+void default_setup_apic_routing(void)
+{
+#ifdef CONFIG_X86_IO_APIC
+	printk(KERN_INFO
+		"Enabling APIC mode:  Flat.  Using %d I/O APICs\n",
+		nr_ioapics);
+#endif
+}
 
 static void default_vector_allocation_domain(int cpu, struct cpumask *retmask)
 {
@@ -72,7 +92,7 @@ static int probe_default(void)
 	return 1;
 }
 
-struct genapic apic_default = {
+struct apic apic_default = {
 
 	.name				= "default",
 	.probe				= probe_default,
@@ -125,19 +145,26 @@ struct genapic apic_default = {
 	.wait_for_init_deassert		= default_wait_for_init_deassert,
 
 	.smp_callin_clear_local_apic	= NULL,
-	.store_NMI_vector		= NULL,
 	.inquire_remote_apic		= default_inquire_remote_apic,
+
+	.read				= native_apic_mem_read,
+	.write				= native_apic_mem_write,
+	.icr_read			= native_apic_icr_read,
+	.icr_write			= native_apic_icr_write,
+	.wait_icr_idle			= native_apic_wait_icr_idle,
+	.safe_wait_icr_idle		= native_safe_apic_wait_icr_idle,
 };
 
-extern struct genapic apic_numaq;
-extern struct genapic apic_summit;
-extern struct genapic apic_bigsmp;
-extern struct genapic apic_es7000;
-extern struct genapic apic_default;
+extern struct apic apic_numaq;
+extern struct apic apic_summit;
+extern struct apic apic_bigsmp;
+extern struct apic apic_es7000;
+extern struct apic apic_default;
 
-struct genapic *apic = &apic_default;
+struct apic *apic = &apic_default;
+EXPORT_SYMBOL_GPL(apic);
 
-static struct genapic *apic_probe[] __initdata = {
+static struct apic *apic_probe[] __initdata = {
 #ifdef CONFIG_X86_NUMAQ
 	&apic_numaq,
 #endif
@@ -170,8 +197,8 @@ static int __init parse_apic(char *arg)
 		}
 	}
 
-	if (x86_quirks->update_genapic)
-		x86_quirks->update_genapic();
+	if (x86_quirks->update_apic)
+		x86_quirks->update_apic();
 
 	/* Parsed again by __setup for debug/verbose */
 	return 0;
@@ -191,8 +218,8 @@ void __init generic_bigsmp_probe(void)
 	if (!cmdline_apic && apic == &apic_default) {
 		if (apic_bigsmp.probe()) {
 			apic = &apic_bigsmp;
-			if (x86_quirks->update_genapic)
-				x86_quirks->update_genapic();
+			if (x86_quirks->update_apic)
+				x86_quirks->update_apic();
 			printk(KERN_INFO "Overriding APIC driver with %s\n",
 			       apic->name);
 		}
@@ -214,8 +241,8 @@ void __init generic_apic_probe(void)
 		if (!apic_probe[i])
 			panic("Didn't find an APIC driver");
 
-		if (x86_quirks->update_genapic)
-			x86_quirks->update_genapic();
+		if (x86_quirks->update_apic)
+			x86_quirks->update_apic();
 	}
 	printk(KERN_INFO "Using APIC driver %s\n", apic->name);
 }
@@ -235,8 +262,8 @@ generic_mps_oem_check(struct mpc_table *mpc, char *oem, char *productid)
 
 		if (!cmdline_apic) {
 			apic = apic_probe[i];
-			if (x86_quirks->update_genapic)
-				x86_quirks->update_genapic();
+			if (x86_quirks->update_apic)
+				x86_quirks->update_apic();
 			printk(KERN_INFO "Switched to APIC driver `%s'.\n",
 			       apic->name);
 		}
@@ -257,8 +284,8 @@ int __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 
 		if (!cmdline_apic) {
 			apic = apic_probe[i];
-			if (x86_quirks->update_genapic)
-				x86_quirks->update_genapic();
+			if (x86_quirks->update_apic)
+				x86_quirks->update_apic();
 			printk(KERN_INFO "Switched to APIC driver `%s'.\n",
 			       apic->name);
 		}
@@ -266,146 +293,3 @@ int __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 	}
 	return 0;
 }
-
-#endif /* CONFIG_X86_LOCAL_APIC */
-
-/**
- * pre_intr_init_hook - initialisation prior to setting up interrupt vectors
- *
- * Description:
- *	Perform any necessary interrupt initialisation prior to setting up
- *	the "ordinary" interrupt call gates.  For legacy reasons, the ISA
- *	interrupts should be initialised here if the machine emulates a PC
- *	in any way.
- **/
-void __init pre_intr_init_hook(void)
-{
-	if (x86_quirks->arch_pre_intr_init) {
-		if (x86_quirks->arch_pre_intr_init())
-			return;
-	}
-	init_ISA_irqs();
-}
-
-/**
- * intr_init_hook - post gate setup interrupt initialisation
- *
- * Description:
- *	Fill in any interrupts that may have been left out by the general
- *	init_IRQ() routine.  interrupts having to do with the machine rather
- *	than the devices on the I/O bus (like APIC interrupts in intel MP
- *	systems) are started here.
- **/
-void __init intr_init_hook(void)
-{
-	if (x86_quirks->arch_intr_init) {
-		if (x86_quirks->arch_intr_init())
-			return;
-	}
-}
-
-/**
- * pre_setup_arch_hook - hook called prior to any setup_arch() execution
- *
- * Description:
- *	generally used to activate any machine specific identification
- *	routines that may be needed before setup_arch() runs.  On Voyager
- *	this is used to get the board revision and type.
- **/
-void __init pre_setup_arch_hook(void)
-{
-}
-
-/**
- * trap_init_hook - initialise system specific traps
- *
- * Description:
- *	Called as the final act of trap_init().  Used in VISWS to initialise
- *	the various board specific APIC traps.
- **/
-void __init trap_init_hook(void)
-{
-	if (x86_quirks->arch_trap_init) {
-		if (x86_quirks->arch_trap_init())
-			return;
-	}
-}
-
-static struct irqaction irq0  = {
-	.handler = timer_interrupt,
-	.flags = IRQF_DISABLED | IRQF_NOBALANCING | IRQF_IRQPOLL,
-	.mask = CPU_MASK_NONE,
-	.name = "timer"
-};
-
-/**
- * pre_time_init_hook - do any specific initialisations before.
- *
- **/
-void __init pre_time_init_hook(void)
-{
-	if (x86_quirks->arch_pre_time_init)
-		x86_quirks->arch_pre_time_init();
-}
-
-/**
- * time_init_hook - do any specific initialisations for the system timer.
- *
- * Description:
- *	Must plug the system timer interrupt source at HZ into the IRQ listed
- *	in irq_vectors.h:TIMER_IRQ
- **/
-void __init time_init_hook(void)
-{
-	if (x86_quirks->arch_time_init) {
-		/*
-		 * A nonzero return code does not mean failure, it means
-		 * that the architecture quirk does not want any
-		 * generic (timer) setup to be performed after this:
-		 */
-		if (x86_quirks->arch_time_init())
-			return;
-	}
-
-	irq0.mask = cpumask_of_cpu(0);
-	setup_irq(0, &irq0);
-}
-
-#ifdef CONFIG_MCA
-/**
- * mca_nmi_hook - hook into MCA specific NMI chain
- *
- * Description:
- *	The MCA (Microchannel Architecture) has an NMI chain for NMI sources
- *	along the MCA bus.  Use this to hook into that chain if you will need
- *	it.
- **/
-void mca_nmi_hook(void)
-{
-	/*
-	 * If I recall correctly, there's a whole bunch of other things that
-	 * we can do to check for NMI problems, but that's all I know about
-	 * at the moment.
-	 */
-	pr_warning("NMI generated from unknown source!\n");
-}
-#endif
-
-static __init int no_ipi_broadcast(char *str)
-{
-	get_option(&str, &no_broadcast);
-	pr_info("Using %s mode\n",
-		no_broadcast ? "No IPI Broadcast" : "IPI Broadcast");
-	return 1;
-}
-__setup("no_ipi_broadcast=", no_ipi_broadcast);
-
-static int __init print_ipi_mode(void)
-{
-	pr_info("Using IPI %s mode\n",
-		no_broadcast ? "No-Shortcut" : "Shortcut");
-	return 0;
-}
-
-late_initcall(print_ipi_mode);
-

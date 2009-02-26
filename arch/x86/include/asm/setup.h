@@ -13,6 +13,7 @@
 struct mpc_cpu;
 struct mpc_bus;
 struct mpc_oemtable;
+
 struct x86_quirks {
 	int (*arch_pre_time_init)(void);
 	int (*arch_time_init)(void);
@@ -30,8 +31,16 @@ struct x86_quirks {
 	void (*smp_read_mpc_oem)(struct mpc_oemtable *oemtable,
 				unsigned short oemsize);
 	int (*setup_ioapic_ids)(void);
-	int (*update_genapic)(void);
+	int (*update_apic)(void);
 };
+
+extern void x86_quirk_pre_intr_init(void);
+extern void x86_quirk_intr_init(void);
+
+extern void x86_quirk_trap_init(void);
+
+extern void x86_quirk_pre_time_init(void);
+extern void x86_quirk_time_init(void);
 
 #endif /* __ASSEMBLY__ */
 

@@ -34,9 +34,7 @@
 #include <linux/smp.h>
 #include <linux/mm.h>
 
-#include <asm/arch_hooks.h>
 #include <asm/pgalloc.h>
-#include <asm/genapic.h>
 #include <asm/atomic.h>
 #include <asm/mpspec.h>
 #include <asm/i8253.h>
@@ -112,11 +110,7 @@ static __init int setup_apicpmtimer(char *s)
 __setup("apicpmtimer", setup_apicpmtimer);
 #endif
 
-#ifdef CONFIG_X86_64
-#define HAVE_X2APIC
-#endif
-
-#ifdef HAVE_X2APIC
+#ifdef CONFIG_X86_X2APIC
 int x2apic;
 /* x2apic enabled before OS handover */
 static int x2apic_preenabled;
@@ -214,18 +208,13 @@ static int modern_apic(void)
 	return lapic_get_version() >= 0x14;
 }
 
-/*
- * Paravirt kernels also might be using these below ops. So we still
- * use generic apic_read()/apic_write(), which might be pointing to different
- * ops in PARAVIRT case.
- */
-void xapic_wait_icr_idle(void)
+void native_apic_wait_icr_idle(void)
 {
 	while (apic_read(APIC_ICR) & APIC_ICR_BUSY)
 		cpu_relax();
 }
 
-u32 safe_xapic_wait_icr_idle(void)
+u32 native_safe_apic_wait_icr_idle(void)
 {
 	u32 send_status;
 	int timeout;
@@ -241,13 +230,13 @@ u32 safe_xapic_wait_icr_idle(void)
 	return send_status;
 }
 
-void xapic_icr_write(u32 low, u32 id)
+void native_apic_icr_write(u32 low, u32 id)
 {
 	apic_write(APIC_ICR2, SET_APIC_DEST_FIELD(id));
 	apic_write(APIC_ICR, low);
 }
 
-static u64 xapic_icr_read(void)
+u64 native_apic_icr_read(void)
 {
 	u32 icr1, icr2;
 
@@ -256,54 +245,6 @@ static u64 xapic_icr_read(void)
 
 	return icr1 | ((u64)icr2 << 32);
 }
-
-static struct apic_ops xapic_ops = {
-	.read = native_apic_mem_read,
-	.write = native_apic_mem_write,
-	.icr_read = xapic_icr_read,
-	.icr_write = xapic_icr_write,
-	.wait_icr_idle = xapic_wait_icr_idle,
-	.safe_wait_icr_idle = safe_xapic_wait_icr_idle,
-};
-
-struct apic_ops __read_mostly *apic_ops = &xapic_ops;
-EXPORT_SYMBOL_GPL(apic_ops);
-
-#ifdef HAVE_X2APIC
-static void x2apic_wait_icr_idle(void)
-{
-	/* no need to wait for icr idle in x2apic */
-	return;
-}
-
-static u32 safe_x2apic_wait_icr_idle(void)
-{
-	/* no need to wait for icr idle in x2apic */
-	return 0;
-}
-
-void x2apic_icr_write(u32 low, u32 id)
-{
-	wrmsrl(APIC_BASE_MSR + (APIC_ICR >> 4), ((__u64) id) << 32 | low);
-}
-
-static u64 x2apic_icr_read(void)
-{
-	unsigned long val;
-
-	rdmsrl(APIC_BASE_MSR + (APIC_ICR >> 4), val);
-	return val;
-}
-
-static struct apic_ops x2apic_ops = {
-	.read = native_apic_msr_read,
-	.write = native_apic_msr_write,
-	.icr_read = x2apic_icr_read,
-	.icr_write = x2apic_icr_write,
-	.wait_icr_idle = x2apic_wait_icr_idle,
-	.safe_wait_icr_idle = safe_x2apic_wait_icr_idle,
-};
-#endif
 
 /**
  * enable_NMI_through_LVT0 - enable NMI through local vector table 0
@@ -895,7 +836,7 @@ void clear_local_APIC(void)
 	}
 
 	/* lets not touch this if we didn't frob it */
-#if defined(CONFIG_X86_MCE_P4THERMAL) || defined(X86_MCE_INTEL)
+#if defined(CONFIG_X86_MCE_P4THERMAL) || defined(CONFIG_X86_MCE_INTEL)
 	if (maxlvt >= 5) {
 		v = apic_read(APIC_LVTTHMR);
 		apic_write(APIC_LVTTHMR, v | APIC_LVT_MASKED);
@@ -1320,23 +1261,21 @@ void __cpuinit end_local_APIC_setup(void)
 	apic_pm_activate();
 }
 
-#ifdef HAVE_X2APIC
+#ifdef CONFIG_X86_X2APIC
 void check_x2apic(void)
 {
-	int msr, msr2;
-
-	rdmsr(MSR_IA32_APICBASE, msr, msr2);
-
-	if (msr & X2APIC_ENABLE) {
+	if (x2apic_enabled()) {
 		pr_info("x2apic enabled by BIOS, switching to x2apic ops\n");
 		x2apic_preenabled = x2apic = 1;
-		apic_ops = &x2apic_ops;
 	}
 }
 
 void enable_x2apic(void)
 {
 	int msr, msr2;
+
+	if (!x2apic)
+		return;
 
 	rdmsr(MSR_IA32_APICBASE, msr, msr2);
 	if (!(msr & X2APIC_ENABLE)) {
@@ -1401,7 +1340,6 @@ void __init enable_IR_x2apic(void)
 
 	if (!x2apic) {
 		x2apic = 1;
-		apic_ops = &x2apic_ops;
 		enable_x2apic();
 	}
 
@@ -1439,7 +1377,7 @@ end:
 
 	return;
 }
-#endif /* HAVE_X2APIC */
+#endif /* CONFIG_X86_X2APIC */
 
 #ifdef CONFIG_X86_64
 /*
@@ -1570,7 +1508,7 @@ void __init early_init_lapic_mapping(void)
  */
 void __init init_apic_mappings(void)
 {
-#ifdef HAVE_X2APIC
+#ifdef CONFIG_X86_X2APIC
 	if (x2apic) {
 		boot_cpu_physical_apicid = read_apic_id();
 		return;
@@ -1634,9 +1572,7 @@ int __init APIC_init_uniprocessor(void)
 	}
 #endif
 
-#ifdef HAVE_X2APIC
 	enable_IR_x2apic();
-#endif
 #ifdef CONFIG_X86_64
 	default_setup_apic_routing();
 #endif
@@ -2021,7 +1957,7 @@ static int lapic_resume(struct sys_device *dev)
 
 	local_irq_save(flags);
 
-#ifdef HAVE_X2APIC
+#ifdef CONFIG_X86_X2APIC
 	if (x2apic)
 		enable_x2apic();
 	else
