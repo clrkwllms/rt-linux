@@ -16,10 +16,17 @@ static bool opcode_is_prefix(uint8_t b)
 		|| b == 0x67;
 }
 
+#ifdef CONFIG_X86_64
 static bool opcode_is_rex_prefix(uint8_t b)
 {
 	return (b & 0xf0) == 0x40;
 }
+#else
+static bool opcode_is_rex_prefix(uint8_t b)
+{
+	return false;
+}
+#endif
 
 /*
  * This is a VERY crude opcode decoder. We only need to find the size of the
@@ -38,7 +45,6 @@ void kmemcheck_opcode_decode(const uint8_t *op, unsigned int *size)
 			operand_size_override = 2;
 	}
 
-#ifdef CONFIG_X86_64
 	/* REX prefix */
 	if (opcode_is_rex_prefix(*op)) {
 		if (*op & 0x08) {
@@ -48,7 +54,6 @@ void kmemcheck_opcode_decode(const uint8_t *op, unsigned int *size)
 
 		++op;
 	}
-#endif
 
 	/* escape opcode */
 	if (*op == 0x0f) {
