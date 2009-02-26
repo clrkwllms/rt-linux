@@ -33,7 +33,7 @@
 
 void __init kmemcheck_init(void)
 {
-	printk(KERN_INFO "kmemcheck: \"Bugs, beware!\"\n");
+	printk(KERN_INFO "kmemcheck: Initialized\n");
 
 #ifdef CONFIG_SMP
 	/*
