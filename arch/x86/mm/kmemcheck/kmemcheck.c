@@ -29,24 +29,9 @@
 #include "error.h"
 #include "opcode.h"
 #include "pte.h"
+#include "selftest.h"
 #include "shadow.h"
 
-void __init kmemcheck_init(void)
-{
-	printk(KERN_INFO "kmemcheck: Initialized\n");
-
-#ifdef CONFIG_SMP
-	/*
-	 * Limit SMP to use a single CPU. We rely on the fact that this code
-	 * runs before SMP is set up.
-	 */
-	if (setup_max_cpus > 1) {
-		printk(KERN_INFO
-			"kmemcheck: Limiting number of CPUs to 1.\n");
-		setup_max_cpus = 1;
-	}
-#endif
-}
 
 #ifdef CONFIG_KMEMCHECK_DISABLED_BY_DEFAULT
 #  define KMEMCHECK_ENABLED 0
@@ -61,6 +46,29 @@ void __init kmemcheck_init(void)
 #endif
 
 int kmemcheck_enabled = KMEMCHECK_ENABLED;
+
+void __init kmemcheck_init(void)
+{
+#ifdef CONFIG_SMP
+	/*
+	 * Limit SMP to use a single CPU. We rely on the fact that this code
+	 * runs before SMP is set up.
+	 */
+	if (setup_max_cpus > 1) {
+		printk(KERN_INFO
+			"kmemcheck: Limiting number of CPUs to 1.\n");
+		setup_max_cpus = 1;
+	}
+#endif
+
+	if (!kmemcheck_selftest()) {
+		printk(KERN_INFO "kmemcheck: self-tests failed; disabling\n");
+		kmemcheck_enabled = 0;
+		return;
+	}
+
+	printk(KERN_INFO "kmemcheck: Initialized\n");
+}
 
 /*
  * We need to parse the kmemcheck= option before any memory is allocated.
