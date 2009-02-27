@@ -28,6 +28,8 @@ static bool opcode_is_rex_prefix(uint8_t b)
 }
 #endif
 
+#define REX_W (1 << 3)
+
 /*
  * This is a VERY crude opcode decoder. We only need to find the size of the
  * load/store that caused our #PF and this should work for all the opcodes
@@ -47,27 +49,47 @@ void kmemcheck_opcode_decode(const uint8_t *op, unsigned int *size)
 
 	/* REX prefix */
 	if (opcode_is_rex_prefix(*op)) {
-		if (*op & 0x08) {
+		uint8_t rex = *op;
+
+		++op;
+		if (rex & REX_W) {
+			switch (*op) {
+			case 0x63:
+				*size = 4;
+				return;
+			case 0x0f:
+				++op;
+
+				switch (*op) {
+				case 0xb6:
+				case 0xbe:
+					*size = 1;
+					return;
+				case 0xb7:
+				case 0xbf:
+					*size = 2;
+					return;
+				}
+
+				break;
+			}
+
 			*size = 8;
 			return;
 		}
-
-		++op;
 	}
 
 	/* escape opcode */
 	if (*op == 0x0f) {
 		++op;
 
-		if (*op == 0xb6) {
-			*size = 1;
-			return;
-		}
-
-		if (*op == 0xb7) {
-			*size = 2;
-			return;
-		}
+		/*
+		 * This is move with zero-extend and sign-extend, respectively;
+		 * we don't have to think about 0xb6/0xbe, because this is
+		 * already handled in the conditional below.
+		 */
+		if (*op == 0xb7 || *op == 0xbf)
+			operand_size_override = 2;
 	}
 
 	*size = (*op & 1) ? operand_size_override : 1;
