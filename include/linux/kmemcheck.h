@@ -34,7 +34,14 @@
 	union {						\
 		struct fields name;			\
 		struct fields;				\
-	};
+	};						\
+							\
+	/*						\
+	 * Erk. Due to gcc bug, we'll get a "error:	\
+	 * flexible array member in otherwise empty	\
+	 * struct without this.				\
+	 */						\
+	int kmemcheck_dummy_##name##_[0];
 
 #ifdef CONFIG_KMEMCHECK
 extern int kmemcheck_enabled;
