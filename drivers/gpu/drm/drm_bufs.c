@@ -51,38 +51,24 @@ resource_size_t drm_get_resource_len(struct drm_device *dev, unsigned int resour
 
 EXPORT_SYMBOL(drm_get_resource_len);
 
-static struct drm_map_list *drm_find_matching_map(struct drm_device *dev,
-						  struct drm_local_map *map)
+struct drm_map_list *drm_find_matching_map(struct drm_device *dev,
+					   struct drm_local_map *map)
 {
 	struct drm_map_list *entry;
 	list_for_each_entry(entry, &dev->maplist, head) {
-		/*
-		 * Because the kernel-userspace ABI is fixed at a 32-bit offset
-		 * while PCI resources may live above that, we ignore the map
-		 * offset for maps of type _DRM_FRAMEBUFFER or _DRM_REGISTERS.
-		 * It is assumed that each driver will have only one resource of
-		 * each type.
-		 */
 		if (!entry->map ||
 		    map->type != entry->map->type ||
 		    entry->master != dev->primary->master)
 			continue;
-		switch (map->type) {
-		case _DRM_SHM:
-			if (map->flags != _DRM_CONTAINS_LOCK)
-				break;
-		case _DRM_REGISTERS:
-		case _DRM_FRAME_BUFFER:
-			return entry;
-		default: /* Make gcc happy */
-			;
-		}
-		if (entry->map->offset == map->offset)
+
+		if (entry->map->offset == map->offset ||
+		    (map->type == _DRM_SHM && map->flags & _DRM_CONTAINS_LOCK))
 			return entry;
 	}
 
 	return NULL;
 }
+EXPORT_SYMBOL(drm_find_matching_map);
 
 static int drm_map_handle(struct drm_device *dev, struct drm_hash_item *hash,
 			  unsigned long user_token, int hashed_handle, int shm)
@@ -357,7 +343,7 @@ static int drm_addmap_core(struct drm_device * dev, resource_size_t offset,
 	/* We do it here so that dev->struct_mutex protects the increment */
 	user_token = (map->type == _DRM_SHM) ? (unsigned long)map->handle :
 		map->offset;
-	ret = drm_map_handle(dev, &list->hash, user_token, 0,
+	ret = drm_map_handle(dev, &list->hash, user_token, 1,
 			     (map->type == _DRM_SHM));
 	if (ret) {
 		if (map->type == _DRM_REGISTERS)
