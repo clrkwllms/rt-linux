@@ -916,11 +916,10 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 				      req->nr_sectors, good_bytes));
 	if (blk_end_request(req, error, good_bytes) == 0) {
 		/* This request is completely finished; start the next one */
+		 __scsi_release_buffers(cmd, 0);
 		scsi_next_command(cmd);
 		return;
 	}
-
-	error = -EIO;
 
 	/* The request isn't finished yet.  Figure out what to do next. */
 	if (result == 0) {
@@ -931,8 +930,9 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 		if (good_bytes > 0 || --req->retries >= 0)
 			action = ACTION_REPREP;
 		else {
-			action = ACTION_FAIL;
 			description = "Retries exhausted";
+			action = ACTION_FAIL;
+			error = -EIO;
 		}
 	} else if (error && scsi_noretry_cmd(cmd)) {
 		/* Retrys are disallowed, so kill the remainder. */
@@ -944,6 +944,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 		 */
 		action = ACTION_RETRY;
 	} else if (sense_valid && !sense_deferred) {
+		error = -EIO;
 		switch (sshdr.sense_key) {
 		case UNIT_ATTENTION:
 			if (cmd->device->removable) {
@@ -1043,7 +1044,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 			if (driver_byte(result) & DRIVER_SENSE)
 				scsi_print_sense("", cmd);
 		}
-		blk_end_request(req, -EIO, blk_rq_bytes(req));
+		blk_end_request(req, error, blk_rq_bytes(req));
 		scsi_next_command(cmd);
 		break;
 	case ACTION_REPREP:
