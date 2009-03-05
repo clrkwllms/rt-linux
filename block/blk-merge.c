@@ -111,12 +111,19 @@ void blk_recalc_rq_segments(struct request *rq)
 
 void blk_recount_segments(struct request_queue *q, struct bio *bio)
 {
+	unsigned int seg_size;
 	struct bio *nxt = bio->bi_next;
 
 	bio->bi_next = NULL;
-	bio->bi_phys_segments = __blk_recalc_rq_segments(q, bio, NULL);
+	bio->bi_phys_segments = __blk_recalc_rq_segments(q, bio, &seg_size);
 	bio->bi_next = nxt;
 	bio->bi_flags |= (1 << BIO_SEG_VALID);
+
+	if (bio->bi_phys_segments == 1 && seg_size > bio->bi_seg_front_size)
+		bio->bi_seg_front_size = seg_size;
+	if (seg_size > bio->bi_seg_back_size)
+		bio->bi_seg_back_size = seg_size;
+
 }
 EXPORT_SYMBOL(blk_recount_segments);
 
