@@ -40,6 +40,9 @@ config X86
 	select HAVE_GENERIC_DMA_COHERENT if X86_32
 	select HAVE_EFFICIENT_UNALIGNED_ACCESS
 	select USER_STACKTRACE_SUPPORT
+	select HAVE_KERNEL_GZIP
+	select HAVE_KERNEL_BZIP2
+	select HAVE_KERNEL_LZMA
 	select HAVE_ARCH_KMEMCHECK
 
 config ARCH_DEFCONFIG
@@ -134,6 +137,9 @@ config ARCH_HAS_CACHE_LINE_SIZE
 	def_bool y
 
 config HAVE_SETUP_PER_CPU_AREA
+	def_bool y
+
+config HAVE_DYNAMIC_PER_CPU_AREA
 	def_bool y
 
 config HAVE_CPUMASK_OF_CPU_MAP
@@ -778,6 +784,11 @@ config X86_MCE_AMD
 	   Additional support for AMD specific MCE features such as
 	   the DRAM Error Threshold.
 
+config X86_MCE_THRESHOLD
+	depends on X86_MCE_AMD || X86_MCE_INTEL
+	bool
+	default y
+
 config X86_MCE_NONFATAL
 	tristate "Check for non-fatal errors on AMD Athlon/Duron / Intel Pentium 4"
 	depends on X86_32 && X86_MCE
@@ -1123,7 +1134,7 @@ config NODES_SHIFT
 	  Specify the maximum number of NUMA Nodes available on the target
 	  system.  Increases memory reserved to accomodate various tables.
 
-config HAVE_ARCH_BOOTMEM_NODE
+config HAVE_ARCH_BOOTMEM
 	def_bool y
 	depends on X86_32 && NUMA
 
@@ -1823,7 +1834,7 @@ config DMAR
 	  remapping devices.
 
 config DMAR_DEFAULT_ON
-	def_bool n
+	def_bool y
 	prompt "Enable DMA Remapping Devices by default"
 	depends on DMAR
 	help

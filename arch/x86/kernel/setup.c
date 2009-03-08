@@ -202,7 +202,9 @@ struct ist_info ist_info;
 #endif
 
 #else
-struct cpuinfo_x86 boot_cpu_data __read_mostly;
+struct cpuinfo_x86 boot_cpu_data __read_mostly = {
+	.x86_phys_bits = MAX_PHYSMEM_BITS,
+};
 EXPORT_SYMBOL(boot_cpu_data);
 #endif
 
@@ -600,19 +602,7 @@ static int __init setup_elfcorehdr(char *arg)
 early_param("elfcorehdr", setup_elfcorehdr);
 #endif
 
-static int __init default_update_apic(void)
-{
-#ifdef CONFIG_SMP
-	if (!apic->wakeup_cpu)
-		apic->wakeup_cpu = wakeup_secondary_cpu_via_init;
-#endif
-
-	return 0;
-}
-
-static struct x86_quirks default_x86_quirks __initdata = {
-	.update_apic         = default_update_apic,
-};
+static struct x86_quirks default_x86_quirks __initdata;
 
 struct x86_quirks *x86_quirks __initdata = &default_x86_quirks;
 
@@ -782,6 +772,9 @@ void __init setup_arch(char **cmdline_p)
 
 	finish_e820_parsing();
 
+	if (efi_enabled)
+		efi_init();
+
 	dmi_scan_machine();
 
 	dmi_check_system(bad_bios_dmi_table);
@@ -801,8 +794,6 @@ void __init setup_arch(char **cmdline_p)
 	insert_resource(&iomem_resource, &data_resource);
 	insert_resource(&iomem_resource, &bss_resource);
 
-	if (efi_enabled)
-		efi_init();
 
 #ifdef CONFIG_X86_32
 	if (ppro_with_ram_bug()) {
@@ -875,9 +866,7 @@ void __init setup_arch(char **cmdline_p)
 
 	reserve_initrd();
 
-#ifdef CONFIG_X86_64
 	vsmp_init();
-#endif
 
 	io_delay_init();
 
