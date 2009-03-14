@@ -863,21 +863,25 @@ void conf_set_all_new_symbols(enum conf_def_mode mode)
 
 		sym_calc_value(csym);
 		prop = sym_get_choice_prop(csym);
-		def = -1;
-		while (1) {
-			cnt = 0;
-			expr_list_for_each_sym(prop->expr, e, sym) {
-				if (sym->visible == no)
-					continue;
+		cnt = 0;
+		expr_list_for_each_sym(prop->expr, e, sym)
+			cnt++;
+
+		def = (rand() % cnt);
+
+		cnt = 0;
+		expr_list_for_each_sym(prop->expr, e, sym) {
+			if (sym) {
 				if (def == cnt++) {
+					sym->def[S_DEF_USER].tri = yes;
 					csym->def[S_DEF_USER].val = sym;
-					break;
+				}
+				else {
+					sym->def[S_DEF_USER].tri = no;
 				}
 			}
-			if (def >= 0 || cnt < 2)
-				break;
-			def = (rand() % cnt) + 1;
 		}
 		csym->flags |= SYMBOL_DEF_USER;
+		csym->flags &= ~(SYMBOL_VALID);
 	}
 }
