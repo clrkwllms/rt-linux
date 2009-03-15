@@ -922,6 +922,8 @@ config SLUB
 
 config SLOB
 	depends on EMBEDDED
+	# lockups observed:
+	depends on 0
 	bool "SLOB (Simple Allocator)"
 	help
 	   SLOB replaces the stock allocator with a drastically simpler
