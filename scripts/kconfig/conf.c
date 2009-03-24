@@ -470,11 +470,12 @@ int main(int ac, char **av)
 			unsigned int seed;
 
 			/*
-			 * Use microseconds derived seed:
+			 * Use microseconds derived seed,
+			 * compensate for systems where it may be zero
 			 */
 			gettimeofday(&now, NULL);
 
-			seed = (unsigned int)(now.tv_sec*now.tv_usec);
+			seed = (unsigned int)((now.tv_sec + 1) * (now.tv_usec + 1));
 			srand(seed);
 
 			input_mode = set_random;
