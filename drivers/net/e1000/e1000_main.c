@@ -577,11 +577,29 @@ out:
 
 void e1000_down(struct e1000_adapter *adapter)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	struct net_device *netdev = adapter->netdev;
+	u32 rctl, tctl;
 
 	/* signal that we're down so the interrupt handler does not
 	 * reschedule our watchdog timer */
 	set_bit(__E1000_DOWN, &adapter->flags);
+
+	/* disable receives in the hardware */
+	rctl = er32(RCTL);
+	ew32(RCTL, rctl & ~E1000_RCTL_EN);
+	/* flush and sleep below */
+
+	/* can be netif_tx_disable when NETIF_F_LLTX is removed */
+	netif_stop_queue(netdev);
+
+	/* disable transmits in the hardware */
+	tctl = er32(TCTL);
+	tctl &= ~E1000_TCTL_EN;
+	ew32(TCTL, tctl);
+	/* flush both disables and wait for them to finish */
+	E1000_WRITE_FLUSH();
+	msleep(10);
 
 	napi_disable(&adapter->napi);
 
@@ -595,7 +613,6 @@ void e1000_down(struct e1000_adapter *adapter)
 	adapter->link_speed = 0;
 	adapter->link_duplex = 0;
 	netif_carrier_off(netdev);
-	netif_stop_queue(netdev);
 
 	e1000_reset(adapter);
 	e1000_clean_all_tx_rings(adapter);
@@ -1048,8 +1065,6 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
 	if (pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
 
-	netdev->features |= NETIF_F_LLTX;
-
 	netdev->vlan_features |= NETIF_F_TSO;
 	netdev->vlan_features |= NETIF_F_TSO6;
 	netdev->vlan_features |= NETIF_F_HW_CSUM;
@@ -1368,8 +1383,6 @@ static int __devinit e1000_sw_init(struct e1000_adapter *adapter)
 		return -ENOMEM;
 	}
 
-	spin_lock_init(&adapter->tx_queue_lock);
-
 	/* Explicitly disable IRQ since the NIC can be in any state. */
 	e1000_irq_disable(adapter);
 
@@ -1624,7 +1637,6 @@ setup_tx_desc_die:
 
 	txdr->next_to_use = 0;
 	txdr->next_to_clean = 0;
-	spin_lock_init(&txdr->tx_lock);
 
 	return 0;
 }
@@ -1882,8 +1894,6 @@ int e1000_setup_all_rx_resources(struct e1000_adapter *adapter)
  * e1000_setup_rctl - configure the receive control registers
  * @adapter: Board private structure
  **/
-#define PAGE_USE_COUNT(S) (((S) >> PAGE_SHIFT) + \
-			(((S) & (PAGE_SIZE - 1)) ? 1 : 0))
 static void e1000_setup_rctl(struct e1000_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
@@ -2063,6 +2073,7 @@ static void e1000_unmap_and_free_tx_resource(struct e1000_adapter *adapter,
 		dev_kfree_skb_any(buffer_info->skb);
 		buffer_info->skb = NULL;
 	}
+	buffer_info->time_stamp = 0;
 	/* buffer_info must be completely set up in the transmit path */
 }
 
@@ -2861,11 +2872,11 @@ static bool e1000_tx_csum(struct e1000_adapter *adapter,
 		return false;
 
 	switch (skb->protocol) {
-	case __constant_htons(ETH_P_IP):
+	case cpu_to_be16(ETH_P_IP):
 		if (ip_hdr(skb)->protocol == IPPROTO_TCP)
 			cmd_len |= E1000_TXD_CMD_TCP;
 		break;
-	case __constant_htons(ETH_P_IPV6):
+	case cpu_to_be16(ETH_P_IPV6):
 		/* XXX not handling all IPV6 headers */
 		if (ipv6_hdr(skb)->nexthdr == IPPROTO_TCP)
 			cmd_len |= E1000_TXD_CMD_TCP;
@@ -2910,24 +2921,24 @@ static int e1000_tx_map(struct e1000_adapter *adapter,
 			unsigned int mss)
 {
 	struct e1000_hw *hw = &adapter->hw;
+	struct e1000_buffer *buffer_info;
 	unsigned int len = skb_headlen(skb);
 	unsigned int offset, size, count = 0, i;
 	unsigned int f;
-	dma_addr_t map;
+	dma_addr_t *map;
 
 	i = tx_ring->next_to_use;
 
 	if (skb_dma_map(&adapter->pdev->dev, skb, DMA_TO_DEVICE)) {
 		dev_err(&adapter->pdev->dev, "TX DMA map failed\n");
-		dev_kfree_skb(skb);
-		return -2;
+		return 0;
 	}
 
-	map = skb_shinfo(skb)->dma_maps[0];
+	map = skb_shinfo(skb)->dma_maps;
 	offset = 0;
 
 	while (len) {
-		struct e1000_buffer *buffer_info = &tx_ring->buffer_info[i];
+		buffer_info = &tx_ring->buffer_info[i];
 		size = min(len, max_per_txd);
 		/* Workaround for Controller erratum --
 		 * descriptor for non-tso packet in a linear SKB that follows a
@@ -2960,14 +2971,18 @@ static int e1000_tx_map(struct e1000_adapter *adapter,
 			size -= 4;
 
 		buffer_info->length = size;
-		buffer_info->dma = map + offset;
+		buffer_info->dma = map[0] + offset;
 		buffer_info->time_stamp = jiffies;
 		buffer_info->next_to_watch = i;
 
 		len -= size;
 		offset += size;
 		count++;
-		if (unlikely(++i == tx_ring->count)) i = 0;
+		if (len) {
+			i++;
+			if (unlikely(i == tx_ring->count))
+				i = 0;
+		}
 	}
 
 	for (f = 0; f < nr_frags; f++) {
@@ -2975,11 +2990,13 @@ static int e1000_tx_map(struct e1000_adapter *adapter,
 
 		frag = &skb_shinfo(skb)->frags[f];
 		len = frag->size;
-		map = skb_shinfo(skb)->dma_maps[f + 1];
 		offset = 0;
 
 		while (len) {
-			struct e1000_buffer *buffer_info;
+			i++;
+			if (unlikely(i == tx_ring->count))
+				i = 0;
+
 			buffer_info = &tx_ring->buffer_info[i];
 			size = min(len, max_per_txd);
 			/* Workaround for premature desc write-backs
@@ -2995,21 +3012,18 @@ static int e1000_tx_map(struct e1000_adapter *adapter,
 				size -= 4;
 
 			buffer_info->length = size;
-			buffer_info->dma = map + offset;
+			buffer_info->dma = map[f + 1] + offset;
 			buffer_info->time_stamp = jiffies;
 			buffer_info->next_to_watch = i;
 
 			len -= size;
 			offset += size;
 			count++;
-			if (unlikely(++i == tx_ring->count)) i = 0;
 		}
 	}
 
-	i = (i == 0) ? tx_ring->count - 1 : i - 1;
 	tx_ring->buffer_info[i].skb = skb;
 	tx_ring->buffer_info[first].next_to_watch = i;
-	smp_wmb();
 
 	return count;
 }
@@ -3183,7 +3197,6 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	unsigned int max_txd_pwr = E1000_MAX_TXD_PWR;
 	unsigned int tx_flags = 0;
 	unsigned int len = skb->len - skb->data_len;
-	unsigned long flags;
 	unsigned int nr_frags;
 	unsigned int mss;
 	int count = 0;
@@ -3288,22 +3301,15 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	    (hw->mac_type == e1000_82573))
 		e1000_transfer_dhcp_info(adapter, skb);
 
-	if (!spin_trylock_irqsave(&tx_ring->tx_lock, flags))
-		/* Collision - tell upper layer to requeue */
-		return NETDEV_TX_LOCKED;
-
 	/* need: count + 2 desc gap to keep tail from touching
 	 * head, otherwise try next time */
-	if (unlikely(e1000_maybe_stop_tx(netdev, tx_ring, count + 2))) {
-		spin_unlock_irqrestore(&tx_ring->tx_lock, flags);
+	if (unlikely(e1000_maybe_stop_tx(netdev, tx_ring, count + 2)))
 		return NETDEV_TX_BUSY;
-	}
 
 	if (unlikely(hw->mac_type == e1000_82547)) {
 		if (unlikely(e1000_82547_fifo_workaround(adapter, skb))) {
 			netif_stop_queue(netdev);
 			mod_timer(&adapter->tx_fifo_stall_timer, jiffies + 1);
-			spin_unlock_irqrestore(&tx_ring->tx_lock, flags);
 			return NETDEV_TX_BUSY;
 		}
 	}
@@ -3318,7 +3324,6 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	tso = e1000_tso(adapter, tx_ring, skb);
 	if (tso < 0) {
 		dev_kfree_skb_any(skb);
-		spin_unlock_irqrestore(&tx_ring->tx_lock, flags);
 		return NETDEV_TX_OK;
 	}
 
@@ -3334,16 +3339,21 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if (likely(skb->protocol == htons(ETH_P_IP)))
 		tx_flags |= E1000_TX_FLAGS_IPV4;
 
-	e1000_tx_queue(adapter, tx_ring, tx_flags,
-	               e1000_tx_map(adapter, tx_ring, skb, first,
-	                            max_per_txd, nr_frags, mss));
+	count = e1000_tx_map(adapter, tx_ring, skb, first, max_per_txd,
+	                     nr_frags, mss);
 
-	netdev->trans_start = jiffies;
+	if (count) {
+		e1000_tx_queue(adapter, tx_ring, tx_flags, count);
+		netdev->trans_start = jiffies;
+		/* Make sure there is space in the ring for the next send. */
+		e1000_maybe_stop_tx(netdev, tx_ring, MAX_SKB_FRAGS + 2);
 
-	/* Make sure there is space in the ring for the next send. */
-	e1000_maybe_stop_tx(netdev, tx_ring, MAX_SKB_FRAGS + 2);
+	} else {
+		dev_kfree_skb_any(skb);
+		tx_ring->buffer_info[first].time_stamp = 0;
+		tx_ring->next_to_use = first;
+	}
 
-	spin_unlock_irqrestore(&tx_ring->tx_lock, flags);
 	return NETDEV_TX_OK;
 }
 
@@ -3685,12 +3695,12 @@ static irqreturn_t e1000_intr_msi(int irq, void *data)
 			mod_timer(&adapter->watchdog_timer, jiffies + 1);
 	}
 
-	if (likely(netif_rx_schedule_prep(&adapter->napi))) {
+	if (likely(napi_schedule_prep(&adapter->napi))) {
 		adapter->total_tx_bytes = 0;
 		adapter->total_tx_packets = 0;
 		adapter->total_rx_bytes = 0;
 		adapter->total_rx_packets = 0;
-		__netif_rx_schedule(&adapter->napi);
+		__napi_schedule(&adapter->napi);
 	} else
 		e1000_irq_enable(adapter);
 
@@ -3745,16 +3755,18 @@ static irqreturn_t e1000_intr(int irq, void *data)
 		ew32(IMC, ~0);
 		E1000_WRITE_FLUSH();
 	}
-	if (likely(netif_rx_schedule_prep(&adapter->napi))) {
+	if (likely(napi_schedule_prep(&adapter->napi))) {
 		adapter->total_tx_bytes = 0;
 		adapter->total_tx_packets = 0;
 		adapter->total_rx_bytes = 0;
 		adapter->total_rx_packets = 0;
-		__netif_rx_schedule(&adapter->napi);
-	} else
+		__napi_schedule(&adapter->napi);
+	} else {
 		/* this really should not happen! if it does it is basically a
 		 * bug, but not a hard error, so enable ints and continue */
-		e1000_irq_enable(adapter);
+		if (!test_bit(__E1000_DOWN, &adapter->flags))
+			e1000_irq_enable(adapter);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -3771,28 +3783,21 @@ static int e1000_clean(struct napi_struct *napi, int budget)
 
 	adapter = netdev_priv(poll_dev);
 
-	/* e1000_clean is called per-cpu.  This lock protects
-	 * tx_ring[0] from being cleaned by multiple cpus
-	 * simultaneously.  A failure obtaining the lock means
-	 * tx_ring[0] is currently being cleaned anyway. */
-	if (spin_trylock(&adapter->tx_queue_lock)) {
-		tx_cleaned = e1000_clean_tx_irq(adapter,
-						&adapter->tx_ring[0]);
-		spin_unlock(&adapter->tx_queue_lock);
-	}
+	tx_cleaned = e1000_clean_tx_irq(adapter, &adapter->tx_ring[0]);
 
 	adapter->clean_rx(adapter, &adapter->rx_ring[0],
 	                  &work_done, budget);
 
-	if (tx_cleaned)
+	if (!tx_cleaned)
 		work_done = budget;
 
 	/* If budget not fully consumed, exit the polling mode */
 	if (work_done < budget) {
 		if (likely(adapter->itr_setting & 3))
 			e1000_set_itr(adapter);
-		netif_rx_complete(napi);
-		e1000_irq_enable(adapter);
+		napi_complete(napi);
+		if (!test_bit(__E1000_DOWN, &adapter->flags))
+			e1000_irq_enable(adapter);
 	}
 
 	return work_done;
@@ -3811,15 +3816,16 @@ static bool e1000_clean_tx_irq(struct e1000_adapter *adapter,
 	struct e1000_buffer *buffer_info;
 	unsigned int i, eop;
 	unsigned int count = 0;
-	bool cleaned = false;
+	bool cleaned;
 	unsigned int total_tx_bytes=0, total_tx_packets=0;
 
 	i = tx_ring->next_to_clean;
 	eop = tx_ring->buffer_info[i].next_to_watch;
 	eop_desc = E1000_TX_DESC(*tx_ring, eop);
 
-	while (eop_desc->upper.data & cpu_to_le32(E1000_TXD_STAT_DD)) {
-		for (cleaned = false; !cleaned; ) {
+	while ((eop_desc->upper.data & cpu_to_le32(E1000_TXD_STAT_DD)) &&
+	       (count < tx_ring->count)) {
+		for (cleaned = false; !cleaned; count++) {
 			tx_desc = E1000_TX_DESC(*tx_ring, i);
 			buffer_info = &tx_ring->buffer_info[i];
 			cleaned = (i == eop);
@@ -3842,10 +3848,6 @@ static bool e1000_clean_tx_irq(struct e1000_adapter *adapter,
 
 		eop = tx_ring->buffer_info[i].next_to_watch;
 		eop_desc = E1000_TX_DESC(*tx_ring, eop);
-#define E1000_TX_WEIGHT 64
-		/* weight of a sort for tx, to avoid endless transmit cleanup */
-		if (count++ == E1000_TX_WEIGHT)
-			break;
 	}
 
 	tx_ring->next_to_clean = i;
@@ -3867,13 +3869,8 @@ static bool e1000_clean_tx_irq(struct e1000_adapter *adapter,
 		/* Detect a transmit hang in hardware, this serializes the
 		 * check with the clearing of time_stamp and movement of i */
 		adapter->detect_tx_hung = false;
-		/*
-		 * read barrier to make sure that the ->dma member and time
-		 * stamp are updated fully
-		 */
-		smp_rmb();
-		if (tx_ring->buffer_info[eop].dma &&
-		    time_after(jiffies, tx_ring->buffer_info[eop].time_stamp +
+		if (tx_ring->buffer_info[i].time_stamp &&
+		    time_after(jiffies, tx_ring->buffer_info[i].time_stamp +
 		               (adapter->tx_timeout_factor * HZ))
 		    && !(er32(STATUS) & E1000_STATUS_TXOFF)) {
 
@@ -3895,7 +3892,7 @@ static bool e1000_clean_tx_irq(struct e1000_adapter *adapter,
 				readl(hw->hw_addr + tx_ring->tdt),
 				tx_ring->next_to_use,
 				tx_ring->next_to_clean,
-				tx_ring->buffer_info[eop].time_stamp,
+				tx_ring->buffer_info[i].time_stamp,
 				eop,
 				jiffies,
 				eop_desc->upper.fields.status);
@@ -3906,7 +3903,7 @@ static bool e1000_clean_tx_irq(struct e1000_adapter *adapter,
 	adapter->total_tx_packets += total_tx_packets;
 	adapter->net_stats.tx_bytes += total_tx_bytes;
 	adapter->net_stats.tx_packets += total_tx_packets;
-	return cleaned;
+	return (count < tx_ring->count);
 }
 
 /**
