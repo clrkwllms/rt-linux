@@ -1538,6 +1538,13 @@ config SCSI_NSP32
 config SCSI_DEBUG
 	tristate "SCSI debugging host simulator"
 	depends on SCSI
+
+	#
+	# SCSI-debug can break when combined with async bootup. Turn
+	# it off for now:
+	#
+	depends on BROKEN
+
 	select CRC_T10DIF
 	help
 	  This is a host adapter simulator that can simulate multiple hosts
