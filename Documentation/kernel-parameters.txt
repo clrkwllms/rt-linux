@@ -50,6 +50,7 @@ parameter is applicable:
 	ISAPNP	ISA PnP code is enabled.
 	ISDN	Appropriate ISDN support is enabled.
 	JOY	Appropriate joystick support is enabled.
+	KMEMTRACE kmemtrace is enabled.
 	LIBATA  Libata driver is enabled
 	LP	Printer support is enabled.
 	LOOP	Loopback device support is enabled.
@@ -258,6 +259,22 @@ and is between 256 and 4096 characters. It is defined in the file
 			Override the pmtimer bug detection: force the kernel
 			to assume that this machine's pmtimer latches its value
 			and always returns good values.
+
+	acpi_enforce_resources=	[ACPI]
+			{ strict | lax | no }
+			Check for resource conflicts between native drivers
+			and ACPI OperationRegions (SystemIO and SystemMemory
+			only). IO ports and memory declared in ACPI might be
+			used by the ACPI subsystem in arbitrary AML code and
+			can interfere with legacy drivers.
+			strict (default): access to resources claimed by ACPI
+			is denied; legacy drivers trying to access reserved
+			resources will fail to bind to device using them.
+			lax: access to resources claimed by ACPI is allowed;
+			legacy drivers trying to access reserved resources
+			will bind successfully but a warning message is logged.
+			no: ACPI OperationRegions are not marked as reserved,
+			no further checks are performed.
 
 	agp=		[AGP]
 			{ off | try_unsupported }
@@ -616,6 +633,9 @@ and is between 256 and 4096 characters. It is defined in the file
 			only useful to kernel developers.
 
 	debug_objects	[KNL] Enable object debugging
+
+	no_debug_objects
+			[KNL] Disable object debugging
 
 	debugpat	[X86] Enable PAT debugging
 
@@ -1078,6 +1098,15 @@ and is between 256 and 4096 characters. It is defined in the file
 			use the HighMem zone if it exists, and the Normal
 			zone if it does not.
 
+	kmemtrace.enable=	[KNL,KMEMTRACE] Format: { yes | no }
+				Controls whether kmemtrace is enabled
+				at boot-time.
+
+	kmemtrace.subbufs=n	[KNL,KMEMTRACE] Overrides the number of
+			subbufs kmemtrace's relay channel has. Set this
+			higher than default (KMEMTRACE_N_SUBBUFS in code) if
+			you experience buffer overruns.
+
 	movablecore=nn[KMG]	[KNL,X86-32,IA-64,PPC,X86-64] This parameter
 			is similar to kernelcore except it specifies the
 			amount of memory used for migratable allocations.
@@ -1523,7 +1552,9 @@ and is between 256 and 4096 characters. It is defined in the file
 
 	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
 
-	nohlt		[BUGS=ARM,SH]
+	nohlt		[BUGS=ARM,SH] Tells the kernel that the sleep(SH) or
+			wfi(ARM) instruction doesn't work correctly and not to
+			use it. This is also useful when using JTAG debugger.
 
 	no-hlt		[BUGS=X86-32] Tells the kernel that the hlt
 			instruction doesn't work correctly and not to
@@ -1543,6 +1574,8 @@ and is between 256 and 4096 characters. It is defined in the file
 	nohz=		[KNL] Boottime enable/disable dynamic ticks
 			Valid arguments: on, off
 			Default: on
+
+	noiotrap	[SH] Disables trapped I/O port accesses.
 
 	noirqdebug	[X86-32] Disables the code which attempts to detect and
 			disable unhandled interrupt sources.
@@ -1603,7 +1636,7 @@ and is between 256 and 4096 characters. It is defined in the file
 	nosoftlockup	[KNL] Disable the soft-lockup detector.
 
 	noswapaccount	[KNL] Disable accounting of swap in memory resource
-			controller. (See Documentation/controllers/memory.txt)
+			controller. (See Documentation/cgroups/memory.txt)
 
 	nosync		[HW,M68K] Disables sync negotiation for all devices.
 
@@ -1953,7 +1986,7 @@ and is between 256 and 4096 characters. It is defined in the file
 
 	relax_domain_level=
 			[KNL, SMP] Set scheduler's default relax_domain_level.
-			See Documentation/cpusets.txt.
+			See Documentation/cgroups/cpusets.txt.
 
 	reserve=	[KNL,BUGS] Force the kernel to ignore some iomem area
 
@@ -2361,6 +2394,8 @@ and is between 256 and 4096 characters. It is defined in the file
 			Default is off.
 
 	tp720=		[HW,PS2]
+
+	trace_buf_size=nn[KMG] [ftrace] will set tracing buffer size.
 
 	trix=		[HW,OSS] MediaTrix AudioTrix Pro
 			Format:
