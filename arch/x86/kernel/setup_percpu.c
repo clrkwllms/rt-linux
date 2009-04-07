@@ -42,6 +42,19 @@ unsigned long __per_cpu_offset[NR_CPUS] __read_mostly = {
 };
 EXPORT_SYMBOL(__per_cpu_offset);
 
+/*
+ * On x86_64 symbols referenced from code should be reachable using
+ * 32bit relocations.  Reserve space for static percpu variables in
+ * modules so that they are always served from the first chunk which
+ * is located at the percpu segment base.  On x86_32, anything can
+ * address anywhere.  No need to reserve space in the first chunk.
+ */
+#ifdef CONFIG_X86_64
+#define PERCPU_FIRST_CHUNK_RESERVE	PERCPU_MODULE_RESERVE
+#else
+#define PERCPU_FIRST_CHUNK_RESERVE	0
+#endif
+
 /**
  * pcpu_need_numa - determine percpu allocation needs to consider NUMA
  *
@@ -140,8 +153,7 @@ static struct page * __init pcpur_get_page(unsigned int cpu, int pageno)
 static ssize_t __init setup_pcpu_remap(size_t static_size)
 {
 	static struct vm_struct vm;
-	pg_data_t *last;
-	size_t ptrs_size;
+	size_t ptrs_size, dyn_size;
 	unsigned int cpu;
 	ssize_t ret;
 
@@ -149,32 +161,21 @@ static ssize_t __init setup_pcpu_remap(size_t static_size)
 	 * If large page isn't supported, there's no benefit in doing
 	 * this.  Also, on non-NUMA, embedding is better.
 	 */
-	if (!cpu_has_pse || pcpu_need_numa())
+	if (!cpu_has_pse || !pcpu_need_numa())
 		return -EINVAL;
 
-	last = NULL;
-	for_each_possible_cpu(cpu) {
-		int node = early_cpu_to_node(cpu);
-
-		if (node_online(node) && NODE_DATA(node) &&
-		    last && last != NODE_DATA(node))
-			goto proceed;
-
-		last = NODE_DATA(node);
-	}
-	return -EINVAL;
-
-proceed:
 	/*
 	 * Currently supports only single page.  Supporting multiple
 	 * pages won't be too difficult if it ever becomes necessary.
 	 */
-	pcpur_size = PFN_ALIGN(static_size + PERCPU_DYNAMIC_RESERVE);
+	pcpur_size = PFN_ALIGN(static_size + PERCPU_MODULE_RESERVE +
+			       PERCPU_DYNAMIC_RESERVE);
 	if (pcpur_size > PMD_SIZE) {
 		pr_warning("PERCPU: static data is larger than large page, "
 			   "can't use large page\n");
 		return -EINVAL;
 	}
+	dyn_size = pcpur_size - static_size - PERCPU_FIRST_CHUNK_RESERVE;
 
 	/* allocate pointer array and alloc large pages */
 	ptrs_size = PFN_ALIGN(num_possible_cpus() * sizeof(pcpur_ptrs[0]));
@@ -217,8 +218,9 @@ proceed:
 	pr_info("PERCPU: Remapped at %p with large pages, static data "
 		"%zu bytes\n", vm.addr, static_size);
 
-	ret = pcpu_setup_first_chunk(pcpur_get_page, static_size, PMD_SIZE,
-				     pcpur_size - static_size, vm.addr, NULL);
+	ret = pcpu_setup_first_chunk(pcpur_get_page, static_size,
+				     PERCPU_FIRST_CHUNK_RESERVE, dyn_size,
+				     PMD_SIZE, vm.addr, NULL);
 	goto out_free_ar;
 
 enomem:
@@ -241,24 +243,13 @@ static ssize_t __init setup_pcpu_remap(size_t static_size)
  * Embedding allocator
  *
  * The first chunk is sized to just contain the static area plus
- * PERCPU_DYNAMIC_RESERVE and allocated as a contiguous area using
- * bootmem allocator and used as-is without being mapped into vmalloc
- * area.  This enables the first chunk to piggy back on the linear
- * physical PMD mapping and doesn't add any additional pressure to
- * TLB.
+ * module and dynamic reserves and embedded into linear physical
+ * mapping so that it can use PMD mapping without additional TLB
+ * pressure.
  */
-static void *pcpue_ptr __initdata;
-static size_t pcpue_unit_size __initdata;
-
-static struct page * __init pcpue_get_page(unsigned int cpu, int pageno)
-{
-	return virt_to_page(pcpue_ptr + cpu * pcpue_unit_size
-			    + ((size_t)pageno << PAGE_SHIFT));
-}
-
 static ssize_t __init setup_pcpu_embed(size_t static_size)
 {
-	unsigned int cpu;
+	size_t reserve = PERCPU_MODULE_RESERVE + PERCPU_DYNAMIC_RESERVE;
 
 	/*
 	 * If large page isn't supported, there's no benefit in doing
@@ -268,26 +259,8 @@ static ssize_t __init setup_pcpu_embed(size_t static_size)
 	if (!cpu_has_pse || pcpu_need_numa())
 		return -EINVAL;
 
-	/* allocate and copy */
-	pcpue_unit_size = PFN_ALIGN(static_size + PERCPU_DYNAMIC_RESERVE);
-	pcpue_unit_size = max_t(size_t, pcpue_unit_size, PCPU_MIN_UNIT_SIZE);
-	pcpue_ptr = pcpu_alloc_bootmem(0, num_possible_cpus() * pcpue_unit_size,
-				       PAGE_SIZE);
-	if (!pcpue_ptr)
-		return -ENOMEM;
-
-	for_each_possible_cpu(cpu)
-		memcpy(pcpue_ptr + cpu * pcpue_unit_size, __per_cpu_load,
-		       static_size);
-
-	/* we're ready, commit */
-	pr_info("PERCPU: Embedded %zu pages at %p, static data %zu bytes\n",
-		pcpue_unit_size >> PAGE_SHIFT, pcpue_ptr, static_size);
-
-	return pcpu_setup_first_chunk(pcpue_get_page, static_size,
-				      pcpue_unit_size,
-				      pcpue_unit_size - static_size, pcpue_ptr,
-				      NULL);
+	return pcpu_embed_first_chunk(static_size, PERCPU_FIRST_CHUNK_RESERVE,
+				      reserve - PERCPU_FIRST_CHUNK_RESERVE, -1);
 }
 
 /*
@@ -344,8 +317,9 @@ static ssize_t __init setup_pcpu_4k(size_t static_size)
 	pr_info("PERCPU: Allocated %d 4k pages, static data %zu bytes\n",
 		pcpu4k_nr_static_pages, static_size);
 
-	ret = pcpu_setup_first_chunk(pcpu4k_get_page, static_size, 0, 0, NULL,
-				     pcpu4k_populate_pte);
+	ret = pcpu_setup_first_chunk(pcpu4k_get_page, static_size,
+				     PERCPU_FIRST_CHUNK_RESERVE, -1,
+				     -1, NULL, pcpu4k_populate_pte);
 	goto out_free_ar;
 
 enomem:

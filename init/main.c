@@ -72,6 +72,7 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
+#include <trace/kmemtrace.h>
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
@@ -408,8 +409,7 @@ static void __init smp_init(void)
 	 * Set up the current CPU as possible to migrate to.
 	 * The other ones will be done by cpu_up/cpu_down()
 	 */
-	cpu = smp_processor_id();
-	cpu_set(cpu, cpu_active_map);
+	set_cpu_active(smp_processor_id(), true);
 
 	/* FIXME: This should be done in userspace --RR */
 	for_each_present_cpu(cpu) {
@@ -650,6 +650,7 @@ asmlinkage void __init start_kernel(void)
 	enable_debug_pagealloc();
 	cpu_hotplug_init();
 	kmem_cache_init();
+	kmemtrace_init();
 	debug_objects_mem_init();
 	idr_init_cache();
 	setup_per_cpu_pageset();
@@ -771,6 +772,7 @@ static void __init do_basic_setup(void)
 {
 	rcu_init_sched(); /* needed by module_init stage. */
 	init_workqueues();
+	cpuset_init_smp();
 	usermodehelper_init();
 	driver_init();
 	init_irq_proc();
@@ -798,6 +800,7 @@ static void run_init_process(char *init_filename)
  * makes it inline to init() and it becomes part of init.text section
  */
 static noinline int init_post(void)
+	__releases(kernel_lock)
 {
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
@@ -846,7 +849,7 @@ static int __init kernel_init(void * unused)
 	/*
 	 * init can run on any cpu.
 	 */
-	set_cpus_allowed_ptr(current, CPU_MASK_ALL_PTR);
+	set_cpus_allowed_ptr(current, cpu_all_mask);
 	/*
 	 * Tell the world that we're going to be the grim
 	 * reaper of innocent orphaned children.
@@ -866,8 +869,6 @@ static int __init kernel_init(void * unused)
 
 	smp_init();
 	sched_init_smp();
-
-	cpuset_init_smp();
 
 	do_basic_setup();
 

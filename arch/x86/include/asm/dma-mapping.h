@@ -8,6 +8,7 @@
 
 #include <linux/kmemcheck.h>
 #include <linux/scatterlist.h>
+#include <linux/dma-debug.h>
 #include <linux/dma-attrs.h>
 #include <asm/io.h>
 #include <asm/swiotlb.h>
@@ -57,12 +58,17 @@ dma_map_single(struct device *hwdev, void *ptr, size_t size,
 	       enum dma_data_direction dir)
 {
 	struct dma_map_ops *ops = get_dma_ops(hwdev);
+	dma_addr_t addr;
 
 	kmemcheck_mark_initialized(ptr, size);
 	BUG_ON(!valid_dma_direction(dir));
-	return ops->map_page(hwdev, virt_to_page(ptr),
+	addr = ops->map_page(hwdev, virt_to_page(ptr),
 			     (unsigned long)ptr & ~PAGE_MASK, size,
 			     dir, NULL);
+	debug_dma_map_page(hwdev, virt_to_page(ptr),
+			   (unsigned long)ptr & ~PAGE_MASK, size,
+			   dir, addr, true);
+	return addr;
 }
 
 static inline void
@@ -74,6 +80,7 @@ dma_unmap_single(struct device *dev, dma_addr_t addr, size_t size,
 	BUG_ON(!valid_dma_direction(dir));
 	if (ops->unmap_page)
 		ops->unmap_page(dev, addr, size, dir, NULL);
+	debug_dma_unmap_page(dev, addr, size, dir, true);
 }
 
 static inline int
@@ -81,6 +88,7 @@ dma_map_sg(struct device *hwdev, struct scatterlist *sg,
 	   int nents, enum dma_data_direction dir)
 {
 	struct dma_map_ops *ops = get_dma_ops(hwdev);
+	int ents;
 
 	struct scatterlist *s;
 	int i;
@@ -88,7 +96,10 @@ dma_map_sg(struct device *hwdev, struct scatterlist *sg,
 	for_each_sg(sg, s, nents, i)
 		kmemcheck_mark_initialized(sg_virt(s), s->length);
 	BUG_ON(!valid_dma_direction(dir));
-	return ops->map_sg(hwdev, sg, nents, dir, NULL);
+	ents = ops->map_sg(hwdev, sg, nents, dir, NULL);
+	debug_dma_map_sg(hwdev, sg, nents, ents, dir);
+
+	return ents;
 }
 
 static inline void
@@ -98,6 +109,7 @@ dma_unmap_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 	struct dma_map_ops *ops = get_dma_ops(hwdev);
 
 	BUG_ON(!valid_dma_direction(dir));
+	debug_dma_unmap_sg(hwdev, sg, nents, dir);
 	if (ops->unmap_sg)
 		ops->unmap_sg(hwdev, sg, nents, dir, NULL);
 }
@@ -111,6 +123,7 @@ dma_sync_single_for_cpu(struct device *hwdev, dma_addr_t dma_handle,
 	BUG_ON(!valid_dma_direction(dir));
 	if (ops->sync_single_for_cpu)
 		ops->sync_single_for_cpu(hwdev, dma_handle, size, dir);
+	debug_dma_sync_single_for_cpu(hwdev, dma_handle, size, dir);
 	flush_write_buffers();
 }
 
@@ -123,6 +136,7 @@ dma_sync_single_for_device(struct device *hwdev, dma_addr_t dma_handle,
 	BUG_ON(!valid_dma_direction(dir));
 	if (ops->sync_single_for_device)
 		ops->sync_single_for_device(hwdev, dma_handle, size, dir);
+	debug_dma_sync_single_for_device(hwdev, dma_handle, size, dir);
 	flush_write_buffers();
 }
 
@@ -137,6 +151,8 @@ dma_sync_single_range_for_cpu(struct device *hwdev, dma_addr_t dma_handle,
 	if (ops->sync_single_range_for_cpu)
 		ops->sync_single_range_for_cpu(hwdev, dma_handle, offset,
 					       size, dir);
+	debug_dma_sync_single_range_for_cpu(hwdev, dma_handle,
+					    offset, size, dir);
 	flush_write_buffers();
 }
 
@@ -151,6 +167,8 @@ dma_sync_single_range_for_device(struct device *hwdev, dma_addr_t dma_handle,
 	if (ops->sync_single_range_for_device)
 		ops->sync_single_range_for_device(hwdev, dma_handle,
 						  offset, size, dir);
+	debug_dma_sync_single_range_for_device(hwdev, dma_handle,
+					       offset, size, dir);
 	flush_write_buffers();
 }
 
@@ -163,6 +181,7 @@ dma_sync_sg_for_cpu(struct device *hwdev, struct scatterlist *sg,
 	BUG_ON(!valid_dma_direction(dir));
 	if (ops->sync_sg_for_cpu)
 		ops->sync_sg_for_cpu(hwdev, sg, nelems, dir);
+	debug_dma_sync_sg_for_cpu(hwdev, sg, nelems, dir);
 	flush_write_buffers();
 }
 
@@ -175,6 +194,7 @@ dma_sync_sg_for_device(struct device *hwdev, struct scatterlist *sg,
 	BUG_ON(!valid_dma_direction(dir));
 	if (ops->sync_sg_for_device)
 		ops->sync_sg_for_device(hwdev, sg, nelems, dir);
+	debug_dma_sync_sg_for_device(hwdev, sg, nelems, dir);
 
 	flush_write_buffers();
 }
@@ -184,16 +204,25 @@ static inline dma_addr_t dma_map_page(struct device *dev, struct page *page,
 				      enum dma_data_direction dir)
 {
 	struct dma_map_ops *ops = get_dma_ops(dev);
+	dma_addr_t addr;
 
 	kmemcheck_mark_initialized(page_address(page) + offset, size);
 	BUG_ON(!valid_dma_direction(dir));
-	return ops->map_page(dev, page, offset, size, dir, NULL);
+	addr = ops->map_page(dev, page, offset, size, dir, NULL);
+	debug_dma_map_page(dev, page, offset, size, dir, addr, false);
+
+	return addr;
 }
 
 static inline void dma_unmap_page(struct device *dev, dma_addr_t addr,
 				  size_t size, enum dma_data_direction dir)
 {
-	dma_unmap_single(dev, addr, size, dir);
+	struct dma_map_ops *ops = get_dma_ops(dev);
+
+	BUG_ON(!valid_dma_direction(dir));
+	if (ops->unmap_page)
+		ops->unmap_page(dev, addr, size, dir, NULL);
+	debug_dma_unmap_page(dev, addr, size, dir, false);
 }
 
 static inline void
@@ -258,8 +287,11 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
 	if (!ops->alloc_coherent)
 		return NULL;
 
-	return ops->alloc_coherent(dev, size, dma_handle,
-				   dma_alloc_coherent_gfp_flags(dev, gfp));
+	memory = ops->alloc_coherent(dev, size, dma_handle,
+				     dma_alloc_coherent_gfp_flags(dev, gfp));
+	debug_dma_alloc_coherent(dev, size, *dma_handle, memory);
+
+	return memory;
 }
 
 static inline void dma_free_coherent(struct device *dev, size_t size,
@@ -272,6 +304,7 @@ static inline void dma_free_coherent(struct device *dev, size_t size,
 	if (dma_release_from_coherent(dev, get_order(size), vaddr))
 		return;
 
+	debug_dma_free_coherent(dev, size, vaddr, bus);
 	if (ops->free_coherent)
 		ops->free_coherent(dev, size, vaddr, bus);
 }
