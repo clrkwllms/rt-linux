@@ -1,6 +1,8 @@
 config VIDEO_CX231XX
        tristate "Conexant cx231xx USB video capture support"
        depends on VIDEO_DEV && I2C && INPUT
+	# build failure
+       depends on 0
        select VIDEO_TUNER
        select VIDEO_TVEEPROM
        select VIDEO_IR
