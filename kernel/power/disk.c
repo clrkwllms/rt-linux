@@ -22,6 +22,7 @@
 #include <linux/console.h>
 #include <linux/cpu.h>
 #include <linux/freezer.h>
+#include <scsi/scsi_scan.h>
 #include <asm/suspend.h>
 
 #include "power.h"
@@ -289,7 +290,7 @@ static int create_image(int platform_mode)
  *	hibernation_snapshot - quiesce devices and create the hibernation
  *	snapshot image.
  *	@platform_mode - if set, use the platform driver, if available, to
- *			 prepare the platform frimware for the power transition.
+ *			 prepare the platform firmware for the power transition.
  *
  *	Must be called with pm_mutex held
  */
@@ -412,7 +413,7 @@ static int resume_target_kernel(bool platform_mode)
  *	hibernation_restore - quiesce devices and restore the hibernation
  *	snapshot image.  If successful, control returns in hibernation_snaphot()
  *	@platform_mode - if set, use the platform driver, if available, to
- *			 prepare the platform frimware for the transition.
+ *			 prepare the platform firmware for the transition.
  *
  *	Must be called with pm_mutex held
  */
@@ -643,6 +644,13 @@ static int software_resume(void)
 	 */
 	if (noresume)
 		return 0;
+
+	/*
+	 * We can't depend on SCSI devices being available after loading one of
+	 * their modules if scsi_complete_async_scans() is not called and the
+	 * resume device usually is a SCSI one.
+	 */
+	scsi_complete_async_scans();
 
 	/*
 	 * name_to_dev_t() below takes a sysfs buffer mutex when sysfs

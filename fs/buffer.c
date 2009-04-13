@@ -199,13 +199,13 @@ __find_get_block_slow(struct block_device *bdev, sector_t block)
 	head = page_buffers(page);
 	bh = head;
 	do {
-		if (bh->b_blocknr == block) {
+		if (!buffer_mapped(bh))
+			all_mapped = 0;
+		else if (bh->b_blocknr == block) {
 			ret = bh;
 			get_bh(bh);
 			goto out_unlock;
 		}
-		if (!buffer_mapped(bh))
-			all_mapped = 0;
 		bh = bh->b_this_page;
 	} while (bh != head);
 
@@ -737,7 +737,7 @@ static int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
 {
 	struct buffer_head *bh;
 	struct list_head tmp;
-	struct address_space *mapping;
+	struct address_space *mapping, *prev_mapping = NULL;
 	int err = 0, err2;
 
 	INIT_LIST_HEAD(&tmp);
@@ -762,7 +762,18 @@ static int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
 				 * contents - it is a noop if I/O is still in
 				 * flight on potentially older contents.
 				 */
-				ll_rw_block(SWRITE_SYNC, 1, &bh);
+				ll_rw_block(SWRITE_SYNC_PLUG, 1, &bh);
+
+				/*
+				 * Kick off IO for the previous mapping. Note
+				 * that we will not run the very last mapping,
+				 * wait_on_buffer() will do that for us
+				 * through sync_buffer().
+				 */
+				if (prev_mapping && prev_mapping != mapping)
+					blk_run_address_space(prev_mapping);
+				prev_mapping = mapping;
+
 				brelse(bh);
 				spin_lock(lock);
 			}
@@ -1585,6 +1596,16 @@ EXPORT_SYMBOL(unmap_underlying_metadata);
  * locked buffer.   This only can happen if someone has written the buffer
  * directly, with submit_bh().  At the address_space level PageWriteback
  * prevents this contention from occurring.
+ *
+ * If block_write_full_page() is called with wbc->sync_mode ==
+ * WB_SYNC_ALL, the writes are posted using WRITE_SYNC_PLUG; this
+ * causes the writes to be flagged as synchronous writes, but the
+ * block device queue will NOT be unplugged, since usually many pages
+ * will be pushed to the out before the higher-level caller actually
+ * waits for the writes to be completed.  The various wait functions,
+ * such as wait_on_writeback_range() will ultimately call sync_page()
+ * which will ultimately call blk_run_backing_dev(), which will end up
+ * unplugging the device queue.
  */
 static int __block_write_full_page(struct inode *inode, struct page *page,
 			get_block_t *get_block, struct writeback_control *wbc)
@@ -1595,6 +1616,8 @@ static int __block_write_full_page(struct inode *inode, struct page *page,
 	struct buffer_head *bh, *head;
 	const unsigned blocksize = 1 << inode->i_blkbits;
 	int nr_underway = 0;
+	int write_op = (wbc->sync_mode == WB_SYNC_ALL ?
+			WRITE_SYNC_PLUG : WRITE);
 
 	BUG_ON(!PageLocked(page));
 
@@ -1686,7 +1709,7 @@ static int __block_write_full_page(struct inode *inode, struct page *page,
 	do {
 		struct buffer_head *next = bh->b_this_page;
 		if (buffer_async_write(bh)) {
-			submit_bh(WRITE, bh);
+			submit_bh(write_op, bh);
 			nr_underway++;
 		}
 		bh = next;
@@ -1740,7 +1763,7 @@ recover:
 		struct buffer_head *next = bh->b_this_page;
 		if (buffer_async_write(bh)) {
 			clear_buffer_dirty(bh);
-			submit_bh(WRITE, bh);
+			submit_bh(write_op, bh);
 			nr_underway++;
 		}
 		bh = next;
@@ -2956,12 +2979,13 @@ void ll_rw_block(int rw, int nr, struct buffer_head *bhs[])
 	for (i = 0; i < nr; i++) {
 		struct buffer_head *bh = bhs[i];
 
-		if (rw == SWRITE || rw == SWRITE_SYNC)
+		if (rw == SWRITE || rw == SWRITE_SYNC || rw == SWRITE_SYNC_PLUG)
 			lock_buffer(bh);
 		else if (!trylock_buffer(bh))
 			continue;
 
-		if (rw == WRITE || rw == SWRITE || rw == SWRITE_SYNC) {
+		if (rw == WRITE || rw == SWRITE || rw == SWRITE_SYNC ||
+		    rw == SWRITE_SYNC_PLUG) {
 			if (test_clear_buffer_dirty(bh)) {
 				bh->b_end_io = end_buffer_write_sync;
 				get_bh(bh);
@@ -2997,7 +3021,7 @@ int sync_dirty_buffer(struct buffer_head *bh)
 	if (test_clear_buffer_dirty(bh)) {
 		get_bh(bh);
 		bh->b_end_io = end_buffer_write_sync;
-		ret = submit_bh(WRITE, bh);
+		ret = submit_bh(WRITE_SYNC, bh);
 		wait_on_buffer(bh);
 		if (buffer_eopnotsupp(bh)) {
 			clear_buffer_eopnotsupp(bh);
@@ -3315,7 +3339,6 @@ EXPORT_SYMBOL(cont_write_begin);
 EXPORT_SYMBOL(end_buffer_read_sync);
 EXPORT_SYMBOL(end_buffer_write_sync);
 EXPORT_SYMBOL(file_fsync);
-EXPORT_SYMBOL(fsync_bdev);
 EXPORT_SYMBOL(generic_block_bmap);
 EXPORT_SYMBOL(generic_cont_expand_simple);
 EXPORT_SYMBOL(init_buffer);

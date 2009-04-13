@@ -324,15 +324,6 @@ __cpuinit cpuid4_cache_lookup_regs(int index,
 	return 0;
 }
 
-static int
-__cpuinit cpuid4_cache_lookup(int index, struct _cpuid4_info *this_leaf)
-{
-	struct _cpuid4_info_regs *leaf_regs =
-		(struct _cpuid4_info_regs *)this_leaf;
-
-	return cpuid4_cache_lookup_regs(index, leaf_regs);
-}
-
 static int __cpuinit find_num_cache_leaves(void)
 {
 	unsigned int		eax, ebx, ecx, edx;
@@ -571,6 +562,15 @@ static void __cpuinit free_cache_attributes(unsigned int cpu)
 
 	kfree(per_cpu(cpuid4_info, cpu));
 	per_cpu(cpuid4_info, cpu) = NULL;
+}
+
+static int
+__cpuinit cpuid4_cache_lookup(int index, struct _cpuid4_info *this_leaf)
+{
+	struct _cpuid4_info_regs *leaf_regs =
+		(struct _cpuid4_info_regs *)this_leaf;
+
+	return cpuid4_cache_lookup_regs(index, leaf_regs);
 }
 
 static void __cpuinit get_cpu_leaves(void *_retval)
