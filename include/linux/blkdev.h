@@ -117,8 +117,8 @@ enum rq_flag_bits {
 	__REQ_RW_META,		/* metadata io request */
 	__REQ_COPY_USER,	/* contains copies of user pages */
 	__REQ_INTEGRITY,	/* integrity metadata has been remapped */
-	__REQ_UNPLUG,		/* unplug queue on submission */
 	__REQ_NOIDLE,		/* Don't anticipate more IO after this one */
+	__REQ_IO_STAT,		/* account I/O stat */
 	__REQ_NR_BITS,		/* stops here */
 };
 
@@ -145,8 +145,8 @@ enum rq_flag_bits {
 #define REQ_RW_META	(1 << __REQ_RW_META)
 #define REQ_COPY_USER	(1 << __REQ_COPY_USER)
 #define REQ_INTEGRITY	(1 << __REQ_INTEGRITY)
-#define REQ_UNPLUG	(1 << __REQ_UNPLUG)
 #define REQ_NOIDLE	(1 << __REQ_NOIDLE)
+#define REQ_IO_STAT	(1 << __REQ_IO_STAT)
 
 #define BLK_MAX_CDB	16
 
@@ -600,6 +600,8 @@ enum {
 				 blk_failfast_transport(rq) ||	\
 				 blk_failfast_driver(rq))
 #define blk_rq_started(rq)	((rq)->cmd_flags & REQ_STARTED)
+#define blk_rq_io_stat(rq)	((rq)->cmd_flags & REQ_IO_STAT)
+#define blk_rq_quiet(rq)	((rq)->cmd_flags & REQ_QUIET)
 
 #define blk_account_rq(rq)	(blk_rq_started(rq) && (blk_fs_request(rq) || blk_discard_rq(rq))) 
 

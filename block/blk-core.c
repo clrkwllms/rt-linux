@@ -64,12 +64,11 @@ static struct workqueue_struct *kblockd_workqueue;
 
 static void drive_stat_acct(struct request *rq, int new_io)
 {
-	struct gendisk *disk = rq->rq_disk;
 	struct hd_struct *part;
 	int rw = rq_data_dir(rq);
 	int cpu;
 
-	if (!blk_fs_request(rq) || !disk || !blk_do_io_stat(disk->queue))
+	if (!blk_fs_request(rq) || !blk_do_io_stat(rq))
 		return;
 
 	cpu = part_stat_lock();
@@ -132,6 +131,7 @@ void blk_rq_init(struct request_queue *q, struct request *rq)
 	INIT_HLIST_NODE(&rq->hash);
 	RB_CLEAR_NODE(&rq->rb_node);
 	rq->cmd = rq->__cmd;
+	rq->cmd_len = BLK_MAX_CDB;
 	rq->tag = -1;
 	rq->ref_count = 1;
 }
@@ -643,7 +643,7 @@ static inline void blk_free_request(struct request_queue *q, struct request *rq)
 }
 
 static struct request *
-blk_alloc_request(struct request_queue *q, int rw, int priv, gfp_t gfp_mask)
+blk_alloc_request(struct request_queue *q, int flags, int priv, gfp_t gfp_mask)
 {
 	struct request *rq = mempool_alloc(q->rq.rq_pool, gfp_mask);
 
@@ -652,7 +652,7 @@ blk_alloc_request(struct request_queue *q, int rw, int priv, gfp_t gfp_mask)
 
 	blk_rq_init(q, rq);
 
-	rq->cmd_flags = rw | REQ_ALLOCED;
+	rq->cmd_flags = flags | REQ_ALLOCED;
 
 	if (priv) {
 		if (unlikely(elv_set_request(q, rq, gfp_mask))) {
@@ -792,6 +792,8 @@ static struct request *get_request(struct request_queue *q, int rw_flags,
 	if (priv)
 		rl->elvpriv++;
 
+	if (blk_queue_io_stat(q))
+		rw_flags |= REQ_IO_STAT;
 	spin_unlock_irq(q->queue_lock);
 
 	rq = blk_alloc_request(q, rw_flags, priv, gfp_mask);
@@ -1124,8 +1126,6 @@ void init_request_from_bio(struct request *req, struct bio *bio)
 
 	if (bio_sync(bio))
 		req->cmd_flags |= REQ_RW_SYNC;
-	if (bio_unplug(bio))
-		req->cmd_flags |= REQ_UNPLUG;
 	if (bio_rw_meta(bio))
 		req->cmd_flags |= REQ_RW_META;
 	if (bio_noidle(bio))
@@ -1675,9 +1675,7 @@ EXPORT_SYMBOL(blkdev_dequeue_request);
 
 static void blk_account_io_completion(struct request *req, unsigned int bytes)
 {
-	struct gendisk *disk = req->rq_disk;
-
-	if (!disk || !blk_do_io_stat(disk->queue))
+	if (!blk_do_io_stat(req))
 		return;
 
 	if (blk_fs_request(req)) {
@@ -1694,9 +1692,7 @@ static void blk_account_io_completion(struct request *req, unsigned int bytes)
 
 static void blk_account_io_done(struct request *req)
 {
-	struct gendisk *disk = req->rq_disk;
-
-	if (!disk || !blk_do_io_stat(disk->queue))
+	if (!blk_do_io_stat(req))
 		return;
 
 	/*
@@ -1711,7 +1707,7 @@ static void blk_account_io_done(struct request *req)
 		int cpu;
 
 		cpu = part_stat_lock();
-		part = disk_map_sector_rcu(disk, req->sector);
+		part = disk_map_sector_rcu(req->rq_disk, req->sector);
 
 		part_stat_inc(cpu, part, ios[rw]);
 		part_stat_add(cpu, part, ticks[rw], duration);

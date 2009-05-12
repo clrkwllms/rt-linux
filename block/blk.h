@@ -70,6 +70,10 @@ void blk_queue_congestion_threshold(struct request_queue *q);
 
 int blk_dev_init(void);
 
+void elv_quiesce_start(struct request_queue *q);
+void elv_quiesce_end(struct request_queue *q);
+
+
 /*
  * Return the threshold (number of used requests) at which the queue is
  * considered to be congested.  It include a little hysteresis to keep the
@@ -108,12 +112,9 @@ static inline int blk_cpu_to_group(int cpu)
 #endif
 }
 
-static inline int blk_do_io_stat(struct request_queue *q)
+static inline int blk_do_io_stat(struct request *rq)
 {
-	if (q)
-		return blk_queue_io_stat(q);
-
-	return 0;
+	return rq->rq_disk && blk_rq_io_stat(rq);
 }
 
 #endif
