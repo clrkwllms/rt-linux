@@ -28,13 +28,13 @@
 
 #include <linux/delay.h>
 #include <linux/pci.h>
-#include <linux/module.h>
-#include <linux/firmware.h>
 #include "aic94xx_reg.h"
 #include "aic94xx_hwi.h"
 
 #include "aic94xx_seq.h"
 #include "aic94xx_dump.h"
+
+#include "aic94xx_seq_microcode.c"
 
 /* It takes no more than 0.05 us for an instruction
  * to complete. So waiting for 1 us should be more than
@@ -42,12 +42,6 @@
  */
 #define PAUSE_DELAY 1
 #define PAUSE_TRIES 1000
-
-static const struct firmware *sequencer_fw;
-static u16 cseq_vecs[CSEQ_NUM_VECS], lseq_vecs[LSEQ_NUM_VECS], mode2_task,
-	cseq_idle_loop, lseq_idle_loop;
-static const u8 *cseq_code, *lseq_code;
-static u32 cseq_code_size, lseq_code_size;
 
 static u16 first_scb_site_no = 0xFFFF;
 static u16 last_scb_site_no;
@@ -406,7 +400,7 @@ static int asd_seq_download_seqs(struct asd_ha_struct *asd_ha)
 
 	/* Download the CSEQ */
 	ASD_DPRINTK("downloading CSEQ...\n");
-	err = asd_download_seq(asd_ha, cseq_code, cseq_code_size, 0);
+	err = asd_download_seq(asd_ha, Cseq, sizeof(Cseq), 0);
 	if (err) {
 		asd_printk("CSEQ download failed:%d\n", err);
 		return err;
@@ -416,7 +410,7 @@ static int asd_seq_download_seqs(struct asd_ha_struct *asd_ha)
 	 * microcode can be downloaded at the same time.
 	 */
 	ASD_DPRINTK("downloading LSEQs...\n");
-	err = asd_download_seq(asd_ha, lseq_code, lseq_code_size,
+	err = asd_download_seq(asd_ha, Lseq, sizeof(Lseq),
 			       asd_ha->hw_prof.enabled_phys);
 	if (err) {
 		/* Try it one at a time */
@@ -424,8 +418,8 @@ static int asd_seq_download_seqs(struct asd_ha_struct *asd_ha)
 		u8 lseq_mask = asd_ha->hw_prof.enabled_phys;
 
 		for_each_sequencer(lseq_mask, lseq_mask, lseq) {
-			err = asd_download_seq(asd_ha, lseq_code,
-					       lseq_code_size, 1<<lseq);
+			err = asd_download_seq(asd_ha, Lseq, sizeof(Lseq),
+					       1<<lseq);
 			if (err)
 				break;
 		}
@@ -691,10 +685,10 @@ static void asd_init_lseq_mdp(struct asd_ha_struct *asd_ha,  int lseq)
 {
 	int    i;
 	u32    moffs;
-	u16 ret_addr[] = {
+	static const u16 ret_addr[] = {
 		0xFFFF,		  /* mode 0 */
 		0xFFFF,		  /* mode 1 */
-		mode2_task,	  /* mode 2 */
+		MODE2_TASK,	  /* mode 2 */
 		0,
 		0xFFFF,		  /* mode 4/5 */
 		0xFFFF,		  /* mode 4/5 */
@@ -897,6 +891,16 @@ static void asd_init_scb_sites(struct asd_ha_struct *asd_ha)
 		 * frames received to be dropped. */
 		asd_scbsite_write_byte(asd_ha, site_no, 0x49, 0x01);
 
+		/* Initialize SCB Site Opcode field to invalid. */
+		asd_scbsite_write_byte(asd_ha, site_no,
+				       offsetof(struct scb_header, opcode),
+				       0xFF);
+
+		/* Initialize SCB Site Flags field to mean a response
+		 * frame has been received.  This means inadvertent
+		 * frames received to be dropped. */
+		asd_scbsite_write_byte(asd_ha, site_no, 0x49, 0x01);
+
 		/* Workaround needed by SEQ to fix a SATA issue is to exclude
 		 * certain SCB sites from the free list. */
 		if (!SCB_SITE_VALID(site_no))
@@ -941,9 +945,9 @@ static void asd_init_cseq_cio(struct asd_ha_struct *asd_ha)
 	 * The addresses are 16 bit wide and in dword units.
 	 * The values of their macros are in byte units.
 	 * Thus we have to divide by 4. */
-	asd_write_reg_word(asd_ha, CM11INTVEC0, cseq_vecs[0]);
-	asd_write_reg_word(asd_ha, CM11INTVEC1, cseq_vecs[1]);
-	asd_write_reg_word(asd_ha, CM11INTVEC2, cseq_vecs[2]);
+	asd_write_reg_word(asd_ha, CM11INTVEC0, CSEQ_INT_VEC0);
+	asd_write_reg_word(asd_ha, CM11INTVEC1, CSEQ_INT_VEC1);
+	asd_write_reg_word(asd_ha, CM11INTVEC2, CSEQ_INT_VEC2);
 
 	/* Enable ARP2HALTC (ARP2 Halted from Halt Code Write). */
 	asd_write_reg_byte(asd_ha, CARP2INTEN, EN_ARP2HALTC);
@@ -957,7 +961,7 @@ static void asd_init_cseq_cio(struct asd_ha_struct *asd_ha)
 		asd_write_reg_byte(asd_ha, CMnSCRATCHPAGE(i), 0);
 
 	/* Reset the ARP2 Program Count. */
-	asd_write_reg_word(asd_ha, CPRGMCNT, cseq_idle_loop);
+	asd_write_reg_word(asd_ha, CPRGMCNT, CSEQ_IDLE_LOOP_ENTRY);
 
 	for (i = 0; i < 8; i++) {
 		/* Intialize Mode n Link m Interrupt Enable. */
@@ -1020,7 +1024,7 @@ static void asd_init_lseq_cio(struct asd_ha_struct *asd_ha, int lseq)
 	asd_write_reg_byte(asd_ha, LmMnXFRLVL(lseq, 1), LmMnXFRLVL_256);
 
 	/* Initialize Program Count. */
-	asd_write_reg_word(asd_ha, LmPRGMCNT(lseq), lseq_idle_loop);
+	asd_write_reg_word(asd_ha, LmPRGMCNT(lseq), LSEQ_IDLE_LOOP_ENTRY);
 
 	/* Enable Blind SG Move. */
 	asd_write_reg_dword(asd_ha, LmMODECTL(lseq), LmBLIND48);
@@ -1069,17 +1073,17 @@ static void asd_init_lseq_cio(struct asd_ha_struct *asd_ha, int lseq)
 
 	/* Initialize Interrupt Vector[0-10] address in Mode 3.
 	 * See the comment on CSEQ_INT_* */
-	asd_write_reg_word(asd_ha, LmM3INTVEC0(lseq), lseq_vecs[0]);
-	asd_write_reg_word(asd_ha, LmM3INTVEC1(lseq), lseq_vecs[1]);
-	asd_write_reg_word(asd_ha, LmM3INTVEC2(lseq), lseq_vecs[2]);
-	asd_write_reg_word(asd_ha, LmM3INTVEC3(lseq), lseq_vecs[3]);
-	asd_write_reg_word(asd_ha, LmM3INTVEC4(lseq), lseq_vecs[4]);
-	asd_write_reg_word(asd_ha, LmM3INTVEC5(lseq), lseq_vecs[5]);
-	asd_write_reg_word(asd_ha, LmM3INTVEC6(lseq), lseq_vecs[6]);
-	asd_write_reg_word(asd_ha, LmM3INTVEC7(lseq), lseq_vecs[7]);
-	asd_write_reg_word(asd_ha, LmM3INTVEC8(lseq), lseq_vecs[8]);
-	asd_write_reg_word(asd_ha, LmM3INTVEC9(lseq), lseq_vecs[9]);
-	asd_write_reg_word(asd_ha, LmM3INTVEC10(lseq), lseq_vecs[10]);
+	asd_write_reg_word(asd_ha, LmM3INTVEC0(lseq), LSEQ_INT_VEC0);
+	asd_write_reg_word(asd_ha, LmM3INTVEC1(lseq), LSEQ_INT_VEC1);
+	asd_write_reg_word(asd_ha, LmM3INTVEC2(lseq), LSEQ_INT_VEC2);
+	asd_write_reg_word(asd_ha, LmM3INTVEC3(lseq), LSEQ_INT_VEC3);
+	asd_write_reg_word(asd_ha, LmM3INTVEC4(lseq), LSEQ_INT_VEC4);
+	asd_write_reg_word(asd_ha, LmM3INTVEC5(lseq), LSEQ_INT_VEC5);
+	asd_write_reg_word(asd_ha, LmM3INTVEC6(lseq), LSEQ_INT_VEC6);
+	asd_write_reg_word(asd_ha, LmM3INTVEC7(lseq), LSEQ_INT_VEC7);
+	asd_write_reg_word(asd_ha, LmM3INTVEC8(lseq), LSEQ_INT_VEC8);
+	asd_write_reg_word(asd_ha, LmM3INTVEC9(lseq), LSEQ_INT_VEC9);
+	asd_write_reg_word(asd_ha, LmM3INTVEC10(lseq), LSEQ_INT_VEC10);
 	/*
 	 * Program the Link LED control, applicable only for
 	 * Chip Rev. B or later.
@@ -1175,6 +1179,9 @@ static void asd_seq_setup_seqs(struct asd_ha_struct *asd_ha)
 	/* Initialize DDB sites */
 	asd_seq_init_ddb_sites(asd_ha);
 
+	/* Initialize DDB sites */
+	asd_seq_init_ddb_sites(asd_ha);
+
 	/* Initialize SCB sites. Done first to compute some values which
 	 * the rest of the init code depends on. */
 	asd_init_scb_sites(asd_ha);
@@ -1205,7 +1212,7 @@ static void asd_seq_setup_seqs(struct asd_ha_struct *asd_ha)
 static int asd_seq_start_cseq(struct asd_ha_struct *asd_ha)
 {
 	/* Reset the ARP2 instruction to location zero. */
-	asd_write_reg_word(asd_ha, CPRGMCNT, cseq_idle_loop);
+	asd_write_reg_word(asd_ha, CPRGMCNT, CSEQ_IDLE_LOOP_ENTRY);
 
 	/* Unpause the CSEQ  */
 	return asd_unpause_cseq(asd_ha);
@@ -1219,110 +1226,17 @@ static int asd_seq_start_cseq(struct asd_ha_struct *asd_ha)
 static int asd_seq_start_lseq(struct asd_ha_struct *asd_ha, int lseq)
 {
 	/* Reset the ARP2 instruction to location zero. */
-	asd_write_reg_word(asd_ha, LmPRGMCNT(lseq), lseq_idle_loop);
+	asd_write_reg_word(asd_ha, LmPRGMCNT(lseq), LSEQ_IDLE_LOOP_ENTRY);
 
 	/* Unpause the LmSEQ  */
 	return asd_seq_unpause_lseq(asd_ha, lseq);
-}
-
-int asd_release_firmware(void)
-{
-	if (sequencer_fw)
-		release_firmware(sequencer_fw);
-	return 0;
-}
-
-static int asd_request_firmware(struct asd_ha_struct *asd_ha)
-{
-	int err, i;
-	struct sequencer_file_header header;
-	const struct sequencer_file_header *hdr_ptr;
-	u32 csum = 0;
-	u16 *ptr_cseq_vecs, *ptr_lseq_vecs;
-
-	if (sequencer_fw)
-		/* already loaded */
-		return 0;
-
-	err = request_firmware(&sequencer_fw,
-			       SAS_RAZOR_SEQUENCER_FW_FILE,
-			       &asd_ha->pcidev->dev);
-	if (err)
-		return err;
-
-	hdr_ptr = (const struct sequencer_file_header *)sequencer_fw->data;
-
-	header.csum = le32_to_cpu(hdr_ptr->csum);
-	header.major = le32_to_cpu(hdr_ptr->major);
-	header.minor = le32_to_cpu(hdr_ptr->minor);
-	header.cseq_table_offset = le32_to_cpu(hdr_ptr->cseq_table_offset);
-	header.cseq_table_size = le32_to_cpu(hdr_ptr->cseq_table_size);
-	header.lseq_table_offset = le32_to_cpu(hdr_ptr->lseq_table_offset);
-	header.lseq_table_size = le32_to_cpu(hdr_ptr->lseq_table_size);
-	header.cseq_code_offset = le32_to_cpu(hdr_ptr->cseq_code_offset);
-	header.cseq_code_size = le32_to_cpu(hdr_ptr->cseq_code_size);
-	header.lseq_code_offset = le32_to_cpu(hdr_ptr->lseq_code_offset);
-	header.lseq_code_size = le32_to_cpu(hdr_ptr->lseq_code_size);
-	header.mode2_task = le16_to_cpu(hdr_ptr->mode2_task);
-	header.cseq_idle_loop = le16_to_cpu(hdr_ptr->cseq_idle_loop);
-	header.lseq_idle_loop = le16_to_cpu(hdr_ptr->lseq_idle_loop);
-
-	for (i = sizeof(header.csum); i < sequencer_fw->size; i++)
-		csum += sequencer_fw->data[i];
-
-	if (csum != header.csum) {
-		asd_printk("Firmware file checksum mismatch\n");
-		return -EINVAL;
-	}
-
-	if (header.cseq_table_size != CSEQ_NUM_VECS ||
-	    header.lseq_table_size != LSEQ_NUM_VECS) {
-		asd_printk("Firmware file table size mismatch\n");
-		return -EINVAL;
-	}
-
-	asd_printk("Found sequencer Firmware version %d.%d (%s)\n",
-		   header.major, header.minor, hdr_ptr->version);
-
-	if (header.major != SAS_RAZOR_SEQUENCER_FW_MAJOR) {
-		asd_printk("Firmware Major Version Mismatch;"
-			   "driver requires version %d.X",
-			   SAS_RAZOR_SEQUENCER_FW_MAJOR);
-		return -EINVAL;
-	}
-
-	ptr_cseq_vecs = (u16 *)&sequencer_fw->data[header.cseq_table_offset];
-	ptr_lseq_vecs = (u16 *)&sequencer_fw->data[header.lseq_table_offset];
-	mode2_task = header.mode2_task;
-	cseq_idle_loop = header.cseq_idle_loop;
-	lseq_idle_loop = header.lseq_idle_loop;
-
-	for (i = 0; i < CSEQ_NUM_VECS; i++)
-		cseq_vecs[i] = le16_to_cpu(ptr_cseq_vecs[i]);
-
-	for (i = 0; i < LSEQ_NUM_VECS; i++)
-		lseq_vecs[i] = le16_to_cpu(ptr_lseq_vecs[i]);
-
-	cseq_code = &sequencer_fw->data[header.cseq_code_offset];
-	cseq_code_size = header.cseq_code_size;
-	lseq_code = &sequencer_fw->data[header.lseq_code_offset];
-	lseq_code_size = header.lseq_code_size;
-
-	return 0;
 }
 
 int asd_init_seqs(struct asd_ha_struct *asd_ha)
 {
 	int err;
 
-	err = asd_request_firmware(asd_ha);
-
-	if (err) {
-		asd_printk("Failed to load sequencer firmware file %s, error %d\n",
-			   SAS_RAZOR_SEQUENCER_FW_FILE, err);
-		return err;
-	}
-
+	asd_printk("using sequencer %s\n", SAS_RAZOR_SEQUENCER_VERSION);
 	err = asd_seq_download_seqs(asd_ha);
 	if (err) {
 		asd_printk("couldn't download sequencers for %s\n",
@@ -1411,5 +1325,3 @@ void asd_update_port_links(struct asd_ha_struct *asd_ha, struct asd_phy *phy)
 	if (err)
 		asd_printk("couldn't update DDB 0:error:%d\n", err);
 }
-
-MODULE_FIRMWARE(SAS_RAZOR_SEQUENCER_FW_FILE);
