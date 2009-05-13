@@ -13,6 +13,22 @@ menuconfig MISC_DEVICES
 
 if MISC_DEVICES
 
+config IBM_RTL
+	tristate "Device driver to enable PRTL support"
+	depends on X86 && PCI
+	---help---
+	  Enable support for IBM Premium Real Time Mode (PRTM).
+	  This module will allow you the enter and exit PRTM in the BIOS via
+	  sysfs on platforms that support this feature.  System in PRTM will
+	  not recive cpu generated SMIs for recoverable errors.  Use of this
+	  feature without proper support may void your hardware warrenty.
+
+	  If the proper bios support is found the driver will load and create
+	  /sys/devices/system/ibm_rtl/.  The "state" varable will indicate
+	  weather or not the BIOS is in PRTM.
+	  state = 0 (BIOS SMI's on)
+	  state = 1 (BIOS SMI's off)
+
 config AD525X_DPOT
 	tristate "Analog Devices AD525x Digital Potentiometers"
 	depends on I2C && SYSFS
@@ -26,6 +42,7 @@ config AD525X_DPOT
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called ad525x_dpot.
+
 
 config ATMEL_PWM
 	tristate "Atmel AT32/AT91 PWM support"
