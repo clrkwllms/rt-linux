@@ -1259,7 +1259,7 @@ __rb_reserve_next(struct ring_buffer_per_cpu *cpu_buffer,
 		if (tail < BUF_PAGE_SIZE) {
 			/* Mark the rest of the page with padding */
 			event = __rb_page_index(tail_page, tail);
-			kmemcheck_annotate_bitfield(event->bitfield);
+			kmemcheck_annotate_bitfield(event, bitfield);
 			rb_event_set_padding(event);
 		}
 
@@ -1289,7 +1289,7 @@ __rb_reserve_next(struct ring_buffer_per_cpu *cpu_buffer,
 		return NULL;
 
 	event = __rb_page_index(tail_page, tail);
-	kmemcheck_annotate_bitfield(event->bitfield);
+	kmemcheck_annotate_bitfield(event, bitfield);
 	rb_update_event(event, type, length);
 
 	/*

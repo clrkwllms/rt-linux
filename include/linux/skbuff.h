@@ -347,18 +347,18 @@ struct sk_buff {
 		};
 	};
 	__u32			priority;
-	kmemcheck_define_bitfield(flags1, {
-		__u8			local_df:1,
-					cloned:1,
-					ip_summed:2,
-					nohdr:1,
-					nfctinfo:3;
-		__u8			pkt_type:3,
-					fclone:2,
-					ipvs_property:1,
-					peeked:1,
-					nf_trace:1;
-	});
+	kmemcheck_bitfield_begin(flags1);
+	__u8			local_df:1,
+				cloned:1,
+				ip_summed:2,
+				nohdr:1,
+				nfctinfo:3;
+	__u8			pkt_type:3,
+				fclone:2,
+				ipvs_property:1,
+				peeked:1,
+				nf_trace:1;
+	kmemcheck_bitfield_end(flags1);
 	__be16			protocol;
 
 	void			(*destructor)(struct sk_buff *skb);
@@ -379,15 +379,15 @@ struct sk_buff {
 #endif
 #endif
 
-	kmemcheck_define_bitfield(flags2, {
+	kmemcheck_bitfield_begin(flags2);
 #ifdef CONFIG_IPV6_NDISC_NODETYPE
-		__u8			ndisc_nodetype:2;
+	__u8			ndisc_nodetype:2;
 #endif
 #if defined(CONFIG_MAC80211) || defined(CONFIG_MAC80211_MODULE)
-		__u8			do_not_encrypt:1;
-		__u8			requeue:1;
+	__u8			do_not_encrypt:1;
+	__u8			requeue:1;
 #endif
-	});
+	kmemcheck_bitfield_end(flags2);
 
 	/* 0/13/14 bit hole */
 

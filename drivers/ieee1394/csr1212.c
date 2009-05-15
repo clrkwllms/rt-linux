@@ -388,7 +388,7 @@ csr1212_new_descriptor_leaf(u8 dtype, u32 specifier_id,
 	if (!kv)
 		return NULL;
 
-	kmemcheck_annotate_bitfield(kv->value.leaf.data[0]);
+	kmemcheck_annotate_variable(kv->value.leaf.data[0]);
 	CSR1212_DESCRIPTOR_LEAF_SET_TYPE(kv, dtype);
 	CSR1212_DESCRIPTOR_LEAF_SET_SPECIFIER_ID(kv, specifier_id);
 

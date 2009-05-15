@@ -67,16 +67,16 @@ struct inet_request_sock {
 	__be32			loc_addr;
 	__be32			rmt_addr;
 	__be16			rmt_port;
-	kmemcheck_define_bitfield(flags, {
-		u16			snd_wscale : 4,
-					rcv_wscale : 4,
-					tstamp_ok  : 1,
-					sack_ok	   : 1,
-					wscale_ok  : 1,
-					ecn_ok	   : 1,
-					acked	   : 1,
-					no_srccheck: 1;
-	});
+	kmemcheck_bitfield_begin(flags);
+	u16			snd_wscale : 4,
+				rcv_wscale : 4,
+				tstamp_ok  : 1,
+				sack_ok	   : 1,
+				wscale_ok  : 1,
+				ecn_ok	   : 1,
+				acked	   : 1,
+				no_srccheck: 1;
+	kmemcheck_bitfield_end(flags);
 	struct ip_options	*opt;
 };
 
@@ -204,7 +204,7 @@ static inline struct request_sock *inet_reqsk_alloc(struct request_sock_ops *ops
 	struct inet_request_sock *ireq = inet_rsk(req);
 
 	if (req != NULL) {
-		kmemcheck_annotate_bitfield(ireq->flags);
+		kmemcheck_annotate_bitfield(ireq, flags);
 		ireq->opt = NULL;
 	}
 

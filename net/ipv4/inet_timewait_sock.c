@@ -118,7 +118,7 @@ struct inet_timewait_sock *inet_twsk_alloc(const struct sock *sk, const int stat
 	if (tw != NULL) {
 		const struct inet_sock *inet = inet_sk(sk);
 
-		kmemcheck_annotate_bitfield(tw->flags);
+		kmemcheck_annotate_bitfield(tw, flags);
 
 		/* Give us an identity. */
 		tw->tw_daddr	    = inet->daddr;

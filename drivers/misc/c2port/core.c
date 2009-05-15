@@ -892,9 +892,9 @@ struct c2port_device *c2port_device_register(char *name,
 		return ERR_PTR(-EINVAL);
 
 	c2dev = kmalloc(sizeof(struct c2port_device), GFP_KERNEL);
+	kmemcheck_annotate_bitfield(c2dev, flags);
 	if (unlikely(!c2dev))
 		return ERR_PTR(-ENOMEM);
-	kmemcheck_annotate_bitfield(c2dev->flags);
 
 	ret = idr_pre_get(&c2port_idr, GFP_KERNEL);
 	if (!ret) {
