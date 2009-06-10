@@ -668,12 +668,11 @@ int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
 			ret = NOTIFY_STOP;
 		break;
 	case DIE_GPF:
+		// TODO: do this better on PREEMPT_RT
 		/* kprobe_running() needs smp_processor_id() */
-		preempt_disable();
-		if (kprobe_running() &&
+		if (per_cpu(current_kprobe, raw_smp_processor_id()) &&
 		    kprobe_fault_handler(args->regs, args->trapnr))
 			ret = NOTIFY_STOP;
-		preempt_enable();
 		break;
 	default:
 		break;

@@ -1222,7 +1222,9 @@ void hrtimer_interrupt(struct clock_event_device *dev)
 
 static void run_hrtimer_softirq(struct softirq_action *h)
 {
-	struct hrtimer_cpu_base *cpu_base = &__get_cpu_var(hrtimer_bases);
+	struct hrtimer_cpu_base *cpu_base;
+
+	cpu_base = &per_cpu(hrtimer_bases, raw_smp_processor_id());
 
 	spin_lock_irq(&cpu_base->lock);
 
