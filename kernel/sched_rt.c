@@ -73,8 +73,10 @@ static inline void inc_rt_tasks(struct task_struct *p, struct rq *rq)
 	WARN_ON(!rt_task(p));
 	rq->rt.rt_nr_running++;
 #ifdef CONFIG_SMP
-	if (p->prio < rq->rt.highest_prio)
+	if (p->prio < rq->rt.highest_prio) {
 		rq->rt.highest_prio = p->prio;
+		cpupri_set(&rq->rd->cpupri, rq->cpu, p->prio);
+	}
 	if (p->nr_cpus_allowed > 1)
 		rq->rt.rt_nr_migratory++;
 
@@ -84,6 +86,8 @@ static inline void inc_rt_tasks(struct task_struct *p, struct rq *rq)
 
 static inline void dec_rt_tasks(struct task_struct *p, struct rq *rq)
 {
+	int highest_prio = rq->rt.highest_prio;
+
 	WARN_ON(!rt_task(p));
 	WARN_ON(!rq->rt.rt_nr_running);
 	rq->rt.rt_nr_running--;
@@ -102,6 +106,9 @@ static inline void dec_rt_tasks(struct task_struct *p, struct rq *rq)
 		rq->rt.highest_prio = MAX_RT_PRIO;
 	if (p->nr_cpus_allowed > 1)
 		rq->rt.rt_nr_migratory--;
+
+	if (rq->rt.highest_prio != highest_prio)
+		cpupri_set(&rq->rd->cpupri, rq->cpu, rq->rt.highest_prio);
 
 	update_rt_migration(rq);
 #endif /* CONFIG_SMP */
@@ -293,69 +300,17 @@ static DEFINE_PER_CPU(cpumask_t, local_cpu_mask);
 
 static int find_lowest_cpus(struct task_struct *task, cpumask_t *lowest_mask)
 {
-	int       lowest_prio = -1;
-	int       lowest_cpu  = -1;
-	int       count       = 0;
-	int       cpu;
+	int count;
 
-	cpus_and(*lowest_mask, task_rq(task)->rd->online, task->cpus_allowed);
+	count = cpupri_find(&task_rq(task)->rd->cpupri, task, lowest_mask);
 
 	/*
-	 * Scan each rq for the lowest prio.
+	 * cpupri cannot efficiently tell us how many bits are set, so it only
+	 * returns a boolean.  However, the caller of this function will
+	 * special case the value "1", so we want to return a positive integer
+	 * other than one if there are bits to look at
 	 */
-	for_each_cpu_mask(cpu, *lowest_mask) {
-		struct rq *rq = cpu_rq(cpu);
-
-		/* We look for lowest RT prio or non-rt CPU */
-		if (rq->rt.highest_prio >= MAX_RT_PRIO) {
-			/*
-			 * if we already found a low RT queue
-			 * and now we found this non-rt queue
-			 * clear the mask and set our bit.
-			 * Otherwise just return the queue as is
-			 * and the count==1 will cause the algorithm
-			 * to use the first bit found.
-			 */
-			if (lowest_cpu != -1) {
-				cpus_clear(*lowest_mask);
-				cpu_set(rq->cpu, *lowest_mask);
-			}
-			return 1;
-		}
-
-		/* no locking for now */
-		if ((rq->rt.highest_prio > task->prio)
-		    && (rq->rt.highest_prio >= lowest_prio)) {
-			if (rq->rt.highest_prio > lowest_prio) {
-				/* new low - clear old data */
-				lowest_prio = rq->rt.highest_prio;
-				lowest_cpu = cpu;
-				count = 0;
-			}
-			count++;
-		} else
-			cpu_clear(cpu, *lowest_mask);
-	}
-
-	/*
-	 * Clear out all the set bits that represent
-	 * runqueues that were of higher prio than
-	 * the lowest_prio.
-	 */
-	if (lowest_cpu > 0) {
-		/*
-		 * Perhaps we could add another cpumask op to
-		 * zero out bits. Like cpu_zero_bits(cpumask, nrbits);
-		 * Then that could be optimized to use memset and such.
-		 */
-		for_each_cpu_mask(cpu, *lowest_mask) {
-			if (cpu >= lowest_cpu)
-				break;
-			cpu_clear(cpu, *lowest_mask);
-		}
-	}
-
-	return count;
+	return count ? 2 : 0;
 }
 
 static inline int pick_optimal_cpu(int this_cpu, cpumask_t *mask)
@@ -379,8 +334,12 @@ static int find_lowest_rq(struct task_struct *task)
 	cpumask_t *lowest_mask = &__get_cpu_var(local_cpu_mask);
 	int this_cpu = smp_processor_id();
 	int cpu      = task_cpu(task);
-	int count    = find_lowest_cpus(task, lowest_mask);
+	int count;
 
+	if (task->nr_cpus_allowed == 1)
+		return -1; /* No other targets possible */
+
+	count = find_lowest_cpus(task, lowest_mask);
 	if (!count)
 		return -1; /* No targets found */
 
@@ -734,6 +693,8 @@ static void join_domain_rt(struct rq *rq)
 {
 	if (rq->rt.overloaded)
 		rt_set_overload(rq);
+
+	cpupri_set(&rq->rd->cpupri, rq->cpu, rq->rt.highest_prio);
 }
 
 /* Assumes rq->lock is held */
@@ -741,6 +702,8 @@ static void leave_domain_rt(struct rq *rq)
 {
 	if (rq->rt.overloaded)
 		rt_clear_overload(rq);
+
+	cpupri_set(&rq->rd->cpupri, rq->cpu, CPUPRI_INVALID);
 }
 
 /*
