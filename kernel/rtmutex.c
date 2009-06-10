@@ -1015,7 +1015,7 @@ __rt_spin_lock_init(spinlock_t *lock, char *name, struct lock_class_key *key)
 }
 EXPORT_SYMBOL(__rt_spin_lock_init);
 
-int rt_rwlock_limit;
+int rt_rwlock_limit = NR_CPUS;
 
 static inline int rt_release_bkl(struct rt_mutex *lock, unsigned long flags);
 static inline void rt_reacquire_bkl(int saved_lock_depth);
