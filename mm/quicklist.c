@@ -66,11 +66,7 @@ void quicklist_trim(int nr, void (*dtor)(void *),
 		pages_to_free = min_pages_to_free(q, min_pages, max_free);
 
 		while (pages_to_free > 0) {
-			/*
-			 * We pass a gfp_t of 0 to quicklist_alloc here
-			 * because we will never call into the page allocator.
-			 */
-			void *p = __quicklist_alloc(cpu, nr, 0, NULL);
+			void *p = __quicklist_alloc(q);
 
 			if (dtor)
 				dtor(p);
@@ -88,7 +84,7 @@ unsigned long quicklist_total_size(void)
 	struct quicklist *ql, *q;
 
 	for_each_online_cpu(cpu) {
-		ql = per_cpu(quicklist, cpu);
+		ql = per_cpu_var_locked(quicklist, cpu);
 		for (q = ql; q < ql + CONFIG_NR_QUICK; q++)
 			count += q->nr_pages;
 	}
