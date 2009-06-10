@@ -1108,6 +1108,23 @@ update_rw_mutex_owner(struct rw_mutex *rwm)
 	rt_mutex_set_owner(mutex, mtxowner, 0);
 }
 
+#ifdef CONFIG_DEBUG_RT_MUTEXES
+/*
+ * A rw lock is about to be added or has already been
+ * removed from current. Make sure it doesn't exist still.
+ */
+static void rw_check_held(struct rw_mutex *rwm)
+{
+	int reader_count = current->reader_lock_count;
+	int i;
+
+	for (i = 0; i < reader_count; i++)
+		WARN_ON_ONCE(current->owned_read_locks[i].lock == rwm);
+}
+#else
+# define rw_check_held(rwm)	do { } while (0)
+#endif
+
 /*
  * The fast path does not add itself to the reader list to keep
  * from needing to grab the spinlock. We need to add the owner
@@ -1122,16 +1139,14 @@ update_rw_mutex_owner(struct rw_mutex *rwm)
  */
 
 static inline void
-rt_rwlock_update_owner(struct rw_mutex *rwm, unsigned owners)
+rt_rwlock_update_owner(struct rw_mutex *rwm, struct task_struct *own)
 {
 	struct reader_lock_struct *rls;
-	struct task_struct *own;
 	int i;
 
-	if (!owners || rt_rwlock_pending(rwm))
+	if (!own || rt_rwlock_pending(rwm))
 		return;
 
-	own = rt_rwlock_owner(rwm);
 	if (own == RT_RW_READER)
 		return;
 
@@ -1201,7 +1216,7 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 	}
 
 	owners = atomic_read(&rwm->owners);
-	rt_rwlock_update_owner(rwm, owners);
+	rt_rwlock_update_owner(rwm, rt_rwlock_owner(rwm));
 
 	/* Check for rwlock limits */
 	if (rt_rwlock_limit && owners >= rt_rwlock_limit)
@@ -1253,6 +1268,7 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
  taken:
 	if (incr) {
 		atomic_inc(&rwm->owners);
+		rw_check_held(rwm);
 		reader_count = current->reader_lock_count++;
 		if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
 			rls = &current->owned_read_locks[reader_count];
@@ -1280,11 +1296,12 @@ try_to_take_rw_write(struct rw_mutex *rwm, int mtx)
 	own = rt_rwlock_owner(rwm);
 
 	/* owners must be zero for writer */
-	rt_rwlock_update_owner(rwm, atomic_read(&rwm->owners));
+	if (own) {
+		rt_rwlock_update_owner(rwm, own);
 
-	/* readers or writers? */
-	if ((own && !rt_rwlock_pending(rwm)))
-		return 0;
+		if (!rt_rwlock_pending(rwm))
+			return 0;
+	}
 
 	/*
 	 * RT_RW_PENDING means that the lock is free, but there are
@@ -1431,6 +1448,7 @@ __rt_read_fasttrylock(struct rw_mutex *rwm)
 		}
 
 		atomic_inc(&rwm->owners);
+		rw_check_held(rwm);
 		reader_count = current->reader_lock_count;
 		if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
 			current->owned_read_locks[reader_count].lock = rwm;
@@ -1713,6 +1731,7 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 				WARN_ON(!rls->list.prev || list_empty(&rls->list));
 				list_del_init(&rls->list);
 				rls->lock = NULL;
+				rw_check_held(rwm);
 			}
 			break;
 		}
@@ -1729,7 +1748,7 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 	if (unlikely(rt_rwlock_owner(rwm) != current &&
 		     rt_rwlock_owner(rwm) != RT_RW_READER)) {
 		/* Update the owner if necessary */
-		rt_rwlock_update_owner(rwm, atomic_read(&rwm->owners));
+		rt_rwlock_update_owner(rwm, rt_rwlock_owner(rwm));
 		goto out;
 	}
 
@@ -1786,7 +1805,8 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 		if (rt_rwlock_limit &&
 		    unlikely(atomic_read(&rwm->owners) >= rt_rwlock_limit))
 			goto out;
-		rwm->owner = RT_RW_PENDING_READ;
+		if (!reader_count)
+			rwm->owner = RT_RW_PENDING_READ;
 	}
 
 	wakeup_next_waiter(mutex, savestate);
@@ -1812,6 +1832,7 @@ rt_read_fastunlock(struct rw_mutex *rwm,
 	WARN_ON(!atomic_read(&rwm->count));
 	WARN_ON(!atomic_read(&rwm->owners));
 	WARN_ON(!rwm->owner);
+	smp_mb();
 	atomic_dec(&rwm->count);
 	if (likely(rt_rwlock_cmpxchg(rwm, current, NULL))) {
 		struct reader_lock_struct *rls;
@@ -1830,7 +1851,9 @@ rt_read_fastunlock(struct rw_mutex *rwm,
 		rls = &current->owned_read_locks[reader_count];
 		WARN_ON_ONCE(rls->lock != rwm);
 		WARN_ON(rls->list.prev && !list_empty(&rls->list));
+		WARN_ON(rls->count != 1);
 		rls->lock = NULL;
+		rw_check_held(rwm);
 	} else
 		slowfn(rwm, mtx);
 }
@@ -1936,8 +1959,11 @@ rt_write_slowunlock(struct rw_mutex *rwm, int mtx)
 		next = rt_mutex_top_waiter(mutex);
 		/* delete incase we didn't go through the loop */
 		plist_del(&next->pi_list_entry, &pendowner->pi_waiters);
-		/* add back in as top waiter */
-		plist_add(&next->pi_list_entry, &pendowner->pi_waiters);
+
+		/* This could also be a reader (if reader_limit is set) */
+		if (next->write_lock)
+			/* add back in as top waiter */
+			plist_add(&next->pi_list_entry, &pendowner->pi_waiters);
 
 		rwm->prio = next->task->prio;
 	} else
@@ -1997,6 +2023,7 @@ rt_mutex_downgrade_write(struct rw_mutex *rwm)
 	/* we have the lock and are sole owner, then update the accounting */
 	atomic_inc(&rwm->count);
 	atomic_inc(&rwm->owners);
+	rw_check_held(rwm);
 	reader_count = current->reader_lock_count++;
 	rls = &current->owned_read_locks[reader_count];
 	if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
@@ -2058,8 +2085,7 @@ rt_mutex_downgrade_write(struct rw_mutex *rwm)
 
 		/* delete incase we didn't go through the loop */
 		plist_del(&next->pi_list_entry, &current->pi_waiters);
-		/* add back in as top waiter */
-		plist_add(&next->pi_list_entry, &current->pi_waiters);
+		/* No need to add back since readers don't have PI waiters */
 	} else
 		rwm->prio = MAX_PRIO;
 
