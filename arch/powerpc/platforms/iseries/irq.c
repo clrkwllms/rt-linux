@@ -278,7 +278,6 @@ static struct irq_chip iseries_pic = {
 	.shutdown	= iseries_shutdown_IRQ,
 	.unmask		= iseries_enable_IRQ,
 	.mask		= iseries_disable_IRQ,
-	.ack		= iseries_end_IRQ,
 	.eoi		= iseries_end_IRQ
 };
 
