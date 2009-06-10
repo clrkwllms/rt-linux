@@ -97,7 +97,7 @@ extern void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
 #ifdef CONFIG_LOCKDEP
 # define local_irq_enable_in_hardirq()	do { } while (0)
 #else
-# define local_irq_enable_in_hardirq()	local_irq_enable()
+# define local_irq_enable_in_hardirq()	local_irq_enable_nort()
 #endif
 
 extern void disable_irq_nosync(unsigned int irq);
@@ -463,6 +463,39 @@ extern void init_irq_proc(void);
 static inline void init_irq_proc(void)
 {
 }
+#endif
+
+#ifdef CONFIG_PREEMPT_RT
+# define local_irq_disable_nort()	do { } while (0)
+# define local_irq_enable_nort()	do { } while (0)
+# define local_irq_enable_rt()		local_irq_enable()
+# define local_irq_save_nort(flags)	do { local_save_flags(flags); } while (0)
+# define local_irq_restore_nort(flags)	do { (void)(flags); } while (0)
+# define spin_lock_nort(lock)		do { } while (0)
+# define spin_unlock_nort(lock)		do { } while (0)
+# define spin_lock_bh_nort(lock)	do { } while (0)
+# define spin_unlock_bh_nort(lock)	do { } while (0)
+# define spin_lock_rt(lock)		spin_lock(lock)
+# define spin_unlock_rt(lock)		spin_unlock(lock)
+# define smp_processor_id_rt(cpu)	(cpu)
+# define in_atomic_rt()			(!oops_in_progress && \
+					  (in_atomic() || irqs_disabled()))
+# define read_trylock_rt(lock)		({read_lock(lock); 1; })
+#else
+# define local_irq_disable_nort()	local_irq_disable()
+# define local_irq_enable_nort()	local_irq_enable()
+# define local_irq_enable_rt()		do { } while (0)
+# define local_irq_save_nort(flags)	local_irq_save(flags)
+# define local_irq_restore_nort(flags)	local_irq_restore(flags)
+# define spin_lock_rt(lock)		do { } while (0)
+# define spin_unlock_rt(lock)		do { } while (0)
+# define spin_lock_nort(lock)		spin_lock(lock)
+# define spin_unlock_nort(lock)		spin_unlock(lock)
+# define spin_lock_bh_nort(lock)	spin_lock_bh(lock)
+# define spin_unlock_bh_nort(lock)	spin_unlock_bh(lock)
+# define smp_processor_id_rt(cpu)	smp_processor_id()
+# define in_atomic_rt()			0
+# define read_trylock_rt(lock)		read_trylock(lock)
 #endif
 
 #endif
