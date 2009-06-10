@@ -1739,10 +1739,21 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 			spin_lock(&current->pi_lock);
 			current->owned_read_locks[i].count--;
 			if (!current->owned_read_locks[i].count) {
-				current->reader_lock_count--;
-				WARN_ON_ONCE(i != current->reader_lock_count);
-				atomic_dec(&rwm->owners);
+				if (likely(i == current->reader_lock_count - 1)) {
+					int count = --current->reader_lock_count;
+
+					/* check for holes */
+					for (count--; count >= 0; count--) {
+						rls = &current->owned_read_locks[count];
+						if (likely(rls->lock))
+							break;
+						current->reader_lock_count--;
+					}
+					WARN_ON(current->reader_lock_count < 0);
+				} /* else ... Bah! bad locking practice */
 				rls = &current->owned_read_locks[i];
+
+				atomic_dec(&rwm->owners);
 				WARN_ON(!rls->list.prev || list_empty(&rls->list));
 				list_del_init(&rls->list);
 				rls->lock = NULL;
@@ -1879,20 +1890,49 @@ rt_read_fastunlock(struct rw_mutex *rwm,
 		int owners;
 
 		spin_lock_irqsave(&current->pi_lock, flags);
-		reader_count = --current->reader_lock_count;
-		spin_unlock_irqrestore(&current->pi_lock, flags);
-
-		rt_mutex_deadlock_account_unlock(current);
+		reader_count = current->reader_lock_count - 1;
 		if (unlikely(reader_count < 0)) {
 			    reader_count = 0;
 			    WARN_ON_ONCE(1);
 		}
+		rls = &current->owned_read_locks[reader_count];
+		if (unlikely(rls->lock != rwm)) {
+			int i;
+
+			/* Bah! Bad locking practice! */
+			for (i = reader_count - 1; i >= 0; i--) {
+				rls = &current->owned_read_locks[i];
+				if (rls->lock == rwm)
+					break;
+			}
+			if (unlikely(i < 0)) {
+				/* We don't own the lock?? */
+				WARN_ON_ONCE(1);
+				spin_unlock_irqrestore(&current->pi_lock, flags);
+				return;
+			}
+			/* We will have a hole */
+		} else {
+			struct reader_lock_struct *rs;
+			int count = --current->reader_lock_count;
+
+			/* check for holes */
+			for (count--; count >= 0; count--) {
+				rs = &current->owned_read_locks[count];
+				if (likely(rs->lock))
+					break;
+				current->reader_lock_count--;
+			}
+			WARN_ON(current->reader_lock_count < 0);
+		}
+		spin_unlock_irqrestore(&current->pi_lock, flags);
+
+		rt_mutex_deadlock_account_unlock(current);
 		owners = atomic_dec_return(&rwm->owners);
 		if (unlikely(owners < 0)) {
 			atomic_set(&rwm->owners, 0);
 			WARN_ON_ONCE(1);
 		}
-		rls = &current->owned_read_locks[reader_count];
 		WARN_ON_ONCE(rls->lock != rwm);
 		WARN_ON(rls->list.prev && !list_empty(&rls->list));
 		WARN_ON(rls->count != 1);
