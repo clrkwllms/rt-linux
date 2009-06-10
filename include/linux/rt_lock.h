@@ -60,6 +60,12 @@ typedef raw_spinlock_t spinlock_t;
 
 #ifdef CONFIG_PREEMPT_RT
 
+struct rw_mutex {
+	struct task_struct	*owner;
+	struct rt_mutex		mutex;
+	atomic_t		count;	/* number of times held for read */
+};
+
 /*
  * RW-semaphores are a spinlock plus a reader-depth count.
  *
@@ -71,8 +77,7 @@ typedef raw_spinlock_t spinlock_t;
  * fair and makes it simpler as well:
  */
 struct rw_semaphore {
-	struct rt_mutex		lock;
-	int			read_depth;
+	struct rw_mutex	owners;
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	struct lockdep_map	dep_map;
 #endif
@@ -189,7 +194,7 @@ extern int __bad_func_type(void);
  */
 
 #define __RWSEM_INITIALIZER(name) \
-	{ .lock = __RT_MUTEX_INITIALIZER(name.lock), \
+	{ .owners.mutex = __RT_MUTEX_INITIALIZER(name.owners.mutex), \
 	  RW_DEP_MAP_INIT(name) }
 
 #define DECLARE_RWSEM(lockname) \
@@ -222,7 +227,7 @@ extern void fastcall rt_up_read(struct rw_semaphore *rwsem);
 extern void fastcall rt_up_write(struct rw_semaphore *rwsem);
 extern void fastcall rt_downgrade_write(struct rw_semaphore *rwsem);
 
-# define rt_rwsem_is_locked(rws)	(rt_mutex_is_locked(&(rws)->lock))
+# define rt_rwsem_is_locked(rws)	((rws)->owners.owner != NULL)
 
 #define PICK_RWSEM_OP(...) PICK_FUNCTION(struct compat_rw_semaphore *,	\
 	struct rw_semaphore *, ##__VA_ARGS__)

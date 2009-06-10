@@ -383,6 +383,16 @@ do {								\
  	ret;							\
 })
 
+#define LOCK_CONTENDED_RT_RW(_lock, f_try, f_lock)		\
+do {								\
+	if (!f_try(&(_lock)->owners)) {				\
+		lock_contended(&(_lock)->dep_map, _RET_IP_);	\
+		f_lock(&(_lock)->owners);			\
+	}							\
+	lock_acquired(&(_lock)->dep_map);			\
+} while (0)
+
+
 #else /* CONFIG_LOCK_STAT */
 
 #define lock_contended(lockdep_map, ip) do {} while (0)
@@ -396,6 +406,9 @@ do {								\
 
 #define LOCK_CONTENDED_RT_RET(_lock, f_try, f_lock) \
 	f_lock(&(_lock)->lock)
+
+#define LOCK_CONTENDED_RT_RW(_lock, f_try, f_lock) \
+	f_lock(&(_lock)->owners)
 
 #endif /* CONFIG_LOCK_STAT */
 

@@ -301,26 +301,14 @@ EXPORT_SYMBOL(__rt_rwlock_init);
 void fastcall rt_up_write(struct rw_semaphore *rwsem)
 {
 	rwsem_release(&rwsem->dep_map, 1, _RET_IP_);
-	rt_mutex_unlock(&rwsem->lock);
+	rt_mutex_up_write(&rwsem->owners);
 }
 EXPORT_SYMBOL(rt_up_write);
 
 void fastcall rt_up_read(struct rw_semaphore *rwsem)
 {
-	unsigned long flags;
-
 	rwsem_release(&rwsem->dep_map, 1, _RET_IP_);
-	/*
-	 * Read locks within the self-held write lock succeed.
-	 */
-	spin_lock_irqsave(&rwsem->lock.wait_lock, flags);
-	if (rt_mutex_real_owner(&rwsem->lock) == current && rwsem->read_depth) {
-		spin_unlock_irqrestore(&rwsem->lock.wait_lock, flags);
-		rwsem->read_depth--;
-		return;
-	}
-	spin_unlock_irqrestore(&rwsem->lock.wait_lock, flags);
-	rt_mutex_unlock(&rwsem->lock);
+	rt_mutex_up_read(&rwsem->owners);
 }
 EXPORT_SYMBOL(rt_up_read);
 
@@ -336,7 +324,7 @@ EXPORT_SYMBOL(rt_downgrade_write);
 
 int fastcall rt_down_write_trylock(struct rw_semaphore *rwsem)
 {
-	int ret = rt_mutex_trylock(&rwsem->lock);
+	int ret = rt_mutex_down_write_trylock(&rwsem->owners);
 
 	if (ret)
 		rwsem_acquire(&rwsem->dep_map, 0, 1, _RET_IP_);
@@ -344,38 +332,29 @@ int fastcall rt_down_write_trylock(struct rw_semaphore *rwsem)
 }
 EXPORT_SYMBOL(rt_down_write_trylock);
 
+static void __rt_down_write(struct rw_semaphore *rwsem, int subclass)
+{
+	rwsem_acquire(&rwsem->dep_map, subclass, 0, _RET_IP_);
+	LOCK_CONTENDED_RT_RW(rwsem, rt_mutex_down_write_trylock, rt_mutex_down_write);
+}
+
 void fastcall rt_down_write(struct rw_semaphore *rwsem)
 {
-	rwsem_acquire(&rwsem->dep_map, 0, 0, _RET_IP_);
-	LOCK_CONTENDED_RT(rwsem, rt_mutex_trylock, rt_mutex_lock);
+	__rt_down_write(rwsem, 0);
 }
 EXPORT_SYMBOL(rt_down_write);
 
 void fastcall rt_down_write_nested(struct rw_semaphore *rwsem, int subclass)
 {
-	rwsem_acquire(&rwsem->dep_map, subclass, 0, _RET_IP_);
-	LOCK_CONTENDED_RT(rwsem, rt_mutex_trylock, rt_mutex_lock);
+	__rt_down_write(rwsem, subclass);
 }
 EXPORT_SYMBOL(rt_down_write_nested);
 
 int fastcall rt_down_read_trylock(struct rw_semaphore *rwsem)
 {
-	unsigned long flags;
 	int ret;
 
-	/*
-	 * Read locks within the self-held write lock succeed.
-	 */
-	spin_lock_irqsave(&rwsem->lock.wait_lock, flags);
-	if (rt_mutex_real_owner(&rwsem->lock) == current) {
-		spin_unlock_irqrestore(&rwsem->lock.wait_lock, flags);
-		rwsem_acquire_read(&rwsem->dep_map, 0, 1, _RET_IP_);
-		rwsem->read_depth++;
-		return 1;
-	}
-	spin_unlock_irqrestore(&rwsem->lock.wait_lock, flags);
-
-	ret = rt_mutex_trylock(&rwsem->lock);
+	ret = rt_mutex_down_read_trylock(&rwsem->owners);
 	if (ret)
 		rwsem_acquire(&rwsem->dep_map, 0, 1, _RET_IP_);
 	return ret;
@@ -384,22 +363,8 @@ EXPORT_SYMBOL(rt_down_read_trylock);
 
 static void __rt_down_read(struct rw_semaphore *rwsem, int subclass)
 {
-	unsigned long flags;
-
 	rwsem_acquire_read(&rwsem->dep_map, subclass, 0, _RET_IP_);
-
-	/*
-	 * Read locks within the write lock succeed.
-	 */
-	spin_lock_irqsave(&rwsem->lock.wait_lock, flags);
-
-	if (rt_mutex_real_owner(&rwsem->lock) == current) {
-		spin_unlock_irqrestore(&rwsem->lock.wait_lock, flags);
-		rwsem->read_depth++;
-		return;
-	}
-	spin_unlock_irqrestore(&rwsem->lock.wait_lock, flags);
-	LOCK_CONTENDED_RT(rwsem, rt_mutex_trylock, rt_mutex_lock);
+	LOCK_CONTENDED_RT_RW(rwsem, rt_mutex_down_read_trylock, rt_mutex_down_read);
 }
 
 void fastcall rt_down_read(struct rw_semaphore *rwsem)
@@ -424,8 +389,7 @@ void fastcall __rt_rwsem_init(struct rw_semaphore *rwsem, char *name,
 	debug_check_no_locks_freed((void *)rwsem, sizeof(*rwsem));
 	lockdep_init_map(&rwsem->dep_map, name, key, 0);
 #endif
-	__rt_mutex_init(&rwsem->lock, name);
-	rwsem->read_depth = 0;
+	rt_mutex_rwsem_init(&rwsem->owners, name);
 }
 EXPORT_SYMBOL(__rt_rwsem_init);
 
