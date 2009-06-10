@@ -164,7 +164,8 @@ irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action)
 	} while (action);
 
 	if (status & IRQF_SAMPLE_RANDOM) {
-		local_irq_enable();
+		if (hardirq_count() && (action->flags & IRQF_DISABLED))
+			local_irq_enable();
 		add_interrupt_randomness(irq);
 	}
 	local_irq_disable();
