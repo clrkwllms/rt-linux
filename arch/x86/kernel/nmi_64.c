@@ -413,10 +413,16 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 				if (i == cpu)
 					continue;
 				nmi_show_regs[i] = 1;
+			}
+
+			smp_send_nmi_allbutself();
+
+			for_each_online_cpu(i) {
+				if (i == cpu)
+					continue;
 				while (nmi_show_regs[i] == 1)
 					cpu_relax();
 			}
-
 			die_nmi("NMI Watchdog detected LOCKUP on CPU %d\n", regs,
 				panic_on_timeout);
 		}
