@@ -2015,7 +2015,7 @@ again:
 
 	local_irq_disable();
 
-	if (need_resched()) {
+	if (need_resched() || need_resched_delayed()) {
 		local_irq_enable();
 		preempt_enable();
 		r = 1;
