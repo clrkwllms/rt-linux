@@ -358,13 +358,15 @@ EXPORT_SYMBOL(trace_hardirqs_off_caller);
 void trace_preempt_on(unsigned long a0, unsigned long a1)
 {
 	tracing_hist_preempt_stop(0);
-	stop_critical_timing(a0, a1);
+	if (preempt_trace())
+		stop_critical_timing(a0, a1);
 }
 
 void trace_preempt_off(unsigned long a0, unsigned long a1)
 {
 	start_critical_timing(a0, a1);
-	tracing_hist_preempt_start();
+	if (preempt_trace())
+		tracing_hist_preempt_start();
 }
 #endif /* CONFIG_PREEMPT_TRACER */
 
