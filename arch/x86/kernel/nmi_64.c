@@ -539,7 +539,9 @@ void __trigger_all_cpu_backtrace(void)
 void smp_send_nmi_allbutself(void)
 {
 #ifdef CONFIG_SMP
+	preempt_disable();
 	send_IPI_allbutself(NMI_VECTOR);
+	preempt_enable();
 #endif
 }
 

@@ -538,9 +538,11 @@ void smp_send_nmi_allbutself(void)
 {
 #ifdef CONFIG_SMP
 	cpumask_t mask = cpu_online_map;
+	preempt_disable();
 	cpu_clear(safe_smp_processor_id(), mask);
 	if (!cpus_empty(mask))
 		send_IPI_mask(mask, NMI_VECTOR);
+	preempt_enable();
 #endif
 }
 
