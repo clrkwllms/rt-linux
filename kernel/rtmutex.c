@@ -1433,69 +1433,12 @@ rt_read_slowlock(struct rw_mutex *rwm, int mtx)
 	debug_rt_mutex_free_waiter(&waiter);
 }
 
-static inline int
-__rt_read_fasttrylock(struct rw_mutex *rwm)
-{
- retry:
-	if (likely(rt_rwlock_cmpxchg(rwm, NULL, current))) {
-		int reader_count;
-		unsigned long flags;
-
-		rt_mutex_deadlock_account_lock(&rwm->mutex, current);
-		atomic_inc(&rwm->count);
-		smp_mb();
-		/*
-		 * It is possible that the owner was zeroed
-		 * before we incremented count. If owner is not
-		 * current, then retry again
-		 */
-		if (unlikely(rwm->owner != current)) {
-			atomic_dec(&rwm->count);
-			goto retry;
-		}
-
-		atomic_inc(&rwm->owners);
-		rw_check_held(rwm);
-		local_irq_save(flags);
-		spin_lock(&current->pi_lock);
-		reader_count = current->reader_lock_count++;
-		if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
-			current->owned_read_locks[reader_count].lock = rwm;
-			current->owned_read_locks[reader_count].count = 1;
-		} else
-			WARN_ON_ONCE(1);
-		/*
-		 * If this task is no longer the sole owner of the lock
-		 * or someone is blocking, then we need to add the task
-		 * to the lock.
-		 */
-		if (unlikely(rwm->owner != current)) {
-			struct rt_mutex *mutex = &rwm->mutex;
-			struct reader_lock_struct *rls;
-
-			/* preserve lock order, we only need wait_lock now */
-			spin_unlock(&current->pi_lock);
-
-			spin_lock(&mutex->wait_lock);
-			rls = &current->owned_read_locks[reader_count];
-			if (!rls->list.prev || list_empty(&rls->list))
-				list_add(&rls->list, &rwm->readers);
-			spin_unlock(&mutex->wait_lock);
-		} else
-			spin_unlock(&current->pi_lock);
-		local_irq_restore(flags);
-		return 1;
-	}
-	return 0;
-}
-
 static inline void
 rt_read_fastlock(struct rw_mutex *rwm,
 		 void fastcall (*slowfn)(struct rw_mutex *rwm, int mtx),
 		 int mtx)
 {
-	if (unlikely(!__rt_read_fasttrylock(rwm)))
-		slowfn(rwm, mtx);
+	slowfn(rwm, mtx);
 }
 
 void fastcall rt_mutex_down_read(struct rw_mutex *rwm)
@@ -1533,10 +1476,7 @@ static inline int
 rt_read_fasttrylock(struct rw_mutex *rwm,
 		    int fastcall (*slowfn)(struct rw_mutex *rwm, int mtx), int mtx)
 {
-	if (likely(__rt_read_fasttrylock(rwm)))
-		return 1;
-	else
-		return slowfn(rwm, mtx);
+	return slowfn(rwm, mtx);
 }
 
 int __sched rt_mutex_down_read_trylock(struct rw_mutex *rwm)
@@ -1655,13 +1595,7 @@ rt_write_fastlock(struct rw_mutex *rwm,
 		  void fastcall (*slowfn)(struct rw_mutex *rwm, int mtx),
 		  int mtx)
 {
-	struct task_struct *val = (void *)((unsigned long)current |
-					   RT_RWLOCK_WRITER);
-
-	if (likely(rt_rwlock_cmpxchg(rwm, NULL, val)))
-		rt_mutex_deadlock_account_lock(&rwm->mutex, current);
-	else
-		slowfn(rwm, mtx);
+	slowfn(rwm, mtx);
 }
 
 void fastcall rt_mutex_down_write(struct rw_mutex *rwm)
@@ -1698,14 +1632,7 @@ static inline int
 rt_write_fasttrylock(struct rw_mutex *rwm,
 		     int fastcall (*slowfn)(struct rw_mutex *rwm, int mtx), int mtx)
 {
-	struct task_struct *val = (void *)((unsigned long)current |
-					   RT_RWLOCK_WRITER);
-
-	if (likely(rt_rwlock_cmpxchg(rwm, NULL, val))) {
-		rt_mutex_deadlock_account_lock(&rwm->mutex, current);
-		return 1;
-	} else
-		return slowfn(rwm, mtx);
+	return slowfn(rwm, mtx);
 }
 
 int fastcall rt_mutex_down_write_trylock(struct rw_mutex *rwm)
@@ -1728,6 +1655,8 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 	spin_lock_irqsave(&mutex->wait_lock, flags);
 
 	rt_mutex_deadlock_account_unlock(current);
+
+	atomic_dec(&rwm->count);
 
 	/*
 	 * To prevent multiple readers from zeroing out the owner
@@ -1885,65 +1814,7 @@ rt_read_fastunlock(struct rw_mutex *rwm,
 	WARN_ON(!atomic_read(&rwm->count));
 	WARN_ON(!atomic_read(&rwm->owners));
 	WARN_ON(!rwm->owner);
-	smp_mb();
-	atomic_dec(&rwm->count);
-	if (likely(rt_rwlock_cmpxchg(rwm, current, NULL))) {
-		struct reader_lock_struct *rls;
-		unsigned long flags;
-		int reader_count;
-		int owners;
-
-		spin_lock_irqsave(&current->pi_lock, flags);
-		reader_count = current->reader_lock_count - 1;
-		if (unlikely(reader_count < 0)) {
-			    reader_count = 0;
-			    WARN_ON_ONCE(1);
-		}
-		rls = &current->owned_read_locks[reader_count];
-		if (unlikely(rls->lock != rwm)) {
-			int i;
-
-			/* Bah! Bad locking practice! */
-			for (i = reader_count - 1; i >= 0; i--) {
-				rls = &current->owned_read_locks[i];
-				if (rls->lock == rwm)
-					break;
-			}
-			if (unlikely(i < 0)) {
-				/* We don't own the lock?? */
-				WARN_ON_ONCE(1);
-				spin_unlock_irqrestore(&current->pi_lock, flags);
-				return;
-			}
-			/* We will have a hole */
-		} else {
-			struct reader_lock_struct *rs;
-			int count = --current->reader_lock_count;
-
-			/* check for holes */
-			for (count--; count >= 0; count--) {
-				rs = &current->owned_read_locks[count];
-				if (likely(rs->lock))
-					break;
-				current->reader_lock_count--;
-			}
-			WARN_ON(current->reader_lock_count < 0);
-		}
-		spin_unlock_irqrestore(&current->pi_lock, flags);
-
-		rt_mutex_deadlock_account_unlock(current);
-		owners = atomic_dec_return(&rwm->owners);
-		if (unlikely(owners < 0)) {
-			atomic_set(&rwm->owners, 0);
-			WARN_ON_ONCE(1);
-		}
-		WARN_ON_ONCE(rls->lock != rwm);
-		WARN_ON(rls->list.prev && !list_empty(&rls->list));
-		WARN_ON(rls->count != 1);
-		rls->lock = NULL;
-		rw_check_held(rwm);
-	} else
-		slowfn(rwm, mtx);
+	slowfn(rwm, mtx);
 }
 
 void fastcall rt_mutex_up_read(struct rw_mutex *rwm)
@@ -2083,10 +1954,7 @@ rt_write_fastunlock(struct rw_mutex *rwm,
 					   RT_RWLOCK_WRITER);
 
 	WARN_ON(rt_rwlock_owner(rwm) != current);
-	if (likely(rt_rwlock_cmpxchg(rwm, (struct task_struct *)val, NULL)))
-		rt_mutex_deadlock_account_unlock(current);
-	else
-		slowfn(rwm, mtx);
+	slowfn(rwm, mtx);
 }
 
 void fastcall rt_mutex_up_write(struct rw_mutex *rwm)
