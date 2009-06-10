@@ -437,7 +437,13 @@ config SYSCTL
 
 config RADIX_TREE_CONCURRENT
 	bool "Enable concurrent radix tree operations (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
 	default y if SMP
+
+config RADIX_TREE_OPTIMISTIC
+	bool "Enabled optimistic locking (EXPERIMENTAL)"
+	depends on RADIX_TREE_CONCURRENT
+	default y
 
 menuconfig EMBEDDED
 	bool "Configure standard kernel features (for small systems)"

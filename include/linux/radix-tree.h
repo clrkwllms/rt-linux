@@ -197,28 +197,47 @@ static inline void radix_tree_replace_slot(void **pslot, void *item)
 	rcu_assign_pointer(*pslot, item);
 }
 
+#if defined(CONFIG_RADIX_TREE_OPTIMISTIC)
+static inline void radix_tree_lock(struct radix_tree_context *context)
+{
+	rcu_read_lock();
+	BUG_ON(context->locked);
+}
+#elif defined(CONFIG_RADIX_TREE_CONCURRENT)
 static inline void radix_tree_lock(struct radix_tree_context *context)
 {
 	struct radix_tree_root *root = context->root;
+
 	rcu_read_lock();
 	spin_lock(&root->lock);
-#ifdef CONFIG_RADIX_TREE_CONCURRENT
 	BUG_ON(context->locked);
 	context->locked = &root->lock;
-#endif
 }
+#else
+static inline void radix_tree_lock(struct radix_tree_context *context)
+{
+	struct radix_tree_root *root = context->root;
 
+	rcu_read_lock();
+	spin_lock(&root->lock);
+}
+#endif
+
+#if defined(CONFIG_RADIX_TREE_CONCURRENT)
 static inline void radix_tree_unlock(struct radix_tree_context *context)
 {
-#ifdef CONFIG_RADIX_TREE_CONCURRENT
 	BUG_ON(!context->locked);
 	spin_unlock(context->locked);
 	context->locked = NULL;
-#else
-	spin_unlock(&context->root->lock);
-#endif
 	rcu_read_unlock();
 }
+#else
+static inline void radix_tree_unlock(struct radix_tree_context *context)
+{
+	spin_unlock(&context->root->lock);
+	rcu_read_unlock();
+}
+#endif
 
 int radix_tree_insert(struct radix_tree_root *, unsigned long, void *);
 void *radix_tree_lookup(struct radix_tree_root *, unsigned long);
