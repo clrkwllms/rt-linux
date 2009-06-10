@@ -364,9 +364,9 @@ void trace_preempt_on(unsigned long a0, unsigned long a1)
 
 void trace_preempt_off(unsigned long a0, unsigned long a1)
 {
-	start_critical_timing(a0, a1);
+	tracing_hist_preempt_start();
 	if (preempt_trace())
-		tracing_hist_preempt_start();
+		start_critical_timing(a0, a1);
 }
 #endif /* CONFIG_PREEMPT_TRACER */
 
