@@ -115,9 +115,12 @@ EXPORT_SYMBOL(__write_trylock_irqsave);
  * If lockdep is enabled then we use the non-preemption spin-ops
  * even on CONFIG_PREEMPT, because lockdep assumes that interrupts are
  * not re-enabled during lock-acquire (which the preempt-spin-ops do):
+ *
+ * We also disable them on x86 because we now have ticket/fifo locks,
+ * which are defeated using a preemptible spinlock
  */
 #if !defined(CONFIG_PREEMPT) || !defined(CONFIG_SMP) || \
-	defined(CONFIG_DEBUG_LOCK_ALLOC)
+	defined(CONFIG_DEBUG_LOCK_ALLOC) || defined(CONFIG_X86)
 
 void __lockfunc __read_lock(raw_rwlock_t *lock)
 {
