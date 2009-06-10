@@ -4058,10 +4058,11 @@ static int page_alloc_cpu_notify(struct notifier_block *self,
 	int cpu = (unsigned long)hcpu;
 
 	if (action == CPU_DEAD || action == CPU_DEAD_FROZEN) {
-		local_irq_disable();
+		unsigned long flags;
+		__lock_cpu_pcp(&flags, cpu);
 		__drain_pages(cpu);
 		vm_events_fold_cpu(cpu);
-		local_irq_enable();
+		unlock_cpu_pcp(flags, cpu);
 		refresh_cpu_vm_stats(cpu);
 	}
 	return NOTIFY_OK;
