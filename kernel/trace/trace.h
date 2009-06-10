@@ -7,6 +7,10 @@
 #include <linux/clocksource.h>
 #include <linux/mmiotrace.h>
 
+#ifdef CONFIG_X86_64
+#include <asm/asm-offsets.h>
+#endif
+
 enum trace_type {
 	__TRACE_FIRST_TYPE = 0,
 
