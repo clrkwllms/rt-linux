@@ -562,6 +562,7 @@ static void wakeup_next_waiter(struct rt_mutex *lock, int savestate)
 {
 	struct rt_mutex_waiter *waiter;
 	struct task_struct *pendowner;
+	struct rt_mutex_waiter *next;
 
 	spin_lock(&current->pi_lock);
 
@@ -624,6 +625,12 @@ static void wakeup_next_waiter(struct rt_mutex *lock, int savestate)
 	 * waiter with higher priority than pending-owner->normal_prio
 	 * is blocked on the unboosted (pending) owner.
 	 */
+
+	if (rt_mutex_has_waiters(lock))
+		next = rt_mutex_top_waiter(lock);
+	else
+		next = NULL;
+
 	spin_lock(&pendowner->pi_lock);
 
 	WARN_ON(!pendowner->pi_blocked_on);
@@ -632,12 +639,9 @@ static void wakeup_next_waiter(struct rt_mutex *lock, int savestate)
 
 	pendowner->pi_blocked_on = NULL;
 
-	if (rt_mutex_has_waiters(lock)) {
-		struct rt_mutex_waiter *next;
-
-		next = rt_mutex_top_waiter(lock);
+	if (next)
 		plist_add(&next->pi_list_entry, &pendowner->pi_waiters);
-	}
+
 	spin_unlock(&pendowner->pi_lock);
 }
 
