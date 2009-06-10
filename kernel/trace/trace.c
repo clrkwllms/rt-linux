@@ -3268,7 +3268,7 @@ void ftrace_stop(void)
 	if (tr->ctrl) {
 		tr->ctrl = 0;
 		if (saved_tracer && saved_tracer->ctrl_update)
-			saved_tracer->ctrl_update;
+			saved_tracer->ctrl_update(tr);
 	}
 
 
