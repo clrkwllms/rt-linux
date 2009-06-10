@@ -15,6 +15,15 @@
 
 # KBUILD_CFLAGS used when building rest of boot (takes effect recursively)
 KBUILD_CFLAGS 	+= -fno-builtin -D__BOOTER__ -Iarch/$(ARCH)/boot/include
+
+ifdef CONFIG_MCOUNT
+# do not trace the boot loader
+nullstring :=
+space      := $(nullstring) # end of the line
+pg_flag     = $(nullstring) -pg # end of the line
+KBUILD_CFLAGS     := $(subst ${pg_flag},${space},${KBUILD_CFLAGS})
+endif
+
 HOSTCFLAGS	+= -Iarch/$(ARCH)/boot/include
 
 BOOT_TARGETS	= zImage zImage.initrd znetboot znetboot.initrd
