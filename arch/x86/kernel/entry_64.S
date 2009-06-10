@@ -779,7 +779,7 @@ paranoid_swapgs\trace:
 	swapgs
 paranoid_restore\trace:
 	RESTORE_ALL 8
-	iretq
+	jmp iret_label
 paranoid_userspace\trace:
 	GET_THREAD_INFO(%rcx)
 	movl threadinfo_flags(%rcx),%ebx
