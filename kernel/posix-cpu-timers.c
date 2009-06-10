@@ -1292,18 +1292,6 @@ void __run_posix_cpu_timers(struct task_struct *tsk)
 	LIST_HEAD(firing);
 	struct k_itimer *timer, *next;
 
-
-#define UNEXPIRED(clock) \
-		(cputime_eq(tsk->it_##clock##_expires, cputime_zero) || \
-		 cputime_lt(clock##_ticks(tsk), tsk->it_##clock##_expires))
-
-	if (UNEXPIRED(prof) && UNEXPIRED(virt) &&
-	    (tsk->it_sched_expires == 0 ||
-	     tsk->se.sum_exec_runtime < tsk->it_sched_expires))
-		return;
-
-#undef	UNEXPIRED
-
 	/*
 	 * Double-check with locks held.
 	 */
@@ -1428,6 +1416,19 @@ void run_posix_cpu_timers(struct task_struct *tsk)
 	BUG_ON(!irqs_disabled());
 	if(!per_cpu(posix_timer_task, cpu))
 		return;
+
+
+#define UNEXPIRED(clock) \
+		(cputime_eq(tsk->it_##clock##_expires, cputime_zero) || \
+		 cputime_lt(clock##_ticks(tsk), tsk->it_##clock##_expires))
+
+	if (UNEXPIRED(prof) && UNEXPIRED(virt) &&
+	    (tsk->it_sched_expires == 0 ||
+	     tsk->sum_exec_runtime < tsk->it_sched_expires))
+		return;
+
+#undef	UNEXPIRED
+
 	/* get per-cpu references */
 	tasklist = per_cpu(posix_timer_tasklist, cpu);
 
@@ -1446,7 +1447,7 @@ void run_posix_cpu_timers(struct task_struct *tsk)
 		per_cpu(posix_timer_tasklist, cpu) = tsk;
 	}
 	/* XXX signal the thread somehow */
-	wake_up_process(per_cpu(posix_timer_task,cpu));
+	wake_up_process(per_cpu(posix_timer_task, cpu));
 }
 
 
