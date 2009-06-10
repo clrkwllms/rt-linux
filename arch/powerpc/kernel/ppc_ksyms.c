@@ -46,7 +46,7 @@
 #include <asm/ftrace.h>
 
 #ifdef CONFIG_PPC64
-EXPORT_SYMBOL(local_irq_restore);
+EXPORT_SYMBOL(raw_local_irq_restore);
 #endif
 
 #ifdef CONFIG_PPC32

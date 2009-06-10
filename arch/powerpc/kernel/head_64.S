@@ -878,7 +878,7 @@ END_FW_FTR_SECTION_IFCLR(FW_FEATURE_ISERIES)
 	 * handles any interrupts pending at this point.
 	 */
 	ld	r3,SOFTE(r1)
-	bl	.local_irq_restore
+	bl	.raw_local_irq_restore
 	b	11f
 
 /* Here we have a page fault that hash_page can't handle. */

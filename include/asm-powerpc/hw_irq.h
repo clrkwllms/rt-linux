@@ -16,18 +16,18 @@ extern void timer_interrupt(struct pt_regs *);
 #ifdef CONFIG_PPC64
 #include <asm/paca.h>
 
-static inline unsigned long local_get_flags(void)
+static inline unsigned long raw_local_get_flags(void)
 {
 	unsigned long flags;
 
-<<<<<<< delete extern unsigned long local_get_flags(void);
-<<<<<<< delete extern unsigned long local_irq_disable(void);
+	__asm__ __volatile__("lbz %0,%1(13)"
+	: "=r" (flags)
 	: "i" (offsetof(struct paca_struct, soft_enabled)));
 
 	return flags;
 }
 
-static inline unsigned long local_irq_disable(void)
+static inline unsigned long raw_local_irq_disable(void)
 {
 	unsigned long flags, zero;
 
@@ -53,8 +53,8 @@ extern void raw_local_irq_restore(unsigned long);
 #define raw_irqs_disabled_flags(flags)	((flags) == 0)
 
 
-#define __hard_irq_enable()	__mtmsrd(mfmsr() | MSR_EE, 1)
-#define __hard_irq_disable()	__mtmsrd(mfmsr() & ~MSR_EE, 1)
+#define __hard_irq_enable()		__mtmsrd(mfmsr() | MSR_EE, 1)
+#define __hard_irq_disable()		__mtmsrd(mfmsr() & ~MSR_EE, 1)
 
 #define  hard_irq_disable()			\
 	do {					\
@@ -63,17 +63,15 @@ extern void raw_local_irq_restore(unsigned long);
 		get_paca()->hard_enabled = 0;	\
 	} while(0)
 
-#else
+#else  /* CONFIG_PPC64 */
 
 #if defined(CONFIG_BOOKE)
 #define SET_MSR_EE(x)	mtmsr(x)
 #define raw_local_irq_restore(flags)	__asm__ __volatile__("wrtee %0" : : "r" (flags) : "memory")
-<<<<<<< delete #define local_irq_restore(flags) do { \
-#define raw_local_irq_restore(flags) do { \
 #else
 #define SET_MSR_EE(x)	mtmsr(x)
 #define raw_local_irq_restore(flags)	mtmsr(flags)
-#endif
+#endif /* CONFIG_BOOKE */
 
 static inline void raw_local_irq_disable(void)
 {
