@@ -1012,6 +1012,13 @@ static inline void update_times(void)
 	static unsigned long last_tick = INITIAL_JIFFIES;
 	unsigned long ticks, flags;
 
+	/*
+	 * Dont take the xtime_lock from every CPU in
+	 * every tick - only when needed:
+	 */
+	if (jiffies == last_tick)
+		return;
+
 	write_seqlock_irqsave(&xtime_lock, flags);
 	ticks = jiffies - last_tick;
 	if (ticks) {
