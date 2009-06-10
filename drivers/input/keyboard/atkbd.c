@@ -1401,9 +1401,23 @@ static ssize_t atkbd_show_err_count(struct atkbd *atkbd, char *buf)
 	return sprintf(buf, "%lu\n", atkbd->err_count);
 }
 
+static int __read_mostly noatkbd;
+
+static int __init noatkbd_setup(char *str)
+{
+        noatkbd = 1;
+        printk(KERN_INFO "debug: not setting up AT keyboard.\n");
+
+        return 1;
+}
+
+__setup("noatkbd", noatkbd_setup);
 
 static int __init atkbd_init(void)
 {
+	if (noatkbd)
+		return 0;
+
 	return serio_register_driver(&atkbd_drv);
 }
 
