@@ -29,6 +29,7 @@
 #include <asm/cputable.h>
 #include <asm/firmware.h>
 #include <asm/bug.h>
+#include <asm/ftrace.h>
 
 /*
  * System calls.
@@ -855,6 +856,7 @@ _GLOBAL(_mcount)
 	mflr	r3
 	stdu	r1, -112(r1)
 	std	r3, 128(r1)
+	subi	r3, r3, MCOUNT_INSN_SIZE
 	.globl mcount_call
 mcount_call:
 	bl	ftrace_stub
@@ -871,6 +873,7 @@ _GLOBAL(ftrace_caller)
 	stdu	r1, -112(r1)
 	std	r3, 128(r1)
 	ld	r4, 16(r11)
+	subi	r3, r3, MCOUNT_INSN_SIZE
 .globl ftrace_call
 ftrace_call:
 	bl	ftrace_stub
@@ -892,7 +895,7 @@ _GLOBAL(_mcount)
 	std	r3, 128(r1)
 	ld	r4, 16(r11)
 
-
+	subi	r3, r3, MCOUNT_INSN_SIZE
 	LOAD_REG_ADDR(r5,ftrace_trace_function)
 	ld	r5,0(r5)
 	ld	r5,0(r5)
