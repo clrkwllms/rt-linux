@@ -18,7 +18,7 @@ typedef unsigned long cycles_t;
 
 #ifndef mach_read_cycles
  #define mach_read_cycles() (0)
-#ifdef CONFIG_LATENCY_TIMING
+#ifdef CONFIG_EVENT_TRACE
  #define mach_cycles_to_usecs(d) (d)
  #define mach_usecs_to_cycles(d) (d)
 #endif
