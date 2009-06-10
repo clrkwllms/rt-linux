@@ -64,20 +64,20 @@ static void queue_process(struct work_struct *work)
 			continue;
 		}
 
-		local_irq_save(flags);
+		local_irq_save_nort(flags);
 		netif_tx_lock(dev);
 		if ((netif_queue_stopped(dev) ||
 		     netif_subqueue_stopped(dev, skb)) ||
 		     dev->hard_start_xmit(skb, dev) != NETDEV_TX_OK) {
 			skb_queue_head(&npinfo->txq, skb);
 			netif_tx_unlock(dev);
-			local_irq_restore(flags);
+			local_irq_restore_nort(flags);
 
 			schedule_delayed_work(&npinfo->tx_work, HZ/10);
 			return;
 		}
 		netif_tx_unlock(dev);
-		local_irq_restore(flags);
+		local_irq_restore_nort(flags);
 	}
 }
 
@@ -146,7 +146,7 @@ static void poll_napi(struct netpoll *np)
 	int budget = 16;
 
 	list_for_each_entry(napi, &np->dev->napi_list, dev_list) {
-		if (napi->poll_owner != smp_processor_id() &&
+		if (napi->poll_owner != raw_smp_processor_id() &&
 		    spin_trylock(&napi->poll_lock)) {
 			budget = poll_one_napi(npinfo, napi, budget);
 			spin_unlock(&napi->poll_lock);
@@ -205,30 +205,33 @@ static void refill_skbs(void)
 
 static void zap_completion_queue(void)
 {
-	unsigned long flags;
 	struct softnet_data *sd = &get_cpu_var(softnet_data);
+	struct sk_buff *clist = NULL;
+	unsigned long flags;
 
 	if (sd->completion_queue) {
-		struct sk_buff *clist;
-
 		local_irq_save(flags);
 		clist = sd->completion_queue;
 		sd->completion_queue = NULL;
 		local_irq_restore(flags);
-
-		while (clist != NULL) {
-			struct sk_buff *skb = clist;
-			clist = clist->next;
-			if (skb->destructor) {
-				atomic_inc(&skb->users);
-				dev_kfree_skb_any(skb); /* put this one back */
-			} else {
-				__kfree_skb(skb);
-			}
-		}
 	}
 
+	/*
+	 * Took the list private, can drop our softnet
+	 * reference:
+	 */
 	put_cpu_var(softnet_data);
+
+	while (clist != NULL) {
+		struct sk_buff *skb = clist;
+		clist = clist->next;
+		if (skb->destructor) {
+			atomic_inc(&skb->users);
+			dev_kfree_skb_any(skb); /* put this one back */
+		} else {
+			__kfree_skb(skb);
+		}
+	}
 }
 
 static struct sk_buff *find_skb(struct netpoll *np, int len, int reserve)
@@ -236,13 +239,26 @@ static struct sk_buff *find_skb(struct netpoll *np, int len, int reserve)
 	int count = 0;
 	struct sk_buff *skb;
 
+#ifdef CONFIG_PREEMPT_RT
+	/*
+	 * On -rt skb_pool.lock is schedulable, so if we are
+	 * in an atomic context we just try to dequeue from the
+	 * pool and fail if we cannot get one.
+	 */
+	if (in_atomic() || irqs_disabled())
+		goto pick_atomic;
+#endif
 	zap_completion_queue();
 	refill_skbs();
 repeat:
 
 	skb = alloc_skb(len, GFP_ATOMIC);
-	if (!skb)
+	if (!skb) {
+#ifdef CONFIG_PREEMPT_RT
+pick_atomic:
+#endif
 		skb = skb_dequeue(&skb_pool);
+	}
 
 	if (!skb) {
 		if (++count < 10) {
@@ -262,7 +278,7 @@ static int netpoll_owner_active(struct net_device *dev)
 	struct napi_struct *napi;
 
 	list_for_each_entry(napi, &dev->napi_list, dev_list) {
-		if (napi->poll_owner == smp_processor_id())
+		if (napi->poll_owner == raw_smp_processor_id())
 			return 1;
 	}
 	return 0;
@@ -284,7 +300,7 @@ static void netpoll_send_skb(struct netpoll *np, struct sk_buff *skb)
 	if (skb_queue_len(&npinfo->txq) == 0 && !netpoll_owner_active(dev)) {
 		unsigned long flags;
 
-		local_irq_save(flags);
+		local_irq_save_nort(flags);
 		/* try until next clock tick */
 		for (tries = jiffies_to_usecs(1)/USEC_PER_POLL;
 		     tries > 0; --tries) {
@@ -304,7 +320,7 @@ static void netpoll_send_skb(struct netpoll *np, struct sk_buff *skb)
 
 			udelay(USEC_PER_POLL);
 		}
-		local_irq_restore(flags);
+		local_irq_restore_nort(flags);
 	}
 
 	if (status != NETDEV_TX_OK) {
@@ -727,7 +743,7 @@ int netpoll_setup(struct netpoll *np)
 				       np->name);
 				break;
 			}
-			cond_resched();
+			schedule_timeout_uninterruptible(1);
 		}
 
 		/* If carrier appears to come up instantly, we don't

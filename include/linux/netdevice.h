@@ -1349,20 +1349,20 @@ static inline void __netif_tx_lock(struct net_device *dev, int cpu)
 
 static inline void netif_tx_lock(struct net_device *dev)
 {
-	__netif_tx_lock(dev, smp_processor_id());
+	__netif_tx_lock(dev, raw_smp_processor_id());
 }
 
 static inline void netif_tx_lock_bh(struct net_device *dev)
 {
 	spin_lock_bh(&dev->_xmit_lock);
-	dev->xmit_lock_owner = smp_processor_id();
+	dev->xmit_lock_owner = raw_smp_processor_id();
 }
 
 static inline int netif_tx_trylock(struct net_device *dev)
 {
 	int ok = spin_trylock(&dev->_xmit_lock);
 	if (likely(ok))
-		dev->xmit_lock_owner = smp_processor_id();
+		dev->xmit_lock_owner = raw_smp_processor_id();
 	return ok;
 }
 

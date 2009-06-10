@@ -12,6 +12,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/kallsyms.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -24,6 +25,7 @@
 #include <linux/init.h>
 #include <linux/rcupdate.h>
 #include <linux/list.h>
+#include <linux/delay.h>
 #include <net/pkt_sched.h>
 
 /* Main transmission queue. */
@@ -87,7 +89,7 @@ static inline int handle_dev_cpu_collision(struct sk_buff *skb,
 {
 	int ret;
 
-	if (unlikely(dev->xmit_lock_owner == smp_processor_id())) {
+	if (unlikely(dev->xmit_lock_owner == raw_smp_processor_id())) {
 		/*
 		 * Same CPU holding the lock. It may be a transient
 		 * configuration error, when hard_start_xmit() recurses. We
@@ -144,7 +146,7 @@ static inline int qdisc_restart(struct net_device *dev)
 	/* And release queue */
 	spin_unlock(&dev->queue_lock);
 
-	HARD_TX_LOCK(dev, smp_processor_id());
+	HARD_TX_LOCK(dev, raw_smp_processor_id());
 	if (!netif_subqueue_stopped(dev, skb))
 		ret = dev_hard_start_xmit(skb, dev);
 	HARD_TX_UNLOCK(dev);
@@ -590,8 +592,12 @@ void dev_deactivate(struct net_device *dev)
 
 	/* Wait for outstanding qdisc_run calls. */
 	do {
+		/*
+		 * Wait for outstanding qdisc_run calls.
+		 * TODO: shouldnt this be wakeup-based, instead of polling it?
+		 */
 		while (test_bit(__LINK_STATE_QDISC_RUNNING, &dev->state))
-			yield();
+			msleep(1);
 
 		/*
 		 * Double-check inside queue lock to ensure that all effects
