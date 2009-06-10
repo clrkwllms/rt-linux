@@ -189,10 +189,10 @@ static inline unsigned long __cmpxchg(volatile void *ptr,
 	volatile unsigned long *p = ptr;
 
 	if (size == 4) {
-		local_irq_save(flags);
+		raw_local_irq_save(flags);
 		if ((prev = *p) == old)
 			*p = new;
-		local_irq_restore(flags);
+		raw_local_irq_restore(flags);
 		return(prev);
 	} else
 		return wrong_size_cmpxchg(ptr);
