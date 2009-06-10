@@ -1685,6 +1685,7 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 {
 	struct rt_mutex *mutex = &rwm->mutex;
 	struct rt_mutex_waiter *waiter;
+	struct task_struct *pendowner;
 	struct reader_lock_struct *rls;
 	unsigned long flags;
 	unsigned int reader_count;
@@ -1793,6 +1794,7 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 			rwm->owner = RT_RW_PENDING_READ;
 	}
 
+	pendowner = waiter->task;
 	wakeup_next_waiter(mutex, savestate);
 
 	/*
@@ -1808,6 +1810,17 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 	if (rt_mutex_has_waiters(mutex)) {
 		waiter = rt_mutex_top_waiter(mutex);
 		rwm->prio = waiter->task->prio;
+		/*
+		 * If readers still own this lock, then we need
+		 * to update the pi_list too. Readers have a separate
+		 * path in the PI chain.
+		 */
+		if (reader_count) {
+			spin_lock(&pendowner->pi_lock);
+			plist_del(&waiter->pi_list_entry,
+				  &pendowner->pi_waiters);
+			spin_unlock(&pendowner->pi_lock);
+		}
 	} else
 		rwm->prio = MAX_PRIO;
 
