@@ -15,6 +15,7 @@
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/smp.h>
+#include <linux/cpumask.h>
 #include <linux/kernel_stat.h>
 #include <linux/mc146818rtc.h>
 #include <linux/interrupt.h>
@@ -303,6 +304,14 @@ void smp_send_reschedule(int cpu)
 void smp_send_reschedule_allbutself(void)
 {
 	send_IPI_allbutself(RESCHEDULE_VECTOR);
+}
+
+void smp_send_reschedule_allbutself_cpumask(cpumask_t mask)
+{
+	cpu_clear(smp_processor_id(), mask);
+	cpus_and(mask, mask, cpu_online_map);
+	if (!cpus_empty(mask))
+		send_IPI_mask(mask, RESCHEDULE_VECTOR);
 }
 
 /*

@@ -126,5 +126,8 @@ static __inline int logical_smp_processor_id(void)
 extern unsigned int boot_cpu_id;
 #define cpu_physical_id(cpu)		boot_cpu_id
 #endif /* !CONFIG_SMP */
+
+#define HAVE_RESCHEDULE_ALLBUTSELF_CPUMASK 1
+
 #endif
 

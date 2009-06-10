@@ -7,6 +7,7 @@
  */
 
 #include <linux/errno.h>
+#include <linux/cpumask.h>
 
 extern void cpu_idle(void);
 
@@ -42,6 +43,14 @@ extern void smp_send_reschedule_allbutself(void);
  * trigger a reschedule on all other CPUs:
  */
 extern void smp_send_reschedule_allbutself(void);
+
+#ifdef HAVE_RESCHEDULE_ALLBUTSELF_CPUMASK
+extern void smp_send_reschedule_allbutself_cpumask(cpumask_t);
+#else
+static inline void smp_send_reschedule_allbutself_cpumask(cpumask_t mask) {
+	smp_send_reschedule_allbutself();
+}
+#endif
 
 
 /*
@@ -109,6 +118,7 @@ static inline int up_smp_call_function(void (*func)(void *), void *info)
 	})
 static inline void smp_send_reschedule(int cpu) { }
 static inline void smp_send_reschedule_allbutself(void) { }
+static inline void smp_send_reschedule_allbutself_cpumask(cpumask_t mask) { }
 #define num_booting_cpus()			1
 #define smp_prepare_boot_cpu()			do {} while (0)
 #define smp_call_function_single(cpuid, func, info, retry, wait) \
