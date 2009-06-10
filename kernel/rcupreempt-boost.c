@@ -40,186 +40,9 @@ struct rcu_boost_dat {
 	int rbs_prio;			/* CPU copy of rcu_boost_prio  */
 	struct list_head rbs_toboost;	/* Preempted RCU readers       */
 	struct list_head rbs_boosted;	/* RCU readers that have been boosted */
-#ifdef CONFIG_RCU_TRACE
-	/* The rest are for statistics */
-	unsigned long rbs_stat_task_boost_called;
-	unsigned long rbs_stat_task_boosted;
-	unsigned long rbs_stat_boost_called;
-	unsigned long rbs_stat_try_boost;
-	unsigned long rbs_stat_boosted;
-	unsigned long rbs_stat_unboost_called;
-	unsigned long rbs_stat_unboosted;
-	unsigned long rbs_stat_try_boost_readers;
-	unsigned long rbs_stat_boost_readers;
-	unsigned long rbs_stat_try_unboost_readers;
-	unsigned long rbs_stat_unboost_readers;
-	unsigned long rbs_stat_over_taken;
-#endif /* CONFIG_RCU_TRACE */
 };
 
 static DEFINE_PER_CPU(struct rcu_boost_dat, rcu_boost_data);
-#define RCU_BOOST_ME &__get_cpu_var(rcu_boost_data)
-
-#ifdef CONFIG_RCU_TRACE
-
-#define RCUPREEMPT_BOOST_TRACE_BUF_SIZE 4096
-static char rcupreempt_boost_trace_buf[RCUPREEMPT_BOOST_TRACE_BUF_SIZE];
-
-static ssize_t rcuboost_read(struct file *filp, char __user *buffer,
-				size_t count, loff_t *ppos)
-{
-	static DEFINE_MUTEX(mutex);
-	int cnt = 0;
-	int cpu;
-	struct rcu_boost_dat *rbd;
-	ssize_t bcount;
-	unsigned long task_boost_called = 0;
-	unsigned long task_boosted = 0;
-	unsigned long boost_called = 0;
-	unsigned long try_boost = 0;
-	unsigned long boosted = 0;
-	unsigned long unboost_called = 0;
-	unsigned long unboosted = 0;
-	unsigned long try_boost_readers = 0;
-	unsigned long boost_readers = 0;
-	unsigned long try_unboost_readers = 0;
-	unsigned long unboost_readers = 0;
-	unsigned long over_taken = 0;
-
-	mutex_lock(&mutex);
-
-	for_each_online_cpu(cpu) {
-		rbd = &per_cpu(rcu_boost_data, cpu);
-
-		task_boost_called += rbd->rbs_stat_task_boost_called;
-		task_boosted += rbd->rbs_stat_task_boosted;
-		boost_called += rbd->rbs_stat_boost_called;
-		try_boost += rbd->rbs_stat_try_boost;
-		boosted += rbd->rbs_stat_boosted;
-		unboost_called += rbd->rbs_stat_unboost_called;
-		unboosted += rbd->rbs_stat_unboosted;
-		try_boost_readers += rbd->rbs_stat_try_boost_readers;
-		boost_readers += rbd->rbs_stat_boost_readers;
-		try_unboost_readers += rbd->rbs_stat_try_boost_readers;
-		unboost_readers += rbd->rbs_stat_boost_readers;
-		over_taken += rbd->rbs_stat_over_taken;
-	}
-
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"task_boost_called = %ld\n",
-			task_boost_called);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"task_boosted = %ld\n",
-			task_boosted);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"boost_called = %ld\n",
-			boost_called);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"try_boost = %ld\n",
-			try_boost);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"boosted = %ld\n",
-			boosted);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"unboost_called = %ld\n",
-			unboost_called);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"unboosted = %ld\n",
-			unboosted);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"try_boost_readers = %ld\n",
-			try_boost_readers);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"boost_readers = %ld\n",
-			boost_readers);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"try_unboost_readers = %ld\n",
-			try_unboost_readers);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"unboost_readers = %ld\n",
-			unboost_readers);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"over_taken = %ld\n",
-			over_taken);
-	cnt += snprintf(&rcupreempt_boost_trace_buf[cnt],
-			RCUPREEMPT_BOOST_TRACE_BUF_SIZE - cnt,
-			"rcu_boost_prio = %d\n",
-			rcu_boost_prio);
-	bcount = simple_read_from_buffer(buffer, count, ppos,
-			rcupreempt_boost_trace_buf, strlen(rcupreempt_boost_trace_buf));
-	mutex_unlock(&mutex);
-
-	return bcount;
-}
-
-static struct file_operations rcuboost_fops = {
-	.read = rcuboost_read,
-};
-
-static struct dentry  *rcuboostdir;
-int rcu_trace_boost_create(struct dentry *rcudir)
-{
-	rcuboostdir = debugfs_create_file("rcuboost", 0444, rcudir,
-					  NULL, &rcuboost_fops);
-	if (!rcuboostdir)
-		return 0;
-
-	return 1;
-}
-EXPORT_SYMBOL_GPL(rcu_trace_boost_create);
-
-void rcu_trace_boost_destroy(void)
-{
-	if (rcuboostdir)
-		debugfs_remove(rcuboostdir);
-	rcuboostdir = NULL;
-}
-EXPORT_SYMBOL_GPL(rcu_trace_boost_destroy);
-
-#define RCU_BOOST_TRACE_FUNC_DECL(type)			      \
-	static void rcu_trace_boost_##type(struct rcu_boost_dat *rbd)	\
-	{								\
-		rbd->rbs_stat_##type++;					\
-	}
-RCU_BOOST_TRACE_FUNC_DECL(task_boost_called)
-RCU_BOOST_TRACE_FUNC_DECL(task_boosted)
-RCU_BOOST_TRACE_FUNC_DECL(boost_called)
-RCU_BOOST_TRACE_FUNC_DECL(try_boost)
-RCU_BOOST_TRACE_FUNC_DECL(boosted)
-RCU_BOOST_TRACE_FUNC_DECL(unboost_called)
-RCU_BOOST_TRACE_FUNC_DECL(unboosted)
-RCU_BOOST_TRACE_FUNC_DECL(try_boost_readers)
-RCU_BOOST_TRACE_FUNC_DECL(boost_readers)
-RCU_BOOST_TRACE_FUNC_DECL(try_unboost_readers)
-RCU_BOOST_TRACE_FUNC_DECL(unboost_readers)
-RCU_BOOST_TRACE_FUNC_DECL(over_taken)
-#else /* CONFIG_RCU_TRACE */
-/* These were created by the above macro "RCU_BOOST_TRACE_FUNC_DECL" */
-# define rcu_trace_boost_task_boost_called(rbd) do { } while (0)
-# define rcu_trace_boost_task_boosted(rbd) do { } while (0)
-# define rcu_trace_boost_boost_called(rbd) do { } while (0)
-# define rcu_trace_boost_try_boost(rbd) do { } while (0)
-# define rcu_trace_boost_boosted(rbd) do { } while (0)
-# define rcu_trace_boost_unboost_called(rbd) do { } while (0)
-# define rcu_trace_boost_unboosted(rbd) do { } while (0)
-# define rcu_trace_boost_try_boost_readers(rbd) do { } while (0)
-# define rcu_trace_boost_boost_readers(rbd) do { } while (0)
-# define rcu_trace_boost_try_unboost_readers(rbd) do { } while (0)
-# define rcu_trace_boost_unboost_readers(rbd) do { } while (0)
-# define rcu_trace_boost_over_taken(rbd) do { } while (0)
-#endif /* CONFIG_RCU_TRACE */
 
 static inline int rcu_is_boosted(struct task_struct *task)
 {
@@ -234,10 +57,10 @@ static void rcu_boost_task(struct task_struct *task)
 	WARN_ON(!irqs_disabled());
 	WARN_ON_SMP(!spin_is_locked(&task->pi_lock));
 
-	rcu_trace_boost_task_boost_called(RCU_BOOST_ME);
+	trace_mark(task_boost_called, "NULL");
 
 	if (task->rcu_prio < task->prio) {
-		rcu_trace_boost_task_boosted(RCU_BOOST_ME);
+		trace_mark(task_boosted, "NULL");
 		task_setprio(task, task->rcu_prio);
 	}
 }
@@ -261,7 +84,7 @@ void __rcu_preempt_boost(void)
 
 	WARN_ON(!current->rcu_read_lock_nesting);
 
-	rcu_trace_boost_boost_called(RCU_BOOST_ME);
+	trace_mark(boost_called, "NULL");
 
 	/* check to see if we are already boosted */
 	if (unlikely(rcu_is_boosted(curr)))
@@ -279,7 +102,7 @@ void __rcu_preempt_boost(void)
 
 	curr->rcub_rbdp = rbd;
 
-	rcu_trace_boost_try_boost(rbd);
+	trace_mark(try_boost, "NULL");
 
 	prio = rt_mutex_getprio(curr);
 
@@ -288,7 +111,7 @@ void __rcu_preempt_boost(void)
 	if (prio <= rbd->rbs_prio)
 		goto out;
 
-	rcu_trace_boost_boosted(curr->rcub_rbdp);
+	trace_mark(boosted, "NULL");
 
 	curr->rcu_prio = rbd->rbs_prio;
 	rcu_boost_task(curr);
@@ -313,7 +136,7 @@ void __rcu_preempt_unboost(void)
 	int prio;
 	unsigned long flags;
 
-	rcu_trace_boost_unboost_called(RCU_BOOST_ME);
+	trace_mark(unboost_called, "NULL");
 
 	/* if not boosted, then ignore */
 	if (likely(!rcu_is_boosted(curr)))
@@ -351,7 +174,7 @@ void __rcu_preempt_unboost(void)
 
 	list_del_init(&curr->rcub_entry);
 
-	rcu_trace_boost_unboosted(rbd);
+	trace_mark(unboosted, "NULL");
 
 	curr->rcu_prio = MAX_PRIO;
 
@@ -412,7 +235,7 @@ static int __rcu_boost_readers(struct rcu_boost_dat *rbd, int prio, unsigned lon
 		 * Another task may have taken over.
 		 */
 		if (curr->rcu_preempt_counter != rcu_boost_counter) {
-			rcu_trace_boost_over_taken(rbd);
+			trace_mark(over_taken, "NULL");
 			return 1;
 		}
 
@@ -443,7 +266,7 @@ void rcu_boost_readers(void)
 
 	prio = rt_mutex_getprio(curr);
 
-	rcu_trace_boost_try_boost_readers(RCU_BOOST_ME);
+	trace_mark(try_boost_readers, "NULL");
 
 	if (prio >= rcu_boost_prio) {
 		/* already boosted */
@@ -453,7 +276,7 @@ void rcu_boost_readers(void)
 
 	rcu_boost_prio = prio;
 
-	rcu_trace_boost_boost_readers(RCU_BOOST_ME);
+	trace_mark(boost_readers, "NULL");
 
 	/* Flag that we are the one to unboost */
 	curr->rcu_preempt_counter = ++rcu_boost_counter;
@@ -486,12 +309,12 @@ void rcu_unboost_readers(void)
 
 	spin_lock_irqsave(&rcu_boost_wake_lock, flags);
 
-	rcu_trace_boost_try_unboost_readers(RCU_BOOST_ME);
+	trace_mark(try_unboost_readers, "NULL");
 
 	if (current->rcu_preempt_counter != rcu_boost_counter)
 		goto out;
 
-	rcu_trace_boost_unboost_readers(RCU_BOOST_ME);
+	trace_mark(unboost_readers, "NULL");
 
 	/*
 	 * We could also put in something that
@@ -512,6 +335,16 @@ void rcu_unboost_readers(void)
  out:
 	spin_unlock_irqrestore(&rcu_boost_wake_lock, flags);
 }
+
+/*
+ * This function exports the rcu_boost_prio variable for use by
+ * modules that need it e.g. RCU_TRACE module
+ */
+int read_rcu_boost_prio(void)
+{
+	return rcu_boost_prio;
+}
+EXPORT_SYMBOL_GPL(read_rcu_boost_prio);
 
 /*
  * The krcupreemptd wakes up every "rcu_preempt_thread_secs"

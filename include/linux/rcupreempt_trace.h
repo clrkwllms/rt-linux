@@ -96,5 +96,45 @@ extern int rcupreempt_flip_flag(int cpu);
 extern int rcupreempt_mb_flag(int cpu);
 extern char *rcupreempt_try_flip_state_name(void);
 
+#ifdef CONFIG_PREEMPT_RCU_BOOST
+struct preempt_rcu_boost_trace {
+	unsigned long rbs_stat_task_boost_called;
+	unsigned long rbs_stat_task_boosted;
+	unsigned long rbs_stat_boost_called;
+	unsigned long rbs_stat_try_boost;
+	unsigned long rbs_stat_boosted;
+	unsigned long rbs_stat_unboost_called;
+	unsigned long rbs_stat_unboosted;
+	unsigned long rbs_stat_try_boost_readers;
+	unsigned long rbs_stat_boost_readers;
+	unsigned long rbs_stat_try_unboost_readers;
+	unsigned long rbs_stat_unboost_readers;
+	unsigned long rbs_stat_over_taken;
+};
+
+#define DEFINE_PREEMPT_RCU_BOOST_MARKER_HANDLER(preempt_rcu_boost_var) \
+void preempt_rcu_boost_var##_callback(const struct marker *mdata, \
+				void *private_data, const char *format, ...) \
+{ \
+	struct preempt_rcu_boost_trace *boost_trace; \
+	boost_trace = (&per_cpu(boost_trace_data, smp_processor_id())); \
+	boost_trace->rbs_stat_##preempt_rcu_boost_var++; \
+}
+
+struct preempt_rcu_boost_probe {
+	const char *name;
+	const char *format;
+	marker_probe_func *probe_func;
+};
+
+#define INIT_PREEMPT_RCU_BOOST_PROBE(preempt_rcu_boost_probe_worker) \
+{ \
+	.name = __stringify(preempt_rcu_boost_probe_worker), \
+	.probe_func = preempt_rcu_boost_probe_worker##_callback \
+}
+
+extern int read_rcu_boost_prio(void);
+#endif /* CONFIG_PREEMPT_RCU_BOOST */
+
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUPREEMPT_TRACE_H */
