@@ -1230,6 +1230,10 @@ config OUT_OF_LINE_PFN_TO_PAGE
 	def_bool X86_64
 	depends on DISCONTIGMEM
 
+config HARDIRQS_SW_RESEND
+	bool
+	default y
+
 menu "Power management options"
 	depends on !X86_VOYAGER
 
