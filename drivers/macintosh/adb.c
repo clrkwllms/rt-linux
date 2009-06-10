@@ -250,6 +250,8 @@ adb_probe_task(void *x)
 {
 	strcpy(current->comm, "kadbprobe");
 
+	down(&adb_probe_mutex);
+
 	printk(KERN_INFO "adb: starting probe task...\n");
 	do_adb_reset_bus();
 	printk(KERN_INFO "adb: finished probe task...\n");
@@ -276,7 +278,9 @@ adb_reset_bus(void)
 		return 0;
 	}
 
-	down(&adb_probe_mutex);
+	if (adb_got_sleep)
+		return 0;
+
 	schedule_work(&adb_reset_work);
 	return 0;
 }
@@ -339,9 +343,8 @@ adb_notify_sleep(struct pmu_sleep_notifier *self, int when)
 {
 	switch (when) {
 	case PBOOK_SLEEP_REQUEST:
+		/* Signal to discontiue probing  */
 		adb_got_sleep = 1;
-		/* We need to get a lock on the probe thread */
-		down(&adb_probe_mutex);
 		/* Stop autopoll */
 		if (adb_controller->autopoll)
 			adb_controller->autopoll(0);
@@ -350,7 +353,6 @@ adb_notify_sleep(struct pmu_sleep_notifier *self, int when)
 		break;
 	case PBOOK_WAKE:
 		adb_got_sleep = 0;
-		up(&adb_probe_mutex);
 		adb_reset_bus();
 		break;
 	}

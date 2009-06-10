@@ -42,7 +42,7 @@ static inline unsigned long __spin_trylock(volatile unsigned long *lock)
 	return ret;
 }
 
-void _raw_spin_lock(spinlock_t *lock)
+void __raw_spin_lock(raw_spinlock_t *lock)
 {
 	int cpu = smp_processor_id();
 	unsigned int stuck = INIT_STUCK;
@@ -62,9 +62,9 @@ void _raw_spin_lock(spinlock_t *lock)
 	lock->owner_pc = (unsigned long)__builtin_return_address(0);
 	lock->owner_cpu = cpu;
 }
-EXPORT_SYMBOL(_raw_spin_lock);
+EXPORT_SYMBOL(__raw_spin_lock);
 
-int _raw_spin_trylock(spinlock_t *lock)
+int __raw_spin_trylock(raw_spinlock_t *lock)
 {
 	if (__spin_trylock(&lock->lock))
 		return 0;
@@ -72,9 +72,9 @@ int _raw_spin_trylock(spinlock_t *lock)
 	lock->owner_pc = (unsigned long)__builtin_return_address(0);
 	return 1;
 }
-EXPORT_SYMBOL(_raw_spin_trylock);
+EXPORT_SYMBOL(__raw_spin_trylock);
 
-void _raw_spin_unlock(spinlock_t *lp)
+void __raw_spin_unlock(raw_spinlock_t *lp)
 {
   	if ( !lp->lock )
 		printk("_spin_unlock(%p): no lock cpu %d curr PC %p %s/%d\n",
@@ -88,13 +88,13 @@ void _raw_spin_unlock(spinlock_t *lp)
 	wmb();
 	lp->lock = 0;
 }
-EXPORT_SYMBOL(_raw_spin_unlock);
+EXPORT_SYMBOL(__raw_spin_unlock);
 
 /*
  * For rwlocks, zero is unlocked, -1 is write-locked,
  * positive is read-locked.
  */
-static __inline__ int __read_trylock(rwlock_t *rw)
+static __inline__ int __read_trylock(raw_rwlock_t *rw)
 {
 	signed int tmp;
 
@@ -114,13 +114,13 @@ static __inline__ int __read_trylock(rwlock_t *rw)
 	return tmp;
 }
 
-int _raw_read_trylock(rwlock_t *rw)
+int __raw_read_trylock(raw_rwlock_t *rw)
 {
 	return __read_trylock(rw) > 0;
 }
-EXPORT_SYMBOL(_raw_read_trylock);
+EXPORT_SYMBOL(__raw_read_trylock);
 
-void _raw_read_lock(rwlock_t *rw)
+void __raw_read_lock(rwlock_t *rw)
 {
 	unsigned int stuck;
 
@@ -135,9 +135,9 @@ void _raw_read_lock(rwlock_t *rw)
 		}
 	}
 }
-EXPORT_SYMBOL(_raw_read_lock);
+EXPORT_SYMBOL(__raw_read_lock);
 
-void _raw_read_unlock(rwlock_t *rw)
+void __raw_read_unlock(raw_rwlock_t *rw)
 {
 	if ( rw->lock == 0 )
 		printk("_read_unlock(): %s/%d (nip %08lX) lock %d\n",
@@ -146,9 +146,9 @@ void _raw_read_unlock(rwlock_t *rw)
 	wmb();
 	atomic_dec((atomic_t *) &(rw)->lock);
 }
-EXPORT_SYMBOL(_raw_read_unlock);
+EXPORT_SYMBOL(__raw_read_unlock);
 
-void _raw_write_lock(rwlock_t *rw)
+void __raw_write_lock(raw_rwlock_t *rw)
 {
 	unsigned int stuck;
 
@@ -164,18 +164,18 @@ void _raw_write_lock(rwlock_t *rw)
 	}
 	wmb();
 }
-EXPORT_SYMBOL(_raw_write_lock);
+EXPORT_SYMBOL(__raw_write_lock);
 
-int _raw_write_trylock(rwlock_t *rw)
+int __raw_write_trylock(raw_rwlock_t *rw)
 {
 	if (cmpxchg(&rw->lock, 0, -1) != 0)
 		return 0;
 	wmb();
 	return 1;
 }
-EXPORT_SYMBOL(_raw_write_trylock);
+EXPORT_SYMBOL(__raw_write_trylock);
 
-void _raw_write_unlock(rwlock_t *rw)
+void __raw_write_unlock(raw_rwlock_t *rw)
 {
 	if (rw->lock >= 0)
 		printk("_write_lock(): %s/%d (nip %08lX) lock %d\n",
@@ -184,6 +184,6 @@ void _raw_write_unlock(rwlock_t *rw)
 	wmb();
 	rw->lock = 0;
 }
-EXPORT_SYMBOL(_raw_write_unlock);
+EXPORT_SYMBOL(__raw_write_unlock);
 
 #endif

@@ -29,7 +29,7 @@
  *	sem->count = tmp;
  *	return old_count;
  */
-static inline int __sem_update_count(struct semaphore *sem, int incr)
+static inline int __sem_update_count(struct compat_semaphore *sem, int incr)
 {
 	int old_count, tmp;
 
@@ -48,7 +48,7 @@ static inline int __sem_update_count(struct semaphore *sem, int incr)
 	return old_count;
 }
 
-void __up(struct semaphore *sem)
+void __compat_up(struct compat_semaphore *sem)
 {
 	/*
 	 * Note that we incremented count in up() before we came here,
@@ -70,7 +70,7 @@ void __up(struct semaphore *sem)
  * Thus it is only when we decrement count from some value > 0
  * that we have actually got the semaphore.
  */
-void __sched __down(struct semaphore *sem)
+void __sched __compat_down(struct compat_semaphore *sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -100,7 +100,7 @@ void __sched __down(struct semaphore *sem)
 	wake_up(&sem->wait);
 }
 
-int __sched __down_interruptible(struct semaphore * sem)
+int __sched __compat_down_interruptible(struct compat_semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;
@@ -128,4 +128,9 @@ int __sched __down_interruptible(struct semaphore * sem)
 	remove_wait_queue(&sem->wait, &wait);
 	wake_up(&sem->wait);
 	return retval;
+}
+
+int compat_sem_is_locked(struct compat_semaphore *sem)
+{
+	return (int) atomic_read(&sem->count) < 0;
 }

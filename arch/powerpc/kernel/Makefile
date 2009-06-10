@@ -22,11 +22,12 @@ endif
 
 endif
 
-obj-y				:= semaphore.o cputable.o ptrace.o syscalls.o \
+obj-y				:= cputable.o ptrace.o syscalls.o \
 				   irq.o align.o signal_32.o pmc.o vdso.o \
 				   init_task.o process.o systbl.o idle.o \
 				   signal.o
 obj-y				+= vdso32/
+obj-$(CONFIG_ASM_SEMAPHORES)	+= semaphore.o
 obj-$(CONFIG_PPC64)		+= setup_64.o binfmt_elf32.o sys_ppc32.o \
 				   signal_64.o ptrace32.o \
 				   paca.o cpu_setup_ppc970.o \

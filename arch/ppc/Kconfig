@@ -16,13 +16,6 @@ config GENERIC_HARDIRQS
 	bool
 	default y
 
-config RWSEM_GENERIC_SPINLOCK
-	bool
-
-config RWSEM_XCHGADD_ALGORITHM
-	bool
-	default y
-
 config ARCH_HAS_ILOG2_U32
 	bool
 	default y
@@ -979,6 +972,18 @@ config ARCH_POPULATES_NODE_MAP
 
 source kernel/Kconfig.hz
 source kernel/Kconfig.preempt
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+
+config ASM_SEMAPHORES
+	bool
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+
 source "mm/Kconfig"
 
 source "fs/Kconfig.binfmt"

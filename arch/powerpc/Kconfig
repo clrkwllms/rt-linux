@@ -46,13 +46,6 @@ config IRQ_PER_CPU
 	bool
 	default y
 
-config RWSEM_GENERIC_SPINLOCK
-	bool
-
-config RWSEM_XCHGADD_ALGORITHM
-	bool
-	default y
-
 config ARCH_HAS_ILOG2_U32
 	bool
 	default y
@@ -177,6 +170,18 @@ config HIGHMEM
 source kernel/time/Kconfig
 source kernel/Kconfig.hz
 source kernel/Kconfig.preempt
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+
+config ASM_SEMAPHORES
+	bool
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+
 source "fs/Kconfig.binfmt"
 
 # We optimistically allocate largepages from the VM, so make the limit
