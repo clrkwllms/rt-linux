@@ -685,14 +685,19 @@ static void trace_save_cmdline(struct task_struct *tsk)
 	if (!spin_trylock(&trace_cmdline_lock))
 		return;
 
+	/* from the pid, find the index of the cmdline array */
 	idx = map_pid_to_cmdline[tsk->pid];
+
 	if (idx >= SAVED_CMDLINES) {
+		/* this is new */
 		idx = (cmdline_idx + 1) % SAVED_CMDLINES;
 
+		/* check the reverse map and reset it if needed */
 		map = map_cmdline_to_pid[idx];
 		if (map <= PID_MAX_DEFAULT)
 			map_pid_to_cmdline[map] = (unsigned)-1;
 
+		map_cmdline_to_pid[idx] = tsk->pid;
 		map_pid_to_cmdline[tsk->pid] = idx;
 
 		cmdline_idx = idx;
@@ -716,6 +721,9 @@ static char *trace_find_cmdline(int pid)
 
 	map = map_pid_to_cmdline[pid];
 	if (map >= SAVED_CMDLINES)
+		goto out;
+
+	if (map_cmdline_to_pid[map] != pid)
 		goto out;
 
 	cmdline = saved_cmdlines[map];
