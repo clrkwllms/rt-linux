@@ -302,7 +302,8 @@ void trace_function(struct trace_array *tr,
 		    struct trace_array_cpu *data,
 		    unsigned long ip,
 		    unsigned long parent_ip,
-		    unsigned long flags);
+		    unsigned long flags,
+		    unsigned long pc);
 void tracing_event_irq(struct trace_array *tr,
 		       struct trace_array_cpu *data,
 		       unsigned long flags,

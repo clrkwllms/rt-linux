@@ -354,7 +354,7 @@ notrace void tracing_hist_preempt_stop(int irqs_on)
 	cpu = raw_smp_processor_id();
 
 #ifdef CONFIG_INTERRUPT_OFF_HIST
-	if (irqs_on  &&
+	if (irqs_on &&
 	    per_cpu(hist_irqsoff_tracing, cpu)) {
 		stop = ftrace_now(cpu);
 		stop_set++;
