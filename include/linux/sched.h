@@ -292,6 +292,7 @@ static inline void show_state(void)
 }
 
 extern void show_regs(struct pt_regs *);
+extern void irq_show_regs_callback(int cpu, struct pt_regs *regs);
 
 /*
  * TASK is a pointer to the task whose backtrace we want to see (or NULL for current

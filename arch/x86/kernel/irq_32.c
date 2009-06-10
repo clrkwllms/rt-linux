@@ -79,7 +79,9 @@ fastcall unsigned int do_IRQ(struct pt_regs *regs)
 	u32 *isp;
 #endif
 
+#ifdef CONFIG_X86_LOCAL_APIC
 	irq_show_regs_callback(smp_processor_id(), regs);
+#endif
 
 	if (unlikely((unsigned)irq >= NR_IRQS)) {
 		printk(KERN_EMERG "%s: cannot handle IRQ %d\n",

@@ -96,6 +96,8 @@ extern void smp_send_nmi_allbutself(void);
 #define K8_APIC_EXT_INT_MSG_EXT 0x7
 #define K8_APIC_EXT_LVT_ENTRY_THRESHOLD    0
 
+extern void smp_send_nmi_allbutself(void);
+
 #define ARCH_APICTIMER_STOPS_ON_C3	1
 
 extern unsigned boot_cpu_id;

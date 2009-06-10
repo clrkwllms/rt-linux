@@ -209,7 +209,7 @@ static struct sysrq_key_op sysrq_showregs_op = {
 	.enable_mask	= SYSRQ_ENABLE_DUMP,
 };
 
-#if defined(__i386__)
+#if defined(__i386__) || defined(__x86_64__)
 
 static void sysrq_handle_showallregs(int key, struct tty_struct *tty)
 {
