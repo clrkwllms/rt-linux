@@ -1069,7 +1069,7 @@ cache_free_alien(struct kmem_cache *cachep, void *objp, int *this_cpu)
 }
 
 static inline void *alternate_node_alloc(struct kmem_cache *cachep,
-		gfp_t flags)
+		gfp_t flags, int *this_cpu)
 {
 	return NULL;
 }
@@ -1084,7 +1084,7 @@ static inline void *____cache_alloc_node(struct kmem_cache *cachep,
 
 static void *____cache_alloc_node(struct kmem_cache *cachep, gfp_t flags,
 				int nodeid, int *this_cpu);
-static void *alternate_node_alloc(struct kmem_cache *, gfp_t);
+static void *alternate_node_alloc(struct kmem_cache *, gfp_t, int *);
 
 static struct array_cache **alloc_alien_cache(int node, int limit)
 {
@@ -3331,9 +3331,10 @@ ____cache_alloc(struct kmem_cache *cachep, gfp_t flags, int *this_cpu)
  * If we are in_interrupt, then process context, including cpusets and
  * mempolicy, may not apply and should not be used for allocation policy.
  */
-static void *alternate_node_alloc(struct kmem_cache *cachep, gfp_t flags)
+static void *alternate_node_alloc(struct kmem_cache *cachep, gfp_t flags,
+				int *this_cpu)
 {
-	int nid_alloc, nid_here, this_cpu = raw_smp_processor_id();
+	int nid_alloc, nid_here;
 
 	if (in_interrupt() || (flags & __GFP_THISNODE))
 		return NULL;
@@ -3343,7 +3344,7 @@ static void *alternate_node_alloc(struct kmem_cache *cachep, gfp_t flags)
 	else if (current->mempolicy)
 		nid_alloc = slab_node(current->mempolicy);
 	if (nid_alloc != nid_here)
-		return ____cache_alloc_node(cachep, flags, nid_alloc, &this_cpu);
+		return ____cache_alloc_node(cachep, flags, nid_alloc, this_cpu);
 	return NULL;
 }
 
@@ -3556,7 +3557,7 @@ __do_cache_alloc(struct kmem_cache *cache, gfp_t flags, int *this_cpu)
 	void *objp;
 
 	if (unlikely(current->flags & (PF_SPREAD_SLAB | PF_MEMPOLICY))) {
-		objp = alternate_node_alloc(cache, flags);
+		objp = alternate_node_alloc(cache, flags, this_cpu);
 		if (objp)
 			goto out;
 	}
