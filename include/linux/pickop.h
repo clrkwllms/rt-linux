@@ -1,10 +1,6 @@
 #ifndef _LINUX_PICKOP_H
 #define _LINUX_PICKOP_H
 
-#undef TYPE_EQUAL
-#define TYPE_EQUAL(var, type) \
-		__builtin_types_compatible_p(typeof(var), type *)
-
 #undef PICK_TYPE_EQUAL
 #define PICK_TYPE_EQUAL(var, type) \
 		__builtin_types_compatible_p(typeof(var), type)
