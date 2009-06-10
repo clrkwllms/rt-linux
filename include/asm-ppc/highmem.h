@@ -78,7 +78,7 @@ static inline void *kmap_atomic(struct page *page, enum km_type type)
 	unsigned int idx;
 	unsigned long vaddr;
 
-	/* even !CONFIG_PREEMPT needs this, for in_atomic in do_page_fault */
+	preempt_disable();
 	pagefault_disable();
 	if (!PageHighMem(page))
 		return page_address(page);
@@ -102,6 +102,7 @@ static inline void kunmap_atomic(void *kvaddr, enum km_type type)
 
 	if (vaddr < KMAP_FIX_BEGIN) { // FIXME
 		pagefault_enable();
+		preempt_enable();
 		return;
 	}
 
@@ -115,6 +116,7 @@ static inline void kunmap_atomic(void *kvaddr, enum km_type type)
 	flush_tlb_page(NULL, vaddr);
 #endif
 	pagefault_enable();
+	preempt_enable();
 }
 
 static inline struct page *kmap_atomic_to_page(void *ptr)
