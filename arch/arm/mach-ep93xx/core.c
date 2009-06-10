@@ -32,6 +32,8 @@
 #include <linux/termios.h>
 #include <linux/amba/bus.h>
 #include <linux/amba/serial.h>
+#include <linux/clocksource.h>
+#include <linux/clockchips.h>
 
 #include <asm/types.h>
 #include <asm/setup.h>
@@ -49,7 +51,6 @@
 #include <asm/arch/gpio.h>
 
 #include <asm/hardware/vic.h>
-
 
 /*************************************************************************
  * Static I/O mappings that are needed for all EP93xx platforms
@@ -93,39 +94,58 @@ void __init ep93xx_map_io(void)
  * to use this timer for something else.  We also use timer 4 for keeping
  * track of lost jiffies.
  */
-static unsigned int last_jiffy_time;
-static unsigned int next_jiffy_time;
-static unsigned int accumulator;
-
-#define TIMER4_TICKS_PER_JIFFY		(983040 / HZ)
-#define TIMER4_TICKS_MOD_JIFFY		(983040 % HZ)
-
-static int after_eq(unsigned long a, unsigned long b)
-{
-	return ((signed long)(a - b)) >= 0;
-}
+static struct clock_event_device clockevent_ep93xx;
 
 static int ep93xx_timer_interrupt(int irq, void *dev_id)
 {
-	write_seqlock(&xtime_lock);
+ 	__raw_writel(EP93XX_TC_CLEAR, EP93XX_TIMER1_CLEAR);
 
-	__raw_writel(1, EP93XX_TIMER1_CLEAR);
-	while (after_eq(__raw_readl(EP93XX_TIMER4_VALUE_LOW), next_jiffy_time)) {
-		timer_tick();
-
-		last_jiffy_time = next_jiffy_time;
-		next_jiffy_time += TIMER4_TICKS_PER_JIFFY;
-		accumulator += TIMER4_TICKS_MOD_JIFFY;
-		if (accumulator >= HZ) {
-			next_jiffy_time++;
-			accumulator -= HZ;
-		}
-	}
-
-	write_sequnlock(&xtime_lock);
+ 	clockevent_ep93xx.event_handler(&clockevent_ep93xx);
 
 	return IRQ_HANDLED;
 }
+
+static int ep93xx_set_next_event(unsigned long evt,
+				  struct clock_event_device *unused)
+{
+	__raw_writel(evt, EP93XX_TIMER1_LOAD);
+	return 0;
+}
+
+static void ep93xx_set_mode(enum clock_event_mode mode,
+			    struct clock_event_device *evt)
+{
+	u32 tmode = EP93XX_TC123_SEL_508KHZ;
+
+	/* Disable timer */
+	__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
+
+	switch(mode) {
+	case CLOCK_EVT_MODE_PERIODIC:
+		/* Set timer period  */
+		__raw_writel((508469 / HZ) - 1, EP93XX_TIMER1_LOAD);
+		tmode |= EP93XX_TC123_PERIODIC;
+
+	case CLOCK_EVT_MODE_ONESHOT:
+		tmode |= EP93XX_TC123_ENABLE;
+		__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
+		break;
+
+	case CLOCK_EVT_MODE_SHUTDOWN:
+	case CLOCK_EVT_MODE_UNUSED:
+	case CLOCK_EVT_MODE_RESUME:
+		return;
+	}
+}
+
+static struct clock_event_device clockevent_ep93xx = {
+	.name		= "ep93xx-timer1",
+	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
+	.shift		= 32,
+	.set_mode	= ep93xx_set_mode,
+	.set_next_event	= ep93xx_set_next_event,
+};
+
 
 static struct irqaction ep93xx_timer_irq = {
 	.name		= "ep93xx timer",
@@ -133,32 +153,58 @@ static struct irqaction ep93xx_timer_irq = {
 	.handler	= ep93xx_timer_interrupt,
 };
 
-static void __init ep93xx_timer_init(void)
+static void __init ep93xx_clockevent_init(void)
 {
-	/* Enable periodic HZ timer.  */
-	__raw_writel(0x48, EP93XX_TIMER1_CONTROL);
-	__raw_writel((508469 / HZ) - 1, EP93XX_TIMER1_LOAD);
-	__raw_writel(0xc8, EP93XX_TIMER1_CONTROL);
-
-	/* Enable lost jiffy timer.  */
-	__raw_writel(0x100, EP93XX_TIMER4_VALUE_HIGH);
-
 	setup_irq(IRQ_EP93XX_TIMER1, &ep93xx_timer_irq);
+
+	clockevent_ep93xx.mult = div_sc(508469, NSEC_PER_SEC,
+					clockevent_ep93xx.shift);
+	clockevent_ep93xx.max_delta_ns =
+		clockevent_delta2ns(0xfffffffe, &clockevent_ep93xx);
+	clockevent_ep93xx.min_delta_ns =
+		clockevent_delta2ns(0xf, &clockevent_ep93xx);
+	clockevent_ep93xx.cpumask = cpumask_of_cpu(0);
+	clockevents_register_device(&clockevent_ep93xx);
 }
 
-static unsigned long ep93xx_gettimeoffset(void)
+/*
+ * timer4 is a 40 Bit timer, separated in a 32bit and a 8 bit
+ * register, EP93XX_TIMER4_VALUE_LOW stores 32 bit word. The
+ * controlregister is in EP93XX_TIMER4_VALUE_HIGH
+ */
+
+cycle_t ep93xx_get_cycles(void)
 {
-	int offset;
+	return __raw_readl(EP93XX_TIMER4_VALUE_LOW);
+}
 
-	offset = __raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time;
+static struct clocksource clocksource_ep93xx = {
+	.name		= "ep93xx_timer4",
+	.rating		= 200,
+	.read		= ep93xx_get_cycles,
+	.mask		= 0xFFFFFFFF,
+	.shift		= 20,
+	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+};
 
-	/* Calculate (1000000 / 983040) * offset.  */
-	return offset + (53 * offset / 3072);
+static void __init ep93xx_clocksource_init(void)
+{
+	/* Reset time-stamp counter */
+	__raw_writel(0x100, EP93XX_TIMER4_VALUE_HIGH);
+
+	clocksource_ep93xx.mult =
+		clocksource_hz2mult(983040, clocksource_ep93xx.shift);
+	clocksource_register(&clocksource_ep93xx);
+}
+
+static void __init ep93xx_timer_init(void)
+{
+	ep93xx_clocksource_init();
+	ep93xx_clockevent_init();
 }
 
 struct sys_timer ep93xx_timer = {
-	.init		= ep93xx_timer_init,
-	.offset		= ep93xx_gettimeoffset,
+ 	.init			= ep93xx_timer_init,
 };
 
 
@@ -509,7 +555,6 @@ static struct platform_device ep93xx_ohci_device = {
 	.num_resources	= ARRAY_SIZE(ep93xx_ohci_resources),
 	.resource	= ep93xx_ohci_resources,
 };
-
 
 void __init ep93xx_init_devices(void)
 {
