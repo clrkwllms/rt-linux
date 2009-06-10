@@ -11,7 +11,7 @@ obj-y     = sched.o fork.o exec_domain.o panic.o printk.o profile.o \
 	    hrtimer.o rwsem.o latency.o nsproxy.o srcu.o \
 	    utsname.o notifier.o
 
-CFLAGS_REMOVE_sched.o = -pg -mno-spe
+CFLAGS_REMOVE_sched.o = -mno-spe
 
 ifdef CONFIG_FTRACE
 # Do not trace debug files and internal ftrace files
