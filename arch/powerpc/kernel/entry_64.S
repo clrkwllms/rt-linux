@@ -471,7 +471,8 @@ _GLOBAL(ret_from_except_lite)
 
 #ifdef CONFIG_PREEMPT
 	clrrdi	r9,r1,THREAD_SHIFT	/* current_thread_info() */
-	li	r0,_TIF_NEED_RESCHED	/* bits to check */
+	li	r0,(_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED)
+					/* bits to check */
 	ld	r3,_MSR(r1)
 	ld	r4,TI_FLAGS(r9)
 	/* Move MSR_PR bit in r3 to _TIF_SIGPENDING position in r0 */
@@ -579,16 +580,21 @@ do_work:
 	cmpdi	r0,0
 	crandc	eq,cr1*4+eq,eq
 	bne	restore
+	/* here we are preempting the current task */
 1:
-	/* preempt_schedule_irq() expects interrupts disabled. */
-	bl	.preempt_schedule_irq
+	li	r0,1
+	stb	r0,PACASOFTIRQEN(r13)
+	stb	r0,PACAHARDIRQEN(r13)
+	ori	r10,r10,MSR_EE
+	mtmsrd	r10,1		/* reenable interrupts */
+	bl	.preempt_schedule
 	mfmsr	r10
 	clrrdi	r9,r1,THREAD_SHIFT
 	rldicl	r10,r10,48,1	/* disable interrupts again */
 	rotldi	r10,r10,16
 	mtmsrd	r10,1
 	ld	r4,TI_FLAGS(r9)
-	andi.	r0,r4,_TIF_NEED_RESCHED
+	andi.	r0,r4,(_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED)
 	bne	1b
 	b	restore
 
@@ -603,7 +609,7 @@ user_work:
 	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1
 
-	andi.	r0,r4,_TIF_NEED_RESCHED
+	andi.	r0,r4,(_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED)
 	beq	1f
 	bl	.schedule
 	b	.ret_from_except_lite

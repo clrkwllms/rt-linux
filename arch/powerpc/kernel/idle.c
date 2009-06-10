@@ -61,7 +61,8 @@ void cpu_idle(void)
 	set_thread_flag(TIF_POLLING_NRFLAG);
 	while (1) {
 		tick_nohz_stop_sched_tick();
-		while (!need_resched() && !cpu_should_die()) {
+		while (!need_resched() && !need_resched_delayed() &&
+				!cpu_should_die()) {
 			ppc64_runlatch_off();
 
 			if (ppc_md.power_save) {
