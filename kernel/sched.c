@@ -3769,7 +3769,7 @@ void scheduler_tick(void)
 		rq->clock = next_tick;
 	rq->tick_timestamp = rq->clock;
 	update_cpu_load(rq);
-	if (curr != rq->idle) /* FIXME: needed? */
+	if (curr != rq->idle && curr->se.on_rq)
 		curr->sched_class->task_tick(rq, curr);
 	spin_unlock(&rq->lock);
 
