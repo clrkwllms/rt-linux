@@ -407,6 +407,16 @@ struct pv_apic_ops pv_apic_ops = {
 #endif
 };
 
+#ifdef CONFIG_HIGHPTE
+/*
+ * kmap_atomic() might be an inline or a macro:
+ */
+static void *kmap_atomic_func(struct page *page, enum km_type idx)
+{
+	return kmap_atomic(page, idx);
+}
+#endif
+
 struct pv_mmu_ops pv_mmu_ops = {
 	.pagetable_setup_start = native_pagetable_setup_start,
 	.pagetable_setup_done = native_pagetable_setup_done,
@@ -434,7 +444,7 @@ struct pv_mmu_ops pv_mmu_ops = {
 	.pte_update_defer = paravirt_nop,
 
 #ifdef CONFIG_HIGHPTE
-	.kmap_atomic_pte = kmap_atomic,
+	.kmap_atomic_pte = kmap_atomic_func,
 #endif
 
 #ifdef CONFIG_X86_PAE
