@@ -349,9 +349,11 @@ static const struct stacktrace_ops print_trace_ops = {
 void
 show_trace(struct task_struct *tsk, struct pt_regs *regs, unsigned long *stack)
 {
+	pause_on_oops_head();
 	printk("\nCall Trace:\n");
 	dump_trace(tsk, regs, stack, &print_trace_ops, NULL);
 	printk("\n");
+	pause_on_oops_tail();
 	print_preempt_trace(tsk);
 }
 

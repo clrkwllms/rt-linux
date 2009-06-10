@@ -27,7 +27,38 @@ static int pause_on_oops;
 static int pause_on_oops_flag;
 static DEFINE_SPINLOCK(pause_on_oops_lock);
 
-int panic_timeout;
+/*
+ * Debugging helper: freeze all console output after printing the
+ * first oops's head (or tail):
+ */
+static int pause_on_oops_head_flag = 0;
+static int pause_on_oops_tail_flag = 0;
+
+static void pause_on_oops_loop(int flag)
+{
+	switch (flag) {
+	default:
+		break;
+	case 1:
+		for (;;)
+			local_irq_disable();
+	case 2:
+		for (;;)
+			local_irq_enable();
+	}
+}
+
+void pause_on_oops_head(void)
+{
+	pause_on_oops_loop(pause_on_oops_head_flag);
+}
+
+void pause_on_oops_tail(void)
+{
+	pause_on_oops_loop(pause_on_oops_tail_flag);
+}
+
+int panic_timeout __read_mostly;
 
 ATOMIC_NOTIFIER_HEAD(panic_notifier_list);
 
@@ -189,6 +220,22 @@ static int __init pause_on_oops_setup(char *str)
 	return 1;
 }
 __setup("pause_on_oops=", pause_on_oops_setup);
+
+static int __init pause_on_oops_head_setup(char *str)
+{
+	pause_on_oops_head_flag = simple_strtoul(str, NULL, 0);
+	printk(KERN_INFO "pause_on_oops_head: %d\n", pause_on_oops_head_flag);
+	return 1;
+}
+__setup("pause_on_oops_head=", pause_on_oops_head_setup);
+
+static int __init pause_on_oops_tail_setup(char *str)
+{
+	pause_on_oops_tail_flag = simple_strtoul(str, NULL, 0);
+	printk(KERN_INFO "pause_on_oops_tail: %d\n", pause_on_oops_tail_flag);
+	return 1;
+}
+__setup("pause_on_oops_tail=", pause_on_oops_tail_setup);
 
 static void spin_msec(int msecs)
 {

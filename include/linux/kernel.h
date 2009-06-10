@@ -223,6 +223,10 @@ extern void wake_up_klogd(void);
 extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in progress */
 extern int panic_timeout;
 extern int panic_on_oops;
+
+extern void pause_on_oops_head(void);
+extern void pause_on_oops_tail(void);
+
 extern int panic_on_unrecovered_nmi;
 extern int tainted;
 extern const char *print_tainted(void);
