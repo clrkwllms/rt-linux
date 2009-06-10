@@ -42,7 +42,12 @@
 #include <linux/cpumask.h>
 #include <linux/seqlock.h>
 
-#define call_rcu_bh(head, rcu) call_rcu(head, rcu)
+/*
+ * Someone might want to pass call_rcu_bh as a function pointer.
+ * So this needs to just be a rename and not a macro function.
+ *  (no parentheses)
+ */
+#define call_rcu_bh	 	call_rcu_preempt
 #define rcu_bh_qsctr_inc(cpu)	do { } while (0)
 #define __rcu_read_lock_bh()	{ rcu_read_lock(); local_bh_disable(); }
 #define __rcu_read_unlock_bh()	{ local_bh_enable(); rcu_read_unlock(); }
