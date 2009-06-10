@@ -23,8 +23,8 @@
 enum { MR_NONE, MR_ACCESS, MR_UPDATE };
 
 typedef struct {
-	struct rw_semaphore	mr_lock;
-	int			mr_writer;
+	struct compat_rw_semaphore	mr_lock;
+	int				mr_writer;
 } mrlock_t;
 
 #define mrinit(mrp, name)	\

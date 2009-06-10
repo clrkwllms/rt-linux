@@ -1225,14 +1225,32 @@ static int __blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags,
 	 * For now, block device ->open() routine must _not_
 	 * examine anything in 'inode' argument except ->i_rdev.
 	 */
-	struct file fake_file = {};
-	struct dentry fake_dentry = {};
-	fake_file.f_mode = mode;
-	fake_file.f_flags = flags;
-	fake_file.f_path.dentry = &fake_dentry;
-	fake_dentry.d_inode = bdev->bd_inode;
+	struct file *fake_file;
+	struct dentry *fake_dentry;
+	int err = -ENOMEM;
 
-	return do_open(bdev, &fake_file, for_part);
+	fake_file = kmalloc(sizeof(*fake_file), GFP_KERNEL);
+	if (!fake_file)
+		goto out;
+	memset(fake_file, 0, sizeof(*fake_file));
+
+	fake_dentry = kmalloc(sizeof(*fake_dentry), GFP_KERNEL);
+	if (!fake_dentry)
+		goto out_free_file;
+	memset(fake_dentry, 0, sizeof(*fake_dentry));
+
+	fake_file->f_mode = mode;
+	fake_file->f_flags = flags;
+	fake_file->f_path.dentry = fake_dentry;
+	fake_dentry->d_inode = bdev->bd_inode;
+
+	err = do_open(bdev, fake_file, for_part);
+
+	kfree(fake_dentry);
+out_free_file:
+	kfree(fake_file);
+out:
+	return err;
 }
 
 int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags)

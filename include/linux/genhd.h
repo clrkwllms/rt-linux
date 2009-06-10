@@ -157,15 +157,22 @@ struct disk_attribute {
  * variants disable/enable preemption.
  */
 #ifdef	CONFIG_SMP
-#define __disk_stat_add(gendiskp, field, addnd) 	\
-	(per_cpu_ptr(gendiskp->dkstats, smp_processor_id())->field += addnd)
+#define __disk_stat_add(gendiskp, field, addnd)			\
+do {								\
+	preempt_disable();					\
+	(per_cpu_ptr(gendiskp->dkstats,				\
+			smp_processor_id())->field += addnd);	\
+	preempt_enable();					\
+} while (0)
 
 #define disk_stat_read(gendiskp, field)					\
 ({									\
 	typeof(gendiskp->dkstats->field) res = 0;			\
 	int i;								\
+	preempt_disable();						\
 	for_each_possible_cpu(i)					\
 		res += per_cpu_ptr(gendiskp->dkstats, i)->field;	\
+	preempt_enable();						\
 	res;								\
 })
 

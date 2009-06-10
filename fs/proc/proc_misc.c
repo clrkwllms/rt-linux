@@ -96,6 +96,27 @@ static int loadavg_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
+#ifdef CONFIG_PREEMPT_RT
+static int loadavg_rt_read_proc(char *page, char **start, off_t off,
+				 int count, int *eof, void *data)
+{
+	extern unsigned long avenrun_rt[];
+	extern unsigned long rt_nr_running(void);
+	int a, b, c;
+	int len;
+
+	a = avenrun_rt[0] + (FIXED_1/200);
+	b = avenrun_rt[1] + (FIXED_1/200);
+	c = avenrun_rt[2] + (FIXED_1/200);
+	len = sprintf(page,"%d.%02d %d.%02d %d.%02d %ld/%d %d\n",
+		LOAD_INT(a), LOAD_FRAC(a),
+		LOAD_INT(b), LOAD_FRAC(b),
+		LOAD_INT(c), LOAD_FRAC(c),
+		rt_nr_running(), nr_threads, current->nsproxy->pid_ns->last_pid);
+	return proc_calc_metrics(page, start, off, count, eof, len);
+}
+#endif
+
 static int uptime_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
@@ -555,6 +576,38 @@ static int show_stat(struct seq_file *p, void *v)
 		nr_iowait());
 
 	kfree(per_irq_sum);
+#ifdef CONFIG_PREEMPT_RT
+	{
+		unsigned long nr_uninterruptible_cpu(int cpu);
+		extern int pi_initialized;
+		unsigned long rt_nr_running(void);
+		unsigned long rt_nr_running_cpu(int cpu);
+		unsigned long rt_nr_uninterruptible(void);
+		unsigned long rt_nr_uninterruptible_cpu(int cpu);
+
+		int i;
+
+		seq_printf(p, "pi_init: %d\n", pi_initialized);
+		seq_printf(p, "nr_running(): %ld\n",
+			nr_running());
+		seq_printf(p, "nr_uninterruptible(): %ld\n",
+			nr_uninterruptible());
+		for_each_online_cpu(i)
+			seq_printf(p, "nr_uninterruptible(%d): %ld\n",
+				i, nr_uninterruptible_cpu(i));
+		seq_printf(p, "rt_nr_running(): %ld\n",
+			rt_nr_running());
+		for_each_online_cpu(i)
+			seq_printf(p, "rt_nr_running(%d): %ld\n",
+				i, rt_nr_running_cpu(i));
+		seq_printf(p, "nr_rt_uninterruptible(): %ld\n",
+			   rt_nr_uninterruptible());
+		for_each_online_cpu(i)
+			seq_printf(p, "nr_rt_uninterruptible(%d): %ld\n",
+				   i, rt_nr_uninterruptible_cpu(i));
+	}
+#endif
+
 	return 0;
 }
 
@@ -704,6 +757,9 @@ void __init proc_misc_init(void)
 		int (*read_proc)(char*,char**,off_t,int,int*,void*);
 	} *p, simple_ones[] = {
 		{"loadavg",     loadavg_read_proc},
+#ifdef CONFIG_PREEMPT_RT
+		{"loadavgrt",   loadavg_rt_read_proc},
+#endif
 		{"uptime",	uptime_read_proc},
 		{"meminfo",	meminfo_read_proc},
 		{"version",	version_read_proc},

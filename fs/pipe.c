@@ -385,8 +385,14 @@ redo:
 		wake_up_interruptible_sync(&pipe->wait);
 		kill_fasync(&pipe->fasync_writers, SIGIO, POLL_OUT);
 	}
+	/*
+	 * Hack: we turn off atime updates for -RT kernels.
+	 * Who uses them on pipes anyway?
+	 */
+#ifndef CONFIG_PREEMPT_RT
 	if (ret > 0)
 		file_accessed(filp);
+#endif
 	return ret;
 }
 
@@ -558,8 +564,14 @@ out:
 		wake_up_interruptible_sync(&pipe->wait);
 		kill_fasync(&pipe->fasync_readers, SIGIO, POLL_IN);
 	}
+	/*
+	 * Hack: we turn off atime updates for -RT kernels.
+	 * Who uses them on pipes anyway?
+	 */
+#ifndef CONFIG_PREEMPT_RT
 	if (ret > 0)
 		file_update_time(filp);
+#endif
 	return ret;
 }
 
