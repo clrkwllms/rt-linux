@@ -1083,6 +1083,13 @@ config RMEM
 	  patching /dev/mem because we don't expect this functionality
 	  to ever be accepted into mainline.
 
+config ALLOC_RTSJ_MEM
+	tristate "RTSJ-specific hack to reserve memory"
+	default m
+	help
+	  The RTSJ TCK conformance test requires reserving some physical
+	  memory for testing /dev/rmem.
+
 config DEVPORT
 	bool
 	depends on !M68K

@@ -100,6 +100,12 @@ static inline void acpi_early_init(void) { }
 #ifndef CONFIG_DEBUG_RODATA
 static inline void mark_rodata_ro(void) { }
 #endif
+#ifdef CONFIG_ALLOC_RTSJ_MEM
+extern void alloc_rtsj_mem_early_setup(void);
+#else
+static inline void alloc_rtsj_mem_early_setup(void) { }
+#endif
+
 
 #ifdef CONFIG_TC
 extern void tc_init(void);
@@ -613,6 +619,7 @@ asmlinkage void __init start_kernel(void)
 #endif
 	vfs_caches_init_early();
 	cpuset_init_early();
+	alloc_rtsj_mem_early_setup();
 	mem_init();
 	kmem_cache_init();
 	setup_per_cpu_pageset();
