@@ -319,7 +319,6 @@ print_trace_warning_symbol(void *data, char *msg, unsigned long symbol)
 {
 	print_symbol(msg, symbol);
 	printk("\n");
-	debug_show_held_locks(tsk);
 }
 
 static void print_trace_warning(void *data, char *msg)
@@ -354,6 +353,7 @@ show_trace(struct task_struct *tsk, struct pt_regs *regs, unsigned long *stack)
 	dump_trace(tsk, regs, stack, &print_trace_ops, NULL);
 	printk("\n");
 	pause_on_oops_tail();
+	debug_show_held_locks(tsk);
 	print_preempt_trace(tsk);
 }
 
