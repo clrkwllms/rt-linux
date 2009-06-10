@@ -125,7 +125,7 @@ static inline void nfs_inc_server_stats(struct nfs_server *server, enum nfs_stat
 	cpu = get_cpu();
 	iostats = per_cpu_ptr(server->io_stats, cpu);
 	iostats->events[stat] ++;
-	put_cpu_no_resched();
+	put_cpu();
 }
 
 static inline void nfs_inc_stats(struct inode *inode, enum nfs_stat_eventcounters stat)
@@ -141,7 +141,7 @@ static inline void nfs_add_server_stats(struct nfs_server *server, enum nfs_stat
 	cpu = get_cpu();
 	iostats = per_cpu_ptr(server->io_stats, cpu);
 	iostats->bytes[stat] += addend;
-	put_cpu_no_resched();
+	put_cpu();
 }
 
 static inline void nfs_add_stats(struct inode *inode, enum nfs_stat_bytecounters stat, unsigned long addend)
