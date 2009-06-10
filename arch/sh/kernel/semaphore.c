@@ -46,7 +46,7 @@ DEFINE_SPINLOCK(semaphore_wake_lock);
  * critical part is the inline stuff in <asm/semaphore.h>
  * where we want to avoid any extra jumps and calls.
  */
-void __up(struct semaphore *sem)
+void __attribute_used__ __compat_up(struct compat_semaphore *sem)
 {
 	wake_one_more(sem);
 	wake_up(&sem->wait);
@@ -104,7 +104,7 @@ void __up(struct semaphore *sem)
 	tsk->state = TASK_RUNNING;		\
 	remove_wait_queue(&sem->wait, &wait);
 
-void __sched __down(struct semaphore * sem)
+void __attribute_used__ __sched __compat_down(struct compat_semaphore * sem)
 {
 	DOWN_VAR
 	DOWN_HEAD(TASK_UNINTERRUPTIBLE)
@@ -114,7 +114,7 @@ void __sched __down(struct semaphore * sem)
 	DOWN_TAIL(TASK_UNINTERRUPTIBLE)
 }
 
-int __sched __down_interruptible(struct semaphore * sem)
+int __attribute_used__ __sched __compat_down_interruptible(struct compat_semaphore * sem)
 {
 	int ret = 0;
 	DOWN_VAR
@@ -133,7 +133,13 @@ int __sched __down_interruptible(struct semaphore * sem)
 	return ret;
 }
 
-int __down_trylock(struct semaphore * sem)
+int __attribute_used__ __compat_down_trylock(struct compat_semaphore * sem)
 {
 	return waking_non_zero_trylock(sem);
 }
+
+fastcall int __sched compat_sem_is_locked(struct compat_semaphore *sem)
+{
+  return (int) atomic_read(&sem->count) < 0;
+}
+

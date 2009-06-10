@@ -43,7 +43,7 @@ void update_mmu_cache(struct vm_area_struct * vma,
 	}
 #endif
 
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 
 	/* Set PTEH register */
 	vpn = (address & MMU_VPN_MASK) | get_asid();
@@ -76,7 +76,7 @@ void update_mmu_cache(struct vm_area_struct * vma,
 
 	/* Load the TLB */
 	asm volatile("ldtlb": /* no output */ : /* no input */ : "memory");
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 }
 
 void local_flush_tlb_one(unsigned long asid, unsigned long page)

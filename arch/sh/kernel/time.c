@@ -24,7 +24,7 @@
 struct sys_timer *sys_timer;
 
 /* Move this somewhere more sensible.. */
-DEFINE_SPINLOCK(rtc_lock);
+DEFINE_RAW_SPINLOCK(rtc_lock);
 EXPORT_SYMBOL(rtc_lock);
 
 /* Dummy RTC ops */

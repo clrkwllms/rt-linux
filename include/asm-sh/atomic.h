@@ -49,11 +49,11 @@ static inline int atomic_cmpxchg(atomic_t *v, int old, int new)
 	int ret;
 	unsigned long flags;
 
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	ret = v->counter;
 	if (likely(ret == old))
 		v->counter = new;
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 
 	return ret;
 }
@@ -65,11 +65,11 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
 	int ret;
 	unsigned long flags;
 
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	ret = v->counter;
 	if (ret != u)
 		v->counter += a;
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 
 	return ret != u;
 }

@@ -81,7 +81,7 @@ static union irq_ctx *hardirq_ctx[NR_CPUS] __read_mostly;
 static union irq_ctx *softirq_ctx[NR_CPUS] __read_mostly;
 #endif
 
-asmlinkage int do_IRQ(unsigned int irq, struct pt_regs *regs)
+asmlinkage notrace int do_IRQ(unsigned int irq, struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 #ifdef CONFIG_IRQSTACKS

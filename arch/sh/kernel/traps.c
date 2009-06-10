@@ -77,7 +77,7 @@ static void dump_mem(const char *str, unsigned long bottom, unsigned long top)
 	}
 }
 
-static DEFINE_SPINLOCK(die_lock);
+static DEFINE_RAW_SPINLOCK(die_lock);
 
 void die(const char * str, struct pt_regs * regs, long err)
 {

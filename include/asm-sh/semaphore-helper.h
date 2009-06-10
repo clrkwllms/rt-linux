@@ -14,12 +14,12 @@
  * This is trivially done with load_locked/store_cond,
  * which we have.  Let the rest of the losers suck eggs.
  */
-static __inline__ void wake_one_more(struct semaphore * sem)
+static __inline__ void wake_one_more(struct compat_semaphore * sem)
 {
 	atomic_inc((atomic_t *)&sem->sleepers);
 }
 
-static __inline__ int waking_non_zero(struct semaphore *sem)
+static __inline__ int waking_non_zero(struct compat_semaphore *sem)
 {
 	unsigned long flags;
 	int ret = 0;
@@ -43,7 +43,7 @@ static __inline__ int waking_non_zero(struct semaphore *sem)
  * protected by the spinlock in order to make atomic this atomic_inc() with the
  * atomic_read() in wake_one_more(), otherwise we can race. -arca
  */
-static __inline__ int waking_non_zero_interruptible(struct semaphore *sem,
+static __inline__ int waking_non_zero_interruptible(struct compat_semaphore *sem,
 						struct task_struct *tsk)
 {
 	unsigned long flags;
@@ -70,7 +70,7 @@ static __inline__ int waking_non_zero_interruptible(struct semaphore *sem,
  * protected by the spinlock in order to make atomic this atomic_inc() with the
  * atomic_read() in wake_one_more(), otherwise we can race. -arca
  */
-static __inline__ int waking_non_zero_trylock(struct semaphore *sem)
+static __inline__ int waking_non_zero_trylock(struct compat_semaphore *sem)
 {
 	unsigned long flags;
 	int ret = 1;

@@ -19,9 +19,9 @@ static inline void set_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	*a |= mask;
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 }
 
 /*
@@ -37,9 +37,9 @@ static inline void clear_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	*a &= ~mask;
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 }
 
 static inline void change_bit(int nr, volatile void * addr)
@@ -50,9 +50,9 @@ static inline void change_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	*a ^= mask;
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 }
 
 static inline int test_and_set_bit(int nr, volatile void * addr)
@@ -63,10 +63,10 @@ static inline int test_and_set_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	retval = (mask & *a) != 0;
 	*a |= mask;
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 
 	return retval;
 }
@@ -79,10 +79,10 @@ static inline int test_and_clear_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	retval = (mask & *a) != 0;
 	*a &= ~mask;
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 
 	return retval;
 }
@@ -95,10 +95,10 @@ static inline int test_and_change_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	retval = (mask & *a) != 0;
 	*a ^= mask;
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 
 	return retval;
 }

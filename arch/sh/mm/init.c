@@ -21,7 +21,7 @@
 #include <asm/sections.h>
 #include <asm/cache.h>
 
-DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
+DEFINE_PER_CPU_LOCKED(struct mmu_gather, mmu_gathers);
 pgd_t swapper_pg_dir[PTRS_PER_PGD];
 
 void (*copy_page)(void *from, void *to);

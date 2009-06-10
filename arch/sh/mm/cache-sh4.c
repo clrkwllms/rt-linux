@@ -204,7 +204,7 @@ void flush_cache_sigtramp(unsigned long addr)
 	index = CACHE_IC_ADDRESS_ARRAY |
 			(v & boot_cpu_data.icache.entry_mask);
 
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	jump_to_P2();
 
 	for (i = 0; i < boot_cpu_data.icache.ways;
@@ -213,7 +213,7 @@ void flush_cache_sigtramp(unsigned long addr)
 
 	back_to_P1();
 	wmb();
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 }
 
 static inline void flush_cache_4096(unsigned long start,
@@ -229,10 +229,10 @@ static inline void flush_cache_4096(unsigned long start,
 	    (start < CACHE_OC_ADDRESS_ARRAY))
 		exec_offset = 0x20000000;
 
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	__flush_cache_4096(start | SH_CACHE_ASSOC,
 			   P1SEGADDR(phys), exec_offset);
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 }
 
 /*
@@ -260,7 +260,7 @@ static inline void flush_icache_all(void)
 {
 	unsigned long flags, ccr;
 
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	jump_to_P2();
 
 	/* Flush I-cache */
@@ -274,7 +274,7 @@ static inline void flush_icache_all(void)
 	 */
 
 	back_to_P1();
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 }
 
 void flush_dcache_all(void)

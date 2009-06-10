@@ -28,7 +28,7 @@
 #include <asm/timer.h>
 
 static LIST_HEAD(clock_list);
-static DEFINE_SPINLOCK(clock_lock);
+static DEFINE_RAW_SPINLOCK(clock_lock);
 static DEFINE_MUTEX(clock_list_sem);
 
 /*

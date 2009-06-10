@@ -157,7 +157,7 @@ ENTRY(resume_userspace)
 	mov.l	@(TI_FLAGS,r8), r0		! current_thread_info->flags
 	tst	#_TIF_WORK_MASK, r0
 	bt/s	__restore_all
-	 tst	#_TIF_NEED_RESCHED, r0
+	 tst	#_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED, r0
 
 	.align	2
 work_pending:
@@ -209,10 +209,10 @@ work_resched:
 	tst	#_TIF_WORK_MASK, r0
 	bt	__restore_all
 	bra	work_pending
-	 tst	#_TIF_NEED_RESCHED, r0
+	 tst	#_TIF_NEED_RESCHED | _TIF_NEED_RESCHED_DELAYED, r0
 
 	.align	2
-1:	.long	schedule
+1:	.long	__schedule
 2:	.long	do_notify_resume
 3:	.long	restore_all
 #ifdef CONFIG_TRACE_IRQFLAGS
@@ -226,7 +226,7 @@ syscall_exit_work:
 	! r8: current_thread_info
 	tst	#_TIF_SYSCALL_TRACE | _TIF_SINGLESTEP, r0
 	bt/s	work_pending
-	 tst	#_TIF_NEED_RESCHED, r0
+	 tst	#_TIF_NEED_RESCHED| _TIF_NEED_RESCHED_DELAYED, r0
 #ifdef CONFIG_TRACE_IRQFLAGS
 	mov.l	5f, r0
 	jsr	@r0

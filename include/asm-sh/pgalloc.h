@@ -13,7 +13,7 @@ static inline void pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmd,
 	set_pmd(pmd, __pmd((unsigned long)pte));
 }
 
-static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd,
+static inline void notrace pmd_populate(struct mm_struct *mm, pmd_t *pmd,
 				struct page *pte)
 {
 	set_pmd(pmd, __pmd((unsigned long)page_address(pte)));

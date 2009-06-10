@@ -28,9 +28,9 @@ static inline void *kmap_coherent(struct page *page, unsigned long addr)
 	vaddr = __fix_to_virt(FIX_CMAP_END - idx);
 	pte = mk_pte(page, PAGE_KERNEL);
 
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 	flush_tlb_one(get_asid(), vaddr);
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 
 	update_mmu_cache(NULL, vaddr, pte);
 
