@@ -21,4 +21,8 @@ obj-$(CONFIG_SCHED_TRACER) += trace_sched_wakeup.o
 obj-$(CONFIG_MMIOTRACE) += trace_mmiotrace.o
 obj-$(CONFIG_EVENT_TRACER) += trace_events.o
 
+obj-$(CONFIG_INTERRUPT_OFF_HIST) += trace_hist.o
+obj-$(CONFIG_PREEMPT_OFF_HIST) += trace_hist.o
+obj-$(CONFIG_WAKEUP_LATENCY_HIST) += trace_hist.o
+
 libftrace-y := ftrace.o
