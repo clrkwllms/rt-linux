@@ -330,6 +330,11 @@ sysenter_past_esp:
 	pushl %eax
 	CFI_ADJUST_CFA_OFFSET 4
 	SAVE_ALL
+#ifdef CONFIG_EVENT_TRACE
+	pushl %edx; pushl %ecx; pushl %ebx; pushl %eax
+	call sys_call
+	popl %eax; popl %ebx; popl %ecx; popl %edx
+#endif
 	GET_THREAD_INFO(%ebp)
 
 	/* Note, _TIF_SECCOMP is bit number 8, and so it needs testw and not testb */
@@ -345,6 +350,11 @@ sysenter_past_esp:
 	movl TI_flags(%ebp), %ecx
 	testw $_TIF_ALLWORK_MASK, %cx
 	jne syscall_exit_work
+#ifdef CONFIG_EVENT_TRACE
+	pushl %eax
+	call sys_ret
+	popl %eax
+#endif
 /* if something modifies registers it must also disable sysexit */
 	movl PT_EIP(%esp), %edx
 	movl PT_OLDESP(%esp), %ecx
@@ -368,6 +378,11 @@ ENTRY(system_call)
 	pushl %eax			# save orig_eax
 	CFI_ADJUST_CFA_OFFSET 4
 	SAVE_ALL
+#ifdef CONFIG_EVENT_TRACE
+	pushl %edx; pushl %ecx; pushl %ebx; pushl %eax
+	call sys_call
+	popl %eax; popl %ebx; popl %ecx; popl %edx
+#endif
 	GET_THREAD_INFO(%ebp)
 					# system call tracing in operation / emulation
 	/* Note, _TIF_SECCOMP is bit number 8, and so it needs testw and not testb */
