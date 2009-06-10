@@ -2269,15 +2269,25 @@ static int rt_mutex_adjust_readers(struct rt_mutex *orig_lock,
 	}
 
 	list_for_each_entry(rls, &rwm->readers, list) {
+		int chain_walk = 0;
+
 		task = rls->task;
 		get_task_struct(task);
+
+		spin_lock(&task->pi_lock);
+		__rt_mutex_adjust_prio(task);
+		if (task->pi_blocked_on)
+			chain_walk = 1;
+		spin_unlock(&task->pi_lock);
+
 		/*
 		 * rt_mutex_adjust_prio_chain will do
 		 * the put_task_struct
 		 */
-		rt_mutex_adjust_prio_chain(task, 0, orig_lock,
-					   orig_waiter, top_task,
-					   recursion_depth+1);
+		if (chain_walk)
+			rt_mutex_adjust_prio_chain(task, 0, orig_lock,
+						   orig_waiter, top_task,
+						   recursion_depth + 1);
 	}
 
 	return 0;
