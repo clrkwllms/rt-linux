@@ -77,6 +77,9 @@ irqsoff_tracer_call(unsigned long ip, unsigned long parent_ip)
 	long disabled;
 	int cpu;
 
+	if (unlikely(!ftrace_enabled))
+		return;
+
 	/*
 	 * Does not matter if we preempt. We test the flags
 	 * afterward, to see if irqs are disabled or not.

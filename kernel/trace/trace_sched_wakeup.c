@@ -45,7 +45,7 @@ wakeup_tracer_call(unsigned long ip, unsigned long parent_ip)
 	int resched;
 	int cpu;
 
-	if (likely(!wakeup_task))
+	if (likely(!wakeup_task) || !ftrace_enabled)
 		return;
 
 	resched = need_resched();
