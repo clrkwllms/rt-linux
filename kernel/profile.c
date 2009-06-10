@@ -23,6 +23,7 @@
 #include <linux/profile.h>
 #include <linux/highmem.h>
 #include <linux/mutex.h>
+#include <linux/sched.h>
 #include <asm/sections.h>
 #include <asm/semaphore.h>
 #include <asm/irq_regs.h>
@@ -46,6 +47,7 @@ int prof_on __read_mostly;
 EXPORT_SYMBOL_GPL(prof_on);
 
 static cpumask_t prof_cpu_mask = CPU_MASK_ALL;
+int prof_pid = -1;
 #ifdef CONFIG_SMP
 static DEFINE_PER_CPU(struct profile_hit *[2], cpu_profile_hits);
 static DEFINE_PER_CPU(int, cpu_profile_flip);
@@ -416,7 +418,8 @@ void __profile_tick(int type, struct pt_regs *regs)
 {
 	if (type == CPU_PROFILING && timer_hook)
 		timer_hook(regs);
-	if (!user_mode(regs) && cpu_isset(smp_processor_id(), prof_cpu_mask))
+	if (!user_mode(regs) && cpu_isset(smp_processor_id(), prof_cpu_mask) &&
+	    (prof_pid == -1 || prof_pid == current->pid))
 		profile_hit(type, (void *)profile_pc(regs));
 }
 
