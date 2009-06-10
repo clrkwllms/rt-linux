@@ -785,8 +785,8 @@ rt_spin_lock_slowunlock(struct rt_mutex *lock)
 
 void __lockfunc rt_spin_lock(spinlock_t *lock)
 {
-	rt_spin_lock_fastlock(&lock->lock, rt_spin_lock_slowlock);
 	spin_acquire(&lock->dep_map, 0, 0, _RET_IP_);
+	LOCK_CONTENDED_RT(lock, rt_mutex_trylock, __rt_spin_lock);
 }
 EXPORT_SYMBOL(rt_spin_lock);
 
@@ -800,8 +800,8 @@ EXPORT_SYMBOL(__rt_spin_lock);
 
 void __lockfunc rt_spin_lock_nested(spinlock_t *lock, int subclass)
 {
-	rt_spin_lock_fastlock(&lock->lock, rt_spin_lock_slowlock);
 	spin_acquire(&lock->dep_map, subclass, 0, _RET_IP_);
+	LOCK_CONTENDED_RT(lock, rt_mutex_trylock, __rt_spin_lock);
 }
 EXPORT_SYMBOL(rt_spin_lock_nested);
 
