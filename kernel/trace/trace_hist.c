@@ -359,11 +359,17 @@ notrace void tracing_hist_preempt_stop(int irqs_on)
 		stop = ftrace_now(cpu);
 		stop_set++;
 		start = per_cpu(hist_irqsoff_start, cpu);
-		latency = (long)nsecs_to_usecs(stop - start);
-		if (latency > 1000000) {
-			printk("%d: latency = %ld (%lu)\n", __LINE__, latency, latency);
-			printk("%d: start=%Ld  stop=%Ld\n", __LINE__, start, stop);
-		}
+
+		if (stop > start) {
+			latency = (long)nsecs_to_usecs(stop - start);
+			if (latency > 1000000) {
+				printk("%d: latency = %ld (%lu)\n", __LINE__,
+				       latency, latency);
+				printk("%d: start=%Ld  stop=%Ld\n", __LINE__,
+				       start, stop);
+			}
+		} else
+			latency = 0;
 		barrier();
 		per_cpu(hist_irqsoff_tracing, cpu) = 0;
 		latency_hist(INTERRUPT_LATENCY, cpu, latency);
@@ -377,11 +383,17 @@ notrace void tracing_hist_preempt_stop(int irqs_on)
 		if (1 || !(stop_set++))
 			stop = ftrace_now(cpu);
 		start = per_cpu(hist_preemptoff_start, cpu);
-		latency = (long)nsecs_to_usecs(stop - start);
-		if (latency > 1000000) {
-			printk("%d: latency = %ld (%lu)\n", __LINE__, latency, latency);
-			printk("%d: start=%Ld  stop=%Ld\n", __LINE__, start, stop);
-		}
+
+		if (stop > start) {
+			latency = (long)nsecs_to_usecs(stop - start);
+			if (latency > 1000000) {
+				printk("%d: latency = %ld (%lu)\n", __LINE__,
+				       latency, latency);
+				printk("%d: start=%Ld  stop=%Ld\n", __LINE__,
+				       start, stop);
+			}
+		} else
+			latency = 0;
 		barrier();
 		per_cpu(hist_preemptoff_tracing, cpu) = 0;
 		latency_hist(PREEMPT_LATENCY, cpu, latency);
@@ -397,11 +409,18 @@ notrace void tracing_hist_preempt_stop(int irqs_on)
 		if (1 || !stop_set)
 			stop = ftrace_now(cpu);
 		start = per_cpu(hist_preemptirqsoff_start, cpu);
-		latency = (long)nsecs_to_usecs(stop - start);
-		if (latency > 1000000) {
-			printk("%d: latency = %ld (%lu)\n", __LINE__, latency, latency);
-			printk("%d: start=%Ld  stop=%Ld\n", __LINE__, start, stop);
-		}
+
+		if (stop > start) {
+			latency = (long)nsecs_to_usecs(stop - start);
+			if (latency > 1000000) {
+				printk("%d: latency = %ld (%lu)\n", __LINE__,
+				       latency, latency);
+				printk("%d: start=%Ld  stop=%Ld\n", __LINE__,
+				       start, stop);
+			}
+		} else
+			latency = 0;
+
 		barrier();
 		per_cpu(hist_preemptirqsoff_tracing, cpu) = 0;
 		latency_hist(PREEMPT_INTERRUPT_LATENCY, cpu, latency);
