@@ -239,6 +239,7 @@ show_trace_log_lvl(struct task_struct *task, struct pt_regs *regs,
 {
 	dump_trace(task, regs, stack, &print_trace_ops, log_lvl);
 	printk("%s =======================\n", log_lvl);
+	print_preempt_trace(task);
 }
 
 void show_trace(struct task_struct *task, struct pt_regs *regs,

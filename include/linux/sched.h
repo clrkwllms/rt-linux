@@ -1134,6 +1134,13 @@ struct task_struct {
 	unsigned int lockdep_recursion;
 #endif
 
+#define MAX_PREEMPT_TRACE 25
+
+#ifdef CONFIG_PREEMPT_TRACE
+	unsigned long preempt_trace_eip[MAX_PREEMPT_TRACE];
+	unsigned long preempt_trace_parent_eip[MAX_PREEMPT_TRACE];
+#endif
+
 /* journalling filesystem info */
 	void *journal_info;
 
@@ -2013,6 +2020,12 @@ static inline void inc_syscr(struct task_struct *tsk)
 static inline void inc_syscw(struct task_struct *tsk)
 {
 }
+#endif
+
+#ifdef CONFIG_PREEMPT_TRACE
+void print_preempt_trace(struct task_struct *tsk);
+#else
+# define print_preempt_trace(tsk) do { } while (0)
 #endif
 
 #ifdef CONFIG_SMP

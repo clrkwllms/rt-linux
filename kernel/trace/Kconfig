@@ -156,3 +156,10 @@ config WAKEUP_LATENCY_HIST
 	help
 	  This option uses the infrastructure of the wakeup tracer
 	  to create a histogram of latencies.
+
+config PREEMPT_TRACE
+	bool "Keep a record of preempt disabled spots"
+	depends on DEBUG_KERNEL
+	select TRACING
+	help
+	  Keeps a record of the last 25 preempt disabled locations.

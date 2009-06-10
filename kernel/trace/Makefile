@@ -25,4 +25,6 @@ obj-$(CONFIG_INTERRUPT_OFF_HIST) += trace_hist.o
 obj-$(CONFIG_PREEMPT_OFF_HIST) += trace_hist.o
 obj-$(CONFIG_WAKEUP_LATENCY_HIST) += trace_hist.o
 
+obj-$(CONFIG_PREEMPT_TRACE) += preempt-trace.o
+
 libftrace-y := ftrace.o
