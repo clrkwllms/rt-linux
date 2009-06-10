@@ -93,6 +93,9 @@
 #ifdef CONFIG_MIPS
 # include <asm/time.h>
 #endif
+static unsigned long rtc_port;
+static int rtc_irq = PCI_IRQ_NONE;
+#endif
 
 #ifdef CONFIG_RTC_HISTOGRAM
 
@@ -114,10 +117,6 @@ enum rtc_states {
 	S_READ_MISSED,		/* Signal delivered, read() deadline missed */
 };
 
-#endif
-
-static unsigned long rtc_port;
-static int rtc_irq = PCI_IRQ_NONE;
 #endif
 
 #ifdef	CONFIG_HPET_RTC_IRQ
