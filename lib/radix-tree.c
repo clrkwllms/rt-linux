@@ -103,12 +103,13 @@ radix_tree_node_alloc(struct radix_tree_root *root)
 	if (ret == NULL && !(gfp_mask & __GFP_WAIT)) {
 		struct radix_tree_preload *rtp;
 
-		rtp = &__get_cpu_var(radix_tree_preloads);
+		rtp = &get_cpu_var(radix_tree_preloads);
 		if (rtp->nr) {
 			ret = rtp->nodes[rtp->nr - 1];
 			rtp->nodes[rtp->nr - 1] = NULL;
 			rtp->nr--;
 		}
+		put_cpu_var(radix_tree_preloads);
 	}
 	BUG_ON(radix_tree_is_indirect_ptr(ret));
 	return ret;
@@ -126,6 +127,8 @@ radix_tree_node_free(struct radix_tree_node *node)
 {
 	call_rcu(&node->rcu_head, radix_tree_node_rcu_free);
 }
+
+#ifndef CONFIG_PREEMPT_RT
 
 /*
  * Load up this CPU's radix_tree_node buffer with sufficient objects to
@@ -159,6 +162,8 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL(radix_tree_preload);
+
+#endif
 
 static inline void tag_set(struct radix_tree_node *node, unsigned int tag,
 		int offset)
