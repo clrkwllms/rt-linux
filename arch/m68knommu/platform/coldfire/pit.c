@@ -119,7 +119,7 @@ static irqreturn_t pit_tick(int irq, void *dummy)
 
 static struct irqaction pit_irq = {
 	.name	 = "timer",
-	.flags	 = IRQF_DISABLED | IRQF_TIMER,
+	.flags	 = IRQF_DISABLED | IRQF_TIMER | IRQF_NODELAY,
 	.handler = pit_tick,
 };
 

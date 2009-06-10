@@ -77,9 +77,11 @@ void cpu_idle(void)
 		stop_critical_timings();
 		idle();
 		start_critical_timings();
-		preempt_enable_no_resched();
-		schedule();
+		local_irq_disable();
+		__preempt_enable_no_resched();
+		__schedule();
 		preempt_disable();
+		local_irq_enable();
 	}
 }
 
