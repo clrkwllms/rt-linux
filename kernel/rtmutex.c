@@ -834,6 +834,7 @@ rt_spin_lock_slowlock(struct rt_mutex *lock)
 	struct rt_mutex_waiter waiter;
 	unsigned long saved_state, state, flags;
 	struct task_struct *orig_owner;
+	int missed = 0;
 
 	debug_rt_mutex_init_waiter(&waiter);
 	waiter.task = NULL;
@@ -860,8 +861,14 @@ rt_spin_lock_slowlock(struct rt_mutex *lock)
 		int saved_lock_depth = current->lock_depth;
 
 		/* Try to acquire the lock */
-		if (do_try_to_take_rt_mutex(lock, STEAL_LATERAL))
+		if (do_try_to_take_rt_mutex(lock, STEAL_LATERAL)) {
+			/* If we never blocked break out now */
+			if (!missed)
+				goto unlock;
 			break;
+		}
+		missed = 1;
+
 		/*
 		 * waiter.task is NULL the first time we come here and
 		 * when we have been woken up by the previous owner
@@ -920,6 +927,7 @@ rt_spin_lock_slowlock(struct rt_mutex *lock)
 	 */
 	fixup_rt_mutex_waiters(lock);
 
+ unlock:
 	spin_unlock_irqrestore(&lock->wait_lock, flags);
 
 	debug_rt_mutex_free_waiter(&waiter);
