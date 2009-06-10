@@ -103,27 +103,6 @@ static void wakeup_softirqd(int softirq)
 
 	if (unlikely(!tsk))
 		return;
-#if defined(CONFIG_PREEMPT_SOFTIRQS) && defined(CONFIG_PREEMPT_HARDIRQS)
-	/*
-	 * Optimization: if we are in a hardirq thread context, and
-	 * if the priority of the softirq thread is the same as the
-	 * priority of the hardirq thread, then 'merge' softirq
-	 * processing into the hardirq context. (it will later on
-	 * execute softirqs via do_softirq_from_hardirq()).
-	 * So here we can skip the wakeup and can rely on the hardirq
-	 * context processing it later on.
-	 */
-	if ((current->flags & PF_HARDIRQ) && !hardirq_count() &&
-			(tsk->normal_prio == current->normal_prio) &&
-	    /*
-	     * The hard irq thread must be bound to a single CPU to run
-	     * a softirq. Don't worry about locking, the irq thread
-	     * should be the only one to modify the cpus_allowed, when
-	     * the irq affinity changes.
-	     */
-	    (cpus_weight(current->cpus_allowed) == 1))
-		return;
-#endif
 	/*
 	 * Wake up the softirq task:
 	 */

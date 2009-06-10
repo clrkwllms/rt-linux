@@ -786,28 +786,11 @@ static int do_irqd(void * __desc)
 {
 	struct sched_param param = { 0, };
 	struct irq_desc *desc = __desc;
-	int run_softirq = 1;
 
 #ifdef CONFIG_SMP
 	cpumask_t cpus_allowed;
 
 	cpus_allowed = desc->affinity;
-	/*
-	 * If the irqd is bound to one CPU we let it run softirqs
-	 * that have the same priority as the irqd thread. We do
-	 * not run it if the irqd is bound to more than one CPU
-	 * due to the fact that it can
-	 *  1) migrate to other CPUS while running the softirqd
-	 *  2) if we pin the irqd to a CPU to run the softirqd, then
-	 *     we risk a high priority process from waking up and
-	 *     preempting the irqd. Although the irqd may be able to
-	 *     run on other CPUS due to its irq affinity, it will not
-	 *     be able to since we bound it to a CPU to run softirqs.
-	 *     So a RT hog could starve the irqd from running on
-	 *     other CPUS that it's allowed to run on.
-	 */
-	if (cpus_weight(cpus_allowed) != 1)
-		run_softirq = 0; /* turn it off */
 #endif
 	current->flags |= PF_NOFREEZE | PF_HARDIRQ;
 
@@ -823,8 +806,6 @@ static int do_irqd(void * __desc)
 		do {
 			set_current_state(TASK_INTERRUPTIBLE);
 			do_hardirq(desc);
-			if (run_softirq)
-				do_softirq_from_hardirq();
 		} while (current->state == TASK_RUNNING);
 
 		local_irq_enable_nort();
@@ -832,14 +813,8 @@ static int do_irqd(void * __desc)
 		/*
 		 * Did IRQ affinities change?
 		 */
-		if (!cpus_equal(cpus_allowed, desc->affinity)) {
+		if (!cpus_equal(cpus_allowed, desc->affinity))
 			cpus_allowed = desc->affinity;
-			/*
-			 * Only allow the irq thread to run the softirqs
-			 * if it is bound to a single CPU.
-			 */
-			run_softirq = (cpus_weight(cpus_allowed) == 1);
-		}
 #endif
 		schedule();
 	}
