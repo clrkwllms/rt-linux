@@ -1137,6 +1137,12 @@ rt_rwlock_update_owner(struct rw_mutex *rwm, struct task_struct *own)
 	if (own == RT_RW_READER)
 		return;
 
+	/*
+	 * We don't need to grab the pi_lock to look at the reader list
+	 * since we hold the rwm wait_lock. We only care about the pointer
+	 * to this lock, and we own the wait_lock, so that pointer
+	 * can't be changed.
+	 */
 	for (i = own->reader_lock_count - 1; i >= 0; i--) {
 		if (own->owned_read_locks[i].lock == rwm)
 			break;
@@ -1256,6 +1262,7 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 	if (incr) {
 		atomic_inc(&rwm->owners);
 		rw_check_held(rwm);
+		spin_lock(&current->pi_lock);
 		reader_count = current->reader_lock_count++;
 		if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
 			rls = &current->owned_read_locks[reader_count];
@@ -1265,6 +1272,7 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 			list_add(&rls->list, &rwm->readers);
 		} else
 			WARN_ON_ONCE(1);
+		spin_unlock(&current->pi_lock);
 	}
 	rt_mutex_deadlock_account_lock(mutex, current);
 	atomic_inc(&rwm->count);
@@ -1420,6 +1428,7 @@ __rt_read_fasttrylock(struct rw_mutex *rwm)
  retry:
 	if (likely(rt_rwlock_cmpxchg(rwm, NULL, current))) {
 		int reader_count;
+		unsigned long flags;
 
 		rt_mutex_deadlock_account_lock(&rwm->mutex, current);
 		atomic_inc(&rwm->count);
@@ -1436,30 +1445,31 @@ __rt_read_fasttrylock(struct rw_mutex *rwm)
 
 		atomic_inc(&rwm->owners);
 		rw_check_held(rwm);
-		reader_count = current->reader_lock_count;
+		local_irq_save(flags);
+		spin_lock(&current->pi_lock);
+		reader_count = current->reader_lock_count++;
 		if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
 			current->owned_read_locks[reader_count].lock = rwm;
 			current->owned_read_locks[reader_count].count = 1;
 		} else
 			WARN_ON_ONCE(1);
+		spin_unlock(&current->pi_lock);
 		/*
 		 * If this task is no longer the sole owner of the lock
 		 * or someone is blocking, then we need to add the task
 		 * to the lock.
 		 */
-		smp_mb();
-		current->reader_lock_count++;
 		if (unlikely(rwm->owner != current)) {
 			struct rt_mutex *mutex = &rwm->mutex;
 			struct reader_lock_struct *rls;
-			unsigned long flags;
 
-			spin_lock_irqsave(&mutex->wait_lock, flags);
+			spin_lock(&mutex->wait_lock);
 			rls = &current->owned_read_locks[reader_count];
 			if (!rls->list.prev || list_empty(&rls->list))
 				list_add(&rls->list, &rwm->readers);
-			spin_unlock_irqrestore(&mutex->wait_lock, flags);
+			spin_unlock(&mutex->wait_lock);
 		}
+		local_irq_restore(flags);
 		return 1;
 	}
 	return 0;
@@ -1712,6 +1722,7 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 
 	for (i = current->reader_lock_count - 1; i >= 0; i--) {
 		if (current->owned_read_locks[i].lock == rwm) {
+			spin_lock(&current->pi_lock);
 			current->owned_read_locks[i].count--;
 			if (!current->owned_read_locks[i].count) {
 				current->reader_lock_count--;
@@ -1723,6 +1734,7 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 				rls->lock = NULL;
 				rw_check_held(rwm);
 			}
+			spin_unlock(&current->pi_lock);
 			break;
 		}
 	}
@@ -1848,8 +1860,14 @@ rt_read_fastunlock(struct rw_mutex *rwm,
 	atomic_dec(&rwm->count);
 	if (likely(rt_rwlock_cmpxchg(rwm, current, NULL))) {
 		struct reader_lock_struct *rls;
-		int reader_count = --current->reader_lock_count;
+		unsigned long flags;
+		int reader_count;
 		int owners;
+
+		spin_lock_irqsave(&current->pi_lock, flags);
+		reader_count = --current->reader_lock_count;
+		spin_unlock_irqrestore(&current->pi_lock, flags);
+
 		rt_mutex_deadlock_account_unlock(current);
 		if (unlikely(reader_count < 0)) {
 			    reader_count = 0;
@@ -2041,6 +2059,8 @@ rt_mutex_downgrade_write(struct rw_mutex *rwm)
 	atomic_inc(&rwm->count);
 	atomic_inc(&rwm->owners);
 	rw_check_held(rwm);
+
+	spin_lock(&current->pi_lock);
 	reader_count = current->reader_lock_count++;
 	rls = &current->owned_read_locks[reader_count];
 	if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
@@ -2048,6 +2068,7 @@ rt_mutex_downgrade_write(struct rw_mutex *rwm)
 		rls->count = 1;
 	} else
 		WARN_ON_ONCE(1);
+	spin_unlock(&current->pi_lock);
 
 	if (!rt_mutex_has_waiters(mutex)) {
 		/* We are sole owner, we are done */
