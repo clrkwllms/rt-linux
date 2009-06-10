@@ -4,9 +4,15 @@
  *	Copyright (C) 1992 Linus Torvalds
  *
  * Rewritten. Old one was good in 2.2, but in 2.3 it was immoral. --ANK (990903)
+ *
+ *	Softirq-split implemetation by
+ *	Copyright (C) 2005 Thomas Gleixner, Ingo Molnar
  */
 
 #include <linux/module.h>
+#include <linux/kallsyms.h>
+#include <linux/syscalls.h>
+#include <linux/wait.h>
 #include <linux/kernel_stat.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
@@ -46,7 +52,41 @@ EXPORT_SYMBOL(irq_stat);
 
 static struct softirq_action softirq_vec[32] __cacheline_aligned_in_smp;
 
-static DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
+struct softirqdata {
+	int			nr;
+	unsigned long		cpu;
+	struct task_struct	*tsk;
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+	wait_queue_head_t	wait;
+	int			running;
+#endif
+};
+
+static DEFINE_PER_CPU(struct softirqdata [MAX_SOFTIRQ], ksoftirqd);
+
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+/*
+ * Preempting the softirq causes cases that would not be a
+ * problem when the softirq is not preempted. That is a
+ * process may have code to spin while waiting for a softirq
+ * to finish on another CPU.  But if it happens that the
+ * process has preempted the softirq, this could cause a
+ * deadlock.
+ */
+void wait_for_softirq(int softirq)
+{
+	struct softirqdata *data = &__get_cpu_var(ksoftirqd)[softirq];
+	if (data->running) {
+		DECLARE_WAITQUEUE(wait, current);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		add_wait_queue(&data->wait, &wait);
+		if (data->running)
+			schedule();
+		remove_wait_queue(&data->wait, &wait);
+		__set_current_state(TASK_RUNNING);
+	}
+}
+#endif
 
 /*
  * we cannot loop indefinitely here to avoid userspace starvation,
@@ -54,13 +94,29 @@ static DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
  * to the pending events, so lets the scheduler to balance
  * the softirq load for us.
  */
-static inline void wakeup_softirqd(void)
+static void wakeup_softirqd(int softirq)
 {
 	/* Interrupts are disabled: no need to stop preemption */
-	struct task_struct *tsk = __get_cpu_var(ksoftirqd);
+	struct task_struct *tsk = __get_cpu_var(ksoftirqd)[softirq].tsk;
 
 	if (tsk && tsk->state != TASK_RUNNING)
 		wake_up_process(tsk);
+}
+
+/*
+ * Wake up the softirq threads which have work
+ */
+static void trigger_softirqs(void)
+{
+	u32 pending = local_softirq_pending();
+	int curr = 0;
+
+	while (pending) {
+		if (pending & 1)
+			wakeup_softirqd(curr);
+		pending >>= 1;
+		curr++;
+	}
 }
 
 /*
@@ -97,20 +153,6 @@ void local_bh_disable(void)
 }
 
 EXPORT_SYMBOL(local_bh_disable);
-
-void __local_bh_enable(void)
-{
-	WARN_ON_ONCE(in_irq());
-
-	/*
-	 * softirqs should never be enabled by __local_bh_enable(),
-	 * it always nests inside local_bh_enable() sections:
-	 */
-	WARN_ON_ONCE(softirq_count() == SOFTIRQ_OFFSET);
-
-	sub_preempt_count(SOFTIRQ_OFFSET);
-}
-EXPORT_SYMBOL_GPL(__local_bh_enable);
 
 /*
  * Special-case - softirqs can safely be enabled in
@@ -205,7 +247,7 @@ EXPORT_SYMBOL(local_bh_enable_ip);
  */
 #define MAX_SOFTIRQ_RESTART 10
 
-asmlinkage void __do_softirq(void)
+asmlinkage void ___do_softirq(void)
 {
 	struct softirq_action *h;
 	__u32 pending;
@@ -214,9 +256,6 @@ asmlinkage void __do_softirq(void)
 
 	pending = local_softirq_pending();
 	account_system_vtime(current);
-
-	__local_bh_disable((unsigned long)__builtin_return_address(0));
-	trace_softirq_enter();
 
 	cpu = smp_processor_id();
 restart:
@@ -229,8 +268,17 @@ restart:
 
 	do {
 		if (pending & 1) {
-			h->action(h);
+			{
+				u32 preempt_count = preempt_count();
+				h->action(h);
+				if (preempt_count != preempt_count()) {
+					print_symbol("BUG: softirq exited %s with wrong preemption count!\n", (unsigned long) h->action);
+					printk("entered with %08x, exited with %08x.\n", preempt_count, preempt_count());
+					preempt_count() = preempt_count;
+				}
+			}
 			rcu_bh_qsctr_inc(cpu);
+			cond_resched_softirq_context();
 		}
 		h++;
 		pending >>= 1;
@@ -243,12 +291,34 @@ restart:
 		goto restart;
 
 	if (pending)
-		wakeup_softirqd();
+		trigger_softirqs();
+}
+
+asmlinkage void __do_softirq(void)
+{
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+	/*
+	 * 'preempt harder'. Push all softirq processing off to ksoftirqd.
+	 */
+	if (softirq_preemption) {
+		if (local_softirq_pending())
+			trigger_softirqs();
+		return;
+	}
+#endif
+	/*
+	 * 'immediate' softirq execution:
+	 */
+	__local_bh_disable((unsigned long)__builtin_return_address(0));
+	trace_softirq_enter();
+
+	___do_softirq();
 
 	trace_softirq_exit();
 
 	account_system_vtime(current);
 	_local_bh_enable();
+
 }
 
 #ifndef __ARCH_HAS_DO_SOFTIRQ
@@ -316,19 +386,11 @@ void irq_exit(void)
  */
 inline fastcall void raise_softirq_irqoff(unsigned int nr)
 {
-	__raise_softirq_irqoff(nr);
+	__do_raise_softirq_irqoff(nr);
 
-	/*
-	 * If we're in an interrupt or softirq, we're done
-	 * (this also catches softirq-disabled code). We will
-	 * actually run the softirq once we return from
-	 * the irq or softirq.
-	 *
-	 * Otherwise we wake up ksoftirqd to make sure we
-	 * schedule the softirq soon.
-	 */
-	if (!in_interrupt())
-		wakeup_softirqd();
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+	wakeup_softirqd(nr);
+#endif
 }
 
 void fastcall raise_softirq(unsigned int nr)
@@ -411,7 +473,7 @@ static void tasklet_action(struct softirq_action *a)
 		local_irq_disable();
 		t->next = __get_cpu_var(tasklet_vec).list;
 		__get_cpu_var(tasklet_vec).list = t;
-		__raise_softirq_irqoff(TASKLET_SOFTIRQ);
+		__do_raise_softirq_irqoff(TASKLET_SOFTIRQ);
 		local_irq_enable();
 	}
 }
@@ -444,7 +506,7 @@ static void tasklet_hi_action(struct softirq_action *a)
 		local_irq_disable();
 		t->next = __get_cpu_var(tasklet_hi_vec).list;
 		__get_cpu_var(tasklet_hi_vec).list = t;
-		__raise_softirq_irqoff(HI_SOFTIRQ);
+		__do_raise_softirq_irqoff(HI_SOFTIRQ);
 		local_irq_enable();
 	}
 }
@@ -484,13 +546,24 @@ void __init softirq_init(void)
 	open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);
 }
 
-static int ksoftirqd(void * __bind_cpu)
+static int ksoftirqd(void * __data)
 {
+	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO/2 };
+	struct softirqdata *data = __data;
+	u32 mask = (1 << data->nr);
+	struct softirq_action *h;
+
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+	init_waitqueue_head(&data->wait);
+#endif
+
+	sys_sched_setscheduler(current->pid, SCHED_FIFO, &param);
+	current->flags |= PF_SOFTIRQ;
 	set_current_state(TASK_INTERRUPTIBLE);
 
 	while (!kthread_should_stop()) {
 		preempt_disable();
-		if (!local_softirq_pending()) {
+		if (!(local_softirq_pending() & mask)) {
 			preempt_enable_no_resched();
 			schedule();
 			preempt_disable();
@@ -498,19 +571,41 @@ static int ksoftirqd(void * __bind_cpu)
 
 		__set_current_state(TASK_RUNNING);
 
-		while (local_softirq_pending()) {
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+		data->running = 1;
+#endif
+
+		while (local_softirq_pending() & mask) {
 			/* Preempt disable stops cpu going offline.
 			   If already offline, we'll be on wrong CPU:
 			   don't process */
-			if (cpu_is_offline((long)__bind_cpu))
+			if (cpu_is_offline(data->cpu))
 				goto wait_to_die;
-			do_softirq();
+
+			local_irq_disable();
 			preempt_enable_no_resched();
+			set_softirq_pending(local_softirq_pending() & ~mask);
+			local_bh_disable();
+			local_irq_enable();
+
+			h = &softirq_vec[data->nr];
+			if (h)
+				h->action(h);
+			rcu_bh_qsctr_inc(data->cpu);
+
+			local_irq_disable();
+			_local_bh_enable();
+			local_irq_enable();
+
 			cond_resched();
 			preempt_disable();
 		}
 		preempt_enable();
 		set_current_state(TASK_INTERRUPTIBLE);
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+		data->running = 0;
+		wake_up(&data->wait);
+#endif
 	}
 	__set_current_state(TASK_RUNNING);
 	return 0;
@@ -557,7 +652,7 @@ void tasklet_kill_immediate(struct tasklet_struct *t, unsigned int cpu)
 	BUG();
 }
 
-static void takeover_tasklets(unsigned int cpu)
+void takeover_tasklets(unsigned int cpu)
 {
 	struct tasklet_struct **i;
 
@@ -579,49 +674,82 @@ static void takeover_tasklets(unsigned int cpu)
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
+static const char *softirq_names [] =
+{
+  [HI_SOFTIRQ]		= "high",
+  [SCHED_SOFTIRQ]	= "sched",
+  [TIMER_SOFTIRQ]	= "timer",
+  [NET_TX_SOFTIRQ]	= "net-tx",
+  [NET_RX_SOFTIRQ]	= "net-rx",
+  [BLOCK_SOFTIRQ]	= "block",
+  [TASKLET_SOFTIRQ]	= "tasklet",
+#ifdef CONFIG_HIGH_RES_TIMERS
+  [HRTIMER_SOFTIRQ]	= "hrtimer",
+#endif
+  [RCU_SOFTIRQ]		= "rcu",
+};
+
 static int __cpuinit cpu_callback(struct notifier_block *nfb,
 				  unsigned long action,
 				  void *hcpu)
 {
-	int hotcpu = (unsigned long)hcpu;
+	int hotcpu = (unsigned long)hcpu, i;
 	struct task_struct *p;
 
 	switch (action) {
 	case CPU_UP_PREPARE:
 	case CPU_UP_PREPARE_FROZEN:
-		p = kthread_create(ksoftirqd, hcpu, "ksoftirqd/%d", hotcpu);
-		if (IS_ERR(p)) {
-			printk("ksoftirqd for %i failed\n", hotcpu);
-			return NOTIFY_BAD;
+		for (i = 0; i < MAX_SOFTIRQ; i++) {
+			per_cpu(ksoftirqd, hotcpu)[i].nr = i;
+			per_cpu(ksoftirqd, hotcpu)[i].cpu = hotcpu;
+			per_cpu(ksoftirqd, hotcpu)[i].tsk = NULL;
 		}
-		kthread_bind(p, hotcpu);
-  		per_cpu(ksoftirqd, hotcpu) = p;
- 		break;
+		for (i = 0; i < MAX_SOFTIRQ; i++) {
+			p = kthread_create(ksoftirqd,
+					   &per_cpu(ksoftirqd, hotcpu)[i],
+					   "softirq-%s/%d", softirq_names[i],
+					   hotcpu);
+			if (IS_ERR(p)) {
+				printk("ksoftirqd %d for %i failed\n", i,
+				       hotcpu);
+				return NOTIFY_BAD;
+			}
+			kthread_bind(p, hotcpu);
+			per_cpu(ksoftirqd, hotcpu)[i].tsk = p;
+		}
+		break;
+	break;
 	case CPU_ONLINE:
 	case CPU_ONLINE_FROZEN:
-		wake_up_process(per_cpu(ksoftirqd, hotcpu));
+		for (i = 0; i < MAX_SOFTIRQ; i++)
+			wake_up_process(per_cpu(ksoftirqd, hotcpu)[i].tsk);
 		break;
 #ifdef CONFIG_HOTPLUG_CPU
 	case CPU_UP_CANCELED:
 	case CPU_UP_CANCELED_FROZEN:
-		if (!per_cpu(ksoftirqd, hotcpu))
-			break;
-		/* Unbind so it can run.  Fall thru. */
-		kthread_bind(per_cpu(ksoftirqd, hotcpu),
-			     any_online_cpu(cpu_online_map));
+#if 0
+		for (i = 0; i < MAX_SOFTIRQ; i++) {
+			if (!per_cpu(ksoftirqd, hotcpu)[i].tsk)
+				continue;
+			kthread_bind(per_cpu(ksoftirqd, hotcpu)[i].tsk,
+				     any_online_cpu(cpu_online_map));
+		}
+#endif
 	case CPU_DEAD:
 	case CPU_DEAD_FROZEN: {
 		struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
 
-		p = per_cpu(ksoftirqd, hotcpu);
-		per_cpu(ksoftirqd, hotcpu) = NULL;
 		sched_setscheduler(p, SCHED_FIFO, &param);
-		kthread_stop(p);
+		for (i = 0; i < MAX_SOFTIRQ; i++) {
+			p = per_cpu(ksoftirqd, hotcpu)[i].tsk;
+			per_cpu(ksoftirqd, hotcpu)[i].tsk = NULL;
+			kthread_stop(p);
+		}
 		takeover_tasklets(hotcpu);
 		break;
-	}
 #endif /* CONFIG_HOTPLUG_CPU */
  	}
+	}
 	return NOTIFY_OK;
 }
 
@@ -639,6 +767,29 @@ __init int spawn_ksoftirqd(void)
 	register_cpu_notifier(&cpu_nfb);
 	return 0;
 }
+
+
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+
+int softirq_preemption = 1;
+
+EXPORT_SYMBOL(softirq_preemption);
+
+static int __init softirq_preempt_setup (char *str)
+{
+	if (!strncmp(str, "off", 3))
+		softirq_preemption = 0;
+	else
+		get_option(&str, &softirq_preemption);
+	if (!softirq_preemption)
+		printk("turning off softirq preemption!\n");
+
+	return 1;
+}
+
+__setup("softirq-preempt=", softirq_preempt_setup);
+
+#endif
 
 #ifdef CONFIG_SMP
 /*
