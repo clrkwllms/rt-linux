@@ -54,7 +54,7 @@ void __noreturn cpu_idle(void)
 	/* endless idle loop with no priority at all */
 	while (1) {
 		tick_nohz_stop_sched_tick();
-		while (!need_resched()) {
+		while (!need_resched() && !need_resched_delayed()) {
 #ifdef CONFIG_SMTC_IDLE_HOOK_DEBUG
 			extern void smtc_idle_loop_hook(void);
 
@@ -64,9 +64,11 @@ void __noreturn cpu_idle(void)
 				(*cpu_wait)();
 		}
 		tick_nohz_restart_sched_tick();
-		preempt_enable_no_resched();
-		schedule();
+		local_irq_disable();
+		__preempt_enable_no_resched();
+		__schedule();
 		preempt_disable();
+		local_irq_enable();
 	}
 }
 

@@ -69,7 +69,7 @@ NESTED(handle_sysn32, PT_SIZE, sp)
 	sd	v0, PT_R0(sp)		# set flag for syscall restarting
 1:	sd	v0, PT_R2(sp)		# result
 
-	local_irq_disable		# make sure need_resched and
+	raw_local_irq_disable		# make sure need_resched and
 					# signals dont change between
 					# sampling and return
 	LONG_L  a2, TI_FLAGS($28)	# current->work

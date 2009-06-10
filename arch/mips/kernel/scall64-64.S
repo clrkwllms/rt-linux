@@ -72,7 +72,7 @@ NESTED(handle_sys64, PT_SIZE, sp)
 1:	sd	v0, PT_R2(sp)		# result
 
 n64_syscall_exit:
-	local_irq_disable		# make sure need_resched and
+	raw_local_irq_disable		# make sure need_resched and
 					# signals dont change between
 					# sampling and return
 	LONG_L	a2, TI_FLAGS($28)	# current->work

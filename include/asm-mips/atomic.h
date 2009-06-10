@@ -573,7 +573,6 @@ static __inline__ long atomic64_add_return(long i, atomic64_t * v)
 		raw_local_irq_restore(flags);
 	}
 #endif
-#endif
 
 	smp_llsc_mb();
 

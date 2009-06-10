@@ -29,7 +29,7 @@
  */
 
 static int i8259A_auto_eoi = -1;
-DEFINE_SPINLOCK(i8259A_lock);
+DEFINE_RAW_SPINLOCK(i8259A_lock);
 static void disable_8259A_irq(unsigned int irq);
 static void enable_8259A_irq(unsigned int irq);
 static void mask_and_ack_8259A(unsigned int irq);

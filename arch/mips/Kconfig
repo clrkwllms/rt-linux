@@ -702,18 +702,16 @@ source "arch/mips/vr41xx/Kconfig"
 
 endmenu
 
+
 config RWSEM_GENERIC_SPINLOCK
 	bool
-	depends on !PREEMPT_RT
 	default y
 
 config RWSEM_XCHGADD_ALGORITHM
 	bool
-	depends on !PREEMPT_RT
 
 config ASM_SEMAPHORES
 	bool
-#	depends on !PREEMPT_RT
 	default y
 
 config ARCH_HAS_ILOG2_U32
@@ -1898,6 +1896,15 @@ config SECCOMP
 
 	  If unsure, say Y. Only embedded should say N here.
 
+config GENERIC_TIME
+	bool
+	default y
+
+source "kernel/time/Kconfig"
+
+config CPU_SPEED
+	int "CPU speed used for clocksource/clockevent calculations"
+	default 600
 endmenu
 
 config LOCKDEP_SUPPORT

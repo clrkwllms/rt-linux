@@ -60,7 +60,7 @@ void __cpuinit sb1250_smp_finish(void)
 	extern void sb1250_clockevent_init(void);
 
 	sb1250_clockevent_init();
-	local_irq_enable();
+	raw_local_irq_enable();
 }
 
 /*

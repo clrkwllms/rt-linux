@@ -91,7 +91,22 @@ asmlinkage __cpuinit void start_secondary(void)
 	cpu_idle();
 }
 
-DEFINE_SPINLOCK(smp_call_lock);
+DEFINE_RAW_SPINLOCK(smp_call_lock);
+
+/*
+ * this function sends a 'reschedule' IPI to all other CPUs.
+ * This is used when RT tasks are starving and other CPUs
+ * might be able to run them.
+ */
+void smp_send_reschedule_allbutself(void)
+{
+	int cpu = smp_processor_id();
+	int i;
+
+	for (i = 0; i < NR_CPUS; i++)
+		if (cpu_online(i) && i != cpu)
+			core_send_ipi(i, SMP_RESCHEDULE_YOURSELF);
+}
 
 struct call_data_struct *call_data;
 
@@ -314,6 +329,8 @@ int setup_profiling_timer(unsigned int multiplier)
 	return 0;
 }
 
+static DEFINE_RAW_SPINLOCK(tlbstate_lock);
+
 static void flush_tlb_all_ipi(void *info)
 {
 	local_flush_tlb_all();
@@ -371,6 +388,7 @@ static inline void smp_on_each_tlb(void (*func) (void *info), void *info)
 void flush_tlb_mm(struct mm_struct *mm)
 {
 	preempt_disable();
+	spin_lock(&tlbstate_lock);
 
 	if ((atomic_read(&mm->mm_users) != 1) || (current->mm != mm)) {
 		smp_on_other_tlbs(flush_tlb_mm_ipi, mm);
@@ -383,6 +401,7 @@ void flush_tlb_mm(struct mm_struct *mm)
 			if (cpu_context(cpu, mm))
 				cpu_context(cpu, mm) = 0;
 	}
+	spin_unlock(&tlbstate_lock);
 	local_flush_tlb_mm(mm);
 
 	preempt_enable();
@@ -406,6 +425,8 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned l
 	struct mm_struct *mm = vma->vm_mm;
 
 	preempt_disable();
+	spin_lock(&tlbstate_lock);
+
 	if ((atomic_read(&mm->mm_users) != 1) || (current->mm != mm)) {
 		struct flush_tlb_data fd = {
 			.vma = vma,
@@ -423,6 +444,7 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned l
 			if (cpu_context(cpu, mm))
 				cpu_context(cpu, mm) = 0;
 	}
+	spin_unlock(&tlbstate_lock);
 	local_flush_tlb_range(vma, start, end);
 	preempt_enable();
 }
@@ -454,6 +476,8 @@ static void flush_tlb_page_ipi(void *info)
 void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 {
 	preempt_disable();
+	spin_lock(&tlbstate_lock);
+
 	if ((atomic_read(&vma->vm_mm->mm_users) != 1) || (current->mm != vma->vm_mm)) {
 		struct flush_tlb_data fd = {
 			.vma = vma,
@@ -470,6 +494,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 			if (cpu_context(cpu, vma->vm_mm))
 				cpu_context(cpu, vma->vm_mm) = 0;
 	}
+	spin_unlock(&tlbstate_lock);
 	local_flush_tlb_page(vma, page);
 	preempt_enable();
 }

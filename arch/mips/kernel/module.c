@@ -40,7 +40,7 @@ struct mips_hi16 {
 static struct mips_hi16 *mips_hi16_list;
 
 static LIST_HEAD(dbe_list);
-static DEFINE_SPINLOCK(dbe_lock);
+static DEFINE_RAW_SPINLOCK(dbe_lock);
 
 void *module_alloc(unsigned long size)
 {

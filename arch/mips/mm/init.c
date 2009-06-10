@@ -61,7 +61,7 @@
 
 #endif /* CONFIG_MIPS_MT_SMTC */
 
-DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
+DEFINE_PER_CPU_LOCKED(struct mmu_gather, mmu_gathers);
 
 /*
  * We have up to 8 empty zeroed pages so we can map one of the right colour

@@ -655,6 +655,10 @@ static int setup_rt_frame_32(struct k_sigaction * ka, struct pt_regs *regs,
 	if (err)
 		goto give_sigsegv;
 
+#ifdef CONFIG_PREEMPT_RT
+	local_irq_enable();
+	preempt_check_resched();
+#endif
 	/*
 	 * Arguments to signal handler:
 	 *

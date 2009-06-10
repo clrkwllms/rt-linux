@@ -9,6 +9,7 @@
 #define __ASM_HW_IRQ_H
 
 #include <asm/atomic.h>
+#include <linux/irqflags.h>
 
 extern atomic_t irq_err_count;
 

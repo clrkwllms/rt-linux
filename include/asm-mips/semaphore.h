@@ -47,38 +47,41 @@ struct compat_semaphore {
 	wait_queue_head_t wait;
 };
 
-#define __SEMAPHORE_INITIALIZER(name, n)				\
+#define __COMPAT_SEMAPHORE_INITIALIZER(name, n)				\
 {									\
 	.count		= ATOMIC_INIT(n),				\
 	.wait		= __WAIT_QUEUE_HEAD_INITIALIZER((name).wait)	\
 }
 
-#define __DECLARE_SEMAPHORE_GENERIC(name, count) \
-	struct semaphore name = __SEMAPHORE_INITIALIZER(name, count)
+#define __COMPAT_MUTEX_INITIALIZER(name) \
+	__COMPAT_SEMAPHORE_INITIALIZER(name, 1)
 
-#define DECLARE_MUTEX(name)		__DECLARE_SEMAPHORE_GENERIC(name, 1)
+#define __COMPAT_DECLARE_SEMAPHORE_GENERIC(name, count) \
+	struct compat_semaphore name = __COMPAT_SEMAPHORE_INITIALIZER(name,count)
 
-static inline void sema_init(struct semaphore *sem, int val)
+#define COMPAT_DECLARE_MUTEX(name)		__COMPAT_DECLARE_SEMAPHORE_GENERIC(name, 1)
+
+static inline void compat_sema_init (struct compat_semaphore *sem, int val)
 {
 	atomic_set(&sem->count, val);
 	init_waitqueue_head(&sem->wait);
 }
 
-static inline void init_MUTEX(struct semaphore *sem)
+static inline void compat_init_MUTEX (struct compat_semaphore *sem)
 {
-	sema_init(sem, 1);
+	compat_sema_init(sem, 1);
 }
 
-static inline void init_MUTEX_LOCKED(struct semaphore *sem)
+static inline void compat_init_MUTEX_LOCKED (struct compat_semaphore *sem)
 {
-	sema_init(sem, 0);
+	compat_sema_init(sem, 0);
 }
 
-extern void __down(struct semaphore * sem);
-extern int  __down_interruptible(struct semaphore * sem);
-extern void __up(struct semaphore * sem);
+extern void __compat_down(struct compat_semaphore * sem);
+extern int  __compat_down_interruptible(struct compat_semaphore * sem);
+extern void __compat_up(struct compat_semaphore * sem);
 
-static inline void down(struct semaphore * sem)
+static inline void compat_down(struct compat_semaphore * sem)
 {
 	might_sleep();
 
@@ -110,6 +113,8 @@ static inline void compat_up(struct compat_semaphore * sem)
 	if (unlikely(atomic_inc_return(&sem->count) <= 0))
 		__compat_up(sem);
 }
+
+extern int compat_sem_is_locked(struct compat_semaphore *sem);
 
 #define compat_sema_count(sem) atomic_read(&(sem)->count)
 

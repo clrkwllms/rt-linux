@@ -6,7 +6,7 @@
 
 #include <linux/spinlock.h>
 
-extern spinlock_t rtc_lock;
+extern raw_spinlock_t rtc_lock;
 
 struct m48t35_rtc {
 	volatile u8	pad[0x7ff8];    /* starts at 0x7ff8 */

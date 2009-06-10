@@ -606,9 +606,6 @@ static inline unsigned long __ffs(unsigned long word)
 }
 
 /*
- * fls - find last bit set.
- * @word: The word to search
- *
  * This is defined the same way as ffs.
  * Note fls(0) = 0, fls(1) = 1, fls(0x80000000) = 32.
  */
@@ -626,6 +623,8 @@ static inline int fls64(__u64 word)
 
 	return 64 - word;
 }
+#define __bi_local_irq_save(x)		raw_local_irq_save(x)
+#define __bi_local_irq_restore(x)	raw_local_irq_restore(x)
 #else
 #include <asm-generic/bitops/fls64.h>
 #endif

@@ -98,7 +98,7 @@ NESTED(handle_sys, PT_SIZE, sp)
 1:	sd	v0, PT_R2(sp)		# result
 
 o32_syscall_exit:
-	local_irq_disable		# make need_resched and
+	raw_local_irq_disable		# make need_resched and
 					# signals dont change between
 					# sampling and return
 	LONG_L	a2, TI_FLAGS($28)

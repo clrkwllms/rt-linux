@@ -30,7 +30,7 @@
 	.align	5
 #ifndef CONFIG_PREEMPT
 FEXPORT(ret_from_exception)
-	local_irq_disable			# preempt stop
+	raw_local_irq_disable			# preempt stop
 	b	__ret_from_irq
 #endif
 FEXPORT(ret_from_irq)
@@ -41,7 +41,7 @@ FEXPORT(__ret_from_irq)
 	beqz	t0, resume_kernel
 
 resume_userspace:
-	local_irq_disable		# make sure we dont miss an
+	raw_local_irq_disable	# make sure we dont miss an
 					# interrupt setting need_resched
 					# between sampling and return
 	LONG_L	a2, TI_FLAGS($28)	# current->work
@@ -51,7 +51,9 @@ resume_userspace:
 
 #ifdef CONFIG_PREEMPT
 resume_kernel:
-	local_irq_disable
+	raw_local_irq_disable
+	lw	t0, kernel_preemption
+	beqz	t0, restore_all
 	lw	t0, TI_PRE_COUNT($28)
 	bnez	t0, restore_all
 need_resched:
@@ -61,7 +63,9 @@ need_resched:
 	LONG_L	t0, PT_STATUS(sp)		# Interrupts off?
 	andi	t0, 1
 	beqz	t0, restore_all
+	raw_local_irq_disable
 	jal	preempt_schedule_irq
+	sw      zero, TI_PRE_COUNT($28)
 	b	need_resched
 #endif
 
@@ -69,7 +73,7 @@ FEXPORT(ret_from_fork)
 	jal	schedule_tail		# a0 = struct task_struct *prev
 
 FEXPORT(syscall_exit)
-	local_irq_disable		# make sure need_resched and
+	raw_local_irq_disable	# make sure need_resched and
 					# signals dont change between
 					# sampling and return
 	LONG_L	a2, TI_FLAGS($28)	# current->work
@@ -142,19 +146,21 @@ FEXPORT(restore_partial)		# restore partial frame
 	.set	at
 
 work_pending:
-	andi	t0, a2, _TIF_NEED_RESCHED # a2 is preloaded with TI_FLAGS
+					# a2 is preloaded with TI_FLAGS
+	andi	t0, a2, (_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED)
 	beqz	t0, work_notifysig
 work_resched:
+	raw_local_irq_enable  t0
 	jal	schedule
 
-	local_irq_disable		# make sure need_resched and
+	raw_local_irq_disable	# make sure need_resched and
 					# signals dont change between
 					# sampling and return
 	LONG_L	a2, TI_FLAGS($28)
 	andi	t0, a2, _TIF_WORK_MASK	# is there any work to be done
 					# other than syscall tracing?
 	beqz	t0, restore_all
-	andi	t0, a2, _TIF_NEED_RESCHED
+	andi	t0, a2, (_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED)
 	bnez	t0, work_resched
 
 work_notifysig:				# deal with pending signals and
@@ -170,7 +176,7 @@ syscall_exit_work:
 	li	t0, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
 	and	t0, a2			# a2 is preloaded with TI_FLAGS
 	beqz	t0, work_pending	# trace bit set?
-	local_irq_enable		# could let do_syscall_trace()
+	raw_local_irq_enable	# could let do_syscall_trace()
 					# call schedule() instead
 	move	a0, sp
 	li	a1, 1

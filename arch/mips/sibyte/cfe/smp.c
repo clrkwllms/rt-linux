@@ -107,4 +107,8 @@ void __cpuinit prom_smp_finish(void)
  */
 void prom_cpus_done(void)
 {
+#ifdef CONFIG_HIGH_RES_TIMERS
+	extern void sync_c0_count_master(void);
+	sync_c0_count_master();
+#endif
 }

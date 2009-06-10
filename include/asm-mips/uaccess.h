@@ -427,7 +427,6 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	const void *__cu_from;						\
 	long __cu_len;							\
 									\
-	might_sleep();							\
 	__cu_to = (to);							\
 	__cu_from = (from);						\
 	__cu_len = (n);							\
@@ -483,7 +482,6 @@ extern size_t __copy_user_inatomic(void *__to, const void *__from, size_t __n);
 	const void *__cu_from;						\
 	long __cu_len;							\
 									\
-	might_sleep();							\
 	__cu_to = (to);							\
 	__cu_from = (from);						\
 	__cu_len = (n);							\
@@ -562,7 +560,6 @@ extern size_t __copy_user_inatomic(void *__to, const void *__from, size_t __n);
 	const void __user *__cu_from;					\
 	long __cu_len;							\
 									\
-	might_sleep();							\
 	__cu_to = (to);							\
 	__cu_from = (from);						\
 	__cu_len = (n);							\
@@ -593,7 +590,6 @@ extern size_t __copy_user_inatomic(void *__to, const void *__from, size_t __n);
 	const void __user *__cu_from;					\
 	long __cu_len;							\
 									\
-	might_sleep();							\
 	__cu_to = (to);							\
 	__cu_from = (from);						\
 	__cu_len = (n);							\
@@ -611,7 +607,6 @@ extern size_t __copy_user_inatomic(void *__to, const void *__from, size_t __n);
 	const void __user *__cu_from;					\
 	long __cu_len;							\
 									\
-	might_sleep();							\
 	__cu_to = (to);							\
 	__cu_from = (from);						\
 	__cu_len = (n);							\
@@ -638,7 +633,6 @@ __clear_user(void __user *addr, __kernel_size_t size)
 {
 	__kernel_size_t res;
 
-	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		"move\t$5, $0\n\t"
@@ -687,7 +681,6 @@ __strncpy_from_user(char *__to, const char __user *__from, long __len)
 {
 	long res;
 
-	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		"move\t$5, %2\n\t"
@@ -724,7 +717,6 @@ strncpy_from_user(char *__to, const char __user *__from, long __len)
 {
 	long res;
 
-	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		"move\t$5, %2\n\t"
@@ -743,7 +735,6 @@ static inline long __strlen_user(const char __user *s)
 {
 	long res;
 
-	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		__MODULE_JAL(__strlen_user_nocheck_asm)
@@ -773,7 +764,6 @@ static inline long strlen_user(const char __user *s)
 {
 	long res;
 
-	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		__MODULE_JAL(__strlen_user_asm)
@@ -790,7 +780,6 @@ static inline long __strnlen_user(const char __user *s, long n)
 {
 	long res;
 
-	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		"move\t$5, %2\n\t"
@@ -821,7 +810,6 @@ static inline long strnlen_user(const char __user *s, long n)
 {
 	long res;
 
-	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		"move\t$5, %2\n\t"

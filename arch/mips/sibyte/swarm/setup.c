@@ -136,6 +136,12 @@ void __init plat_mem_setup(void)
 	if (m41t81_probe())
 		swarm_rtc_type = RTC_M4LT81;
 
+#ifdef CONFIG_HIGH_RES_TIMERS
+	/*
+	 * set the mips_hpt_frequency here
+	 */
+	mips_hpt_frequency = CONFIG_CPU_SPEED * 1000000;
+#endif
 	printk("This kernel optimized for "
 #ifdef CONFIG_SIMULATION
 	       "simulation"

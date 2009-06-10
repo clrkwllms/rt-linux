@@ -82,7 +82,7 @@ static struct irq_chip sb1250_irq_type = {
 /* Store the CPU id (not the logical number) */
 int sb1250_irq_owner[SB1250_NR_IRQS];
 
-DEFINE_SPINLOCK(sb1250_imr_lock);
+DEFINE_RAW_SPINLOCK(sb1250_imr_lock);
 
 void sb1250_mask_irq(int cpu, int irq)
 {
@@ -315,6 +315,10 @@ void __init arch_init_irq(void)
 
 #ifdef CONFIG_KGDB
 	imask |= STATUSF_IP6;
+#endif
+
+#ifdef CONFIG_HIGH_RES_TIMERS
+	imask |= STATUSF_IP7;
 #endif
 	/* Enable necessary IPs, disable the rest */
 	change_c0_status(ST0_IM, imask);
