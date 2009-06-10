@@ -193,6 +193,8 @@ struct ocp_enet_private {
 	struct ibm_emac_error_stats	estats;
 	struct net_device_stats		nstats;
 
+	spinlock_t			tx_lock;
+
 	struct device*			ldev;
 };
 

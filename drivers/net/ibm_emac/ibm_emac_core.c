@@ -1058,6 +1058,8 @@ static inline int emac_xmit_finish(struct ocp_enet_private *dev, int len)
 	++dev->stats.tx_packets;
 	dev->stats.tx_bytes += len;
 
+	spin_unlock(&dev->tx_lock);
+
 	return 0;
 }
 
@@ -1071,6 +1073,7 @@ static int emac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	u16 ctrl = EMAC_TX_CTRL_GFCS | EMAC_TX_CTRL_GP | MAL_TX_CTRL_READY |
 	    MAL_TX_CTRL_LAST | emac_tx_csum(dev, skb);
 
+	spin_lock(&dev->tx_lock);
 	slot = dev->tx_slot++;
 	if (dev->tx_slot == NUM_TX_BUFF) {
 		dev->tx_slot = 0;
@@ -1132,6 +1135,8 @@ static int emac_start_xmit_sg(struct sk_buff *skb, struct net_device *ndev)
 	/* This is common "fast" path */
 	if (likely(!nr_frags && len <= MAL_MAX_TX_SIZE))
 		return emac_start_xmit(skb, ndev);
+
+	spin_lock(&dev->tx_lock);
 
 	len -= skb->data_len;
 
@@ -1201,6 +1206,7 @@ static int emac_start_xmit_sg(struct sk_buff *skb, struct net_device *ndev)
       stop_queue:
 	netif_stop_queue(ndev);
 	DBG2("%d: stopped TX queue" NL, dev->def->index);
+	spin_unlock(&dev->tx_lock);
 	return 1;
 }
 #else
@@ -1240,6 +1246,7 @@ static void emac_poll_tx(void *param)
 	DBG2("%d: poll_tx, %d %d" NL, dev->def->index, dev->tx_cnt,
 	     dev->ack_slot);
 
+	spin_lock(&dev->tx_lock);
 	if (dev->tx_cnt) {
 		u16 ctrl;
 		int slot = dev->ack_slot, n = 0;
@@ -1249,6 +1256,7 @@ static void emac_poll_tx(void *param)
 			struct sk_buff *skb = dev->tx_skb[slot];
 			++n;
 
+			spin_unlock(&dev->tx_lock);
 			if (skb) {
 				dev_kfree_skb(skb);
 				dev->tx_skb[slot] = NULL;
@@ -1258,6 +1266,7 @@ static void emac_poll_tx(void *param)
 			if (unlikely(EMAC_IS_BAD_TX(ctrl)))
 				emac_parse_tx_error(dev, ctrl);
 
+			spin_lock(&dev->tx_lock);
 			if (--dev->tx_cnt)
 				goto again;
 		}
@@ -1270,6 +1279,7 @@ static void emac_poll_tx(void *param)
 			DBG2("%d: tx %d pkts" NL, dev->def->index, n);
 		}
 	}
+	spin_unlock(&dev->tx_lock);
 }
 
 static inline void emac_recycle_rx_skb(struct ocp_enet_private *dev, int slot,
@@ -1964,6 +1974,7 @@ static int __init emac_probe(struct ocp_device *ocpdev)
 	dev->ndev = ndev;
 	dev->ldev = &ocpdev->dev;
 	dev->def = ocpdev->def;
+	spin_lock_init(&dev->tx_lock);
 
 	/* Find MAL device we are connected to */
 	maldev =
