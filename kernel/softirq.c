@@ -19,6 +19,7 @@
 #include <linux/mm.h>
 #include <linux/notifier.h>
 #include <linux/percpu.h>
+#include <linux/delay.h>
 #include <linux/cpu.h>
 #include <linux/freezer.h>
 #include <linux/kthread.h>
@@ -639,6 +640,25 @@ void __init softirq_init(void)
 	open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
 	open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);
 }
+
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT_RT)
+
+void tasklet_unlock_wait(struct tasklet_struct *t)
+{
+	while (test_bit(TASKLET_STATE_RUN, &(t)->state)) {
+		/*
+		 * Hack for now to avoid this busy-loop:
+		 */
+#ifdef CONFIG_PREEMPT_RT
+		msleep(1);
+#else
+		barrier();
+#endif
+	}
+}
+EXPORT_SYMBOL(tasklet_unlock_wait);
+
+#endif
 
 static int ksoftirqd(void * __data)
 {
