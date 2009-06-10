@@ -125,43 +125,116 @@
  * the CPU number of the lock there.
  */
 #ifndef CONFIG_PREEMPT_RT
+
 # define slab_irq_disable(cpu) \
 	do { local_irq_disable(); (cpu) = smp_processor_id(); } while (0)
 # define slab_irq_enable(cpu)		local_irq_enable()
+
+static inline void slab_irq_disable_this_rt(int cpu)
+{
+}
+
+static inline void slab_irq_enable_rt(int cpu)
+{
+}
+
 # define slab_irq_save(flags, cpu) \
 	do { local_irq_save(flags); (cpu) = smp_processor_id(); } while (0)
 # define slab_irq_restore(flags, cpu)	local_irq_restore(flags)
+
 /*
  * In the __GFP_WAIT case we enable/disable interrupts on !PREEMPT_RT,
  * which has no per-CPU locking effect since we are holding the cache
  * lock in that case already.
- *
- * (On PREEMPT_RT, these are NOPs, but we have to drop/get the irq locks.)
  */
-# define slab_irq_disable_nort(cpu)	slab_irq_disable(cpu)
-# define slab_irq_enable_nort(cpu)	slab_irq_enable(cpu)
-# define slab_irq_disable_rt(flags)	do { (void)(flags); } while (0)
-# define slab_irq_enable_rt(flags)	do { (void)(flags); } while (0)
+static void slab_irq_enable_GFP_WAIT(gfp_t flags, int *cpu)
+{
+	if (flags & __GFP_WAIT)
+		local_irq_enable();
+}
+
+static void slab_irq_disable_GFP_WAIT(gfp_t flags, int *cpu)
+{
+	if (flags & __GFP_WAIT)
+		local_irq_disable();
+}
+
 # define slab_spin_lock_irq(lock, cpu) \
 	do { spin_lock_irq(lock); (cpu) = smp_processor_id(); } while (0)
-# define slab_spin_unlock_irq(lock, cpu) \
-					spin_unlock_irq(lock)
+# define slab_spin_unlock_irq(lock, cpu) spin_unlock_irq(lock)
+
 # define slab_spin_lock_irqsave(lock, flags, cpu) \
 	do { spin_lock_irqsave(lock, flags); (cpu) = smp_processor_id(); } while (0)
 # define slab_spin_unlock_irqrestore(lock, flags, cpu) \
 	do { spin_unlock_irqrestore(lock, flags); } while (0)
-#else
+
+#else /* CONFIG_PREEMPT_RT */
+
+/*
+ * Instead of serializing the per-cpu state by disabling interrupts we do so
+ * by a lock. This keeps the code preemptable - albeit at the cost of remote
+ * memory access when the task does get migrated away.
+ */
 DEFINE_PER_CPU_LOCKED(int, slab_irq_locks) = { 0, };
-# define slab_irq_disable(cpu)		(void)get_cpu_var_locked(slab_irq_locks, &(cpu))
-# define slab_irq_enable(cpu)		put_cpu_var_locked(slab_irq_locks, cpu)
+
+static void _slab_irq_disable(int *cpu)
+{
+	int this_cpu;
+	spinlock_t *lock;
+
+again:
+	this_cpu = raw_smp_processor_id();
+	lock = &__get_cpu_lock(slab_irq_locks, this_cpu);
+
+	spin_lock(lock);
+	if (unlikely(!cpu_online(this_cpu))) {
+		/*
+		 * Bail - the cpu got hot-unplugged while we were waiting
+		 * for the lock.
+		 */
+		spin_unlock(lock);
+		goto again;
+	}
+
+	*cpu = this_cpu;
+}
+
+#define slab_irq_disable(cpu) _slab_irq_disable(&(cpu))
+
+static inline void slab_irq_enable(int cpu)
+{
+	spin_unlock(&__get_cpu_lock(slab_irq_locks, cpu));
+}
+
+static inline void slab_irq_disable_this_rt(int cpu)
+{
+	spin_lock(&__get_cpu_lock(slab_irq_locks, cpu));
+}
+
+static inline void slab_irq_enable_rt(int cpu)
+{
+	spin_unlock(&__get_cpu_lock(slab_irq_locks, cpu));
+}
+
 # define slab_irq_save(flags, cpu) \
 	do { slab_irq_disable(cpu); (void) (flags); } while (0)
 # define slab_irq_restore(flags, cpu) \
 	do { slab_irq_enable(cpu); (void) (flags); } while (0)
-# define slab_irq_disable_rt(cpu)	slab_irq_disable(cpu)
-# define slab_irq_enable_rt(cpu)	slab_irq_enable(cpu)
-# define slab_irq_disable_nort(cpu)	do { } while (0)
-# define slab_irq_enable_nort(cpu)	do { } while (0)
+
+/*
+ * On PREEMPT_RT we have to drop the locks unconditionally to avoid lock
+ * recursion on the cache_grow()->alloc_slabmgmt() path.
+ */
+static void slab_irq_enable_GFP_WAIT(gfp_t flags, int *cpu)
+{
+	slab_irq_enable(*cpu);
+}
+
+static void slab_irq_disable_GFP_WAIT(gfp_t flags, int *cpu)
+{
+	slab_irq_disable(*cpu);
+}
+
 # define slab_spin_lock_irq(lock, cpu) \
 		do { slab_irq_disable(cpu); spin_lock(lock); } while (0)
 # define slab_spin_unlock_irq(lock, cpu) \
@@ -170,7 +243,8 @@ DEFINE_PER_CPU_LOCKED(int, slab_irq_locks) = { 0, };
 	do { slab_irq_disable(cpu); spin_lock_irqsave(lock, flags); } while (0)
 # define slab_spin_unlock_irqrestore(lock, flags, cpu) \
 	do { spin_unlock_irqrestore(lock, flags); slab_irq_enable(cpu); } while (0)
-#endif
+
+#endif /* CONFIG_PREEMPT_RT */
 
 /*
  * DEBUG	- 1 for kmem_cache_create() to honour; SLAB_RED_ZONE & SLAB_POISON.
@@ -1221,7 +1295,7 @@ cache_free_alien(struct kmem_cache *cachep, void *objp, int *this_cpu)
 }
 #endif
 
-static void __cpuinit cpuup_canceled(long cpu)
+static void __cpuinit cpuup_canceled(int cpu)
 {
 	struct kmem_cache *cachep;
 	struct kmem_list3 *l3 = NULL;
@@ -1231,7 +1305,7 @@ static void __cpuinit cpuup_canceled(long cpu)
 		struct array_cache *nc;
 		struct array_cache *shared;
 		struct array_cache **alien;
-		int this_cpu;
+		int orig_cpu = cpu;
 		cpumask_t mask;
 
 		mask = node_to_cpumask(node);
@@ -1243,31 +1317,30 @@ static void __cpuinit cpuup_canceled(long cpu)
 		if (!l3)
 			goto free_array_cache;
 
-		slab_spin_lock_irq(&l3->list_lock, this_cpu);
+		spin_lock_irq(&l3->list_lock);
 
 		/* Free limit for this kmem_list3 */
 		l3->free_limit -= cachep->batchcount;
 		if (nc)
 			free_block(cachep, nc->entry, nc->avail, node,
-				   &this_cpu);
+				   &cpu);
 
 		if (!cpus_empty(mask)) {
-			slab_spin_unlock_irq(&l3->list_lock,
-					     this_cpu);
+			spin_unlock_irq(&l3->list_lock);
 			goto free_array_cache;
 		}
 
 		shared = l3->shared;
 		if (shared) {
 			free_block(cachep, shared->entry,
-				   shared->avail, node, &this_cpu);
+				   shared->avail, node, &cpu);
 			l3->shared = NULL;
 		}
 
 		alien = l3->alien;
 		l3->alien = NULL;
 
-		slab_spin_unlock_irq(&l3->list_lock, this_cpu);
+		spin_unlock_irq(&l3->list_lock);
 
 		kfree(shared);
 		if (alien) {
@@ -1276,6 +1349,7 @@ static void __cpuinit cpuup_canceled(long cpu)
 		}
 free_array_cache:
 		kfree(nc);
+		BUG_ON(cpu != orig_cpu);
 	}
 	/*
 	 * In the previous loop, all the objects were freed to
@@ -1290,13 +1364,12 @@ free_array_cache:
 	}
 }
 
-static int __cpuinit cpuup_prepare(long cpu)
+static int __cpuinit cpuup_prepare(int cpu)
 {
 	struct kmem_cache *cachep;
 	struct kmem_list3 *l3 = NULL;
 	int node = cpu_to_node(cpu);
 	const int memsize = sizeof(struct kmem_list3);
-	int this_cpu;
 
 	/*
 	 * We need to do this right in the beginning since
@@ -1327,11 +1400,11 @@ static int __cpuinit cpuup_prepare(long cpu)
 			cachep->nodelists[node] = l3;
 		}
 
-		slab_spin_lock_irq(&cachep->nodelists[node]->list_lock, this_cpu);
+		spin_lock_irq(&cachep->nodelists[node]->list_lock);
 		cachep->nodelists[node]->free_limit =
 			(1 + nr_cpus_node(node)) *
 			cachep->batchcount + cachep->num;
-		slab_spin_unlock_irq(&cachep->nodelists[node]->list_lock, this_cpu);
+		spin_unlock_irq(&cachep->nodelists[node]->list_lock);
 	}
 
 	/*
@@ -1368,7 +1441,7 @@ static int __cpuinit cpuup_prepare(long cpu)
 		l3 = cachep->nodelists[node];
 		BUG_ON(!l3);
 
-		slab_spin_lock_irq(&l3->list_lock, this_cpu);
+		spin_lock_irq(&l3->list_lock);
 		if (!l3->shared) {
 			/*
 			 * We are serialised from CPU_DEAD or
@@ -1383,7 +1456,7 @@ static int __cpuinit cpuup_prepare(long cpu)
 			alien = NULL;
 		}
 #endif
-		slab_spin_unlock_irq(&l3->list_lock, this_cpu);
+		spin_unlock_irq(&l3->list_lock);
 		kfree(shared);
 		free_alien_cache(alien);
 	}
@@ -1402,7 +1475,18 @@ static int __cpuinit cpuup_callback(struct notifier_block *nfb,
 	switch (action) {
 	case CPU_LOCK_ACQUIRE:
 		mutex_lock(&cache_chain_mutex);
+		return NOTIFY_OK;
+	case CPU_LOCK_RELEASE:
+		mutex_unlock(&cache_chain_mutex);
+		return NOTIFY_OK;
+
+	default:
 		break;
+	}
+
+	slab_irq_disable_this_rt(cpu);
+
+	switch (action) {
 	case CPU_UP_PREPARE:
 	case CPU_UP_PREPARE_FROZEN:
 		err = cpuup_prepare(cpu);
@@ -1444,10 +1528,10 @@ static int __cpuinit cpuup_callback(struct notifier_block *nfb,
 	case CPU_UP_CANCELED_FROZEN:
 		cpuup_canceled(cpu);
 		break;
-	case CPU_LOCK_RELEASE:
-		mutex_unlock(&cache_chain_mutex);
-		break;
 	}
+
+	slab_irq_enable_rt(cpu);
+
 	return err ? NOTIFY_BAD : NOTIFY_OK;
 }
 
@@ -2898,9 +2982,7 @@ static int cache_grow(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 
 	offset *= cachep->colour_off;
 
-	if (local_flags & __GFP_WAIT)
-		slab_irq_enable_nort(*this_cpu);
-	slab_irq_enable_rt(*this_cpu);
+	slab_irq_enable_GFP_WAIT(local_flags, this_cpu);
 
 	/*
 	 * The test for missing atomic flag is performed here, rather than
@@ -2930,9 +3012,7 @@ static int cache_grow(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 
 	cache_init_objs(cachep, slabp);
 
-	slab_irq_disable_rt(*this_cpu);
-	if (local_flags & __GFP_WAIT)
-		slab_irq_disable_nort(*this_cpu);
+	slab_irq_disable_GFP_WAIT(local_flags, this_cpu);
 
 	check_irq_off();
 	spin_lock(&l3->list_lock);
@@ -2946,9 +3026,7 @@ static int cache_grow(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 opps1:
 	kmem_freepages(cachep, objp);
 failed:
-	slab_irq_disable_rt(*this_cpu);
-	if (local_flags & __GFP_WAIT)
-		slab_irq_disable_nort(*this_cpu);
+	slab_irq_disable_GFP_WAIT(local_flags, this_cpu);
 	return 0;
 }
 
@@ -3395,16 +3473,12 @@ retry:
 		 * We may trigger various forms of reclaim on the allowed
 		 * set and go into memory reserves if necessary.
 		 */
-		if (local_flags & __GFP_WAIT)
-			slab_irq_enable_nort(*this_cpu);
-		slab_irq_enable_rt(*this_cpu);
+		slab_irq_enable_GFP_WAIT(local_flags, this_cpu);
 
 		kmem_flagcheck(cache, flags);
 		obj = kmem_getpages(cache, flags, -1);
 
-		slab_irq_disable_rt(*this_cpu);
-		if (local_flags & __GFP_WAIT)
-			slab_irq_disable_nort(*this_cpu);
+		slab_irq_disable_GFP_WAIT(local_flags, this_cpu);
 
 		if (obj) {
 			/*
