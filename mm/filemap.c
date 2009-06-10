@@ -1764,7 +1764,7 @@ size_t iov_iter_copy_from_user_atomic(struct page *page,
 	size_t copied;
 
 #ifndef CONFIG_PREEMPT_RT
-	BUG_ON(!in_atomic());
+	BUG_ON(!current->pagefault_disabled);
 #endif
 	kaddr = kmap_atomic(page, KM_USER0);
 	if (likely(i->nr_segs == 1)) {
