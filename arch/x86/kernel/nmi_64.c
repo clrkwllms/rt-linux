@@ -52,7 +52,7 @@ static DEFINE_PER_CPU(short, wd_enabled);
 static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu);
 
 /* Run after command line and cpu_init init, but before all other checks */
-void nmi_watchdog_default(void)
+static inline void nmi_watchdog_default(void)
 {
 	if (nmi_watchdog != NMI_DEFAULT)
 		return;
