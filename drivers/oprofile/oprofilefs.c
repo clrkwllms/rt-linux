@@ -21,7 +21,7 @@
 
 #define OPROFILEFS_MAGIC 0x6f70726f
 
-DEFINE_SPINLOCK(oprofilefs_lock);
+DEFINE_RAW_SPINLOCK(oprofilefs_lock);
 
 static struct inode * oprofilefs_get_inode(struct super_block * sb, int mode)
 {

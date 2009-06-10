@@ -69,7 +69,7 @@ static struct hlist_head kretprobe_inst_table[KPROBE_TABLE_SIZE];
 static bool kprobe_enabled;
 
 DEFINE_MUTEX(kprobe_mutex);		/* Protects kprobe_table */
-DEFINE_SPINLOCK(kretprobe_lock);	/* Protects kretprobe_inst_table */
+DEFINE_RAW_SPINLOCK(kretprobe_lock);	/* Protects kretprobe_inst_table */
 static DEFINE_PER_CPU(struct kprobe *, kprobe_instance) = NULL;
 
 #ifdef __ARCH_WANT_KPROBES_INSN_SLOT
