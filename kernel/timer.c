@@ -973,23 +973,25 @@ unsigned long avenrun_rt[3];
 static inline void calc_load(unsigned long ticks)
 {
 	unsigned long active_tasks; /* fixed-point */
+	unsigned long active_rt_tasks; /* fixed-point */
 	static int count = LOAD_FREQ;
 
 	count -= ticks;
 	if (unlikely(count < 0)) {
 		active_tasks = count_active_tasks();
+		active_rt_tasks = count_active_rt_tasks();
 		do {
 			CALC_LOAD(avenrun[0], EXP_1, active_tasks);
 			CALC_LOAD(avenrun[1], EXP_5, active_tasks);
 			CALC_LOAD(avenrun[2], EXP_15, active_tasks);
-			count += LOAD_FREQ;
-		} while (count < 0);
 #ifdef CONFIG_PREEMPT_RT
-		active_tasks = count_active_rt_tasks();
-		CALC_LOAD(avenrun_rt[0], EXP_1, active_tasks);
-		CALC_LOAD(avenrun_rt[1], EXP_5, active_tasks);
-		CALC_LOAD(avenrun_rt[2], EXP_15, active_tasks);
+			CALC_LOAD(avenrun_rt[0], EXP_1, active_tasks);
+			CALC_LOAD(avenrun_rt[1], EXP_5, active_tasks);
+			CALC_LOAD(avenrun_rt[2], EXP_15, active_tasks);
 #endif
+			count += LOAD_FREQ;
+
+		} while (count < 0);
 	}
 }
 
