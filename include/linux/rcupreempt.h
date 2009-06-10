@@ -96,16 +96,6 @@ extern int  rcu_pending_rt(int cpu);
 struct softirq_action;
 extern void rcu_process_callbacks_rt(struct softirq_action *unused);
 
-#ifdef CONFIG_RCU_TRACE
-struct rcupreempt_trace;
-extern int *rcupreempt_flipctr(int cpu);
-extern long rcupreempt_data_completed(void);
-extern int rcupreempt_flip_flag(int cpu);
-extern int rcupreempt_mb_flag(int cpu);
-extern char *rcupreempt_try_flip_state_name(void);
-extern struct rcupreempt_trace *rcupreempt_trace_cpu(int cpu);
-#endif
-
 struct softirq_action;
 
 #ifdef CONFIG_NO_HZ

@@ -69,32 +69,32 @@ struct rcupreempt_trace {
 	long		rcu_try_flip_m2;
 };
 
-#ifdef CONFIG_RCU_TRACE
-#define RCU_TRACE(fn, arg) 	fn(arg);
-#else
-#define RCU_TRACE(fn, arg)
-#endif
+struct rcupreempt_probe_data {
+	const char *name;
+	const char *format;
+	marker_probe_func *probe_func;
+};
 
-extern void rcupreempt_trace_move2done(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_move2wait(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_1(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_e1(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_i1(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_ie1(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_g1(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_a1(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_ae1(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_a2(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_z1(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_ze1(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_z2(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_m1(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_me1(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_try_flip_m2(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_check_callbacks(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_done_remove(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_invoke(struct rcupreempt_trace *trace);
-extern void rcupreempt_trace_next_add(struct rcupreempt_trace *trace);
+#define DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_worker) \
+void rcupreempt_trace_worker##_callback(const struct marker *mdata, \
+				void *private_data, const char *format, ...) \
+{ \
+	struct rcupreempt_trace *trace; \
+	trace = (&per_cpu(trace_data, smp_processor_id())); \
+	rcupreempt_trace_worker(trace); \
+}
+
+#define INIT_RCUPREEMPT_PROBE(rcupreempt_trace_worker) \
+{ \
+	.name = __stringify(rcupreempt_trace_worker), \
+	.probe_func = rcupreempt_trace_worker##_callback \
+}
+
+extern int *rcupreempt_flipctr(int cpu);
+extern long rcupreempt_data_completed(void);
+extern int rcupreempt_flip_flag(int cpu);
+extern int rcupreempt_mb_flag(int cpu);
+extern char *rcupreempt_try_flip_state_name(void);
 
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUPREEMPT_TRACE_H */

@@ -43,10 +43,18 @@
 #include <linux/mutex.h>
 #include <linux/rcupreempt_trace.h>
 #include <linux/debugfs.h>
+#include <linux/percpu.h>
 
 static struct mutex rcupreempt_trace_mutex;
 static char *rcupreempt_trace_buf;
 #define RCUPREEMPT_TRACE_BUF_SIZE 4096
+
+static DEFINE_PER_CPU(struct rcupreempt_trace, trace_data);
+
+struct rcupreempt_trace *rcupreempt_trace_cpu(int cpu)
+{
+	return &per_cpu(trace_data, cpu);
+}
 
 void rcupreempt_trace_move2done(struct rcupreempt_trace *trace)
 {
@@ -134,6 +142,51 @@ void rcupreempt_trace_next_add(struct rcupreempt_trace *trace)
 	trace->next_add++;
 	trace->next_length++;
 }
+
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_move2done);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_move2wait);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_1);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_e1);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_i1);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_ie1);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_g1);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_a1);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_ae1);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_a2);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_z1);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_ze1);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_z2);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_m1);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_me1);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_try_flip_m2);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_check_callbacks);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_done_remove);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_invoke);
+DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_next_add);
+
+static struct rcupreempt_probe_data rcupreempt_probe_array[] =
+{
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_move2done),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_move2wait),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_1),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_e1),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_i1),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_ie1),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_g1),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_a1),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_ae1),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_a2),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_z1),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_ze1),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_z2),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_m1),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_me1),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_try_flip_m2),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_check_callbacks),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_done_remove),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_invoke),
+	INIT_RCUPREEMPT_PROBE(rcupreempt_trace_next_add)
+};
 
 static void rcupreempt_trace_sum(struct rcupreempt_trace *sp)
 {
@@ -297,9 +350,6 @@ static int rcupreempt_debugfs_init(void)
 	if (!ctrsdir)
 		goto free_out;
 
-	if (!rcu_trace_boost_create(rcudir))
-		goto free_out;
-
 	return 0;
 free_out:
 	if (ctrsdir)
@@ -316,6 +366,21 @@ out:
 static int __init rcupreempt_trace_init(void)
 {
 	int ret;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(rcupreempt_probe_array); i++) {
+		struct rcupreempt_probe_data *p = &rcupreempt_probe_array[i];
+		ret = marker_probe_register(p->name, p->format,
+							p->probe_func, p);
+		if (ret)
+			printk(KERN_INFO "Unable to register rcupreempt \
+				probe %s\n", rcupreempt_probe_array[i].name);
+		ret = marker_arm(p->name);
+		if (ret)
+			printk(KERN_INFO "Unable to arm rcupreempt probe %s\n",
+				p->name);
+	}
+	printk(KERN_INFO "RCU Preempt markers registered\n");
 
 	mutex_init(&rcupreempt_trace_mutex);
 	rcupreempt_trace_buf = kmalloc(RCUPREEMPT_TRACE_BUF_SIZE, GFP_KERNEL);
@@ -329,7 +394,12 @@ static int __init rcupreempt_trace_init(void)
 
 static void __exit rcupreempt_trace_cleanup(void)
 {
-	rcu_trace_boost_destroy();
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(rcupreempt_probe_array); i++)
+		marker_probe_unregister(rcupreempt_probe_array[i].name);
+	printk(KERN_INFO "RCU Preempt markers unregistered\n");
+
 	debugfs_remove(statdir);
 	debugfs_remove(gpdir);
 	debugfs_remove(ctrsdir);
@@ -337,6 +407,7 @@ static void __exit rcupreempt_trace_cleanup(void)
 	kfree(rcupreempt_trace_buf);
 }
 
+MODULE_LICENSE("GPL");
 
 module_init(rcupreempt_trace_init);
 module_exit(rcupreempt_trace_cleanup);

@@ -54,7 +54,6 @@
 #include <linux/delay.h>
 #include <linux/byteorder/swabb.h>
 #include <linux/cpumask.h>
-#include <linux/rcupreempt_trace.h>
 
 /*
  * PREEMPT_RCU data structures.
@@ -71,9 +70,6 @@ struct rcu_data {
 	struct rcu_head **waittail[GP_STAGES];
 	struct rcu_head *donelist;
 	struct rcu_head **donetail;
-#ifdef CONFIG_RCU_TRACE
-	struct rcupreempt_trace trace;
-#endif /* #ifdef CONFIG_RCU_TRACE */
 };
 struct rcu_ctrlblk {
 	raw_spinlock_t	fliplock;	/* Protect state-machine transitions. */
@@ -97,10 +93,8 @@ enum rcu_try_flip_states {
 	rcu_try_flip_waitmb_state	/* "M" */
 };
 static enum rcu_try_flip_states rcu_try_flip_state = rcu_try_flip_idle_state;
-#ifdef CONFIG_RCU_TRACE
 static char *rcu_try_flip_state_names[] =
 	{ "idle", "waitack", "waitzero", "waitmb" };
-#endif /* #ifdef CONFIG_RCU_TRACE */
 
 /*
  * Enum and per-CPU flag to determine when each CPU has seen
@@ -145,24 +139,6 @@ static cpumask_t rcu_cpu_online_map = CPU_MASK_NONE;
  */
 #define RCU_DATA_ME()		(&__get_cpu_var(rcu_data))
 #define RCU_DATA_CPU(cpu)	(&per_cpu(rcu_data, cpu))
-
-/*
- * Helper macro for tracing when the appropriate rcu_data is not
- * cached in a local variable, but where the CPU number is so cached.
- */
-#define RCU_TRACE_CPU(f, cpu) RCU_TRACE(f, &(RCU_DATA_CPU(cpu)->trace));
-
-/*
- * Helper macro for tracing when the appropriate rcu_data is not
- * cached in a local variable.
- */
-#define RCU_TRACE_ME(f) RCU_TRACE(f, &(RCU_DATA_ME()->trace));
-
-/*
- * Helper macro for tracing when the appropriate rcu_data is pointed
- * to by a local variable.
- */
-#define RCU_TRACE_RDP(f, rdp) RCU_TRACE(f, &((rdp)->trace));
 
 /*
  * Return the number of RCU batches processed thus far.  Useful
@@ -332,7 +308,7 @@ static void __rcu_advance_callbacks(struct rcu_data *rdp)
 		if (rdp->waitlist[GP_STAGES - 1] != NULL) {
 			*rdp->donetail = rdp->waitlist[GP_STAGES - 1];
 			rdp->donetail = rdp->waittail[GP_STAGES - 1];
-			RCU_TRACE_RDP(rcupreempt_trace_move2done, rdp);
+			trace_mark(rcupreempt_trace_move2done, "NULL");
 		}
 		for (i = GP_STAGES - 2; i >= 0; i--) {
 			if (rdp->waitlist[i] != NULL) {
@@ -351,7 +327,7 @@ static void __rcu_advance_callbacks(struct rcu_data *rdp)
 			wlc++;
 			rdp->nextlist = NULL;
 			rdp->nexttail = &rdp->nextlist;
-			RCU_TRACE_RDP(rcupreempt_trace_move2wait, rdp);
+			trace_mark(rcupreempt_trace_move2wait, "NULL");
 		} else {
 			rdp->waitlist[0] = NULL;
 			rdp->waittail[0] = &rdp->waitlist[0];
@@ -595,9 +571,9 @@ rcu_try_flip_idle(void)
 {
 	int cpu;
 
-	RCU_TRACE_ME(rcupreempt_trace_try_flip_i1);
+	trace_mark(rcupreempt_trace_try_flip_i1, "NULL");
 	if (!rcu_pending(smp_processor_id())) {
-		RCU_TRACE_ME(rcupreempt_trace_try_flip_ie1);
+		trace_mark(rcupreempt_trace_try_flip_ie1, "NULL");
 		return 0;
 	}
 
@@ -605,7 +581,7 @@ rcu_try_flip_idle(void)
 	 * Do the flip.
 	 */
 
-	RCU_TRACE_ME(rcupreempt_trace_try_flip_g1);
+	trace_mark(rcupreempt_trace_try_flip_g1, "NULL");
 	rcu_ctrlblk.completed++;  /* stands in for rcu_try_flip_g2 */
 
 	/*
@@ -635,11 +611,11 @@ rcu_try_flip_waitack(void)
 {
 	int cpu;
 
-	RCU_TRACE_ME(rcupreempt_trace_try_flip_a1);
+	trace_mark(rcupreempt_trace_try_flip_a1, "NULL");
 	for_each_cpu_mask(cpu, rcu_cpu_online_map)
 		if (rcu_try_flip_waitack_needed(cpu) &&
 		    per_cpu(rcu_flip_flag, cpu) != rcu_flip_seen) {
-			RCU_TRACE_ME(rcupreempt_trace_try_flip_ae1);
+			trace_mark(rcupreempt_trace_try_flip_ae1, "NULL");
 			return 0;
 		}
 
@@ -649,7 +625,7 @@ rcu_try_flip_waitack(void)
 	 */
 
 	smp_mb();	/* see above block comment. */
-	RCU_TRACE_ME(rcupreempt_trace_try_flip_a2);
+	trace_mark(rcupreempt_trace_try_flip_a2, "NULL");
 	return 1;
 }
 
@@ -667,11 +643,11 @@ rcu_try_flip_waitzero(void)
 
 	/* Check to see if the sum of the "last" counters is zero. */
 
-	RCU_TRACE_ME(rcupreempt_trace_try_flip_z1);
+	trace_mark(rcupreempt_trace_try_flip_z1, "NULL");
 	for_each_possible_cpu(cpu)
 		sum += per_cpu(rcu_flipctr, cpu)[lastidx];
 	if (sum != 0) {
-		RCU_TRACE_ME(rcupreempt_trace_try_flip_ze1);
+		trace_mark(rcupreempt_trace_try_flip_ze1, "NULL");
 		return 0;
 	}
 
@@ -684,7 +660,7 @@ rcu_try_flip_waitzero(void)
 		dyntick_save_progress_counter(cpu);
 	}
 
-	RCU_TRACE_ME(rcupreempt_trace_try_flip_z2);
+	trace_mark(rcupreempt_trace_try_flip_z2, "NULL");
 	return 1;
 }
 
@@ -698,16 +674,16 @@ rcu_try_flip_waitmb(void)
 {
 	int cpu;
 
-	RCU_TRACE_ME(rcupreempt_trace_try_flip_m1);
+	trace_mark(rcupreempt_trace_try_flip_m1, "NULL");
 	for_each_cpu_mask(cpu, rcu_cpu_online_map)
 		if (rcu_try_flip_waitmb_needed(cpu) &&
 		    per_cpu(rcu_mb_flag, cpu) != rcu_mb_done) {
-			RCU_TRACE_ME(rcupreempt_trace_try_flip_me1);
+			trace_mark(rcupreempt_trace_try_flip_me1, "NULL");
 			return 0;
 		}
 
 	smp_mb(); /* Ensure that the above checks precede any following flip. */
-	RCU_TRACE_ME(rcupreempt_trace_try_flip_m2);
+	trace_mark(rcupreempt_trace_try_flip_m2, "NULL");
 	return 1;
 }
 
@@ -724,9 +700,9 @@ static void rcu_try_flip(void)
 {
 	unsigned long oldirq;
 
-	RCU_TRACE_ME(rcupreempt_trace_try_flip_1);
+	trace_mark(rcupreempt_trace_try_flip_1, "NULL");
 	if (unlikely(!spin_trylock_irqsave(&rcu_ctrlblk.fliplock, oldirq))) {
-		RCU_TRACE_ME(rcupreempt_trace_try_flip_e1);
+		trace_mark(rcupreempt_trace_try_flip_e1, "NULL");
 		return;
 	}
 
@@ -778,7 +754,7 @@ void rcu_check_callbacks_rt(int cpu, int user)
 	if (rcu_ctrlblk.completed == rdp->completed)
 		rcu_try_flip();
 	spin_lock_irqsave(&rdp->lock, oldirq);
-	RCU_TRACE_RDP(rcupreempt_trace_check_callbacks, rdp);
+	trace_mark(rcupreempt_trace_check_callbacks, "NULL");
 	__rcu_advance_callbacks(rdp);
 	spin_unlock_irqrestore(&rdp->lock, oldirq);
 }
@@ -798,7 +774,7 @@ void rcu_advance_callbacks_rt(int cpu, int user)
 			return;
 	}
 	spin_lock_irqsave(&rdp->lock, oldirq);
-	RCU_TRACE_RDP(rcupreempt_trace_check_callbacks, rdp);
+	trace_mark(rcupreempt_trace_check_callbacks, "NULL");
 	__rcu_advance_callbacks(rdp);
 	spin_unlock_irqrestore(&rdp->lock, oldirq);
 }
@@ -900,13 +876,13 @@ void rcu_process_callbacks_rt(struct softirq_action *unused)
 	}
 	rdp->donelist = NULL;
 	rdp->donetail = &rdp->donelist;
-	RCU_TRACE_RDP(rcupreempt_trace_done_remove, rdp);
+	trace_mark(rcupreempt_trace_done_remove, "NULL");
 	spin_unlock_irqrestore(&rdp->lock, flags);
 	while (list) {
 		next = list->next;
 		list->func(list);
 		list = next;
-		RCU_TRACE_ME(rcupreempt_trace_invoke);
+		trace_mark(rcupreempt_trace_invoke, "NULL");
 	}
 }
 
@@ -924,7 +900,7 @@ void fastcall call_rcu_preempt(struct rcu_head *head,
 	__rcu_advance_callbacks(rdp);
 	*rdp->nexttail = head;
 	rdp->nexttail = &head->next;
-	RCU_TRACE_RDP(rcupreempt_trace_next_add, rdp);
+	trace_mark(rcupreempt_trace_next_add, "NULL");
 	spin_unlock(&rdp->lock);
 	local_irq_restore(oldirq);
 }
@@ -1006,7 +982,6 @@ void synchronize_kernel(void)
 	synchronize_rcu();
 }
 
-#ifdef CONFIG_RCU_TRACE
 int *rcupreempt_flipctr(int cpu)
 {
 	return &per_cpu(rcu_flipctr, cpu)[0];
@@ -1030,13 +1005,3 @@ char *rcupreempt_try_flip_state_name(void)
 	return rcu_try_flip_state_names[rcu_try_flip_state];
 }
 EXPORT_SYMBOL_GPL(rcupreempt_try_flip_state_name);
-
-struct rcupreempt_trace *rcupreempt_trace_cpu(int cpu)
-{
-	struct rcu_data *rdp = RCU_DATA_CPU(cpu);
-
-	return &rdp->trace;
-}
-EXPORT_SYMBOL_GPL(rcupreempt_trace_cpu);
-
-#endif /* #ifdef RCU_TRACE */
