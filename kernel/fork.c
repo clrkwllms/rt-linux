@@ -431,6 +431,18 @@ void fastcall __mmdrop(struct mm_struct *mm)
 	free_mm(mm);
 }
 
+#ifdef CONFIG_PREEMPT_RT
+static void ___mmdrop_rcu(struct rcu_head *head)
+{
+	__mmdrop(container_of(head, struct mm_struct, rcu_head));
+}
+
+void fastcall __mmdrop_rcu(struct mm_struct *mm)
+{
+	call_rcu_preempt_online(&mm->rcu_head, ___mmdrop_rcu);
+}
+#endif
+
 /*
  * Decrement the use count and release all resources for an mm.
  */
