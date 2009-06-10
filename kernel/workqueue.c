@@ -594,9 +594,28 @@ int schedule_delayed_work_on(int cpu,
 }
 EXPORT_SYMBOL(schedule_delayed_work_on);
 
+struct schedule_on_each_cpu_work {
+	struct work_struct work;
+	void (*func)(void *info);
+	void *info;
+};
+
+static void schedule_on_each_cpu_func(struct work_struct *work)
+{
+	struct schedule_on_each_cpu_work *w;
+
+	w = container_of(work, typeof(*w), work);
+	w->func(w->info);
+
+	kfree(w);
+}
+
 /**
  * schedule_on_each_cpu - call a function on each online CPU from keventd
  * @func: the function to call
+ * @info: data to pass to function
+ * @retry: ignored
+ * @wait: wait for completion
  *
  * Returns zero on success.
  * Returns -ve errno on failure.
@@ -605,27 +624,51 @@ EXPORT_SYMBOL(schedule_delayed_work_on);
  *
  * schedule_on_each_cpu() is very slow.
  */
-int schedule_on_each_cpu(work_func_t func)
+int schedule_on_each_cpu(void (*func)(void *info), void *info, int retry, int wait)
 {
 	int cpu;
-	struct work_struct *works;
+	struct schedule_on_each_cpu_work **works;
+	int err = 0;
 
-	works = alloc_percpu(struct work_struct);
+	works = kzalloc(sizeof(void *)*nr_cpu_ids, GFP_KERNEL);
 	if (!works)
 		return -ENOMEM;
 
+	for_each_possible_cpu(cpu) {
+		works[cpu] = kmalloc_node(sizeof(struct schedule_on_each_cpu_work),
+				GFP_KERNEL, cpu_to_node(cpu));
+		if (!works[cpu]) {
+			err = -ENOMEM;
+			goto out;
+		}
+	}
+
 	preempt_disable();		/* CPU hotplug */
 	for_each_online_cpu(cpu) {
-		struct work_struct *work = per_cpu_ptr(works, cpu);
+		struct schedule_on_each_cpu_work *work;
 
-		INIT_WORK(work, func);
-		set_bit(WORK_STRUCT_PENDING, work_data_bits(work));
-		__queue_work(per_cpu_ptr(keventd_wq->cpu_wq, cpu), work);
+		work = works[cpu];
+		works[cpu] = NULL;
+
+		work->func = func;
+		work->info = info;
+		INIT_WORK(&work->work, schedule_on_each_cpu_func);
+		set_bit(WORK_STRUCT_PENDING, work_data_bits(&work->work));
+		__queue_work(per_cpu_ptr(keventd_wq->cpu_wq, cpu), &work->work);
 	}
 	preempt_enable();
-	flush_workqueue(keventd_wq);
-	free_percpu(works);
-	return 0;
+
+out:
+	for_each_possible_cpu(cpu) {
+		if (works[cpu])
+			kfree(works[cpu]);
+	}
+	kfree(works);
+
+	if (!err && wait)
+		flush_workqueue(keventd_wq);
+
+	return err;
 }
 
 /**
