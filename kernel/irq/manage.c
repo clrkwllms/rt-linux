@@ -708,7 +708,6 @@ static void thread_edge_irq(irq_desc_t *desc)
 		desc->status &= ~IRQ_PENDING;
 		spin_unlock(&desc->lock);
 		action_ret = handle_IRQ_event(irq, action);
-		cond_resched_hardirq_context();
 		spin_lock_irq(&desc->lock);
 		if (!noirqdebug)
 			note_interrupt(irq, desc, action_ret);
@@ -737,7 +736,6 @@ static void thread_do_irq(irq_desc_t *desc)
 		desc->status &= ~IRQ_PENDING;
 		spin_unlock(&desc->lock);
 		action_ret = handle_IRQ_event(irq, action);
-		cond_resched_hardirq_context();
 		spin_lock_irq(&desc->lock);
 		if (!noirqdebug)
 			note_interrupt(irq, desc, action_ret);
@@ -773,8 +771,6 @@ static void do_hardirq(struct irq_desc *desc)
 		wake_up(&desc->wait_for_handler);
 }
 
-extern asmlinkage void __do_softirq(void);
-
 static int do_irqd(void * __desc)
 {
 	struct sched_param param = { 0, };
@@ -794,16 +790,13 @@ static int do_irqd(void * __desc)
 
 	while (!kthread_should_stop()) {
 		local_irq_disable_nort();
-		set_current_state(TASK_INTERRUPTIBLE);
-#ifndef CONFIG_PREEMPT_RT
-		irq_enter();
-#endif
-		do_hardirq(desc);
-#ifndef CONFIG_PREEMPT_RT
-		irq_exit();
-#endif
+		do {
+			set_current_state(TASK_INTERRUPTIBLE);
+			do_hardirq(desc);
+			do_softirq_from_hardirq();
+		} while (current->state == TASK_RUNNING);
+
 		local_irq_enable_nort();
-		cond_resched();
 #ifdef CONFIG_SMP
 		/*
 		 * Did IRQ affinities change?
