@@ -777,7 +777,15 @@ static int do_irqd(void * __desc)
 	struct irq_desc *desc = __desc;
 
 #ifdef CONFIG_SMP
-	set_cpus_allowed(current, desc->affinity);
+	cpumask_t cpus_allowed, mask;
+
+	cpus_allowed = desc->affinity;
+	/*
+	 * Restrict it to one cpu so we avoid being migrated inside of
+	 * do_softirq_from_hardirq()
+	 */
+	mask = cpumask_of_cpu(first_cpu(desc->affinity));
+	set_cpus_allowed(current, mask);
 #endif
 	current->flags |= PF_NOFREEZE | PF_HARDIRQ;
 
@@ -801,8 +809,16 @@ static int do_irqd(void * __desc)
 		/*
 		 * Did IRQ affinities change?
 		 */
-		if (!cpus_equal(current->cpus_allowed, desc->affinity))
-			set_cpus_allowed(current, desc->affinity);
+		if (!cpus_equal(cpus_allowed, desc->affinity)) {
+			cpus_allowed = desc->affinity;
+			/*
+			 * Restrict it to one cpu so we avoid being
+			 * migrated inside of
+			 * do_softirq_from_hardirq()
+			 */
+			mask = cpumask_of_cpu(first_cpu(desc->affinity));
+			set_cpus_allowed(current, mask);
+		}
 #endif
 		schedule();
 	}
