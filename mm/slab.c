@@ -138,8 +138,8 @@
  *
  * (On PREEMPT_RT, these are NOPs, but we have to drop/get the irq locks.)
  */
-# define slab_irq_disable_nort()	local_irq_disable()
-# define slab_irq_enable_nort()		local_irq_enable()
+# define slab_irq_disable_nort(cpu)	slab_irq_disable(cpu)
+# define slab_irq_enable_nort(cpu)	slab_irq_enable(cpu)
 # define slab_irq_disable_rt(flags)	do { (void)(flags); } while (0)
 # define slab_irq_enable_rt(flags)	do { (void)(flags); } while (0)
 # define slab_spin_lock_irq(lock, cpu) \
@@ -160,8 +160,8 @@ DEFINE_PER_CPU_LOCKED(int, slab_irq_locks) = { 0, };
 	do { slab_irq_enable(cpu); (void) (flags); } while (0)
 # define slab_irq_disable_rt(cpu)	slab_irq_disable(cpu)
 # define slab_irq_enable_rt(cpu)	slab_irq_enable(cpu)
-# define slab_irq_disable_nort()	do { } while (0)
-# define slab_irq_enable_nort()		do { } while (0)
+# define slab_irq_disable_nort(cpu)	do { } while (0)
+# define slab_irq_enable_nort(cpu)	do { } while (0)
 # define slab_spin_lock_irq(lock, cpu) \
 		do { slab_irq_disable(cpu); spin_lock(lock); } while (0)
 # define slab_spin_unlock_irq(lock, cpu) \
@@ -2899,7 +2899,7 @@ static int cache_grow(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 	offset *= cachep->colour_off;
 
 	if (local_flags & __GFP_WAIT)
-		slab_irq_enable_nort();
+		slab_irq_enable_nort(*this_cpu);
 	slab_irq_enable_rt(*this_cpu);
 
 	/*
@@ -2932,7 +2932,7 @@ static int cache_grow(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 
 	slab_irq_disable_rt(*this_cpu);
 	if (local_flags & __GFP_WAIT)
-		slab_irq_disable_nort();
+		slab_irq_disable_nort(*this_cpu);
 
 	check_irq_off();
 	spin_lock(&l3->list_lock);
@@ -2948,7 +2948,7 @@ opps1:
 failed:
 	slab_irq_disable_rt(*this_cpu);
 	if (local_flags & __GFP_WAIT)
-		slab_irq_disable_nort();
+		slab_irq_disable_nort(*this_cpu);
 	return 0;
 }
 
@@ -3396,7 +3396,7 @@ retry:
 		 * set and go into memory reserves if necessary.
 		 */
 		if (local_flags & __GFP_WAIT)
-			slab_irq_enable_nort();
+			slab_irq_enable_nort(*this_cpu);
 		slab_irq_enable_rt(*this_cpu);
 
 		kmem_flagcheck(cache, flags);
@@ -3404,7 +3404,7 @@ retry:
 
 		slab_irq_disable_rt(*this_cpu);
 		if (local_flags & __GFP_WAIT)
-			slab_irq_disable_nort();
+			slab_irq_disable_nort(*this_cpu);
 
 		if (obj) {
 			/*
