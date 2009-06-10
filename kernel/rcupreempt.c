@@ -133,7 +133,7 @@ static cpumask_t rcu_cpu_online_map = CPU_MASK_NONE;
  * only to mediate communication between mainline code and hardware
  * interrupt and NMI handlers.
  */
-#define ORDERED_WRT_IRQ(x) (*(volatile typeof(x) *)&(x))
+#define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
 
 /*
  * RCU_DATA_ME: find the current CPU's rcu_data structure.
@@ -186,7 +186,7 @@ void __rcu_read_lock(void)
 	struct task_struct *me = current;
 	int nesting;
 
-	nesting = ORDERED_WRT_IRQ(me->rcu_read_lock_nesting);
+	nesting = ACCESS_ONCE(me->rcu_read_lock_nesting);
 	if (nesting != 0) {
 
 		/* An earlier rcu_read_lock() covers us, just count it. */
@@ -211,9 +211,9 @@ void __rcu_read_lock(void)
 		 * casts to prevent the compiler from reordering.
 		 */
 
-		idx = ORDERED_WRT_IRQ(rcu_ctrlblk.completed) & 0x1;
+		idx = ACCESS_ONCE(rcu_ctrlblk.completed) & 0x1;
 		smp_read_barrier_depends();  /* @@@@ might be unneeded */
-		ORDERED_WRT_IRQ(__get_cpu_var(rcu_flipctr)[idx])++;
+		ACCESS_ONCE(__get_cpu_var(rcu_flipctr)[idx])++;
 
 		/*
 		 * Now that the per-CPU counter has been incremented, we
@@ -223,7 +223,7 @@ void __rcu_read_lock(void)
 		 * of the need to increment the per-CPU counter.
 		 */
 
-		ORDERED_WRT_IRQ(me->rcu_read_lock_nesting) = nesting + 1;
+		ACCESS_ONCE(me->rcu_read_lock_nesting) = nesting + 1;
 
 		/*
 		 * Now that we have preventing any NMIs from storing
@@ -232,7 +232,7 @@ void __rcu_read_lock(void)
 		 * rcu_read_unlock().
 		 */
 
-		ORDERED_WRT_IRQ(me->rcu_flipctr_idx) = idx;
+		ACCESS_ONCE(me->rcu_flipctr_idx) = idx;
 		local_irq_restore(oldirq);
 	}
 }
@@ -244,7 +244,7 @@ void __rcu_read_unlock(void)
 	struct task_struct *me = current;
 	int nesting;
 
-	nesting = ORDERED_WRT_IRQ(me->rcu_read_lock_nesting);
+	nesting = ACCESS_ONCE(me->rcu_read_lock_nesting);
 	if (nesting > 1) {
 
 		/*
@@ -284,7 +284,7 @@ void __rcu_read_unlock(void)
 		 * DEC Alpha.
 		 */
 
-		idx = ORDERED_WRT_IRQ(me->rcu_flipctr_idx);
+		idx = ACCESS_ONCE(me->rcu_flipctr_idx);
 		smp_read_barrier_depends();  /* @@@ Needed??? */
 
 		/*
@@ -293,7 +293,7 @@ void __rcu_read_unlock(void)
 		 * After this, any interrupts or NMIs will increment and
 		 * decrement the per-CPU counters.
 		 */
-		ORDERED_WRT_IRQ(me->rcu_read_lock_nesting) = nesting - 1;
+		ACCESS_ONCE(me->rcu_read_lock_nesting) = nesting - 1;
 
 		/*
 		 * It is now safe to decrement this task's nesting count.
@@ -304,7 +304,7 @@ void __rcu_read_unlock(void)
 		 * but that is OK, since we have already fetched it.
 		 */
 
-		ORDERED_WRT_IRQ(__get_cpu_var(rcu_flipctr)[idx])--;
+		ACCESS_ONCE(__get_cpu_var(rcu_flipctr)[idx])--;
 		local_irq_restore(oldirq);
 	}
 }
@@ -496,7 +496,7 @@ rcu_try_flip_waitmb(void)
 /*
  * Attempt a single flip of the counters.  Remember, a single flip does
  * -not- constitute a grace period.  Instead, the interval between
- * at least three consecutive flips is a grace period.
+ * at least GP_STAGES+2 consecutive flips is a grace period.
  *
  * If anyone is nuts enough to run this CONFIG_PREEMPT_RCU implementation
  * on a large SMP, they might want to use a hierarchical organization of

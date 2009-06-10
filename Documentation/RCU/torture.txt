@@ -37,6 +37,24 @@ nfakewriters	This is the number of RCU fake writer threads to run.  Fake
 		to trigger special cases caused by multiple writers, such as
 		the synchronize_srcu() early return optimization.
 
+preempt_torture	Specifies that torturing of preemptible RCU is to be
+		undertaken, defaults to no such testing.  This test
+		creates a kernel thread that runs at the lowest possible
+		realtime priority, alternating between ten seconds
+		of spinning and a short sleep period.  The goal is
+		to preempt lower-priority RCU readers.	Note that this
+		currently does not fail the full test, but instead simply
+		counts the number of times that a ten-second CPU burst
+		coincides with a stall in grace-period detection.
+
+		Of course, if the grace period advances during a CPU burst,
+		that indicates that no RCU reader was preempted, so the
+		burst ends early in that case.
+
+		Note that such stalls are expected behavior in preemptible
+		RCU implementations when RCU priority boosting is not
+		enabled (PREEMPT_RCU_BOOST=n).
+
 stat_interval	The number of seconds between output of torture
 		statistics (via printk()).  Regardless of the interval,
 		statistics are printed when the module is unloaded.
@@ -46,12 +64,13 @@ stat_interval	The number of seconds between output of torture
 
 shuffle_interval
 		The number of seconds to keep the test threads affinitied
-		to a particular subset of the CPUs.  Used in conjunction
-		with test_no_idle_hz.
+		to a particular subset of the CPUs, defaults to 5 seconds.
+		Used in conjunction with test_no_idle_hz.
 
 test_no_idle_hz	Whether or not to test the ability of RCU to operate in
 		a kernel that disables the scheduling-clock interrupt to
 		idle CPUs.  Boolean parameter, "1" to test, "0" otherwise.
+		Defaults to omitting this test.
 
 torture_type	The type of RCU to test: "rcu" for the rcu_read_lock() API,
 		"rcu_sync" for rcu_read_lock() with synchronous reclamation,
@@ -81,8 +100,6 @@ the RCU torture test.  The printk()s use KERN_ALERT, so they should
 be evident.  ;-)
 
 The entries are as follows:
-
-o	"ggp": The number of counter flips (or batches) since boot.
 
 o	"rtc": The hexadecimal address of the structure currently visible
 	to readers.
@@ -117,8 +134,8 @@ o	"Reader Pipe": Histogram of "ages" of structures seen by readers.
 o	"Reader Batch": Another histogram of "ages" of structures seen
 	by readers, but in terms of counter flips (or batches) rather
 	than in terms of grace periods.  The legal number of non-zero
-	entries is again two.  The reason for this separate view is
-	that it is easier to get the third entry to show up in the
+	entries is again two.  The reason for this separate view is that
+	it is sometimes easier to get the third entry to show up in the
 	"Reader Batch" list than in the "Reader Pipe" list.
 
 o	"Free-Block Circulation": Shows the number of torture structures
@@ -144,6 +161,21 @@ the per-CPU counter state.  The numbers in parentheses are the values
 of the "old" and "current" counters for the corresponding CPU.  The
 "idx" value maps the "old" and "current" values to the underlying array,
 and is useful for debugging.
+
+In addition, preemptible RCU rcutorture runs will report preemption
+stalls:
+
+rcu-torture: rtc: ffffffff88005a40 ver: 17041 tfle: 1 rta: 17041 rtaf: 7904 rtf: 16941 rtmbe: 0
+rcu-torture: Reader Pipe:  975332139 34406 0 0 0 0 0 0 0 0 0
+rcu-torture: Reader Batch:  975349310 17234 0 0 0 0 0 0 0 0 0
+rcu-torture: Free-Block Circulation:  17040 17030 17028 17022 17009 16994 16982 16969 16955 16941 0
+Preemption stalls: 0
+
+The first four lines are as before, and the last line records the number
+of times that grace-period processing stalled during a realtime CPU burst.
+Note that a non-zero value does not -prove- that RCU priority boosting is
+broken, because there are other things that can stall RCU grace-period
+processing.  Here is hoping that someone comes up with a better test!
 
 
 USAGE
