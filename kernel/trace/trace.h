@@ -24,6 +24,8 @@ enum trace_type {
 	TRACE_TIMESTAMP,
 	TRACE_TASK_ACT,
 	TRACE_TASK_DEACT,
+	TRACE_SYSCALL,
+	TRACE_SYSRET,
 
 	__TRACE_LAST_TYPE
 };
@@ -96,6 +98,19 @@ struct wakeup_entry {
 	unsigned		curr_prio;
 };
 
+struct syscall_entry {
+	unsigned long		ip;
+	unsigned long		nr;
+	unsigned long		p1;
+	unsigned long		p2;
+	unsigned long		p3;
+};
+
+struct sysret_entry {
+	unsigned long		ip;
+	unsigned long		ret;
+};
+
 /*
  * Stack-trace entry:
  */
@@ -132,6 +147,8 @@ struct trace_entry {
 		struct timestamp_entry		timestamp;
 		struct task_entry		task;
 		struct wakeup_entry		wakeup;
+		struct syscall_entry		syscall;
+		struct sysret_entry		sysret;
 	};
 };
 
@@ -320,6 +337,19 @@ void tracing_event_wakeup(struct trace_array *tr,
 			  unsigned long ip,
 			  pid_t pid, int prio,
 			  int curr_prio);
+void tracing_event_syscall(struct trace_array *tr,
+			   struct trace_array_cpu *data,
+			   unsigned long flags,
+			   unsigned long ip,
+			   unsigned long nr,
+			   unsigned long p1,
+			   unsigned long p2,
+			   unsigned long p3);
+void tracing_event_sysret(struct trace_array *tr,
+			  struct trace_array_cpu *data,
+			  unsigned long flags,
+			  unsigned long ip,
+			  unsigned long ret);
 
 void tracing_start_cmdline_record(void);
 void tracing_stop_cmdline_record(void);

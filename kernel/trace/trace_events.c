@@ -34,6 +34,98 @@ static void event_reset(struct trace_array *tr)
 	tr->time_start = ftrace_now(raw_smp_processor_id());
 }
 
+/* HACK */
+void notrace
+sys_call(unsigned long nr, unsigned long p1, unsigned long p2, unsigned long p3)
+{
+	struct trace_array *tr;
+	struct trace_array_cpu *data;
+	unsigned long flags;
+	unsigned long ip;
+	int cpu;
+
+	if (!tracer_enabled)
+		return;
+
+	tr = events_trace;
+	local_irq_save(flags);
+	cpu = raw_smp_processor_id();
+	data = tr->data[cpu];
+
+	atomic_inc(&data->disabled);
+	if (atomic_read(&data->disabled) != 1)
+		goto out;
+
+	ip = CALLER_ADDR0;
+
+	tracing_event_syscall(tr, data, flags, ip, nr, p1, p2, p3);
+
+ out:
+	atomic_dec(&data->disabled);
+	local_irq_restore(flags);
+}
+
+#if defined(CONFIG_COMPAT) && defined(CONFIG_X86)
+void notrace
+sys_ia32_call(unsigned long nr, unsigned long p1, unsigned long p2,
+	      unsigned long p3)
+{
+	struct trace_array *tr;
+	struct trace_array_cpu *data;
+	unsigned long flags;
+	unsigned long ip;
+	int cpu;
+
+	if (!tracer_enabled)
+		return;
+
+	tr = events_trace;
+	local_irq_save(flags);
+	cpu = raw_smp_processor_id();
+	data = tr->data[cpu];
+
+	atomic_inc(&data->disabled);
+	if (atomic_read(&data->disabled) != 1)
+		goto out;
+
+	ip = CALLER_ADDR0;
+	tracing_event_syscall(tr, data, flags, ip, nr | 0x80000000, p1, p2, p3);
+
+ out:
+	atomic_dec(&data->disabled);
+	local_irq_restore(flags);
+}
+#endif
+
+void notrace
+sys_ret(unsigned long ret)
+{
+	struct trace_array *tr;
+	struct trace_array_cpu *data;
+	unsigned long flags;
+	unsigned long ip;
+	int cpu;
+
+	if (!tracer_enabled)
+		return;
+
+	tr = events_trace;
+	local_irq_save(flags);
+	cpu = raw_smp_processor_id();
+	data = tr->data[cpu];
+
+	atomic_inc(&data->disabled);
+	if (atomic_read(&data->disabled) != 1)
+		goto out;
+
+	ip = CALLER_ADDR0;
+	tracing_event_sysret(tr, data, flags, ip, ret);
+
+ out:
+	atomic_dec(&data->disabled);
+	local_irq_restore(flags);
+}
+
 #define getarg(arg, ap) arg = va_arg(ap, typeof(arg));
 
 static void

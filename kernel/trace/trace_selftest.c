@@ -18,6 +18,8 @@ static inline int trace_valid_entry(struct trace_entry *entry)
 	case TRACE_TIMESTAMP:
 	case TRACE_TASK_ACT:
 	case TRACE_TASK_DEACT:
+	case TRACE_SYSCALL:
+	case TRACE_SYSRET:
 		return 1;
 	}
 	return 0;
