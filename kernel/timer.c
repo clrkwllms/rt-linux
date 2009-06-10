@@ -38,6 +38,7 @@
 #include <linux/delay.h>
 #include <linux/tick.h>
 #include <linux/kallsyms.h>
+#include <linux/kthread.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -929,7 +930,7 @@ void update_process_times(int user_tick)
 static unsigned long count_active_tasks(void)
 {
 	/*
-	 * On PREEMPT_RT, we are running in the timer softirq thread,
+	 * On PREEMPT_RT, we are running in the loadavg thread,
 	 * so consider 1 less running tasks:
 	 */
 #ifdef CONFIG_PREEMPT_RT
@@ -999,6 +1000,50 @@ static inline void calc_load(unsigned long ticks)
 	}
 }
 
+#ifdef CONFIG_PREEMPT_RT
+static int loadavg_calculator(void *data)
+{
+	unsigned long now, last;
+
+	last = jiffies;
+	while (!kthread_should_stop()) {
+		struct timespec delay = {
+			.tv_sec = LOAD_FREQ / HZ,
+			.tv_nsec = 0
+		};
+
+		hrtimer_nanosleep(&delay, NULL, HRTIMER_MODE_REL,
+			CLOCK_MONOTONIC);
+		now = jiffies;
+		write_seqlock_irq(&xtime_lock);
+		calc_load(now - last);
+		write_sequnlock_irq(&xtime_lock);
+		last = now;
+	}
+
+	return 0;
+}
+
+static int __init start_loadavg_calculator(void)
+{
+	struct task_struct *p;
+	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO/2 };
+
+	p = kthread_create(loadavg_calculator, NULL, "loadavg");
+	if (IS_ERR(p)) {
+		printk(KERN_ERR "Could not create the loadavg thread.\n");
+		return 1;
+	}
+
+	sched_setscheduler(p, SCHED_FIFO, &param);
+	wake_up_process(p);
+
+	return 0;
+}
+
+late_initcall(start_loadavg_calculator);
+#endif
+
 /*
  * Called by the local, per-CPU timer interrupt on SMP.
  */
@@ -1027,7 +1072,9 @@ static inline void update_times(void)
 	ticks = jiffies - last_tick;
 	if (ticks) {
 		last_tick += ticks;
+#ifndef CONFIG_PREEMPT_RT
 		calc_load(ticks);
+#endif
 	}
 	write_sequnlock_irqrestore(&xtime_lock, flags);
 }
