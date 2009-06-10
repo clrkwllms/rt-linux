@@ -81,12 +81,12 @@ struct entry {
 /*
  * Spinlock protecting the tables - not taken during lookup:
  */
-static DEFINE_SPINLOCK(table_lock);
+static DEFINE_RAW_SPINLOCK(table_lock);
 
 /*
  * Per-CPU lookup locks for fast hash lookup:
  */
-static DEFINE_PER_CPU(spinlock_t, lookup_lock);
+static DEFINE_PER_CPU(raw_spinlock_t, lookup_lock);
 
 /*
  * Mutex to serialize state changes with show-stats activities:
@@ -238,7 +238,7 @@ void timer_stats_update_stats(void *timer, pid_t pid, void *startf,
 	/*
 	 * It doesnt matter which lock we take:
 	 */
-	spinlock_t *lock;
+	raw_spinlock_t *lock = &per_cpu(lookup_lock, raw_smp_processor_id());
 	struct entry *entry, input;
 	unsigned long flags;
 

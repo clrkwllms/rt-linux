@@ -178,7 +178,7 @@ void tick_nohz_stop_sched_tick(void)
 	if (unlikely(ts->nohz_mode == NOHZ_MODE_INACTIVE))
 		goto end;
 
-	if (need_resched())
+	if (need_resched() || need_resched_delayed())
 		goto end;
 
 	cpu = smp_processor_id();

@@ -29,7 +29,7 @@
 
 struct tick_device tick_broadcast_device;
 static cpumask_t tick_broadcast_mask;
-static DEFINE_SPINLOCK(tick_broadcast_lock);
+static DEFINE_RAW_SPINLOCK(tick_broadcast_lock);
 
 #ifdef CONFIG_TICK_ONESHOT
 static void tick_broadcast_clear_oneshot(int cpu);
