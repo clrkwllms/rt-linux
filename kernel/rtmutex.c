@@ -1795,6 +1795,16 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 
 	wakeup_next_waiter(mutex, savestate);
 
+	/*
+	 * If we woke up a reader but the lock is already held by readers
+	 * we need to set the mutex owner to RT_RW_READER, since the
+	 * wakeup_next_waiter set it to the pending reader.
+	 */
+	if (reader_count) {
+		WARN_ON(waiter->write_lock);
+		rt_mutex_set_owner(mutex, RT_RW_READER, 0);
+	}
+
 	if (rt_mutex_has_waiters(mutex)) {
 		waiter = rt_mutex_top_waiter(mutex);
 		rwm->prio = waiter->task->prio;
