@@ -599,6 +599,11 @@ do_work:
 
 user_work:
 #endif
+	/* here we are preempting the current task */
+	li	r0,1
+	stb	r0,PACASOFTIRQEN(r13)
+	stb	r0,PACAHARDIRQEN(r13)
+
 	/* Enable interrupts */
 	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1
