@@ -171,11 +171,13 @@ void cpu_idle(void)
 		while (!need_resched() && !need_resched_delayed())
 			idle();
 		leds_event(led_idle_end);
-		tick_nohz_restart_sched_tick();
 		local_irq_disable();
+		trace_preempt_exit_idle();
+		tick_nohz_restart_sched_tick();
 		__preempt_enable_no_resched();
 		__schedule();
 		preempt_disable();
+		trace_preempt_enter_idle();
 		local_irq_enable();
 	}
 }
