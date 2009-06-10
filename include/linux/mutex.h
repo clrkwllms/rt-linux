@@ -18,6 +18,13 @@
 
 #include <asm/atomic.h>
 
+#ifdef CONFIG_DEBUG_LOCK_ALLOC
+# define __DEP_MAP_MUTEX_INITIALIZER(lockname) \
+		, .dep_map = { .name = #lockname }
+#else
+# define __DEP_MAP_MUTEX_INITIALIZER(lockname)
+#endif
+
 #ifdef CONFIG_PREEMPT_RT
 
 #include <linux/rtmutex.h>
@@ -29,9 +36,11 @@ struct mutex {
 #endif
 };
 
+
 #define __MUTEX_INITIALIZER(mutexname)					\
 	{								\
 		.lock = __RT_MUTEX_INITIALIZER(mutexname.lock)		\
+		__DEP_MAP_MUTEX_INITIALIZER(mutexname)			\
 	}
 
 #define DEFINE_MUTEX(mutexname)						\
@@ -139,13 +148,6 @@ do {							\
 	__mutex_init((mutex), #mutex, &__key);		\
 } while (0)
 # define mutex_destroy(mutex)				do { } while (0)
-#endif
-
-#ifdef CONFIG_DEBUG_LOCK_ALLOC
-# define __DEP_MAP_MUTEX_INITIALIZER(lockname) \
-		, .dep_map = { .name = #lockname }
-#else
-# define __DEP_MAP_MUTEX_INITIALIZER(lockname)
 #endif
 
 #define __MUTEX_INITIALIZER(lockname) \
