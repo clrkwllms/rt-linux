@@ -63,11 +63,14 @@ union nf_conntrack_help {
 #ifdef CONFIG_NETFILTER_DEBUG
 #define NF_CT_ASSERT(x)							\
 do {									\
-	if (!(x))							\
+	if (!(x)) {							\
 		/* Wooah!  I'm tripping my conntrack in a frenzy of	\
 		   netplay... */					\
 		printk("NF_CT_ASSERT: %s:%i(%s)\n",			\
 		       __FILE__, __LINE__, __FUNCTION__);		\
+		if (printk_ratelimit())					\
+			WARN_ON(1);					\
+	}								\
 } while(0)
 #else
 #define NF_CT_ASSERT(x)
