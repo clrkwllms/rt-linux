@@ -327,10 +327,10 @@ void nmi_show_all_regs(void)
 	if (system_state == SYSTEM_BOOTING)
 		return;
 
-	smp_send_nmi_allbutself();
-
 	for_each_online_cpu(i)
 		nmi_show_regs[i] = 1;
+
+	smp_send_nmi_allbutself();
 
 	for_each_online_cpu(i) {
 		while (nmi_show_regs[i] == 1)
