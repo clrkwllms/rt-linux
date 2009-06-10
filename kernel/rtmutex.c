@@ -1149,7 +1149,7 @@ rt_read_slowlock(struct rw_mutex *rwm, int mtx)
 	struct rt_mutex_waiter waiter;
 	struct rt_mutex *mutex = &rwm->mutex;
 	int saved_lock_depth = -1;
-	unsigned long flags;
+	unsigned long saved_state = -1, state, flags;
 
 	spin_lock_irqsave(&mutex->wait_lock, flags);
 	init_lists(mutex);
@@ -1168,13 +1168,19 @@ rt_read_slowlock(struct rw_mutex *rwm, int mtx)
 
 	init_lists(mutex);
 
-	/*
-	 * We drop the BKL here before we go into the wait loop to avoid a
-	 * possible deadlock in the scheduler.
-	 */
-	if (unlikely(current->lock_depth >= 0))
-		saved_lock_depth = rt_release_bkl(mutex, flags);
-	set_current_state(TASK_UNINTERRUPTIBLE);
+	if (mtx) {
+		/*
+		 * We drop the BKL here before we go into the wait loop to avoid a
+		 * possible deadlock in the scheduler.
+		 */
+		if (unlikely(current->lock_depth >= 0))
+			saved_lock_depth = rt_release_bkl(mutex, flags);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+	} else {
+		/* Spin lock must preserve BKL */
+		saved_state = xchg(&current->state, TASK_UNINTERRUPTIBLE);
+		saved_lock_depth = current->lock_depth;
+	}
 
 	for (;;) {
 		unsigned long saved_flags;
@@ -1197,21 +1203,36 @@ rt_read_slowlock(struct rw_mutex *rwm, int mtx)
 		}
 		saved_flags = current->flags & PF_NOSCHED;
 		current->flags &= ~PF_NOSCHED;
+		if (!mtx)
+			current->lock_depth = -1;
 
 		spin_unlock_irqrestore(&mutex->wait_lock, flags);
 
 		debug_rt_mutex_print_deadlock(&waiter);
 
-		if (waiter.task)
+		if (!mtx || waiter.task)
 			schedule_rt_mutex(mutex);
 
 		spin_lock_irqsave(&mutex->wait_lock, flags);
 
 		current->flags |= saved_flags;
-		set_current_state(TASK_UNINTERRUPTIBLE);
+		if (mtx)
+			set_current_state(TASK_UNINTERRUPTIBLE);
+		else {
+			current->lock_depth = saved_lock_depth;
+			state = xchg(&current->state, TASK_UNINTERRUPTIBLE);
+			if (unlikely(state == TASK_RUNNING))
+				saved_state = TASK_RUNNING;
+		}
 	}
 
-	set_current_state(TASK_RUNNING);
+	if (mtx)
+		set_current_state(TASK_RUNNING);
+	else {
+		state = xchg(&current->state, saved_state);
+		if (unlikely(state == TASK_RUNNING))
+			current->state = TASK_RUNNING;
+	}
 
 	if (unlikely(waiter.task))
 		remove_waiter(mutex, &waiter, flags);
@@ -1224,7 +1245,7 @@ rt_read_slowlock(struct rw_mutex *rwm, int mtx)
 	spin_unlock_irqrestore(&mutex->wait_lock, flags);
 
 	/* Must we reaquire the BKL? */
-	if (unlikely(saved_lock_depth >= 0))
+	if (mtx && unlikely(saved_lock_depth >= 0))
 		rt_reacquire_bkl(saved_lock_depth);
 
 	debug_rt_mutex_free_waiter(&waiter);
@@ -1255,6 +1276,11 @@ retry:
 void fastcall rt_mutex_down_read(struct rw_mutex *rwm)
 {
 	rt_read_fastlock(rwm, rt_read_slowlock, 1);
+}
+
+void fastcall rt_rwlock_read_lock(struct rw_mutex *rwm)
+{
+	rt_read_fastlock(rwm, rt_read_slowlock, 0);
 }
 
 
@@ -1309,7 +1335,7 @@ rt_write_slowlock(struct rw_mutex *rwm, int mtx)
 	struct rt_mutex *mutex = &rwm->mutex;
 	struct rt_mutex_waiter waiter;
 	int saved_lock_depth = -1;
-	unsigned long flags;
+	unsigned long flags, saved_state = -1, state;
 
 	debug_rt_mutex_init_waiter(&waiter);
 	waiter.task = NULL;
@@ -1326,13 +1352,19 @@ rt_write_slowlock(struct rw_mutex *rwm, int mtx)
 	}
 	update_rw_mutex_owner(rwm);
 
-	/*
-	 * We drop the BKL here before we go into the wait loop to avoid a
-	 * possible deadlock in the scheduler.
-	 */
-	if (unlikely(current->lock_depth >= 0))
-		saved_lock_depth = rt_release_bkl(mutex, flags);
-	set_current_state(TASK_UNINTERRUPTIBLE);
+	if (mtx) {
+		/*
+		 * We drop the BKL here before we go into the wait loop to avoid a
+		 * possible deadlock in the scheduler.
+		 */
+		if (unlikely(current->lock_depth >= 0))
+			saved_lock_depth = rt_release_bkl(mutex, flags);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+	} else {
+		/* Spin locks must preserve the BKL */
+		saved_lock_depth = current->lock_depth;
+		saved_state = xchg(&current->state, TASK_UNINTERRUPTIBLE);
+	}
 
 	for (;;) {
 		unsigned long saved_flags;
@@ -1355,21 +1387,36 @@ rt_write_slowlock(struct rw_mutex *rwm, int mtx)
 		}
 		saved_flags = current->flags & PF_NOSCHED;
 		current->flags &= ~PF_NOSCHED;
+		if (!mtx)
+			current->lock_depth = -1;
 
 		spin_unlock_irqrestore(&mutex->wait_lock, flags);
 
 		debug_rt_mutex_print_deadlock(&waiter);
 
-		if (waiter.task)
+		if (!mtx || waiter.task)
 			schedule_rt_mutex(mutex);
 
 		spin_lock_irqsave(&mutex->wait_lock, flags);
 
 		current->flags |= saved_flags;
-		set_current_state(TASK_UNINTERRUPTIBLE);
+		if (mtx)
+			set_current_state(TASK_UNINTERRUPTIBLE);
+		else {
+			current->lock_depth = saved_lock_depth;
+			state = xchg(&current->state, TASK_UNINTERRUPTIBLE);
+			if (unlikely(state == TASK_RUNNING))
+				saved_state = TASK_RUNNING;
+		}
 	}
 
-	set_current_state(TASK_RUNNING);
+	if (mtx)
+		set_current_state(TASK_RUNNING);
+	else {
+		state = xchg(&current->state, saved_state);
+		if (unlikely(state == TASK_RUNNING))
+			current->state = TASK_RUNNING;
+	}
 
 	if (unlikely(waiter.task))
 		remove_waiter(mutex, &waiter, flags);
@@ -1381,7 +1428,7 @@ rt_write_slowlock(struct rw_mutex *rwm, int mtx)
 	spin_unlock_irqrestore(&mutex->wait_lock, flags);
 
 	/* Must we reaquire the BKL? */
-	if (unlikely(saved_lock_depth >= 0))
+	if (mtx && unlikely(saved_lock_depth >= 0))
 		rt_reacquire_bkl(saved_lock_depth);
 
 	WARN_ON(atomic_read(&rwm->count));
@@ -1407,6 +1454,11 @@ rt_write_fastlock(struct rw_mutex *rwm,
 void fastcall rt_mutex_down_write(struct rw_mutex *rwm)
 {
 	rt_write_fastlock(rwm, rt_write_slowlock, 1);
+}
+
+void fastcall rt_rwlock_write_lock(struct rw_mutex *rwm)
+{
+	rt_write_fastlock(rwm, rt_write_slowlock, 0);
 }
 
 static int
@@ -1447,10 +1499,11 @@ int fastcall rt_mutex_down_write_trylock(struct rw_mutex *rwm)
 }
 
 static void fastcall noinline __sched
-rt_read_slowunlock(struct rw_mutex *rwm)
+rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 {
 	struct rt_mutex *mutex = &rwm->mutex;
 	unsigned long flags;
+	int savestate = !mtx;
 	struct rt_mutex_waiter *waiter;
 
 	spin_lock_irqsave(&mutex->wait_lock, flags);
@@ -1510,7 +1563,7 @@ rt_read_slowunlock(struct rw_mutex *rwm)
 	 * will steal the lock from the reader. This is the
 	 * only time we can have a reader pending on a lock.
 	 */
-	wakeup_next_waiter(mutex, 0);
+	wakeup_next_waiter(mutex, savestate);
 
  out:
 	spin_unlock_irqrestore(&mutex->wait_lock, flags);
@@ -1521,7 +1574,8 @@ rt_read_slowunlock(struct rw_mutex *rwm)
 
 static inline void
 rt_read_fastunlock(struct rw_mutex *rwm,
-		   void fastcall (*slowfn)(struct rw_mutex *rwm))
+		   void fastcall (*slowfn)(struct rw_mutex *rwm, int mtx),
+		   int mtx)
 {
 	WARN_ON(!atomic_read(&rwm->count));
 	WARN_ON(!rwm->owner);
@@ -1529,20 +1583,26 @@ rt_read_fastunlock(struct rw_mutex *rwm,
 	if (likely(rt_rwlock_cmpxchg(rwm, current, NULL)))
 		rt_mutex_deadlock_account_unlock(current);
 	else
-		slowfn(rwm);
+		slowfn(rwm, mtx);
 }
 
 void fastcall rt_mutex_up_read(struct rw_mutex *rwm)
 {
-	rt_read_fastunlock(rwm, rt_read_slowunlock);
+	rt_read_fastunlock(rwm, rt_read_slowunlock, 1);
+}
+
+void fastcall rt_rwlock_read_unlock(struct rw_mutex *rwm)
+{
+	rt_read_fastunlock(rwm, rt_read_slowunlock, 0);
 }
 
 static void fastcall noinline __sched
-rt_write_slowunlock(struct rw_mutex *rwm)
+rt_write_slowunlock(struct rw_mutex *rwm, int mtx)
 {
 	struct rt_mutex *mutex = &rwm->mutex;
 	struct rt_mutex_waiter *waiter;
 	struct task_struct *pendowner;
+	int savestate = !mtx;
 	unsigned long flags;
 
 	spin_lock_irqsave(&mutex->wait_lock, flags);
@@ -1573,7 +1633,7 @@ rt_write_slowunlock(struct rw_mutex *rwm)
 
 	waiter = rt_mutex_top_waiter(mutex);
 	pendowner = waiter->task;
-	wakeup_next_waiter(mutex, 0);
+	wakeup_next_waiter(mutex, savestate);
 
 	/* another writer is next? */
 	if (waiter->write_lock) {
@@ -1609,7 +1669,10 @@ rt_write_slowunlock(struct rw_mutex *rwm)
 		waiter->task = NULL;
 		reader->pi_blocked_on = NULL;
 
-		wake_up_process(reader);
+		if (savestate)
+			wake_up_process_mutex(reader);
+		else
+			wake_up_process(reader);
 
 		if (rt_mutex_has_waiters(mutex))
 			waiter = rt_mutex_top_waiter(mutex);
@@ -1639,7 +1702,9 @@ rt_write_slowunlock(struct rw_mutex *rwm)
 
 static inline void
 rt_write_fastunlock(struct rw_mutex *rwm,
-		   void fastcall (*slowfn)(struct rw_mutex *rwm))
+		    void fastcall (*slowfn)(struct rw_mutex *rwm,
+					    int mtx),
+		    int mtx)
 {
 	unsigned long val = (unsigned long)current | RT_RWLOCK_WRITER;
 
@@ -1647,12 +1712,17 @@ rt_write_fastunlock(struct rw_mutex *rwm,
 	if (likely(rt_rwlock_cmpxchg(rwm, (struct task_struct *)val, NULL)))
 		rt_mutex_deadlock_account_unlock(current);
 	else
-		slowfn(rwm);
+		slowfn(rwm, mtx);
 }
 
 void fastcall rt_mutex_up_write(struct rw_mutex *rwm)
 {
-	rt_write_fastunlock(rwm, rt_write_slowunlock);
+	rt_write_fastunlock(rwm, rt_write_slowunlock, 1);
+}
+
+void fastcall rt_rwlock_write_unlock(struct rw_mutex *rwm)
+{
+	rt_write_fastunlock(rwm, rt_write_slowunlock, 0);
 }
 
 void rt_mutex_rwsem_init(struct rw_mutex *rwm, const char *name)

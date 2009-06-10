@@ -166,6 +166,10 @@ extern void rt_mutex_down_write(struct rw_mutex *rwm);
 extern int rt_mutex_down_read_trylock(struct rw_mutex *rwm);
 extern void rt_mutex_down_read(struct rw_mutex *rwm);
 extern void rt_mutex_rwsem_init(struct rw_mutex *rwm, const char *name);
+extern void rt_rwlock_write_lock(struct rw_mutex *rwm);
+extern void rt_rwlock_read_lock(struct rw_mutex *rwm);
+extern void rt_rwlock_write_unlock(struct rw_mutex *rwm);
+extern void rt_rwlock_read_unlock(struct rw_mutex *rwm);
 
 #endif /* CONFIG_PREEMPT_RT */
 

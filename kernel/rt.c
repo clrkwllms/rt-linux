@@ -165,7 +165,7 @@ EXPORT_SYMBOL(_mutex_unlock);
  */
 int __lockfunc rt_write_trylock(rwlock_t *rwlock)
 {
-	int ret = rt_mutex_trylock(&rwlock->lock);
+	int ret = rt_mutex_down_write_trylock(&rwlock->owners);
 
 	if (ret)
 		rwlock_acquire(&rwlock->dep_map, 0, 1, _RET_IP_);
@@ -183,23 +183,9 @@ EXPORT_SYMBOL(rt_write_trylock_irqsave);
 
 int __lockfunc rt_read_trylock(rwlock_t *rwlock)
 {
-	struct rt_mutex *lock = &rwlock->lock;
-	unsigned long flags;
 	int ret;
 
-	/*
-	 * Read locks within the self-held write lock succeed.
-	 */
-	spin_lock_irqsave(&lock->wait_lock, flags);
-	if (rt_mutex_real_owner(lock) == current) {
-		spin_unlock_irqrestore(&lock->wait_lock, flags);
-		rwlock->read_depth++;
-		rwlock_acquire_read(&rwlock->dep_map, 0, 1, _RET_IP_);
-		return 1;
-	}
-	spin_unlock_irqrestore(&lock->wait_lock, flags);
-
-	ret = rt_mutex_trylock(lock);
+	ret = rt_mutex_down_read_trylock(&rwlock->owners);
 	if (ret)
 		rwlock_acquire_read(&rwlock->dep_map, 0, 1, _RET_IP_);
 
@@ -210,27 +196,14 @@ EXPORT_SYMBOL(rt_read_trylock);
 void __lockfunc rt_write_lock(rwlock_t *rwlock)
 {
 	rwlock_acquire(&rwlock->dep_map, 0, 0, _RET_IP_);
-	LOCK_CONTENDED_RT(rwlock, rt_mutex_trylock, __rt_spin_lock);
+	LOCK_CONTENDED_RT_RW(rwlock, rt_mutex_down_write_trylock, rt_rwlock_write_lock);
 }
 EXPORT_SYMBOL(rt_write_lock);
 
 void __lockfunc rt_read_lock(rwlock_t *rwlock)
 {
-	unsigned long flags;
-	struct rt_mutex *lock = &rwlock->lock;
-
 	rwlock_acquire_read(&rwlock->dep_map, 0, 0, _RET_IP_);
-	/*
-	 * Read locks within the write lock succeed.
-	 */
-	spin_lock_irqsave(&lock->wait_lock, flags);
-	if (rt_mutex_real_owner(lock) == current) {
-		spin_unlock_irqrestore(&lock->wait_lock, flags);
-		rwlock->read_depth++;
-		return;
-	}
-	spin_unlock_irqrestore(&lock->wait_lock, flags);
-	LOCK_CONTENDED_RT(rwlock, rt_mutex_trylock, __rt_spin_lock);
+	LOCK_CONTENDED_RT_RW(rwlock, rt_mutex_down_read_trylock, rt_rwlock_read_lock);
 }
 
 EXPORT_SYMBOL(rt_read_lock);
@@ -239,28 +212,14 @@ void __lockfunc rt_write_unlock(rwlock_t *rwlock)
 {
 	/* NOTE: we always pass in '1' for nested, for simplicity */
 	rwlock_release(&rwlock->dep_map, 1, _RET_IP_);
-	__rt_spin_unlock(&rwlock->lock);
+	rt_rwlock_write_unlock(&rwlock->owners);
 }
 EXPORT_SYMBOL(rt_write_unlock);
 
 void __lockfunc rt_read_unlock(rwlock_t *rwlock)
 {
-	struct rt_mutex *lock = &rwlock->lock;
-	unsigned long flags;
-
 	rwlock_release(&rwlock->dep_map, 1, _RET_IP_);
-	// TRACE_WARN_ON(lock->save_state != 1);
-	/*
-	 * Read locks within the self-held write lock succeed.
-	 */
-	spin_lock_irqsave(&lock->wait_lock, flags);
-	if (rt_mutex_real_owner(lock) == current && rwlock->read_depth) {
-		spin_unlock_irqrestore(&lock->wait_lock, flags);
-		rwlock->read_depth--;
-		return;
-	}
-	spin_unlock_irqrestore(&lock->wait_lock, flags);
-	__rt_spin_unlock(&rwlock->lock);
+	rt_rwlock_read_unlock(&rwlock->owners);
 }
 EXPORT_SYMBOL(rt_read_unlock);
 
@@ -289,8 +248,7 @@ void __rt_rwlock_init(rwlock_t *rwlock, char *name, struct lock_class_key *key)
 	debug_check_no_locks_freed((void *)rwlock, sizeof(*rwlock));
 	lockdep_init_map(&rwlock->dep_map, name, key, 0);
 #endif
-	__rt_mutex_init(&rwlock->lock, name);
-	rwlock->read_depth = 0;
+	rt_mutex_rwsem_init(&rwlock->owners, name);
 }
 EXPORT_SYMBOL(__rt_rwlock_init);
 

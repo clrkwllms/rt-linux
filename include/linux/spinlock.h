@@ -266,7 +266,7 @@ do {							\
 
 #ifdef CONFIG_PREEMPT_RT
 # define rt_read_can_lock(rwl)	(!rt_mutex_is_locked(&(rwl)->lock))
-# define rt_write_can_lock(rwl)	(!rt_mutex_is_locked(&(rwl)->lock))
+# define rt_write_can_lock(rwl)	((rwl)->owners.owner == NULL)
 #else
  extern int rt_rwlock_can_lock_never_call_on_non_rt(rwlock_t *rwlock);
 # define rt_read_can_lock(rwl)	rt_rwlock_can_lock_never_call_on_non_rt(rwl)

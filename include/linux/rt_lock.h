@@ -87,8 +87,7 @@ struct rw_semaphore {
  * rwlocks - an RW semaphore plus lock-break field:
  */
 typedef struct {
-	struct rt_mutex		lock;
-	int			read_depth;
+	struct rw_mutex	owners;
 	unsigned int		break_lock;
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	struct lockdep_map	dep_map;
@@ -96,7 +95,7 @@ typedef struct {
 } rwlock_t;
 
 #define __RW_LOCK_UNLOCKED(name) (rwlock_t) \
-	{ .lock = __RT_SPIN_INITIALIZER(name),	\
+	{ .owners.mutex = __RT_SPIN_INITIALIZER(name.owners.mutex),	\
 	  RW_DEP_MAP_INIT(name) }
 #else /* !PREEMPT_RT */
 
