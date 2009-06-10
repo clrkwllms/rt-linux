@@ -126,12 +126,14 @@ static struct futex_hash_bucket futex_queues[1<<FUTEX_HASHBITS];
 /* Futex-fs vfsmount entry: */
 static struct vfsmount *futex_mnt;
 
+int futex_performance_hack;
+
 /*
  * Take mm->mmap_sem, when futex is shared
  */
 static inline void futex_lock_mm(struct rw_semaphore *fshared)
 {
-	if (fshared)
+	if (fshared && !futex_performance_hack)
 		down_read(fshared);
 }
 
@@ -140,7 +142,7 @@ static inline void futex_lock_mm(struct rw_semaphore *fshared)
  */
 static inline void futex_unlock_mm(struct rw_semaphore *fshared)
 {
-	if (fshared)
+	if (fshared && !futex_performance_hack)
 		up_read(fshared);
 }
 
