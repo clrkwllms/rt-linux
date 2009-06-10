@@ -1138,6 +1138,7 @@ void __init trap_init(void)
 	/*
 	 * Should be a barrier for any external CPU state.
 	 */
+	allocate_stacks(0);
 	cpu_init();
 }
 
