@@ -13,7 +13,20 @@
 
 #ifdef CONFIG_LOGDEV
 #include <linux/logdev.h>
+#define LD_WARN_ON_ONCE(cond)				\
+	do {						\
+		static int once;			\
+		if (unlikely(cond) && !once++) {	\
+			lfcnprint("FAILED " #cond);	\
+			logdev_print_off();		\
+			oops_in_progress++; \
+			logdev_dump();			\
+			WARN_ON(1);			\
+			oops_in_progress--; \
+		}					\
+	} while (0)
 #else
+#define LD_WARN_ON_ONCE(cond) WARN_ON_ONCE(cond)
 #define lfcnprint(x...) do { } while (0)
 #define lmark() do { } while(0)
 #define logdev_dump() do { } while (0)
@@ -31,19 +44,30 @@ static DEFINE_MUTEX(mutex1);
 static DEFINE_MUTEX(mutex2);
 static DEFINE_MUTEX(mutex3);
 
+static DEFINE_SPINLOCK(reverse_lock);
+
 struct locks {
 	union {
 		struct rw_semaphore *sem;
 		rwlock_t *lock;
 		struct mutex *mutex;
 	};
+
 	int type;
 	char *name;
+
+	/* to test unnested locks */
+	struct locks *reverse_lock;
+	int reverse_read;
+	struct task_struct *who;
+
+	/* stats */
 	int read_cnt;
 	int write_cnt;
 	int downgrade;
 	int taken;
 	int retaken;
+	int reversed;
 };
 
 enum { LOCK_TYPE_LOCK = 0,
@@ -306,6 +330,7 @@ pick_lock(struct locks *lock, struct locks *sem, struct locks *mutex, int read)
 
 static void do_lock(struct locks *lock, int read)
 {
+	lfcnprint("reader_lock_count=%d", current->reader_lock_count);
 	switch (read) {
 	case LOCK_READ:
 		if (unlikely(lock->type != LOCK_TYPE_LOCK)) {
@@ -363,8 +388,29 @@ static void do_lock(struct locks *lock, int read)
 	lfcnprint("taken %s %p", lock->name, lock);
 }
 
-static void do_unlock(struct locks *lock, int read)
+static void do_unlock(struct locks *lock, int read, struct locks *prev_lock)
 {
+	if (prev_lock) {
+		spin_lock(&reverse_lock);
+		if (!prev_lock->reverse_lock) {
+			int x;
+			/* test reverse order unlocking */
+			x = random32();
+			if (x & 1) {
+				lfcnprint("reverse lock %s %p and %s %p",
+					  lock->name, lock,
+					  prev_lock->name, prev_lock);
+				prev_lock->reverse_lock = lock;
+				prev_lock->reverse_read = read;
+				prev_lock->who = current;
+				lock->reversed++;
+				spin_unlock(&reverse_lock);
+				return;
+			}
+		}
+		spin_unlock(&reverse_lock);
+	}
+
 	switch (read) {
 	case LOCK_READ:
 		if (unlikely(lock->type != LOCK_TYPE_LOCK)) {
@@ -418,10 +464,18 @@ static void do_unlock(struct locks *lock, int read)
 	default:
 		printk("bad lock value %d!!!\n", read);
 	}
-	lfcnprint("unlocked");
+	lfcnprint("%s unlocked", lock->name);
+
+	if (lock->reverse_lock && lock->who == current) {
+		lock->who = NULL;
+		lfcnprint("unlock reverse lock %s %p",
+			  lock->reverse_lock->name, lock->reverse_lock);
+		do_unlock(lock->reverse_lock, lock->reverse_read, NULL);
+		lock->reverse_lock = NULL;
+	}
 }
 
-static void do_something(unsigned long time, int ignore)
+static void do_something(unsigned long time, int ignore, struct locks *prev_lock)
 {
 	lmark();
 	if (test_done)
@@ -450,7 +504,7 @@ static void do_downgrade(unsigned long time, struct locks *lock, int *read)
 			lfcnprint("downgrade %p", sem);
 			lock->downgrade++;
 			downgrade_write(sem);
-			do_something(time, 0);
+			do_something(time, 0, NULL);
 			/* need to do unlock read */
 			*read = SEM_READ;
 		}
@@ -474,10 +528,11 @@ static void update_stats(int read, struct locks *lock)
 
 #define MAX_DEPTH 10
 
-static void run_lock(void (*func)(unsigned long time, int read),
-		     struct locks *lock, unsigned long time, int read, int depth);
+static void run_lock(void (*func)(unsigned long time, int read, struct locks *prev_lock),
+		     struct locks *lock, unsigned long time, int read, int depth,
+		     struct locks *prev_lock);
 
-static void do_again(void (*func)(unsigned long time, int read),
+static void do_again(void (*func)(unsigned long time, int read, struct locks *prev_lock),
 		     struct locks *lock, unsigned long time, int read, int depth)
 {
 	unsigned long x;
@@ -485,19 +540,23 @@ static void do_again(void (*func)(unsigned long time, int read),
 	if (test_done)
 		return;
 
-	/* If this was grabbed for read via rwlock, do again */
-	if (likely(read != LOCK_READ) || depth >= MAX_DEPTH)
+	/*
+	 * If this was grabbed for read via rwlock, do again
+	 * (but not if we did a reverse)
+	 */
+	if (likely(read != LOCK_READ) || depth >= MAX_DEPTH || lock->reverse_lock)
 		return;
 
 	x = random32();
 	if (x & 1) {
 		lfcnprint("read lock again");
-		run_lock(func, lock, time, read, depth+1);
+		run_lock(func, lock, time, read, depth+1, NULL);
 	}
 }
 
-static void run_lock(void (*func)(unsigned long time, int read),
-		     struct locks *lock, unsigned long time, int read, int depth)
+static void run_lock(void (*func)(unsigned long time, int read, struct locks *prev_lock),
+		     struct locks *lock, unsigned long time, int read, int depth,
+		     struct locks *prev_lock)
 {
 	if (test_done)
 		return;
@@ -507,39 +566,39 @@ static void run_lock(void (*func)(unsigned long time, int read),
 		lock->retaken++;
 	do_lock(lock, read);
 	if (!test_done) {
-		func(time, do_read(read));
+		func(time, do_read(read), lock);
 		do_again(func, lock, time, read, depth);
 	}
 	do_downgrade(time, lock, &read);
-	do_unlock(lock, read);
+	do_unlock(lock, read, prev_lock);
 
 }
 
-static void run_one_lock(unsigned long time, int read)
+static void run_one_lock(unsigned long time, int read, struct locks *prev_lock)
 {
 	struct locks *lock;
 
 	lmark();
 	lock = pick_lock(&test_lock1, &test_sem1, &test_mutex1, read);
-	run_lock(do_something, lock, time, read, 0);
+	run_lock(do_something, lock, time, read, 0, prev_lock);
 }
 
-static void run_two_locks(unsigned long time, int read)
+static void run_two_locks(unsigned long time, int read, struct locks *prev_lock)
 {
 	struct locks *lock;
 
 	lmark();
 	lock = pick_lock(&test_lock2, &test_sem2, &test_mutex2, read);
-	run_lock(run_one_lock, lock, time, read, 0);
+	run_lock(run_one_lock, lock, time, read, 0, prev_lock);
 }
 
-static void run_three_locks(unsigned long time, int read)
+static void run_three_locks(unsigned long time, int read, struct locks *prev_lock)
 {
 	struct locks *lock;
 
 	lmark();
 	lock = pick_lock(&test_lock3, &test_sem3, &test_mutex3, read);
-	run_lock(run_two_locks, lock, time, read, 0);
+	run_lock(run_two_locks, lock, time, read, 0, prev_lock);
 }
 
 static int run_test(unsigned long time)
@@ -557,22 +616,20 @@ static int run_test(unsigned long time)
 
 	switch (ret = (start & 3)) {
 	case 0:
-		run_one_lock(time, read);
+		run_one_lock(time, read, NULL);
 		break;
 	case 1:
-		run_two_locks(time, read);
+		run_two_locks(time, read, NULL);
 		break;
 	case 2:
-		run_three_locks(time, read);
+		run_three_locks(time, read, NULL);
 		break;
 	default:
 		ret = 1;
-		run_two_locks(time, read);
+		run_two_locks(time, read, NULL);
 	}
 
-#ifdef CONFIG_PREEMPT_RT
-	WARN_ON_ONCE(current->reader_lock_count);
-#endif
+	LD_WARN_ON_ONCE(current->reader_lock_count);
 
 	return ret;
 }
@@ -618,7 +675,8 @@ static void print_lock_stat(struct locks *lock)
 			       lock->name, lock->downgrade);
 		}
 	}
-	printk("%8s taken:           %8d\n\n", lock->name, lock->taken);
+	printk("%8s taken:           %8d\n", lock->name, lock->taken);
+	printk("%8s reversed:        %8d\n\n", lock->name, lock->reversed);
 }
 
 static int __init mutex_stress_init(void)
@@ -676,7 +734,12 @@ static int __init mutex_stress_init(void)
 		if (tsks[i]) {
 			struct rt_mutex *mtx;
 			unsigned long own;
-			struct rt_mutex_waiter *w;
+			struct rt_my_waiter {
+				struct plist_node list_entry;
+				struct plist_node pi_list_entry;
+				struct task_struct *task;
+				struct rt_mutex *lock;
+			} *w;
 
 			spin_lock_irq(&tsks[i]->pi_lock);
 
@@ -690,9 +753,8 @@ static int __init mutex_stress_init(void)
 				spin_lock(&tsks[i]->pi_lock);
 				own = (unsigned long)mtx->owner & ~3UL;
 				oops_in_progress++;
-				printk("%s:%d is blocked on ",
-				       tsks[i]->comm, tsks[i]->pid);
-				__print_symbol("%s", (unsigned long)mtx);
+				printk("%s:%d is blocked on %p ",
+				       tsks[i]->comm, tsks[i]->pid, mtx);
 				if (own == 0x100)
 					printk(" owner is READER\n");
 				else if (!(own & ~300))
