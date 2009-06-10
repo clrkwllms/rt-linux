@@ -62,7 +62,7 @@
 
 #define GP_STAGES 2
 struct rcu_data {
-	spinlock_t	lock;		/* Protect rcu_data fields. */
+	raw_spinlock_t	lock;		/* Protect rcu_data fields. */
 	long		completed;	/* Number of last completed batch. */
 	int		waitlistcount;
 	struct rcu_head *nextlist;
@@ -76,12 +76,12 @@ struct rcu_data {
 #endif /* #ifdef CONFIG_RCU_TRACE */
 };
 struct rcu_ctrlblk {
-	spinlock_t	fliplock;	/* Protect state-machine transitions. */
+	raw_spinlock_t	fliplock;	/* Protect state-machine transitions. */
 	long		completed;	/* Number of last completed batch. */
 };
 static DEFINE_PER_CPU(struct rcu_data, rcu_data);
 static struct rcu_ctrlblk rcu_ctrlblk = {
-	.fliplock = SPIN_LOCK_UNLOCKED,
+	.fliplock = RAW_SPIN_LOCK_UNLOCKED(rcu_ctrlblk.fliplock),
 	.completed = 0,
 };
 static DEFINE_PER_CPU(int [2], rcu_flipctr) = { 0, 0 };

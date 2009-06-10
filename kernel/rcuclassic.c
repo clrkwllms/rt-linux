@@ -57,7 +57,7 @@ struct rcu_ctrlblk {
 
 	int	signaled;
 
-	spinlock_t	lock	____cacheline_internodealigned_in_smp;
+	raw_spinlock_t	lock	____cacheline_internodealigned_in_smp;
 	cpumask_t	cpumask; /* CPUs that need to switch in order    */
 				 /* for current batch to proceed.        */
 } ____cacheline_internodealigned_in_smp;
@@ -96,13 +96,13 @@ struct rcu_data {
 static struct rcu_ctrlblk rcu_ctrlblk = {
 	.cur = -300,
 	.completed = -300,
-	.lock = __SPIN_LOCK_UNLOCKED(&rcu_ctrlblk.lock),
+	.lock = RAW_SPIN_LOCK_UNLOCKED(&rcu_ctrlblk.lock),
 	.cpumask = CPU_MASK_NONE,
 };
 static struct rcu_ctrlblk rcu_bh_ctrlblk = {
 	.cur = -300,
 	.completed = -300,
-	.lock = __SPIN_LOCK_UNLOCKED(&rcu_bh_ctrlblk.lock),
+	.lock = RAW_SPIN_LOCK_UNLOCKED(&rcu_bh_ctrlblk.lock),
 	.cpumask = CPU_MASK_NONE,
 };
 
