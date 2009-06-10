@@ -10,6 +10,7 @@ struct pt_regs;
 
 extern void start_kernel(void);
 extern void pda_init(int); 
+extern int allocate_stacks(int cpu);
 
 extern void early_idt_handler(void);
 

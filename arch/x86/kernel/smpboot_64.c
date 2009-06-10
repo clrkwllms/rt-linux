@@ -538,7 +538,7 @@ static void __cpuinit do_fork_idle(struct work_struct *work)
 static char boot_exception_stacks[(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_STKSZ]
 __attribute__((section(".bss.page_aligned")));
 
-static int __cpuinit allocate_stacks(int cpu)
+int __cpuinit allocate_stacks(int cpu)
 {
 	static const unsigned int order[N_EXCEPTION_STACKS] = {
 		[0 ... N_EXCEPTION_STACKS - 1] = EXCEPTION_STACK_ORDER,
