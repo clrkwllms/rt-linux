@@ -86,8 +86,9 @@ static inline void inc_rt_tasks(struct task_struct *p, struct rq *rq)
 
 static inline void dec_rt_tasks(struct task_struct *p, struct rq *rq)
 {
+#ifdef CONFIG_SMP
 	int highest_prio = rq->rt.highest_prio;
-
+#endif
 	WARN_ON(!rt_task(p));
 	WARN_ON(!rq->rt.rt_nr_running);
 	rq->rt.rt_nr_running--;
