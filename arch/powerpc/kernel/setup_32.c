@@ -49,11 +49,6 @@
 #include <asm/kgdb.h>
 #endif
 
-#ifdef CONFIG_FTRACE
-extern void _mcount(void);
-EXPORT_SYMBOL(_mcount);
-#endif
-
 extern void bootx_init(unsigned long r4, unsigned long phys);
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
