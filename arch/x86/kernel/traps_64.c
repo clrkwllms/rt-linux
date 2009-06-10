@@ -320,6 +320,7 @@ print_trace_warning_symbol(void *data, char *msg, unsigned long symbol)
 {
 	print_symbol(msg, symbol);
 	printk("\n");
+	debug_show_held_locks(tsk);
 }
 
 static void print_trace_warning(void *data, char *msg)

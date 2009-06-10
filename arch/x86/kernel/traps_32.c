@@ -271,6 +271,7 @@ static void show_stack_log_lvl(struct task_struct *task, struct pt_regs *regs,
 	}
 	printk("\n%sCall Trace:\n", log_lvl);
 	show_trace_log_lvl(task, regs, esp, log_lvl);
+	debug_show_held_locks(task);
 }
 
 void show_stack(struct task_struct *task, unsigned long *esp)
