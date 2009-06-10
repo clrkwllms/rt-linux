@@ -393,7 +393,7 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	}
 
 	if (cpu_isset(cpu, backtrace_mask)) {
-		static DEFINE_SPINLOCK(lock);	/* Serialise the printks */
+		static DEFINE_RAW_SPINLOCK(lock);	/* Serialise the printks */
 
 		spin_lock(&lock);
 		printk("NMI backtrace for cpu %d\n", cpu);
