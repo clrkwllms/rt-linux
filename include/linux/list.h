@@ -320,17 +320,17 @@ static inline int list_empty_careful(const struct list_head *head)
 }
 
 static inline void __list_splice(struct list_head *list,
-				 struct list_head *head)
+				 struct list_head *prev,
+				 struct list_head *next)
 {
 	struct list_head *first = list->next;
 	struct list_head *last = list->prev;
-	struct list_head *at = head->next;
 
-	first->prev = head;
-	head->next = first;
+	first->prev = prev;
+	prev->next = first;
 
-	last->next = at;
-	at->prev = last;
+	last->next = next;
+	next->prev = last;
 }
 
 /**
@@ -341,7 +341,13 @@ static inline void __list_splice(struct list_head *list,
 static inline void list_splice(struct list_head *list, struct list_head *head)
 {
 	if (!list_empty(list))
-		__list_splice(list, head);
+		__list_splice(list, head, head->next);
+}
+
+static inline void list_splice_tail(struct list_head *list, struct list_head *head)
+{
+	if (!list_empty(list))
+		__list_splice(list, head->prev, head);
 }
 
 /**
@@ -355,9 +361,53 @@ static inline void list_splice_init(struct list_head *list,
 				    struct list_head *head)
 {
 	if (!list_empty(list)) {
-		__list_splice(list, head);
+		__list_splice(list, head, head->next);
 		INIT_LIST_HEAD(list);
 	}
+}
+
+static inline void list_splice_tail_init(struct list_head *list,
+					 struct list_head *head)
+{
+	if (!list_empty(list)) {
+		__list_splice(list, head->prev, head);
+		INIT_LIST_HEAD(list);
+	}
+}
+
+static inline void __list_splice2(struct list_head *first,
+	       			struct list_head *last,
+				struct list_head *prev,
+				struct list_head *next)
+{
+	first->prev->next = last->next;
+	last->next->prev = first->prev;
+
+	first->prev = prev;
+	prev->next = first;
+
+	last->next = next;
+	next->prev = last;
+}
+
+/**
+ * list_splice2 - join [first, last] to head
+ * @first: list item
+ * @last: list item further on the same list
+ * @head: the place to add it on another list
+ */
+static inline void list_splice2(struct list_head *first,
+				struct list_head *last,
+				struct list_head *head)
+{
+	__list_splice2(first, last, head, head->next);
+}
+
+static inline void list_splice2_tail(struct list_head *first,
+				     struct list_head *last,
+				     struct list_head *head)
+{
+	__list_splice2(first, last, head->prev, head);
 }
 
 /**

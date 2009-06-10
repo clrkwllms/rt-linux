@@ -128,7 +128,7 @@ void lock_list_splice_init(struct lock_list_head *list,
 	lock = __lock_list_reverse(list);
 	if (!list_empty(&list->head)) {
 		spin_lock_nested(&head->lock, LOCK_LIST_NESTING_NEXT);
-		__list_splice(&list->head, &head->head);
+		__list_splice(&list->head, &head->head, head->head.next);
 		INIT_LIST_HEAD(&list->head);
 		spin_unlock(&head->lock);
 	}
