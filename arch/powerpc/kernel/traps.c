@@ -34,6 +34,7 @@
 #include <linux/backlight.h>
 #include <linux/bug.h>
 #include <linux/kdebug.h>
+#include <linux/ftrace.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -110,6 +111,8 @@ int die(const char *str, struct pt_regs *regs, long err)
 
 	if (debugger(regs))
 		return 1;
+
+	ftrace_stop();
 
 	oops_enter();
 
