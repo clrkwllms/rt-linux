@@ -279,12 +279,14 @@ extern int dir_notify_enable;
 #include <linux/cache.h>
 #include <linux/kobject.h>
 #include <linux/list.h>
+#include <linux/percpu_list.h>
 #include <linux/radix-tree.h>
 #include <linux/prio_tree.h>
 #include <linux/init.h>
 #include <linux/pid.h>
 #include <linux/mutex.h>
 #include <linux/capability.h>
+#include <linux/srcu.h>
 
 #include <asm/atomic.h>
 #include <asm/semaphore.h>
@@ -776,11 +778,11 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
 
 struct file {
 	/*
-	 * fu_list becomes invalid after file_free is called and queued via
+	 * fu_llist becomes invalid after file_free is called and queued via
 	 * fu_rcuhead for RCU freeing
 	 */
 	union {
-		struct list_head	fu_list;
+		struct lock_list_head	fu_llist;
 		struct rcu_head 	fu_rcuhead;
 	} f_u;
 	struct path		f_path;
@@ -809,9 +811,6 @@ struct file {
 #endif /* #ifdef CONFIG_EPOLL */
 	struct address_space	*f_mapping;
 };
-extern spinlock_t files_lock;
-#define file_list_lock() spin_lock(&files_lock);
-#define file_list_unlock() spin_unlock(&files_lock);
 
 #define get_file(x)	atomic_inc(&(x)->f_count)
 #define file_count(x)	atomic_read(&(x)->f_count)
@@ -1007,7 +1006,8 @@ struct super_block {
 	struct list_head	s_io;		/* parked for writeback */
 	struct list_head	s_more_io;	/* parked for more writeback */
 	struct hlist_head	s_anon;		/* anonymous dentries for (nfs) exporting */
-	struct list_head	s_files;
+	struct percpu_list	s_files;
+	struct qrcu_struct	s_qrcu;
 
 	struct block_device	*s_bdev;
 	struct mtd_info		*s_mtd;
@@ -1777,7 +1777,7 @@ static inline void insert_inode_hash(struct inode *inode) {
 }
 
 extern struct file * get_empty_filp(void);
-extern void file_move(struct file *f, struct list_head *list);
+extern void file_move(struct file *f, struct percpu_list *list);
 extern void file_kill(struct file *f);
 #ifdef CONFIG_BLOCK
 struct bio;

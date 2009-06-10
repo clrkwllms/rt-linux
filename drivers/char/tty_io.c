@@ -242,14 +242,13 @@ int tty_paranoia_check(struct tty_struct *tty, struct inode *inode,
 static int check_tty_count(struct tty_struct *tty, const char *routine)
 {
 #ifdef CHECK_TTY_COUNT
-	struct list_head *p;
+	struct file *filp;
 	int count = 0;
-	
-	file_list_lock();
-	list_for_each(p, &tty->tty_files) {
+
+	percpu_list_fold(&tty->tty_files);
+	lock_list_for_each_entry(filp, percpu_list_head(&tty->tty_files), f_u.fu_llist)
 		count++;
-	}
-	file_list_unlock();
+
 	if (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
 	    tty->driver->subtype == PTY_TYPE_SLAVE &&
 	    tty->link && tty->link->count)
@@ -1376,9 +1375,8 @@ static void do_tty_hangup(struct work_struct *work)
 	spin_unlock(&redirect_lock);
 	
 	check_tty_count(tty, "do_tty_hangup");
-	file_list_lock();
 	/* This breaks for file handles being sent over AF_UNIX sockets ? */
-	list_for_each_entry(filp, &tty->tty_files, f_u.fu_list) {
+	lock_list_for_each_entry(filp, percpu_list_head(&tty->tty_files), f_u.fu_llist) {
 		if (filp->f_op->write == redirected_tty_write)
 			cons_filp = filp;
 		if (filp->f_op->write != tty_write)
@@ -1387,7 +1385,6 @@ static void do_tty_hangup(struct work_struct *work)
 		tty_fasync(-1, filp, 0);	/* can't block */
 		filp->f_op = &hung_up_tty_fops;
 	}
-	file_list_unlock();
 	
 	/* FIXME! What are the locking issues here? This may me overdoing things..
 	 * this question is especially important now that we've removed the irqlock. */
@@ -2268,9 +2265,9 @@ static void release_one_tty(struct tty_struct *tty, int idx)
 	tty->magic = 0;
 	tty->driver->refcount--;
 
-	file_list_lock();
-	list_del_init(&tty->tty_files);
-	file_list_unlock();
+	percpu_list_fold(&tty->tty_files);
+	lock_list_del_init(percpu_list_head(&tty->tty_files));
+	percpu_list_destroy(&tty->tty_files);
 
 	free_tty_struct(tty);
 }
@@ -3734,7 +3731,7 @@ static void initialize_tty_struct(struct tty_struct *tty)
 	mutex_init(&tty->atomic_read_lock);
 	mutex_init(&tty->atomic_write_lock);
 	spin_lock_init(&tty->read_lock);
-	INIT_LIST_HEAD(&tty->tty_files);
+	percpu_list_init(&tty->tty_files);
 	INIT_WORK(&tty->SAK_work, do_SAK_work);
 }
 

@@ -1747,8 +1747,11 @@ static inline void flush_unauthorized_files(struct files_struct * files)
 	mutex_lock(&tty_mutex);
 	tty = get_current_tty();
 	if (tty) {
-		file_list_lock();
-		file = list_entry(tty->tty_files.next, typeof(*file), f_u.fu_list);
+		lock_list_for_each_entry(file,
+				percpu_list_head(&tty->tty_files),
+				f_u.fu_llist)
+			break;
+
 		if (file) {
 			/* Revalidate access to controlling tty.
 			   Use inode_has_perm on the tty inode directly rather
@@ -1760,8 +1763,8 @@ static inline void flush_unauthorized_files(struct files_struct * files)
 					   FILE__READ | FILE__WRITE, NULL)) {
 				drop_tty = 1;
 			}
+			lock_list_for_each_entry_stop(file, f_u.fu_llist);
 		}
-		file_list_unlock();
 	}
 	mutex_unlock(&tty_mutex);
 	/* Reset controlling tty. */

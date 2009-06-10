@@ -211,7 +211,7 @@ struct tty_struct {
 	struct work_struct hangup_work;
 	void *disc_data;
 	void *driver_data;
-	struct list_head tty_files;
+	struct percpu_list tty_files;
 
 #define N_TTY_BUF_SIZE 4096
 	

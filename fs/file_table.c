@@ -28,9 +28,6 @@ struct files_stat_struct files_stat = {
 	.max_files = NR_FILE
 };
 
-/* public. Not pretty! */
-__cacheline_aligned_in_smp DEFINE_SPINLOCK(files_lock);
-
 static struct percpu_counter nr_files __cacheline_aligned_in_smp;
 
 static inline void file_free_rcu(struct rcu_head *head)
@@ -111,7 +108,7 @@ struct file *get_empty_filp(void)
 		goto fail_sec;
 
 	tsk = current;
-	INIT_LIST_HEAD(&f->f_u.fu_list);
+	INIT_LOCK_LIST_HEAD(&f->f_u.fu_llist);
 	atomic_set(&f->f_count, 1);
 	rwlock_init(&f->f_owner.lock);
 	f->f_uid = tsk->fsuid;
@@ -303,31 +300,35 @@ void put_filp(struct file *file)
 	}
 }
 
-void file_move(struct file *file, struct list_head *list)
+void file_move(struct file *file, struct percpu_list *list)
 {
 	if (!list)
 		return;
-	file_list_lock();
-	list_move(&file->f_u.fu_list, list);
-	file_list_unlock();
+
+	file_kill(file);
+	percpu_list_add(list, &file->f_u.fu_llist);
 }
 
 void file_kill(struct file *file)
 {
-	if (!list_empty(&file->f_u.fu_list)) {
-		file_list_lock();
-		list_del_init(&file->f_u.fu_list);
-		file_list_unlock();
+	if (file && file->f_mapping && file->f_mapping->host) {
+		struct super_block *sb = file->f_mapping->host->i_sb;
+		if (sb)
+			synchronize_qrcu(&sb->s_qrcu);
 	}
+
+	lock_list_del_init(&file->f_u.fu_llist);
 }
 
 int fs_may_remount_ro(struct super_block *sb)
 {
 	struct file *file;
+	int idx;
 
 	/* Check that no files are currently opened for writing. */
-	file_list_lock();
-	list_for_each_entry(file, &sb->s_files, f_u.fu_list) {
+	idx = qrcu_read_lock(&sb->s_qrcu);
+	percpu_list_fold(&sb->s_files);
+	lock_list_for_each_entry(file, percpu_list_head(&sb->s_files), f_u.fu_llist) {
 		struct inode *inode = file->f_path.dentry->d_inode;
 
 		/* File with pending delete? */
@@ -338,10 +339,11 @@ int fs_may_remount_ro(struct super_block *sb)
 		if (S_ISREG(inode->i_mode) && (file->f_mode & FMODE_WRITE))
 			goto too_bad;
 	}
-	file_list_unlock();
+	qrcu_read_unlock(&sb->s_qrcu, idx);
 	return 1; /* Tis' cool bro. */
 too_bad:
-	file_list_unlock();
+	lock_list_for_each_entry_stop(file, f_u.fu_llist);
+	qrcu_read_unlock(&sb->s_qrcu, idx);
 	return 0;
 }
 

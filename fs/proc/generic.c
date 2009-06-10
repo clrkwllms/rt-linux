@@ -698,6 +698,8 @@ void remove_proc_entry(const char *name, struct proc_dir_entry *parent)
 		goto out;
 	len = strlen(fn);
 
+	percpu_list_fold(&proc_mnt->mnt_sb->s_files);
+
 	spin_lock(&proc_subdir_lock);
 	for (p = &parent->subdir; *p; p=&(*p)->next ) {
 		if (!proc_match(len, fn, *p))
