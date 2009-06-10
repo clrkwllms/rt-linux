@@ -150,6 +150,10 @@ static int parse_table(int __user *, int, void __user *, size_t __user *,
 		void __user *, size_t, struct ctl_table *);
 #endif
 
+#ifdef CONFIG_PREEMPT_RT
+extern int rt_rwlock_limit;
+#endif
+
 
 #ifdef CONFIG_PROC_SYSCTL
 static int proc_do_cad_pid(struct ctl_table *table, int write, struct file *filp,
@@ -394,6 +398,16 @@ static struct ctl_table kern_table[] = {
 		.ctl_name	= CTL_UNNUMBERED,
 		.procname	= "hardirq_preemption",
 		.data		= &hardirq_preemption,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
+#ifdef CONFIG_PREEMPT_RT
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "rwlock_reader_limit",
+		.data		= &rt_rwlock_limit,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,

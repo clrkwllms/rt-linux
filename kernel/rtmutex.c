@@ -997,6 +997,8 @@ __rt_spin_lock_init(spinlock_t *lock, char *name, struct lock_class_key *key)
 }
 EXPORT_SYMBOL(__rt_spin_lock_init);
 
+int rt_rwlock_limit;
+
 static inline int rt_release_bkl(struct rt_mutex *lock, unsigned long flags);
 static inline void rt_reacquire_bkl(int saved_lock_depth);
 
@@ -1070,6 +1072,10 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 		goto taken;
 	}
 
+	/* Check for rwlock limits */
+	if (rt_rwlock_limit && atomic_read(&rwm->owners) >= rt_rwlock_limit)
+		return 0;
+
 	if (mtxowner && mtxowner != RT_RW_READER) {
 		int mode = mtx ? STEAL_NORMAL : STEAL_LATERAL;
 
@@ -1116,6 +1122,7 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 	rt_rwlock_set_owner(rwm, RT_RW_READER, 0);
  taken:
 	if (incr) {
+		atomic_inc(&rwm->owners);
 		reader_count = current->reader_lock_count++;
 		if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
 			current->owned_read_locks[reader_count].lock = rwm;
@@ -1293,6 +1300,7 @@ rt_read_fastlock(struct rw_mutex *rwm,
 			goto retry;
 		}
 
+		atomic_inc(&rwm->owners);
 		reader_count = current->reader_lock_count++;
 		if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
 			current->owned_read_locks[reader_count].lock = rwm;
@@ -1352,6 +1360,7 @@ retry:
 			goto retry;
 		}
 
+		atomic_inc(&rwm->owners);
 		reader_count = current->reader_lock_count++;
 		if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
 			current->owned_read_locks[reader_count].lock = rwm;
@@ -1543,6 +1552,7 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 	struct rt_mutex *mutex = &rwm->mutex;
 	struct rt_mutex_waiter *waiter;
 	unsigned long flags;
+	unsigned int reader_count;
 	int savestate = !mtx;
 	int i;
 
@@ -1565,6 +1575,7 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 			if (!current->owned_read_locks[i].count) {
 				current->reader_lock_count--;
 				WARN_ON_ONCE(i != current->reader_lock_count);
+				atomic_dec(&rwm->owners);
 			}
 			break;
 		}
@@ -1572,20 +1583,34 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 	WARN_ON_ONCE(i < 0);
 
 	/*
-	 * If there are more readers, let the last one do any wakeups.
-	 * Also check to make sure the owner wasn't cleared when two
-	 * readers released the lock at the same time, and the count
-	 * went to zero before grabbing the wait_lock.
+	 * If the last two (or more) readers unlocked at the same
+	 * time, the owner could be cleared since the count went to
+	 * zero. If this has happened, the rwm owner will not
+	 * be set to current or readers. This means that another reader
+	 * already reset the lock, so there is nothing left to do.
 	 */
-	if (atomic_read(&rwm->count) ||
-	    (rt_rwlock_owner(rwm) != current &&
-	     rt_rwlock_owner(rwm) != RT_RW_READER)) {
-		spin_unlock_irqrestore(&mutex->wait_lock, flags);
-		return;
-	}
+	if ((rt_rwlock_owner(rwm) != current &&
+	     rt_rwlock_owner(rwm) != RT_RW_READER))
+		goto out;
+
+	/*
+	 * If there are more readers and we are under the limit
+	 * let the last reader do the wakeups.
+	 */
+	reader_count = atomic_read(&rwm->count);
+	if (reader_count &&
+	    (!rt_rwlock_limit || atomic_read(&rwm->owners) >= rt_rwlock_limit))
+		goto out;
 
 	/* If no one is blocked, then clear all ownership */
 	if (!rt_mutex_has_waiters(mutex)) {
+		/*
+		 * If count is not zero, we are under the limit with
+		 * no other readers.
+		 */
+		if (reader_count)
+			goto out;
+
 		/* We could still have a pending reader waiting */
 		if (rt_mutex_owner_pending(mutex)) {
 			/* set the rwm back to pending */
@@ -1597,24 +1622,32 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 		goto out;
 	}
 
-	/* We are the last reader with pending waiters. */
-	waiter = rt_mutex_top_waiter(mutex);
-	if (waiter->write_lock)
-		rwm->owner = RT_RW_PENDING_WRITE;
-	else
-		rwm->owner = RT_RW_PENDING_READ;
-
 	/*
-	 * It is possible to have a reader waiting. We still only
-	 * wake one up in that case. A way we can have a reader waiting
-	 * is because a writer woke up, a higher prio reader came
-	 * and stole the lock from the writer. But the writer now
-	 * is no longer waiting on the lock and needs to retake
-	 * the lock. We simply wake up the reader and let the
-	 * reader have the lock. If the writer comes by, it
-	 * will steal the lock from the reader. This is the
-	 * only time we can have a reader pending on a lock.
+	 * If the next waiter is a reader, this can be because of
+	 * two things. One is that we hit the reader limit, or
+	 * Two, there is a pending writer.
+	 * We still only wake up one reader at a time (even if
+	 * we could wake up more). This is because we dont
+	 * have any idea if a writer is pending.
 	 */
+	waiter = rt_mutex_top_waiter(mutex);
+	if (waiter->write_lock) {
+		/* only wake up if there are no readers */
+		if (reader_count)
+			goto out;
+		rwm->owner = RT_RW_PENDING_WRITE;
+	} else {
+		/*
+		 * It is also possible that the reader limit decreased.
+		 * If the limit did decrease, we may not be able to
+		 * wake up the reader if we are currently above the limit.
+		 */
+		if (rt_rwlock_limit &&
+		    unlikely(atomic_read(&rwm->owners) >= rt_rwlock_limit))
+			goto out;
+		rwm->owner = RT_RW_PENDING_READ;
+	}
+
 	wakeup_next_waiter(mutex, savestate);
 
  out:
@@ -1630,14 +1663,21 @@ rt_read_fastunlock(struct rw_mutex *rwm,
 		   int mtx)
 {
 	WARN_ON(!atomic_read(&rwm->count));
+	WARN_ON(!atomic_read(&rwm->owners));
 	WARN_ON(!rwm->owner);
 	atomic_dec(&rwm->count);
 	if (likely(rt_rwlock_cmpxchg(rwm, current, NULL))) {
 		int reader_count = --current->reader_lock_count;
+		int owners;
 		rt_mutex_deadlock_account_unlock(current);
 		if (unlikely(reader_count < 0)) {
 			    reader_count = 0;
 			    WARN_ON_ONCE(1);
+		}
+		owners = atomic_dec_return(&rwm->owners);
+		if (unlikely(owners < 0)) {
+			atomic_set(&rwm->owners, 0);
+			WARN_ON_ONCE(1);
 		}
 		WARN_ON_ONCE(current->owned_read_locks[reader_count].lock != rwm);
 	} else
@@ -1789,6 +1829,7 @@ void rt_mutex_rwsem_init(struct rw_mutex *rwm, const char *name)
 
 	rwm->owner = NULL;
 	atomic_set(&rwm->count, 0);
+	atomic_set(&rwm->owners, 0);
 
 	__rt_mutex_init(mutex, name);
 }

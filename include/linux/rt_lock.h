@@ -64,6 +64,7 @@ struct rw_mutex {
 	struct task_struct	*owner;
 	struct rt_mutex		mutex;
 	atomic_t		count;	/* number of times held for read */
+	atomic_t		owners; /* number of owners as readers */
 };
 
 /*
