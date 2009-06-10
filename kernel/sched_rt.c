@@ -684,10 +684,10 @@ static void post_schedule_rt(struct rq *rq)
 	 * first via finish_lock_switch and then reaquire it here.
 	 */
 	if (unlikely(rq->rt.overloaded)) {
-		spin_lock_irq(&rq->lock);
+		spin_lock(&rq->lock);
 		push_rt_tasks(rq);
 		schedstat_inc(rq, rto_schedule_tail);
-		spin_unlock_irq(&rq->lock);
+		spin_unlock(&rq->lock);
 	}
 }
 
