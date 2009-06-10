@@ -80,6 +80,105 @@ static unsigned long height_to_maxindex[RADIX_TREE_MAX_PATH + 1] __read_mostly;
 static struct lock_class_key radix_node_class[RADIX_TREE_MAX_PATH];
 #endif
 
+#ifdef CONFIG_RADIX_TREE_OPTIMISTIC
+static DEFINE_PER_CPU(unsigned long[RADIX_TREE_MAX_PATH+1], optimistic_histogram);
+
+static void optimistic_hit(unsigned long height)
+{
+	if (height > RADIX_TREE_MAX_PATH)
+		height = RADIX_TREE_MAX_PATH;
+
+	__get_cpu_var(optimistic_histogram)[height]++;
+}
+
+#ifdef CONFIG_PROC_FS
+
+#include <linux/seq_file.h>
+#include <linux/uaccess.h>
+
+static void *frag_start(struct seq_file *m, loff_t *pos)
+{
+	if (*pos < 0 || *pos > RADIX_TREE_MAX_PATH)
+		return NULL;
+
+	m->private = (void *)(unsigned long)*pos;
+	return pos;
+}
+
+static void *frag_next(struct seq_file *m, void *arg, loff_t *pos)
+{
+	if (*pos < RADIX_TREE_MAX_PATH) {
+		(*pos)++;
+		(*((unsigned long *)&m->private))++;
+		return pos;
+	}
+	return NULL;
+}
+
+static void frag_stop(struct seq_file *m, void *arg)
+{
+}
+
+unsigned long get_optimistic_stat(unsigned long index)
+{
+	unsigned long total = 0;
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		total += per_cpu(optimistic_histogram, cpu)[index];
+	}
+	return total;
+}
+
+static int frag_show(struct seq_file *m, void *arg)
+{
+	unsigned long index = (unsigned long)m->private;
+	unsigned long hits = get_optimistic_stat(index);
+
+	if (index == 0)
+		seq_printf(m, "levels skipped\thits\n");
+
+	if (index < RADIX_TREE_MAX_PATH)
+		seq_printf(m, "%9lu\t%9lu\n", index, hits);
+	else
+		seq_printf(m, "failed\t%9lu\n", hits);
+
+	return 0;
+}
+
+struct seq_operations optimistic_op = {
+	.start = frag_start,
+	.next = frag_next,
+	.stop = frag_stop,
+	.show = frag_show,
+};
+
+static void optimistic_reset(void)
+{
+	int cpu;
+	int height;
+	for_each_possible_cpu(cpu) {
+		for (height = 0; height <= RADIX_TREE_MAX_PATH; height++)
+			per_cpu(optimistic_histogram, cpu)[height] = 0;
+	}
+}
+
+ssize_t optimistic_write(struct file *file, const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	if (count) {
+		char c;
+		if (get_user(c, buf))
+			return -EFAULT;
+		if (c == '0')
+			optimistic_reset();
+	}
+	return count;
+}
+
+#endif // CONFIG_PROC_FS
+#endif // CONFIG_RADIX_TREE_OPTIMISTIC
+
 /*
  * Radix tree node cache.
  */
@@ -468,7 +567,9 @@ radix_optimistic_lock(struct radix_tree_context *context, unsigned long index,
 			BUG_ON(context->locked);
 			spin_lock(&context->root->lock);
 			context->locked = &context->root->lock;
-		}
+			optimistic_hit(RADIX_TREE_MAX_PATH);
+		} else
+			optimistic_hit(context->root->height - node->height);
 	}
 	return node;
 }

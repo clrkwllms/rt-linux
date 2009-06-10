@@ -302,6 +302,25 @@ static const struct file_operations proc_cpuinfo_operations = {
 	.release	= seq_release,
 };
 
+#ifdef CONFIG_RADIX_TREE_OPTIMISTIC
+extern struct seq_operations optimistic_op;
+static int optimistic_open(struct inode *inode, struct file *file)
+{
+	(void)inode;
+	return seq_open(file, &optimistic_op);
+}
+
+extern ssize_t optimistic_write(struct file *, const char __user *, size_t, loff_t *);
+
+static struct file_operations optimistic_file_operations = {
+	.open	= optimistic_open,
+	.read	= seq_read,
+	.llseek	= seq_lseek,
+	.release = seq_release,
+	.write	= optimistic_write,
+};
+#endif
+
 static int devinfo_show(struct seq_file *f, void *v)
 {
 	int i = *(loff_t *) v;
@@ -787,6 +806,9 @@ void __init proc_misc_init(void)
 		if (entry)
 			entry->proc_fops = &proc_kmsg_operations;
 	}
+#endif
+#ifdef CONFIG_RADIX_TREE_OPTIMISTIC
+	create_seq_entry("radix_optimistic", 0, &optimistic_file_operations);
 #endif
 	create_seq_entry("locks", 0, &proc_locks_operations);
 	create_seq_entry("devices", 0, &proc_devinfo_operations);
