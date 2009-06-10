@@ -407,20 +407,12 @@ asmlinkage long sys_select(int n, fd_set __user *inp, fd_set __user *outp,
 		rtv.tv_sec = timeout;
 		if (timeval_compare(&rtv, &tv) >= 0)
 			rtv = tv;
-		if (copy_to_user(tvp, &rtv, sizeof(rtv))) {
-sticky:
-			/*
-			 * If an application puts its timeval in read-only
-			 * memory, we don't want the Linux-specific update to
-			 * the timeval to cause a fault after the select has
-			 * completed successfully. However, because we're not
-			 * updating the timeval, we can't restart the system
-			 * call.
-			 */
-			if (ret == -ERESTARTNOHAND)
-				ret = -EINTR;
-		}
+		if (copy_to_user(tvp, &rtv, sizeof(rtv)))
+			return -EFAULT;
 	}
+sticky:
+	if (ret == -ERESTARTNOHAND)
+		ret = -EINTR;
 
 	return ret;
 }
