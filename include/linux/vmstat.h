@@ -59,7 +59,12 @@ DECLARE_PER_CPU(struct vm_event_state, vm_event_states);
 
 static inline void __count_vm_event(enum vm_event_item item)
 {
+#ifdef CONFIG_PREEMPT_RT
+	get_cpu_var(vm_event_states).event[item]++;
+	put_cpu();
+#else
 	__get_cpu_var(vm_event_states).event[item]++;
+#endif
 }
 
 static inline void count_vm_event(enum vm_event_item item)
@@ -70,7 +75,12 @@ static inline void count_vm_event(enum vm_event_item item)
 
 static inline void __count_vm_events(enum vm_event_item item, long delta)
 {
+#ifdef CONFIG_PREEMPT_RT
+	get_cpu_var(vm_event_states).event[item] += delta;
+	put_cpu();
+#else
 	__get_cpu_var(vm_event_states).event[item] += delta;
+#endif
 }
 
 static inline void count_vm_events(enum vm_event_item item, long delta)
