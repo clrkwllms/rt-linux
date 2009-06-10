@@ -3,6 +3,8 @@
  *
  *  Copyright (C) 2000 Russell King
  *
+ * FUNCTION_TRACE/mcount support (C) 2005 Timesys john.cooper@timesys.com
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -394,6 +396,113 @@ ENTRY(sys_oabi_call_table)
 #include "calls.S"
 #undef ABI
 #undef OBSOLETE
+
+#ifdef CONFIG_FRAME_POINTER
+
+#ifdef CONFIG_MCOUNT
+/*
+ * At the point where we are in mcount() we maintain the
+ * frame of the prologue code and keep the call to mcount()
+ * out of the stack frame list:
+
+        saved pc          <---\     caller of instrumented routine
+        saved lr              |
+        ip/prev_sp            |
+        fp        -----^      |
+         :                    |
+                              |
+     -> saved pc              |     instrumented routine
+    |   saved lr              |
+    |   ip/prev_sp            |
+    |   fp           ---------/
+    |     :
+    |
+    |                             mcount
+    |	saved pc
+    |	saved lr
+    |	ip/prev sp
+     --	fp
+        r3
+        r2
+        r1
+   sp-> r0
+         :
+ */
+
+	.text
+	.align 0
+	.type mcount %function
+	.global mcount
+
+/* gcc -pg generated FUNCTION_PROLOGUE references mcount()
+ * and has already created the stack frame invocation for
+ * the routine we have been called to instrument. We create
+ * a complete frame nevertheless, as we want to use the same
+ * call to mcount() from c code.
+ */
+mcount:
+
+	ldr	ip, =mcount_enabled	@ leave early, if disabled
+	ldr	ip, [ip]
+	cmp	ip, #0
+	moveq	pc,lr
+
+	mov	ip,  sp
+	stmdb   sp!, {r0 - r3, fp, ip, lr, pc}	@ create stack frame
+
+	ldr	r1, [fp, #-4]		@ get lr (the return address
+					@ of the caller of the
+					@ instrumented function)
+	mov	r0, lr			@ get lr - (the return address
+					@ of the instrumented function)
+
+	sub	fp, ip, #4		@ point fp at this frame
+
+	bl	__trace
+1:
+	ldmdb   fp, {r0 - r3, fp, sp, pc}	@ pop entry frame and return
+
+#endif
+
+/* ARM replacement for unsupported gcc __builtin_return_address(n)
+ * where 0 < n.  n == 0 is supported here as well.
+ *
+ * Walk up the stack frame until the desired frame is found or a NULL
+ * fp is encountered, return NULL in the latter case.
+ *
+ * Note: it is possible under code optimization for the stack invocation
+ * of an ancestor function (level N) to be removed before calling a
+ * descendant function (level N+1).  No easy means is available to deduce
+ * this scenario with the result being [for example] caller_addr(0) when
+ * called from level N+1 returning level N-1 rather than the expected
+ * level N.  This optimization issue appears isolated to the case of
+ * a call to a level N+1 routine made at the tail end of a level N
+ * routine -- the level N frame is deleted and a simple branch is made
+ * to the level N+1 routine.
+ */
+
+	.text
+	.align 0
+	.type arm_return_addr %function
+	.global arm_return_addr
+
+arm_return_addr:
+	mov	ip, r0
+	mov	r0, fp
+3:
+	cmp	r0, #0
+	beq	1f		@ frame list hit end, bail
+	cmp	ip, #0
+	beq	2f		@ reached desired frame
+	ldr	r0, [r0, #-12]  @ else continue, get next fp
+	sub	ip, ip, #1
+	b	 3b
+2:
+	ldr	r0, [r0, #-4]   @ get target return address
+1:
+	mov	pc, lr
+
+#endif
 
 #endif
 

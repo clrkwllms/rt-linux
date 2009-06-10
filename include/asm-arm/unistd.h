@@ -380,6 +380,10 @@
 #define __NR_eventfd			(__NR_SYSCALL_BASE+351)
 #define __NR_fallocate			(__NR_SYSCALL_BASE+352)
 
+#ifndef __ASSEMBLY__
+#define NR_syscalls			(__NR_fallocate + 1 - __NR_SYSCALL_BASE)
+#endif
+
 /*
  * The following SWIs are ARM private.
  */

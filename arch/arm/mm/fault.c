@@ -215,7 +215,7 @@ out:
 	return fault;
 }
 
-static int
+static notrace int
 do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	struct task_struct *tsk;
@@ -311,7 +311,7 @@ no_context:
  * interrupt or a critical region, and should only copy the information
  * from the master page table, nothing more.
  */
-static int
+static notrace int
 do_translation_fault(unsigned long addr, unsigned int fsr,
 		     struct pt_regs *regs)
 {
@@ -354,7 +354,7 @@ bad_area:
  * Some section permission faults need to be handled gracefully.
  * They can happen due to a __{get,put}_user during an oops.
  */
-static int
+static notrace int
 do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	do_bad_area(addr, fsr, regs);
@@ -364,7 +364,7 @@ do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 /*
  * This abort handler always returns "fault".
  */
-static int
+static notrace int
 do_bad(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	return 1;
@@ -419,7 +419,7 @@ static struct fsr_info {
 	{ do_bad,		SIGBUS,  0,		"unknown 31"			   }
 };
 
-void __init
+void __init notrace
 hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
 		int sig, const char *name)
 {
@@ -433,7 +433,7 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
 /*
  * Dispatch a data abort to the relevant handler.
  */
-asmlinkage void __exception
+asmlinkage void __exception notrace
 do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	const struct fsr_info *inf = fsr_info + (fsr & 15) + ((fsr & (1 << 10)) >> 6);
@@ -452,7 +452,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	arm_notify_die("", regs, &info, fsr, 0);
 }
 
-asmlinkage void __exception
+asmlinkage void __exception notrace
 do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
 {
 	do_translation_fault(addr, 0, regs);

@@ -44,7 +44,7 @@ static DEFINE_SPINLOCK(minicache_lock);
  * instruction.  If your processor does not supply this, you have to write your
  * own copy_user_page that does the right thing.
  */
-static void __attribute__((naked))
+static void notrace __attribute__((naked))
 mc_copy_user_page(void *from, void *to)
 {
 	asm volatile(
@@ -88,7 +88,7 @@ void v4_mc_copy_user_page(void *kto, const void *kfrom, unsigned long vaddr)
 /*
  * ARMv4 optimised clear_user_page
  */
-void __attribute__((naked))
+void notrace __attribute__((naked))
 v4_mc_clear_user_page(void *kaddr, unsigned long vaddr)
 {
 	asm volatile(
