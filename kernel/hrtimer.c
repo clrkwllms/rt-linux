@@ -730,6 +730,28 @@ hrtimer_forward(struct hrtimer *timer, ktime_t now, ktime_t interval)
 }
 EXPORT_SYMBOL_GPL(hrtimer_forward);
 
+unsigned long
+hrtimer_overrun(struct hrtimer *timer, ktime_t now, ktime_t interval)
+{
+	unsigned long orun = 1;
+	ktime_t delta;
+
+	delta = ktime_sub(now, timer->expires);
+
+	if (delta.tv64 < 0)
+		return 0;
+
+	if (interval.tv64 < timer->base->resolution.tv64)
+		interval.tv64 = timer->base->resolution.tv64;
+
+	if (unlikely(delta.tv64 >= interval.tv64))
+		orun = ktime_divns(delta, ktime_to_ns(interval)) + 1;
+
+	return orun;
+}
+EXPORT_SYMBOL_GPL(hrtimer_overrun);
+
+
 /*
  * enqueue_hrtimer - internal function to (re)start a timer
  *

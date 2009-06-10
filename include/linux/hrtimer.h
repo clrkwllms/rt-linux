@@ -297,6 +297,9 @@ static inline int hrtimer_is_queued(struct hrtimer *timer)
 /* Forward a hrtimer so it expires after now: */
 extern unsigned long
 hrtimer_forward(struct hrtimer *timer, ktime_t now, ktime_t interval);
+/* Overrun count: */
+extern unsigned long
+hrtimer_overrun(struct hrtimer *timer, ktime_t now, ktime_t interval);
 
 /* Precise sleep: */
 extern long hrtimer_nanosleep(struct timespec *rqtp,
