@@ -296,3 +296,22 @@ void __init setup_arch(char **cmdline_p)
 
 	paging_init();
 }
+
+#ifdef CONFIG_STACKTRACE
+#include <linux/stacktrace.h>
+void notrace save_stack_trace(struct stack_trace *trace)
+{
+}
+#endif /* CONFIG_STACKTRACE */
+
+#ifdef CONFIG_EARLY_PRINTK
+void notrace early_printk(const char *fmt, ...)
+{
+	BUG();
+}
+#endif /* CONFIG_EARLY_PRINTK */
+
+#ifdef CONFIG_MCOUNT
+extern void _mcount(void);
+EXPORT_SYMBOL(_mcount);
+#endif /* CONFIG_MCOUNT */
