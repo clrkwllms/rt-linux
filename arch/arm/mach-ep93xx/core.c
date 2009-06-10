@@ -94,19 +94,32 @@ void __init ep93xx_map_io(void)
  * track of lost jiffies.
  */
 static unsigned int last_jiffy_time;
+static unsigned int next_jiffy_time;
+static unsigned int accumulator;
 
-#define TIMER4_TICKS_PER_JIFFY		((CLOCK_TICK_RATE + (HZ/2)) / HZ)
+#define TIMER4_TICKS_PER_JIFFY		(983040 / HZ)
+#define TIMER4_TICKS_MOD_JIFFY		(983040 % HZ)
+
+static int after_eq(unsigned long a, unsigned long b)
+{
+	return ((signed long)(a - b)) >= 0;
+}
 
 static int ep93xx_timer_interrupt(int irq, void *dev_id)
 {
 	write_seqlock(&xtime_lock);
 
 	__raw_writel(1, EP93XX_TIMER1_CLEAR);
-	while ((signed long)
-		(__raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time)
-						>= TIMER4_TICKS_PER_JIFFY) {
-		last_jiffy_time += TIMER4_TICKS_PER_JIFFY;
+	while (after_eq(__raw_readl(EP93XX_TIMER4_VALUE_LOW), next_jiffy_time)) {
 		timer_tick();
+
+		last_jiffy_time = next_jiffy_time;
+		next_jiffy_time += TIMER4_TICKS_PER_JIFFY;
+		accumulator += TIMER4_TICKS_MOD_JIFFY;
+		if (accumulator >= HZ) {
+			next_jiffy_time++;
+			accumulator -= HZ;
+		}
 	}
 
 	write_sequnlock(&xtime_lock);
