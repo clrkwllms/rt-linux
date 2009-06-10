@@ -109,7 +109,15 @@ extern void hpte_need_flush(struct mm_struct *mm, unsigned long addr,
 
 static inline void arch_enter_lazy_mmu_mode(void)
 {
-	struct ppc64_tlb_batch *batch = &get_cpu_var(ppc64_tlb_batch);
+	struct ppc64_tlb_batch *batch;
+#ifdef CONFIG_PREEMPT_RT
+	preempt_disable();
+#endif
+	batch = &get_cpu_var(ppc64_tlb_batch);
+
+#ifdef CONFIG_PREEMPT_RT
+	preempt_enable();
+#endif
 
 	batch->active = 1;
 	put_cpu_var(ppc64_tlb_batch);
@@ -117,7 +125,12 @@ static inline void arch_enter_lazy_mmu_mode(void)
 
 static inline void arch_leave_lazy_mmu_mode(void)
 {
-	struct ppc64_tlb_batch *batch = &get_cpu_var(ppc64_tlb_batch);
+	struct ppc64_tlb_batch *batch;
+
+#ifdef CONFIG_PREEMPT_RT
+	preempt_disable();
+#endif
+	batch = &get_cpu_var(ppc64_tlb_batch);
 
 	if (batch->active) {
 		if (batch->index) {
@@ -125,6 +138,9 @@ static inline void arch_leave_lazy_mmu_mode(void)
 		}
 		batch->active = 0;
 	}
+#ifdef CONFIG_PREEMPT_RT
+	preempt_enable();
+#endif
 	put_cpu_var(ppc64_tlb_batch);
 }
 
