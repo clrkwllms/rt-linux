@@ -154,7 +154,7 @@ struct unw_script {
 	unsigned long ip;		/* ip this script is for */
 	unsigned long pr_mask;		/* mask of predicates script depends on */
 	unsigned long pr_val;		/* predicate values this script is for */
-	rwlock_t lock;
+	raw_rwlock_t lock;
 	unsigned int flags;		/* see UNW_FLAG_* in unwind.h */
 	unsigned short lru_chain;	/* used for least-recently-used chain */
 	unsigned short coll_chain;	/* used for hash collisions */

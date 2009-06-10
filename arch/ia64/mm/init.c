@@ -37,7 +37,7 @@
 #include <asm/unistd.h>
 #include <asm/mca.h>
 
-DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
+DEFINE_PER_CPU_LOCKED(struct mmu_gather, mmu_gathers);
 
 extern void ia64_tlb_init (void);
 

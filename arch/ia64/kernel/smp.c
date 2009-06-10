@@ -261,6 +261,22 @@ smp_send_reschedule (int cpu)
 }
 
 /*
+ * this function sends a 'reschedule' IPI to all other CPUs.
+ * This is used when RT tasks are starving and other CPUs
+ * might be able to run them:
+ */
+void smp_send_reschedule_allbutself(void)
+{
+	unsigned int cpu;
+
+	for_each_online_cpu(cpu) {
+		if (cpu != smp_processor_id())
+			platform_send_ipi(cpu, IA64_IPI_RESCHEDULE,
+					  IA64_IPI_DM_INT, 0);
+	}
+}
+
+/*
  * Called with preemption disabled.
  */
 static void

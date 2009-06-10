@@ -323,7 +323,7 @@ ia64_mca_spin(const char *func)
 
 typedef struct ia64_state_log_s
 {
-	spinlock_t	isl_lock;
+	raw_spinlock_t	isl_lock;
 	int		isl_index;
 	unsigned long	isl_count;
 	ia64_err_rec_t  *isl_log[IA64_MAX_LOGS]; /* need space to store header + error log */

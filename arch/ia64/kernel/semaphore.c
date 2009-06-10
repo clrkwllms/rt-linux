@@ -40,12 +40,12 @@
  */
 
 void
-__up (struct semaphore *sem)
+__up (struct compat_semaphore *sem)
 {
 	wake_up(&sem->wait);
 }
 
-void __sched __down (struct semaphore *sem)
+void __sched __down (struct compat_semaphore *sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -82,7 +82,7 @@ void __sched __down (struct semaphore *sem)
 	tsk->state = TASK_RUNNING;
 }
 
-int __sched __down_interruptible (struct semaphore * sem)
+int __sched __down_interruptible (struct compat_semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;
@@ -142,7 +142,7 @@ int __sched __down_interruptible (struct semaphore * sem)
  * count.
  */
 int
-__down_trylock (struct semaphore *sem)
+__down_trylock (struct compat_semaphore *sem)
 {
 	unsigned long flags;
 	int sleepers;

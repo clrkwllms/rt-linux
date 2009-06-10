@@ -43,7 +43,7 @@
 #include <asm/system.h>
 #include <asm/fpu.h>
 
-extern spinlock_t sal_lock;
+extern raw_spinlock_t sal_lock;
 
 /* SAL spec _requires_ eight args for each call. */
 #define __IA64_FW_CALL(entry,result,a0,a1,a2,a3,a4,a5,a6,a7)	\

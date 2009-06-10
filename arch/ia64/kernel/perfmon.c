@@ -280,7 +280,7 @@ typedef struct {
  */
 
 typedef struct pfm_context {
-	spinlock_t		ctx_lock;		/* context protection */
+	raw_spinlock_t		ctx_lock;		/* context protection */
 
 	pfm_context_flags_t	ctx_flags;		/* bitmask of flags  (block reason incl.) */
 	unsigned int		ctx_state;		/* state: active/inactive (no bitfield) */
@@ -369,7 +369,7 @@ typedef struct pfm_context {
  * mostly used to synchronize between system wide and per-process
  */
 typedef struct {
-	spinlock_t		pfs_lock;		   /* lock the structure */
+	raw_spinlock_t		pfs_lock;		   /* lock the structure */
 
 	unsigned int		pfs_task_sessions;	   /* number of per task sessions */
 	unsigned int		pfs_sys_sessions;	   /* number of per system wide sessions */
@@ -510,7 +510,7 @@ static pfm_intr_handler_desc_t  *pfm_alt_intr_handler;
 static struct proc_dir_entry 	*perfmon_dir;
 static pfm_uuid_t		pfm_null_uuid = {0,};
 
-static spinlock_t		pfm_buffer_fmt_lock;
+static raw_spinlock_t		pfm_buffer_fmt_lock;
 static LIST_HEAD(pfm_buffer_fmt_list);
 
 static pmu_config_t		*pmu_conf;

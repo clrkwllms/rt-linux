@@ -11,53 +11,64 @@
 
 #include <asm/atomic.h>
 
-struct semaphore {
+/*
+ * On !PREEMPT_RT all semaphores are compat:
+ */
+#ifndef CONFIG_PREEMPT_RT
+# define compat_semaphore semaphore
+#endif
+
+struct compat_semaphore {
 	atomic_t count;
 	int sleepers;
 	wait_queue_head_t wait;
 };
 
-#define __SEMAPHORE_INITIALIZER(name, n)				\
+#define __COMPAT_SEMAPHORE_INITIALIZER(name, n)				\
 {									\
 	.count		= ATOMIC_INIT(n),				\
 	.sleepers	= 0,						\
 	.wait		= __WAIT_QUEUE_HEAD_INITIALIZER((name).wait)	\
 }
 
-#define __DECLARE_SEMAPHORE_GENERIC(name,count)					\
-	struct semaphore name = __SEMAPHORE_INITIALIZER(name, count)
+#define __COMPAT_DECLARE_SEMAPHORE_GENERIC(name,count)					\
+	struct compat_semaphore name = __COMPAT_SEMAPHORE_INITIALIZER(name, count)
 
-#define DECLARE_MUTEX(name)		__DECLARE_SEMAPHORE_GENERIC(name, 1)
+#define COMPAT_DECLARE_MUTEX(name)		__COMPAT_DECLARE_SEMAPHORE_GENERIC(name, 1)
+
+#define compat_sema_count(sem) atomic_read(&(sem)->count)
+
+asmlinkage int compat_sem_is_locked(struct compat_semaphore *sem);
 
 static inline void
-sema_init (struct semaphore *sem, int val)
+compat_sema_init (struct compat_semaphore *sem, int val)
 {
-	*sem = (struct semaphore) __SEMAPHORE_INITIALIZER(*sem, val);
+	*sem = (struct compat_semaphore) __COMPAT_SEMAPHORE_INITIALIZER(*sem, val);
 }
 
 static inline void
-init_MUTEX (struct semaphore *sem)
+compat_init_MUTEX (struct compat_semaphore *sem)
 {
-	sema_init(sem, 1);
+	compat_sema_init(sem, 1);
 }
 
 static inline void
-init_MUTEX_LOCKED (struct semaphore *sem)
+compat_init_MUTEX_LOCKED (struct compat_semaphore *sem)
 {
-	sema_init(sem, 0);
+	compat_sema_init(sem, 0);
 }
 
-extern void __down (struct semaphore * sem);
-extern int  __down_interruptible (struct semaphore * sem);
-extern int  __down_trylock (struct semaphore * sem);
-extern void __up (struct semaphore * sem);
+extern void __down (struct compat_semaphore * sem);
+extern int  __down_interruptible (struct compat_semaphore * sem);
+extern int  __down_trylock (struct compat_semaphore * sem);
+extern void __up (struct compat_semaphore * sem);
 
 /*
  * Atomically decrement the semaphore's count.  If it goes negative,
  * block the calling thread in the TASK_UNINTERRUPTIBLE state.
  */
 static inline void
-down (struct semaphore *sem)
+compat_down (struct compat_semaphore *sem)
 {
 	might_sleep();
 	if (ia64_fetchadd(-1, &sem->count.counter, acq) < 1)
@@ -69,7 +80,7 @@ down (struct semaphore *sem)
  * block the calling thread in the TASK_INTERRUPTIBLE state.
  */
 static inline int
-down_interruptible (struct semaphore * sem)
+compat_down_interruptible (struct compat_semaphore * sem)
 {
 	int ret = 0;
 
@@ -80,7 +91,7 @@ down_interruptible (struct semaphore * sem)
 }
 
 static inline int
-down_trylock (struct semaphore *sem)
+compat_down_trylock (struct compat_semaphore *sem)
 {
 	int ret = 0;
 
@@ -90,10 +101,12 @@ down_trylock (struct semaphore *sem)
 }
 
 static inline void
-up (struct semaphore * sem)
+compat_up (struct compat_semaphore * sem)
 {
 	if (ia64_fetchadd(1, &sem->count.counter, rel) <= -1)
 		__up(sem);
 }
+
+#include <linux/semaphore.h>
 
 #endif /* _ASM_IA64_SEMAPHORE_H */

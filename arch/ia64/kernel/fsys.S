@@ -26,6 +26,7 @@
 
 #include "entry.h"
 
+#ifdef CONFIG_TIME_INTERPOLATION
 /*
  * See Documentation/ia64/fsys.txt for details on fsyscalls.
  *
@@ -348,6 +349,26 @@ ENTRY(fsys_clock_gettime)
 	shl r30 = r32,15
 	br.many .gettime
 END(fsys_clock_gettime)
+
+
+#else // !CONFIG_TIME_INTERPOLATION
+
+# define fsys_gettimeofday 0
+# define fsys_clock_gettime 0
+
+.fail_einval:
+	mov r8 = EINVAL
+	mov r10 = -1
+	FSYS_RETURN
+
+.fail_efault:
+	mov r8 = EFAULT
+	mov r10 = -1
+	FSYS_RETURN
+
+#endif
+
+
 
 /*
  * long fsys_rt_sigprocmask (int how, sigset_t *set, sigset_t *oset, size_t sigsetsize).

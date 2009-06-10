@@ -32,7 +32,7 @@
 #include <asm-generic/mm_hooks.h>
 
 struct ia64_ctx {
-	spinlock_t lock;
+	raw_spinlock_t lock;
 	unsigned int next;	/* next context number to use */
 	unsigned int limit;     /* available free range */
 	unsigned int max_ctx;   /* max. context value supported by all CPUs */

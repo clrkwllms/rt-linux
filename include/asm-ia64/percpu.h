@@ -24,10 +24,17 @@
 #define DECLARE_PER_CPU(type, name)				\
 	extern __SMALL_ADDR_AREA __typeof__(type) per_cpu__##name
 
+#define DECLARE_PER_CPU_LOCKED(type, name)		\
+	extern spinlock_t per_cpu_lock__##name##_locked; \
+	extern __SMALL_ADDR_AREA __typeof__(type) per_cpu__##name##_locked
+
 /* Separate out the type, so (int[3], foo) works. */
 #define DEFINE_PER_CPU(type, name)				\
-	__attribute__((__section__(".data.percpu")))		\
-	__SMALL_ADDR_AREA __typeof__(type) per_cpu__##name
+	__attribute__((__section__(".data.percpu"))) __SMALL_ADDR_AREA __typeof__(type) per_cpu__##name
+
+#define DEFINE_PER_CPU_LOCKED(type, name)				\
+	__attribute__((__section__(".data.percpu"))) __SMALL_ADDR_AREA __DEFINE_SPINLOCK(per_cpu_lock__##name##_locked); \
+	__attribute__((__section__(".data.percpu"))) __SMALL_ADDR_AREA __typeof__(type) per_cpu__##name##_locked
 
 #ifdef CONFIG_SMP
 #define DEFINE_PER_CPU_SHARED_ALIGNED(type, name)			\
@@ -54,6 +61,16 @@ DECLARE_PER_CPU(unsigned long, local_per_cpu_offset);
 #define per_cpu(var, cpu)  (*RELOC_HIDE(&per_cpu__##var, __per_cpu_offset[cpu]))
 #define __get_cpu_var(var) (*RELOC_HIDE(&per_cpu__##var, __ia64_per_cpu_var(local_per_cpu_offset)))
 #define __raw_get_cpu_var(var) (*RELOC_HIDE(&per_cpu__##var, __ia64_per_cpu_var(local_per_cpu_offset)))
+
+#define per_cpu_lock(var, cpu) \
+	(*RELOC_HIDE(&per_cpu_lock__##var##_locked, __per_cpu_offset[cpu]))
+#define per_cpu_var_locked(var, cpu) \
+		(*RELOC_HIDE(&per_cpu__##var##_locked, __per_cpu_offset[cpu]))
+#define __get_cpu_lock(var, cpu) \
+		per_cpu_lock(var, cpu)
+#define __get_cpu_var_locked(var, cpu) \
+		per_cpu_var_locked(var, cpu)
+
 
 extern void percpu_modcopy(void *pcpudst, const void *src, unsigned long size);
 extern void setup_per_cpu_areas (void);

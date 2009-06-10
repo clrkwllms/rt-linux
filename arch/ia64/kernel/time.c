@@ -70,6 +70,7 @@ timer_interrupt (int irq, void *dev_id)
 
 	platform_timer_interrupt(irq, dev_id);
 
+#if 0
 	new_itm = local_cpu_data->itm_next;
 
 	if (!time_after(ia64_get_itc(), new_itm))
@@ -77,29 +78,48 @@ timer_interrupt (int irq, void *dev_id)
 		       ia64_get_itc(), new_itm);
 
 	profile_tick(CPU_PROFILING);
+#endif
 
-	while (1) {
-		update_process_times(user_mode(get_irq_regs()));
+	if (time_after(ia64_get_itc(), local_cpu_data->itm_tick_next)) {
 
-		new_itm += local_cpu_data->itm_delta;
+		unsigned long new_tick_itm;
+		new_tick_itm = local_cpu_data->itm_tick_next;
 
-		if (smp_processor_id() == time_keeper_id) {
-			/*
-			 * Here we are in the timer irq handler. We have irqs locally
-			 * disabled, but we don't know if the timer_bh is running on
-			 * another CPU. We need to avoid to SMP race by acquiring the
-			 * xtime_lock.
-			 */
-			write_seqlock(&xtime_lock);
-			do_timer(1);
-			local_cpu_data->itm_next = new_itm;
-			write_sequnlock(&xtime_lock);
-		} else
-			local_cpu_data->itm_next = new_itm;
+		profile_tick(CPU_PROFILING, get_irq_regs());
 
-		if (time_after(new_itm, ia64_get_itc()))
-			break;
+		while (1) {
+			update_process_times(user_mode(get_irq_regs()));
 
+			new_tick_itm += local_cpu_data->itm_tick_delta;
+
+			if (smp_processor_id() == time_keeper_id) {
+				/*
+				 * Here we are in the timer irq handler. We have irqs locally
+				 * disabled, but we don't know if the timer_bh is running on
+				 * another CPU. We need to avoid to SMP race by acquiring the
+				 * xtime_lock.
+				 */
+				write_seqlock(&xtime_lock);
+				do_timer(get_irq_regs());
+				local_cpu_data->itm_tick_next = new_tick_itm;
+				write_sequnlock(&xtime_lock);
+			} else
+				local_cpu_data->itm_tick_next = new_tick_itm;
+
+			if (time_after(new_tick_itm, ia64_get_itc()))
+				break;
+		}
+	}
+
+	if (time_after(ia64_get_itc(), local_cpu_data->itm_timer_next)) {
+		if (itc_clockevent.event_handler)
+			itc_clockevent.event_handler(get_irq_regs());
+
+		// FIXME, really, please
+		new_itm = local_cpu_data->itm_tick_next;
+
+		if (time_after(new_itm, local_cpu_data->itm_timer_next))
+			new_itm = local_cpu_data->itm_timer_next;
 		/*
 		 * Allow IPIs to interrupt the timer loop.
 		 */
@@ -117,8 +137,8 @@ timer_interrupt (int irq, void *dev_id)
 		 * too fast (with the potentially devastating effect
 		 * of losing monotony of time).
 		 */
-		while (!time_after(new_itm, ia64_get_itc() + local_cpu_data->itm_delta/2))
-			new_itm += local_cpu_data->itm_delta;
+		while (!time_after(new_itm, ia64_get_itc() + local_cpu_data->itm_tick_delta/2))
+			new_itm += local_cpu_data->itm_tick_delta;
 		ia64_set_itm(new_itm);
 		/* double check, in case we got hit by a (slow) PMI: */
 	} while (time_after_eq(ia64_get_itc(), new_itm));
@@ -137,7 +157,7 @@ ia64_cpu_local_tick (void)
 	/* arrange for the cycle counter to generate a timer interrupt: */
 	ia64_set_itv(IA64_TIMER_VECTOR);
 
-	delta = local_cpu_data->itm_delta;
+	delta = local_cpu_data->itm_tick_delta;
 	/*
 	 * Stagger the timer tick for each CPU so they don't occur all at (almost) the
 	 * same time:
@@ -146,8 +166,8 @@ ia64_cpu_local_tick (void)
 		unsigned long hi = 1UL << ia64_fls(cpu);
 		shift = (2*(cpu - hi) + 1) * delta/hi/2;
 	}
-	local_cpu_data->itm_next = ia64_get_itc() + delta + shift;
-	ia64_set_itm(local_cpu_data->itm_next);
+	local_cpu_data->itm_tick_next = ia64_get_itc() + delta + shift;
+	ia64_set_itm(local_cpu_data->itm_tick_next);
 }
 
 static int nojitter;
@@ -205,7 +225,7 @@ ia64_init_itm (void)
 
 	itc_freq = (platform_base_freq*itc_ratio.num)/itc_ratio.den;
 
-	local_cpu_data->itm_delta = (itc_freq + HZ/2) / HZ;
+	local_cpu_data->itm_tick_delta = (itc_freq + HZ/2) / HZ;
 	printk(KERN_DEBUG "CPU %d: base freq=%lu.%03luMHz, ITC ratio=%u/%u, "
 	       "ITC freq=%lu.%03luMHz", smp_processor_id(),
 	       platform_base_freq / 1000000, (platform_base_freq / 1000) % 1000,
@@ -225,6 +245,7 @@ ia64_init_itm (void)
 	local_cpu_data->nsec_per_cyc = ((NSEC_PER_SEC<<IA64_NSEC_PER_CYC_SHIFT)
 					+ itc_freq/2)/itc_freq;
 
+#ifdef CONFIG_TIME_INTERPOLATION
 	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
 #ifdef CONFIG_SMP
 		/* On IA64 in an SMP configuration ITCs are never accurately synchronized.
@@ -297,7 +318,7 @@ static cycle_t itc_get_cycles(void)
 
 static struct irqaction timer_irqaction = {
 	.handler =	timer_interrupt,
-	.flags =	IRQF_DISABLED | IRQF_IRQPOLL,
+	.flags =	IRQF_DISABLED | IRQF_IRQPOLL | IRQF_NODELAY,
 	.name =		"timer"
 };
 
@@ -318,6 +339,8 @@ time_init (void)
 	 * tv_nsec field must be normalized (i.e., 0 <= nsec < NSEC_PER_SEC).
 	 */
 	set_normalized_timespec(&wall_to_monotonic, -xtime.tv_sec, -xtime.tv_nsec);
+	register_itc_clocksource();
+	register_itc_clockevent();
 }
 
 /*
@@ -402,6 +425,7 @@ void update_vsyscall(struct timespec *wall, struct clocksource *c)
 		fsyscall_gtod_data.monotonic_time.tv_nsec -= NSEC_PER_SEC;
 		fsyscall_gtod_data.monotonic_time.tv_sec++;
 	}
+#endif
 
         write_sequnlock_irqrestore(&fsyscall_gtod_data.lock, flags);
 }

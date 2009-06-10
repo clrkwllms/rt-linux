@@ -44,6 +44,7 @@ config SWIOTLB
 
 config RWSEM_XCHGADD_ALGORITHM
 	bool
+	depends on !PREEMPT_RT
 	default y
 
 config ARCH_HAS_ILOG2_U32
@@ -279,6 +280,69 @@ config SMP
 	  available at <http://www.tldp.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
+
+
+config GENERIC_TIME
+       bool
+       default y
+
+config HIGH_RES_TIMERS
+	bool "High-Resolution Timers"
+	help
+
+	  POSIX timers are available by default.  This option enables
+	  high-resolution POSIX timers.  With this option the resolution
+	  is at least 1 microsecond.  High resolution is not free.  If
+	  enabled this option will add a small overhead each time a
+	  timer expires that is not on a 1/HZ tick boundary.  If no such
+	  timers are used the overhead is nil.
+
+	  This option enables two additional POSIX CLOCKS,
+	  CLOCK_REALTIME_HR and CLOCK_MONOTONIC_HR.  Note that this
+	  option does not change the resolution of CLOCK_REALTIME or
+	  CLOCK_MONOTONIC which remain at 1/HZ resolution.
+
+config HIGH_RES_RESOLUTION
+	int "High-Resolution-Timer resolution (nanoseconds)"
+	depends on HIGH_RES_TIMERS
+	default 1000
+	help
+
+	  This sets the resolution of timers accessed with
+          CLOCK_REALTIME_HR and CLOCK_MONOTONIC_HR.  Too
+	  fine a resolution (small a number) will usually not
+          be observable due to normal system latencies.  For an
+          800 MHZ processor about 10,000 is the recommended maximum
+	  (smallest number).  If you don't need that sort of resolution,
+	  higher numbers may generate less overhead.
+
+choice
+	prompt "Clock source"
+	depends on HIGH_RES_TIMERS
+	default HIGH_RES_TIMER_ITC
+	help
+	  This option allows you to choose the hardware source in charge
+	  of generating high precision interruptions on your system.
+	  On IA-64 these are:
+
+	  <timer>				<resolution>
+	  ITC Interval Time Counter		1/CPU clock
+	  HPET High Precision Event Timer	~ (XXX:have to check the spec)
+
+	  The ITC timer is available on all the ia64 computers because
+	  it is integrated directly into the processor. However it may not
+	  give correct results on MP machines with processors running
+	  at different clock rates. In this case you may want to use
+	  the HPET if available on your machine.
+
+
+config HIGH_RES_TIMER_ITC
+	bool "Interval Time Counter/ITC"
+
+config HIGH_RES_TIMER_HPET
+	bool "High Precision Event Timer/HPET"
+
+endchoice
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-1024)"

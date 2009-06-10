@@ -140,7 +140,7 @@ enum salinfo_state {
 
 struct salinfo_data {
 	cpumask_t		cpu_event;	/* which cpus have outstanding events */
-	struct semaphore	mutex;
+	struct compat_semaphore	mutex;
 	u8			*log_buffer;
 	u64			log_size;
 	u8			*oemdata;	/* decoded oem data */
@@ -156,8 +156,8 @@ struct salinfo_data {
 
 static struct salinfo_data salinfo_data[ARRAY_SIZE(salinfo_log_name)];
 
-static DEFINE_SPINLOCK(data_lock);
-static DEFINE_SPINLOCK(data_saved_lock);
+static DEFINE_RAW_SPINLOCK(data_lock);
+static DEFINE_RAW_SPINLOCK(data_saved_lock);
 
 /** salinfo_platform_oemdata - optional callback to decode oemdata from an error
  * record.

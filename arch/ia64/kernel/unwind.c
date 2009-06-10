@@ -82,7 +82,7 @@ typedef unsigned long unw_word;
 typedef unsigned char unw_hash_index_t;
 
 static struct {
-	spinlock_t lock;			/* spinlock for unwind data */
+	raw_spinlock_t lock;			/* spinlock for unwind data */
 
 	/* list of unwind tables (one per load-module) */
 	struct unw_table *tables;
@@ -146,7 +146,7 @@ static struct {
 # endif
 } unw = {
 	.tables = &unw.kernel_table,
-	.lock = __SPIN_LOCK_UNLOCKED(unw.lock),
+	.lock = RAW_SPIN_LOCK_UNLOCKED(unw.lock),
 	.save_order = {
 		UNW_REG_RP, UNW_REG_PFS, UNW_REG_PSP, UNW_REG_PR,
 		UNW_REG_UNAT, UNW_REG_LC, UNW_REG_FPSR, UNW_REG_PRI_UNAT_GR

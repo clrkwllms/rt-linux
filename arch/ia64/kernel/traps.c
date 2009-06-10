@@ -39,11 +39,11 @@ void
 die (const char *str, struct pt_regs *regs, long err)
 {
 	static struct {
-		spinlock_t lock;
+		raw_spinlock_t lock;
 		u32 lock_owner;
 		int lock_owner_depth;
 	} die = {
-		.lock =	__SPIN_LOCK_UNLOCKED(die.lock),
+		.lock =	RAW_SPIN_LOCK_UNLOCKED(die.lock),
 		.lock_owner = -1,
 		.lock_owner_depth = 0
 	};
@@ -181,7 +181,7 @@ __kprobes ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
  * access to fph by the time we get here, as the IVT's "Disabled FP-Register" handler takes
  * care of clearing psr.dfh.
  */
-static inline void
+void
 disabled_fph_fault (struct pt_regs *regs)
 {
 	struct ia64_psr *psr = ia64_psr(regs);
@@ -200,7 +200,7 @@ disabled_fph_fault (struct pt_regs *regs)
 			= (struct task_struct *)ia64_get_kr(IA64_KR_FPU_OWNER);
 
 		if (ia64_is_local_fpu_owner(current)) {
-			preempt_enable_no_resched();
+			__preempt_enable_no_resched();
 			return;
 		}
 
@@ -220,7 +220,7 @@ disabled_fph_fault (struct pt_regs *regs)
 		 */
 		psr->mfh = 1;
 	}
-	preempt_enable_no_resched();
+	__preempt_enable_no_resched();
 }
 
 static inline int

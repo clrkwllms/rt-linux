@@ -111,7 +111,7 @@
 	(PAGE_SIZE / sizeof(struct iosapic_rte_info))
 #define RTE_PREALLOCATED	(1)
 
-static DEFINE_SPINLOCK(iosapic_lock);
+static DEFINE_RAW_SPINLOCK(iosapic_lock);
 
 /*
  * These tables map IA-64 vectors to the IOSAPIC pin that generates this
@@ -390,6 +390,34 @@ iosapic_startup_level_irq (unsigned int irq)
 	return 0;
 }
 
+/*
+ * In the preemptible case mask the IRQ first then handle it and ack it.
+ */
+#ifdef CONFIG_PREEMPT_HARDIRQS
+
+static void
+iosapic_ack_level_irq (unsigned int irq)
+{
+	ia64_vector vec = irq_to_vector(irq);
+	struct iosapic_rte_info *rte;
+
+	move_irq(irq);
+	mask_irq(irq);
+	list_for_each_entry(rte, &iosapic_intr_info[vec].rtes, rte_list)
+		iosapic_eoi(rte->addr, vec);
+}
+
+static void
+iosapic_end_level_irq (unsigned int irq)
+{
+	if (!(irq_desc[irq].status & IRQ_INPROGRESS))
+		unmask_irq(irq);
+}
+
+#else /* !CONFIG_PREEMPT_HARDIRQS */
+
+#define iosapic_ack_level_irq		nop
+
 static void
 iosapic_end_level_irq (unsigned int irq)
 {
@@ -411,10 +439,11 @@ iosapic_end_level_irq (unsigned int irq)
 	}
 }
 
+#endif
+
 #define iosapic_shutdown_level_irq	mask_irq
 #define iosapic_enable_level_irq	unmask_irq
 #define iosapic_disable_level_irq	mask_irq
-#define iosapic_ack_level_irq		nop
 
 static struct irq_chip irq_type_iosapic_level = {
 	.name =		"IO-SAPIC-level",

@@ -40,6 +40,7 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/swap.h>
+#include <linux/percpu.h>
 
 #include <asm/pgalloc.h>
 #include <asm/processor.h>
@@ -61,11 +62,12 @@ struct mmu_gather {
 	unsigned char		need_flush;	/* really unmapped some PTEs? */
 	unsigned long		start_addr;
 	unsigned long		end_addr;
+	int cpu;
 	struct page 		*pages[FREE_PTE_NR];
 };
 
 /* Users of the generic TLB shootdown code must declare this storage space. */
-DECLARE_PER_CPU(struct mmu_gather, mmu_gathers);
+DECLARE_PER_CPU_LOCKED(struct mmu_gather, mmu_gathers);
 
 /*
  * Flush the TLB for address range START to END and, if not in fast mode, release the
@@ -127,8 +129,10 @@ ia64_tlb_flush_mmu (struct mmu_gather *tlb, unsigned long start, unsigned long e
 static inline struct mmu_gather *
 tlb_gather_mmu (struct mm_struct *mm, unsigned int full_mm_flush)
 {
-	struct mmu_gather *tlb = &get_cpu_var(mmu_gathers);
+	int cpu;
+	struct mmu_gather *tlb = &get_cpu_var_locked(mmu_gathers, &cpu);
 
+	tlb->cpu = cpu;
 	tlb->mm = mm;
 	/*
 	 * Use fast mode if only 1 CPU is online.
@@ -165,7 +169,7 @@ tlb_finish_mmu (struct mmu_gather *tlb, unsigned long start, unsigned long end)
 	/* keep the page table cache within bounds */
 	check_pgt_cache();
 
-	put_cpu_var(mmu_gathers);
+	put_cpu_var_locked(mmu_gathers, tlb->cpu);
 }
 
 /*

@@ -438,6 +438,14 @@ ia64_do_signal (struct sigscratch *scr, long in_syscall)
 	long errno = scr->pt.r8;
 #	define ERR_CODE(c)	(IS_IA32_PROCESS(&scr->pt) ? -(c) : (c))
 
+#ifdef CONFIG_PREEMPT_RT
+	/*
+	 * Fully-preemptible kernel does not need interrupts disabled:
+	 */
+	local_irq_enable();
+	preempt_check_resched();
+#endif
+
 	/*
 	 * In the ia64_leave_kernel code path, we want the common case to go fast, which
 	 * is why we may in certain cases get here from kernel mode. Just return without

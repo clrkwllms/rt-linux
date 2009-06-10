@@ -33,7 +33,7 @@ static struct {
 } purge;
 
 struct ia64_ctx ia64_ctx = {
-	.lock =	__SPIN_LOCK_UNLOCKED(ia64_ctx.lock),
+	.lock =	RAW_SPIN_LOCK_UNLOCKED(ia64_ctx.lock),
 	.next =	1,
 	.max_ctx = ~0U
 };

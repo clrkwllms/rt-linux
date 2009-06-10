@@ -124,8 +124,10 @@ struct ia64_psr {
  */
 struct cpuinfo_ia64 {
 	__u32 softirq_pending;
-	__u64 itm_delta;	/* # of clock cycles between clock ticks */
-	__u64 itm_next;		/* interval timer mask value to use for next clock tick */
+	__u64 itm_tick_delta;	/* # of clock cycles between clock ticks */
+	__u64 itm_tick_next;	/* interval timer mask value to use for next clock tick */
+	__u64 itm_timer_next;
+	__u64 __itm_next;
 	__u64 nsec_per_cyc;	/* (1000000000<<IA64_NSEC_PER_CYC_SHIFT)/itc_freq */
 	__u64 unimpl_va_mask;	/* mask of unimplemented virtual address bits (from PAL) */
 	__u64 unimpl_pa_mask;	/* mask of unimplemented physical address bits (from PAL) */

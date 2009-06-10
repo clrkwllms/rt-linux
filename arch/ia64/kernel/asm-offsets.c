@@ -257,6 +257,7 @@ void foo(void)
 	       offsetof (struct pal_min_state_area_s, pmsa_xip));
 	BLANK();
 
+#ifdef CONFIG_TIME_INTERPOLATION
 	/* used by fsys_gettimeofday in arch/ia64/kernel/fsys.S */
 	DEFINE(IA64_GTOD_LOCK_OFFSET,
 		offsetof (struct fsyscall_gtod_data_t, lock));
@@ -278,4 +279,5 @@ void foo(void)
 		offsetof (struct itc_jitter_data_t, itc_jitter));
 	DEFINE(IA64_ITC_LASTCYCLE_OFFSET,
 		offsetof (struct itc_jitter_data_t, itc_lastcycle));
+#endif
 }
