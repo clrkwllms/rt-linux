@@ -2,9 +2,10 @@
 #define _M68KNOMMU_SYSTEM_H
 
 #include <linux/linkage.h>
+#include <linux/kernel.h>
+#include <linux/irqflags.h>
 #include <asm/segment.h>
 #include <asm/entry.h>
-
 /*
  * switch_to(n) should switch tasks to task ptr, first checking that
  * ptr isn't the current task, in which case it does nothing.  This
@@ -128,7 +129,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
 {
   unsigned long tmp, flags;
 
-  local_irq_save(flags);
+  raw_local_irq_save(flags);
 
   switch (size) {
   case 1:
@@ -150,7 +151,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
     : "=&d" (tmp) : "d" (x), "m" (*__xg(ptr)) : "memory");
     break;
   }
-  local_irq_restore(flags);
+  raw_local_irq_restore(flags);
   return tmp;
 }
 #else
@@ -203,10 +204,10 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 
 	if (size == 4) {
 
-		local_irq_save(flags);
+		raw_local_irq_save(flags);
 		if ((prev = *p) == old)
 			*p = new;
-		local_irq_restore(flags);
+		raw_local_irq_restore(flags);
 		return prev;
 	}
 
