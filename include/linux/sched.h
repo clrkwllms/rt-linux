@@ -1009,6 +1009,8 @@ struct sched_entity {
 struct rw_mutex;
 struct reader_lock_struct {
 	struct rw_mutex *lock;
+	struct list_head list;
+	struct task_struct *task;
 	int count;
 };
 

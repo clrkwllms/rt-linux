@@ -1208,6 +1208,14 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 #ifdef CONFIG_PREEMPT_RT
 	p->reader_lock_count = 0;
+	{
+		int i;
+		for (i = 0; i < MAX_RWLOCK_DEPTH; i++) {
+			INIT_LIST_HEAD(&p->owned_read_locks[i].list);
+			p->owned_read_locks[i].count = 0;
+			p->owned_read_locks[i].lock = NULL;
+		}
+	}
 #endif
 
 	if (pid != &init_struct_pid) {

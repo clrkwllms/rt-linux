@@ -65,6 +65,7 @@ struct rw_mutex {
 	struct rt_mutex		mutex;
 	atomic_t		count;	/* number of times held for read */
 	atomic_t		owners; /* number of owners as readers */
+	struct list_head	readers;
 };
 
 /*
@@ -194,7 +195,7 @@ extern int __bad_func_type(void);
  */
 
 #define __RWSEM_INITIALIZER(name) \
-	{ .owners.mutex = __RT_MUTEX_INITIALIZER(name.owners.mutex), \
+	{ .owners.mutex = __RT_MUTEX_INITIALIZER(name.owners.mutex),	\
 	  RW_DEP_MAP_INIT(name) }
 
 #define DECLARE_RWSEM(lockname) \
