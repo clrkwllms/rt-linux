@@ -40,6 +40,7 @@ struct work_struct {
 struct delayed_work {
 	struct work_struct work;
 	struct timer_list timer;
+	int prio;
 };
 
 struct execute_work {
