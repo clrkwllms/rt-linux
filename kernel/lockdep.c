@@ -581,7 +581,7 @@ static void print_lock_dependencies(struct lock_class *class, int depth)
 
 static void print_kernel_version(void)
 {
-	printk("%s %.*s\n", init_utsname()->release,
+	printk("[ %s %.*s\n", init_utsname()->release,
 		(int)strcspn(init_utsname()->version, " "),
 		init_utsname()->version);
 }
@@ -3129,13 +3129,13 @@ void __init lockdep_info(void)
 {
 	printk("Lock dependency validator: Copyright (c) 2006 Red Hat, Inc., Ingo Molnar\n");
 
-	printk("... MAX_LOCKDEP_SUBCLASSES:    %lu\n", MAX_LOCKDEP_SUBCLASSES);
-	printk("... MAX_LOCK_DEPTH:          %lu\n", MAX_LOCK_DEPTH);
-	printk("... MAX_LOCKDEP_KEYS:        %lu\n", MAX_LOCKDEP_KEYS);
-	printk("... CLASSHASH_SIZE:           %lu\n", CLASSHASH_SIZE);
-	printk("... MAX_LOCKDEP_ENTRIES:     %lu\n", MAX_LOCKDEP_ENTRIES);
-	printk("... MAX_LOCKDEP_CHAINS:      %lu\n", MAX_LOCKDEP_CHAINS);
-	printk("... CHAINHASH_SIZE:          %lu\n", CHAINHASH_SIZE);
+	printk("... MAX_LOCKDEP_SUBCLASSES: %6lu\n", MAX_LOCKDEP_SUBCLASSES);
+	printk("... MAX_LOCK_DEPTH:         %6lu\n", MAX_LOCK_DEPTH);
+	printk("... MAX_LOCKDEP_KEYS:       %6lu\n", MAX_LOCKDEP_KEYS);
+	printk("... CLASSHASH_SIZE:         %6lu\n", CLASSHASH_SIZE);
+	printk("... MAX_LOCKDEP_ENTRIES:    %6lu\n", MAX_LOCKDEP_ENTRIES);
+	printk("... MAX_LOCKDEP_CHAINS:     %6lu\n", MAX_LOCKDEP_CHAINS);
+	printk("... CHAINHASH_SIZE:         %6lu\n", CHAINHASH_SIZE);
 
 	printk(" memory used by lock dependency info: %lu kB\n",
 		(sizeof(struct lock_class) * MAX_LOCKDEP_KEYS +
