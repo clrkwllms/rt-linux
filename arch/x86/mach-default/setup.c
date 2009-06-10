@@ -37,6 +37,7 @@ void __init pre_intr_init_hook(void)
  */
 static struct irqaction irq2 = {
 	.handler = no_action,
+	.flags = IRQF_NODELAY,
 	.mask = CPU_MASK_NONE,
 	.name = "cascade",
 };
@@ -85,7 +86,7 @@ void __init trap_init_hook(void)
 
 static struct irqaction irq0  = {
 	.handler = timer_interrupt,
-	.flags = IRQF_DISABLED | IRQF_NOBALANCING | IRQF_IRQPOLL,
+	.flags = IRQF_DISABLED | IRQF_NOBALANCING | IRQF_IRQPOLL | IRQF_NODELAY,
 	.mask = CPU_MASK_NONE,
 	.name = "timer"
 };

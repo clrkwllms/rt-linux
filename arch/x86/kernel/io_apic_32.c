@@ -261,18 +261,6 @@ static void __unmask_IO_APIC_irq (unsigned int irq)
 	__modify_IO_APIC_irq(irq, 0, 0x00010000);
 }
 
-/* mask = 1, trigger = 0 */
-static void __mask_and_edge_IO_APIC_irq (unsigned int irq)
-{
-	__modify_IO_APIC_irq(irq, 0x00010000, 0x00008000);
-}
-
-/* mask = 0, trigger = 1 */
-static void __unmask_and_level_IO_APIC_irq (unsigned int irq)
-{
-	__modify_IO_APIC_irq(irq, 0x00008000, 0x00010000);
-}
-
 static void mask_IO_APIC_irq (unsigned int irq)
 {
 	unsigned long flags;
@@ -1493,7 +1481,7 @@ void __init print_IO_APIC(void)
 	return;
 }
 
-#if 0
+#if 1
 
 static void print_APIC_bitfield (int base)
 {
@@ -1989,8 +1977,10 @@ static void ack_ioapic_quirk_irq(unsigned int irq)
 	if (!(v & (1 << (i & 0x1f)))) {
 		atomic_inc(&irq_mis_count);
 		spin_lock(&ioapic_lock);
-		__mask_and_edge_IO_APIC_irq(irq);
-		__unmask_and_level_IO_APIC_irq(irq);
+		/* mask = 1, trigger = 0 */
+		__modify_IO_APIC_irq(irq, 0x00010000, 0x00008000);
+		/* mask = 0, trigger = 1 */
+		__modify_IO_APIC_irq(irq, 0x00008000, 0x00010000);
 		spin_unlock(&ioapic_lock);
 	}
 }
