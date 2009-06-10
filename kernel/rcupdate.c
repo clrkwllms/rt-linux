@@ -91,8 +91,11 @@ void synchronize_rcu(void)
 	/* Will wake me after RCU finished */
 	call_rcu(&rcu.head, wakeme_after_rcu);
 
+	rcu_boost_readers();
+
 	/* Wait for it */
 	wait_for_completion(&rcu.completion);
+	rcu_unboost_readers();
 }
 EXPORT_SYMBOL_GPL(synchronize_rcu);
 

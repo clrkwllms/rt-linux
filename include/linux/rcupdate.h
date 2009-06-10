@@ -275,5 +275,49 @@ static inline void rcu_qsctr_inc(int cpu)
 	per_cpu(rcu_data_passed_quiesc, cpu) = 1;
 }
 
+struct dentry;
+
+#ifdef CONFIG_PREEMPT_RCU_BOOST
+extern void init_rcu_boost_late(void);
+extern void rcu_boost_readers(void);
+extern void rcu_unboost_readers(void);
+extern void __rcu_preempt_boost(void);
+#ifdef CONFIG_RCU_TRACE
+extern int rcu_trace_boost_create(struct dentry *rcudir);
+extern void rcu_trace_boost_destroy(void);
+#endif /* CONFIG_RCU_TRACE */
+#define rcu_preempt_boost() /* cpp to avoid #include hell. */ \
+	do { \
+		if (unlikely(current->rcu_read_lock_nesting > 0)) \
+			__rcu_preempt_boost(); \
+	} while (0)
+extern void __rcu_preempt_unboost(void);
+#else /* #ifdef CONFIG_PREEMPT_RCU_BOOST */
+static inline void init_rcu_boost_late(void)
+{
+}
+static inline void rcu_preempt_boost(void)
+{
+}
+static inline void __rcu_preempt_unboost(void)
+{
+}
+static inline void rcu_boost_readers(void)
+{
+}
+static inline void rcu_unboost_readers(void)
+{
+}
+#ifdef CONFIG_RCU_TRACE
+static inline int rcu_trace_boost_create(struct dentry *rcudir)
+{
+	return 0;
+}
+static inline void rcu_trace_boost_destroy(void)
+{
+}
+#endif /* CONFIG_RCU_TRACE */
+#endif /* #else #ifdef CONFIG_PREEMPT_RCU_BOOST */
+
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUPDATE_H */

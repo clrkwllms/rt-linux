@@ -585,6 +585,19 @@ struct signal_struct {
 #define SIGNAL_STOP_CONTINUED	0x00000004 /* SIGCONT since WCONTINUED reap */
 #define SIGNAL_GROUP_EXIT	0x00000008 /* group exit in progress */
 
+#ifdef CONFIG_PREEMPT_RCU_BOOST
+#define set_rcu_prio(p, prio) /* cpp to avoid #include hell */ \
+	do { \
+		(p)->rcu_prio = (prio); \
+	} while (0)
+#define get_rcu_prio(p) (p)->rcu_prio  /* cpp to avoid #include hell */
+#else /* #ifdef CONFIG_PREEMPT_RCU_BOOST */
+static inline void set_rcu_prio(struct task_struct *p, int prio)
+{
+}
+#define get_rcu_prio(p) (MAX_PRIO)  /* cpp to use MAX_PRIO before it's defined */
+#endif /* #else #ifdef CONFIG_PREEMPT_RCU_BOOST */
+
 /*
  * Some day this will be a full-fledged user tracking system..
  */
@@ -1008,6 +1021,9 @@ struct task_struct {
 #endif
 
 	int prio, static_prio, normal_prio;
+#ifdef CONFIG_PREEMPT_RCU_BOOST
+	int rcu_prio;
+#endif
 	struct list_head run_list;
 	const struct sched_class *sched_class;
 	struct sched_entity se;
@@ -1044,6 +1060,12 @@ struct task_struct {
 
 #if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
 	struct sched_info sched_info;
+#endif
+#ifdef CONFIG_PREEMPT_RCU_BOOST
+	struct rcu_boost_dat *rcub_rbdp;
+	enum rcu_boost_state rcub_state;
+	struct list_head rcub_entry;
+	unsigned long rcu_preempt_counter;
 #endif
 
 	struct list_head tasks;

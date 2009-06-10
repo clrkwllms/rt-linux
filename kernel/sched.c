@@ -3850,6 +3850,8 @@ asmlinkage void __sched __schedule(void)
 	struct rq *rq;
 	int cpu;
 
+	rcu_preempt_boost();
+
 	preempt_disable();
 	cpu = smp_processor_id();
 	rq = cpu_rq(cpu);

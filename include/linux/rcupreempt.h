@@ -42,6 +42,26 @@
 #include <linux/cpumask.h>
 #include <linux/seqlock.h>
 
+#ifdef CONFIG_PREEMPT_RCU_BOOST
+/*
+ * Task state with respect to being RCU-boosted.  This state is changed
+ * by the task itself in response to the following three events:
+ * 1. Preemption (or block on lock) while in RCU read-side critical section.
+ * 2. Outermost rcu_read_unlock() for blocked RCU read-side critical section.
+ *
+ * The RCU-boost task also updates the state when boosting priority.
+ */
+enum rcu_boost_state {
+	RCU_BOOST_IDLE = 0,	   /* Not yet blocked if in RCU read-side. */
+	RCU_BOOST_BLOCKED = 1,	   /* Blocked from RCU read-side. */
+	RCU_BOOSTED = 2,	   /* Boosting complete. */
+	RCU_BOOST_INVALID = 3,	   /* For bogus state sightings. */
+};
+
+#define N_RCU_BOOST_STATE (RCU_BOOST_INVALID + 1)
+
+#endif /* #ifdef CONFIG_PREEMPT_RCU_BOOST */
+
 /*
  * Someone might want to pass call_rcu_bh as a function pointer.
  * So this needs to just be a rename and not a macro function.

@@ -157,6 +157,19 @@ config PREEMPT_RCU
 
 endchoice
 
+config PREEMPT_RCU_BOOST
+	bool "Enable priority boosting of RCU read-side critical sections"
+	depends on PREEMPT_RCU
+	help
+	  This option permits priority boosting of RCU read-side critical
+	  sections tat have been preempted and a RT process is waiting
+	  on a synchronize_rcu.
+
+	  An RCU thread is also created that periodically wakes up and
+	  performs a synchronize_rcu to make sure that all readers eventually
+	  do complete to prevent an indefinite delay of grace periods and
+	  possible OOM problems.
+
 config RCU_TRACE
 	bool "Enable tracing for RCU - currently stats in debugfs"
 	select DEBUG_FS

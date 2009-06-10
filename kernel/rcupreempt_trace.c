@@ -296,8 +296,14 @@ static int rcupreempt_debugfs_init(void)
 						NULL, &rcuctrs_fops);
 	if (!ctrsdir)
 		goto free_out;
+
+	if (!rcu_trace_boost_create(rcudir))
+		goto free_out;
+
 	return 0;
 free_out:
+	if (ctrsdir)
+		debugfs_remove(ctrsdir);
 	if (statdir)
 		debugfs_remove(statdir);
 	if (gpdir)
@@ -323,6 +329,7 @@ static int __init rcupreempt_trace_init(void)
 
 static void __exit rcupreempt_trace_cleanup(void)
 {
+	rcu_trace_boost_destroy();
 	debugfs_remove(statdir);
 	debugfs_remove(gpdir);
 	debugfs_remove(ctrsdir);
