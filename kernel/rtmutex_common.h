@@ -123,29 +123,31 @@ static inline unsigned long rt_mutex_owner_pending(struct rt_mutex *lock)
 #define RT_RWLOCK_WRITER	2UL
 #define RT_RWLOCK_MASKALL	3UL
 
-/* used as reader owner of the mutex */
-#define RT_RW_READER		(struct task_struct *)0x100
-
 /* used when a writer releases the lock with waiters */
 /*   pending owner is a reader */
-#define RT_RW_PENDING_READ	(struct task_struct *)0x200
+#define RT_RWLOCK_PENDING_READ	((struct task_struct *)0x200)
 /*   pending owner is a writer */
-#define RT_RW_PENDING_WRITE	(struct task_struct *)0x400
+#define RT_RWLOCK_PENDING_WRITE	((struct task_struct *)0x400)
 /* Either of the above is true */
-#define RT_RW_PENDING_MASK	(0x600 | RT_RWLOCK_MASKALL)
+#define RT_RWLOCK_PENDING_MASK	\
+	((unsigned long) RT_RWLOCK_PENDING_READ | \
+	 (unsigned long) RT_RWLOCK_PENDING_WRITE | RT_RWLOCK_MASKALL)
+
+/* used as reader owner of the rt_mutex inside of the rw_mutex */
+#define RT_RW_READER		(struct task_struct *)0x100
 
 /* Return true if lock is not owned but has pending owners */
 static inline int rt_rwlock_pending(struct rw_mutex *rwm)
 {
 	unsigned long owner = (unsigned long)rwm->owner;
-	return (owner & RT_RW_PENDING_MASK) == owner;
+	return (owner & RT_RWLOCK_PENDING_MASK) == owner;
 }
 
 static inline int rt_rwlock_pending_writer(struct rw_mutex *rwm)
 {
 	unsigned long owner = (unsigned long)rwm->owner;
 	return rt_rwlock_pending(rwm) &&
-		(owner & (unsigned long)RT_RW_PENDING_WRITE);
+		(owner & (unsigned long)RT_RWLOCK_PENDING_WRITE);
 }
 
 static inline struct task_struct *rt_rwlock_owner(struct rw_mutex *rwm)
