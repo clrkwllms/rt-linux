@@ -21,49 +21,55 @@
  * m68k version by Andreas Schwab
  */
 
+#ifndef CONFIG_PREEMPT_RT
+# define compat_semaphore semaphore
+#endif
 
-struct semaphore {
+struct compat_semaphore {
 	atomic_t count;
 	atomic_t waking;
 	wait_queue_head_t wait;
 };
 
-#define __SEMAPHORE_INITIALIZER(name, n)				\
+#define __COMPAT_SEMAPHORE_INITIALIZER(name, n)				\
 {									\
 	.count		= ATOMIC_INIT(n),				\
 	.waking		= ATOMIC_INIT(0),				\
 	.wait		= __WAIT_QUEUE_HEAD_INITIALIZER((name).wait)	\
 }
 
-#define __DECLARE_SEMAPHORE_GENERIC(name,count) \
-	struct semaphore name = __SEMAPHORE_INITIALIZER(name,count)
+#define __COMPAT_DECLARE_SEMAPHORE_GENERIC(name,count) \
+	struct compat_semaphore name = __COMPAT_SEMAPHORE_INITIALIZER(name,count)
 
-#define DECLARE_MUTEX(name) __DECLARE_SEMAPHORE_GENERIC(name,1)
+#define COMPAT_DECLARE_MUTEX(name) __COMPAT_DECLARE_SEMAPHORE_GENERIC(name,1)
 
-static inline void sema_init (struct semaphore *sem, int val)
+static inline void compat_sema_init (struct compat_semaphore *sem, int val)
 {
-	*sem = (struct semaphore)__SEMAPHORE_INITIALIZER(*sem, val);
+	*sem = (struct compat_semaphore)__COMPAT_SEMAPHORE_INITIALIZER(*sem, val);
 }
 
-static inline void init_MUTEX (struct semaphore *sem)
+static inline void compat_init_MUTEX (struct compat_semaphore *sem)
 {
-	sema_init(sem, 1);
+	compat_sema_init(sem, 1);
 }
 
-static inline void init_MUTEX_LOCKED (struct semaphore *sem)
+static inline void compat_init_MUTEX_LOCKED (struct compat_semaphore *sem)
 {
-	sema_init(sem, 0);
+	compat_sema_init(sem, 0);
 }
 
-asmlinkage void __down_failed(void /* special register calling convention */);
-asmlinkage int  __down_failed_interruptible(void  /* params in registers */);
-asmlinkage int  __down_failed_trylock(void  /* params in registers */);
-asmlinkage void __up_wakeup(void /* special register calling convention */);
+asmlinkage void __compat_down_failed(void /* special register calling convention */);
+asmlinkage int  __compat_down_failed_interruptible(void  /* params in registers */);
+asmlinkage int  __compat_down_failed_trylock(void  /* params in registers */);
+asmlinkage void __compat_up_wakeup(void /* special register calling convention */);
 
-asmlinkage void __down(struct semaphore * sem);
-asmlinkage int  __down_interruptible(struct semaphore * sem);
-asmlinkage int  __down_trylock(struct semaphore * sem);
-asmlinkage void __up(struct semaphore * sem);
+asmlinkage void __compat_down(struct compat_semaphore * sem);
+asmlinkage int  __compat_down_interruptible(struct compat_semaphore * sem);
+asmlinkage int  __compat_down_trylock(struct compat_semaphore * sem);
+asmlinkage void __compat_up(struct compat_semaphore * sem);
+
+extern int compat_sem_is_locked(struct compat_semaphore *sem);
+#define compat_sema_count(sem) atomic_read(&(sem)->count)
 
 extern spinlock_t semaphore_wake_lock;
 
@@ -72,7 +78,7 @@ extern spinlock_t semaphore_wake_lock;
  * "down_failed" is a special asm handler that calls the C
  * routine that actually waits. See arch/m68k/lib/semaphore.S
  */
-static inline void down(struct semaphore * sem)
+static inline void compat_down(struct compat_semaphore * sem)
 {
 	might_sleep();
 	__asm__ __volatile__(
@@ -87,7 +93,7 @@ static inline void down(struct semaphore * sem)
 		: "cc", "%a0", "%a1", "memory");
 }
 
-static inline int down_interruptible(struct semaphore * sem)
+static inline int compat_down_interruptible(struct compat_semaphore * sem)
 {
 	int ret;
 
@@ -106,9 +112,9 @@ static inline int down_interruptible(struct semaphore * sem)
 	return(ret);
 }
 
-static inline int down_trylock(struct semaphore * sem)
+static inline int compat_down_trylock(struct compat_semaphore * sem)
 {
-	register struct semaphore *sem1 __asm__ ("%a1") = sem;
+	register struct compat_semaphore *sem1 __asm__ ("%a1") = sem;
 	register int result __asm__ ("%d0");
 
 	__asm__ __volatile__(
@@ -134,7 +140,7 @@ static inline int down_trylock(struct semaphore * sem)
  * The default case (no contention) will result in NO
  * jumps for both down() and up().
  */
-static inline void up(struct semaphore * sem)
+static inline void compat_up(struct compat_semaphore * sem)
 {
 	__asm__ __volatile__(
 		"| atomic up operation\n\t"
@@ -147,6 +153,8 @@ static inline void up(struct semaphore * sem)
 		: "g" (sem)
 		: "cc", "%a0", "%a1", "memory");
 }
+
+#include <linux/semaphore.h>
 
 #endif /* __ASSEMBLY__ */
 

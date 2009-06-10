@@ -13,12 +13,12 @@
 /*
  * These two _must_ execute atomically wrt each other.
  */
-static inline void wake_one_more(struct semaphore * sem)
+static inline void wake_one_more(struct compat_semaphore * sem)
 {
 	atomic_inc(&sem->waking);
 }
 
-static inline int waking_non_zero(struct semaphore *sem)
+static inline int waking_non_zero(struct compat_semaphore *sem)
 {
 	int ret;
 	unsigned long flags;
@@ -39,7 +39,7 @@ static inline int waking_non_zero(struct semaphore *sem)
  *	0	go to sleep
  *	-EINTR	interrupted
  */
-static inline int waking_non_zero_interruptible(struct semaphore *sem,
+static inline int waking_non_zero_interruptible(struct compat_semaphore *sem,
 						struct task_struct *tsk)
 {
 	int ret;
@@ -63,7 +63,7 @@ static inline int waking_non_zero_interruptible(struct semaphore *sem,
  *	1	failed to lock
  *	0	got the lock
  */
-static inline int waking_non_zero_trylock(struct semaphore *sem)
+static inline int waking_non_zero_trylock(struct compat_semaphore *sem)
 {
 	int ret;
 	unsigned long flags;

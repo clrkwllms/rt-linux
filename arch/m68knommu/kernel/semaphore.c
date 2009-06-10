@@ -42,7 +42,7 @@ spinlock_t semaphore_wake_lock;
  * critical part is the inline stuff in <asm/semaphore.h>
  * where we want to avoid any extra jumps and calls.
  */
-void __up(struct semaphore *sem)
+void __compat_up(struct compat_semaphore *sem)
 {
 	wake_one_more(sem);
 	wake_up(&sem->wait);
@@ -96,7 +96,7 @@ void __up(struct semaphore *sem)
 	current->state = TASK_RUNNING;		\
 	remove_wait_queue(&sem->wait, &wait);
 
-void __sched __down(struct semaphore * sem)
+void __sched __compat_down(struct compat_semaphore * sem)
 {
 	DECLARE_WAITQUEUE(wait, current);
 
@@ -107,7 +107,7 @@ void __sched __down(struct semaphore * sem)
 	DOWN_TAIL(TASK_UNINTERRUPTIBLE)
 }
 
-int __sched __down_interruptible(struct semaphore * sem)
+int __sched __compat_down_interruptible(struct compat_semaphore * sem)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	int ret = 0;
@@ -127,7 +127,7 @@ int __sched __down_interruptible(struct semaphore * sem)
 	return ret;
 }
 
-int __down_trylock(struct semaphore * sem)
+int __compat_down_trylock(struct compat_semaphore * sem)
 {
 	return waking_non_zero_trylock(sem);
 }

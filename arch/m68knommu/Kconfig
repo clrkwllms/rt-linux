@@ -29,6 +29,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default n
 
+config ASM_SEMAPHORES
+	bool
+	default y
+
 config ARCH_HAS_ILOG2_U32
 	bool
 	default n
