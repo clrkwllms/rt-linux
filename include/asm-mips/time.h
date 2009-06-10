@@ -19,8 +19,6 @@
 #include <linux/clockchips.h>
 #include <linux/clocksource.h>
 
-extern raw_spinlock_t rtc_lock;
-
 /*
  * RTC ops.  By default, they point to weak no-op RTC functions.
  *	rtc_mips_set_time - reverse the above translation and set time to RTC.
