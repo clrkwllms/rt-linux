@@ -240,7 +240,7 @@ static spinlock_t	*rt_hash_locks;
 			spin_lock_init(&rt_hash_locks[i]); \
 		}
 #else
-# define rt_hash_lock_addr(slot) NULL
+# define rt_hash_lock_addr(slot) ((spinlock_t *)NULL)
 # define rt_hash_lock_init()
 #endif
 
