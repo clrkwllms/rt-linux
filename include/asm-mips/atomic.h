@@ -171,7 +171,9 @@ static __inline__ int atomic_add_return(int i, atomic_t * v)
 		: "=&r" (result), "=&r" (temp), "=m" (v->counter)
 		: "Ir" (i), "m" (v->counter)
 		: "memory");
-	} else {
+	}
+#if !defined(CONFIG_NO_SPINLOCK) && !defined(CONFIG_PREEMPT_RT)
+	else {
 		unsigned long flags;
 
 		raw_local_irq_save(flags);
@@ -180,6 +182,7 @@ static __inline__ int atomic_add_return(int i, atomic_t * v)
 		v->counter = result;
 		raw_local_irq_restore(flags);
 	}
+#endif
 
 	smp_llsc_mb();
 
@@ -223,7 +226,9 @@ static __inline__ int atomic_sub_return(int i, atomic_t * v)
 		: "=&r" (result), "=&r" (temp), "=m" (v->counter)
 		: "Ir" (i), "m" (v->counter)
 		: "memory");
-	} else {
+	}
+#if !defined(CONFIG_NO_SPINLOCK) && !defined(CONFIG_PREEMPT_RT)
+	else {
 		unsigned long flags;
 
 		raw_local_irq_save(flags);
@@ -232,6 +237,7 @@ static __inline__ int atomic_sub_return(int i, atomic_t * v)
 		v->counter = result;
 		raw_local_irq_restore(flags);
 	}
+#endif
 
 	smp_llsc_mb();
 
@@ -291,7 +297,9 @@ static __inline__ int atomic_sub_if_positive(int i, atomic_t * v)
 		: "=&r" (result), "=&r" (temp), "=m" (v->counter)
 		: "Ir" (i), "m" (v->counter)
 		: "memory");
-	} else {
+	}
+#if !defined(CONFIG_NO_SPINLOCK) && !defined(CONFIG_PREEMPT_RT)
+	else {
 		unsigned long flags;
 
 		raw_local_irq_save(flags);
@@ -301,6 +309,7 @@ static __inline__ int atomic_sub_if_positive(int i, atomic_t * v)
 			v->counter = result;
 		raw_local_irq_restore(flags);
 	}
+#endif
 
 	smp_llsc_mb();
 
@@ -552,7 +561,9 @@ static __inline__ long atomic64_add_return(long i, atomic64_t * v)
 		: "=&r" (result), "=&r" (temp), "=m" (v->counter)
 		: "Ir" (i), "m" (v->counter)
 		: "memory");
-	} else {
+	}
+#if !defined(CONFIG_NO_SPINLOCK) && !defined(CONFIG_PREEMPT_RT)
+	else {
 		unsigned long flags;
 
 		raw_local_irq_save(flags);
@@ -561,6 +572,8 @@ static __inline__ long atomic64_add_return(long i, atomic64_t * v)
 		v->counter = result;
 		raw_local_irq_restore(flags);
 	}
+#endif
+#endif
 
 	smp_llsc_mb();
 
@@ -604,7 +617,9 @@ static __inline__ long atomic64_sub_return(long i, atomic64_t * v)
 		: "=&r" (result), "=&r" (temp), "=m" (v->counter)
 		: "Ir" (i), "m" (v->counter)
 		: "memory");
-	} else {
+	}
+#if !defined(CONFIG_NO_SPINLOCK) && !defined(CONFIG_PREEMPT_RT)
+	else {
 		unsigned long flags;
 
 		raw_local_irq_save(flags);
@@ -682,6 +697,7 @@ static __inline__ long atomic64_sub_if_positive(long i, atomic64_t * v)
 			v->counter = result;
 		raw_local_irq_restore(flags);
 	}
+#endif
 
 	smp_llsc_mb();
 

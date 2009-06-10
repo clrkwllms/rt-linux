@@ -24,12 +24,20 @@
 
 #ifdef __KERNEL__
 
-#include <asm/atomic.h>
-#include <asm/system.h>
 #include <linux/wait.h>
 #include <linux/rwsem.h>
 
-struct semaphore {
+/*
+ * On !PREEMPT_RT all semaphores are compat:
+ */
+#ifndef CONFIG_PREEMPT_RT
+# define compat_semaphore semaphore
+#endif
+
+#include <asm/atomic.h>
+#include <asm/system.h>
+
+struct compat_semaphore {
 	/*
 	 * Note that any negative value of count is equivalent to 0,
 	 * but additionally indicates that some process(es) might be
@@ -78,30 +86,34 @@ static inline void down(struct semaphore * sem)
 	 * Try to get the semaphore, take the slow path if we fail.
 	 */
 	if (unlikely(atomic_dec_return(&sem->count) < 0))
-		__down(sem);
+		__compat_down(sem);
 }
 
-static inline int down_interruptible(struct semaphore * sem)
+static inline int compat_down_interruptible(struct compat_semaphore * sem)
 {
 	int ret = 0;
 
 	might_sleep();
 
 	if (unlikely(atomic_dec_return(&sem->count) < 0))
-		ret = __down_interruptible(sem);
+		ret = __compat_down_interruptible(sem);
 	return ret;
 }
 
-static inline int down_trylock(struct semaphore * sem)
+static inline int compat_down_trylock(struct compat_semaphore * sem)
 {
 	return atomic_dec_if_positive(&sem->count) < 0;
 }
 
-static inline void up(struct semaphore * sem)
+static inline void compat_up(struct compat_semaphore * sem)
 {
 	if (unlikely(atomic_inc_return(&sem->count) <= 0))
-		__up(sem);
+		__compat_up(sem);
 }
+
+#define compat_sema_count(sem) atomic_read(&(sem)->count)
+
+#include <linux/semaphore.h>
 
 #endif /* __KERNEL__ */
 
