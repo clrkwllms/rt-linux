@@ -84,7 +84,7 @@ static int console_locked, console_suspended;
  * It is also used in interesting ways to provide interlocking in
  * release_console_sem().
  */
-static DEFINE_SPINLOCK(logbuf_lock);
+static DEFINE_RAW_SPINLOCK(logbuf_lock);
 
 #define LOG_BUF_MASK	(log_buf_len-1)
 #define LOG_BUF(idx) (log_buf[(idx) & LOG_BUF_MASK])
@@ -435,7 +435,7 @@ static void __call_console_drivers(unsigned long start, unsigned long end)
 
 	for (con = console_drivers; con; con = con->next) {
 		if ((con->flags & CON_ENABLED) && con->write &&
-				(cpu_online(smp_processor_id()) ||
+				(cpu_online(raw_smp_processor_id()) ||
 				(con->flags & CON_ANYTIME)))
 			con->write(con, &LOG_BUF(start), end - start);
 	}
@@ -551,6 +551,7 @@ static void zap_locks(void)
 	spin_lock_init(&logbuf_lock);
 	/* And make sure that we print immediately */
 	init_MUTEX(&console_sem);
+	zap_rt_locks();
 }
 
 #if defined(CONFIG_PRINTK_TIME)
@@ -649,6 +650,7 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	lockdep_off();
 	spin_lock(&logbuf_lock);
 	printk_cpu = smp_processor_id();
+	preempt_enable();
 
 	/* Emit the output into the temporary buffer */
 	printed_len = vscnprintf(printk_buf, sizeof(printk_buf), fmt, args);
@@ -718,6 +720,8 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 		console_locked = 1;
 		printk_cpu = UINT_MAX;
 		spin_unlock(&logbuf_lock);
+		lockdep_on();
+		local_irq_restore(flags);
 
 		/*
 		 * Console drivers may assume that per-cpu resources have
@@ -725,7 +729,7 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 		 * being able to cope (CON_ANYTIME) don't call them until
 		 * this CPU is officially up.
 		 */
-		if (cpu_online(smp_processor_id()) || have_callable_console()) {
+		if (cpu_online(raw_smp_processor_id()) || have_callable_console()) {
 			console_may_schedule = 0;
 			release_console_sem();
 		} else {
@@ -733,8 +737,6 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 			console_locked = 0;
 			up(&console_sem);
 		}
-		lockdep_on();
-		raw_local_irq_restore(flags);
 	} else {
 		/*
 		 * Someone else owns the drivers.  We drop the spinlock, which
@@ -747,7 +749,6 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 		raw_local_irq_restore(flags);
 	}
 
-	preempt_enable();
 	return printed_len;
 }
 EXPORT_SYMBOL(printk);
@@ -971,13 +972,31 @@ void release_console_sem(void)
 		_con_start = con_start;
 		_log_end = log_end;
 		con_start = log_end;		/* Flush */
+		/*
+		 * on PREEMPT_RT, call console drivers with
+		 * interrupts enabled (if printk was called
+		 * with interrupts disabled):
+		 */
+#ifdef CONFIG_PREEMPT_RT
+		spin_unlock_irqrestore(&logbuf_lock, flags);
+#else
 		spin_unlock(&logbuf_lock);
+#endif
 		call_console_drivers(_con_start, _log_end);
-		local_irq_restore(flags);
+		local_irq_restore_nort(flags);
 	}
 	console_locked = 0;
-	up(&console_sem);
 	spin_unlock_irqrestore(&logbuf_lock, flags);
+	up(&console_sem);
+	/*
+	 * On PREEMPT_RT kernels __wake_up may sleep, so wake syslogd
+	 * up only if we are in a preemptible section. We normally dont
+	 * printk from non-preemptible sections so this is for the emergency
+	 * case only.
+	 */
+#ifdef CONFIG_PREEMPT_RT
+	if (!in_atomic() && !irqs_disabled())
+#endif
 	if (wake_klogd)
 		wake_up_klogd();
 }
@@ -1244,7 +1263,7 @@ void tty_write_message(struct tty_struct *tty, char *msg)
  */
 int __printk_ratelimit(int ratelimit_jiffies, int ratelimit_burst)
 {
-	static DEFINE_SPINLOCK(ratelimit_lock);
+	static DEFINE_RAW_SPINLOCK(ratelimit_lock);
 	static unsigned long toks = 10 * 5 * HZ;
 	static unsigned long last_msg;
 	static int missed;
@@ -1284,6 +1303,23 @@ int printk_ratelimit(void)
 				printk_ratelimit_burst);
 }
 EXPORT_SYMBOL(printk_ratelimit);
+
+static DEFINE_RAW_SPINLOCK(warn_lock);
+
+void __WARN_ON(const char *func, const char *file, const int line)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&warn_lock, flags);
+	printk("%s/%d[CPU#%d]: BUG in %s at %s:%d\n",
+		current->comm, current->pid, raw_smp_processor_id(),
+		func, file, line);
+	dump_stack();
+	spin_unlock_irqrestore(&warn_lock, flags);
+}
+
+EXPORT_SYMBOL(__WARN_ON);
+
 
 /**
  * printk_timed_ratelimit - caller-controlled printk ratelimiting
