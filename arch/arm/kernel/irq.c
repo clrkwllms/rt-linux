@@ -37,6 +37,8 @@
 #include <linux/kallsyms.h>
 #include <linux/proc_fs.h>
 
+#include <linux/ftrace.h>
+
 #include <asm/system.h>
 #include <asm/mach/time.h>
 
@@ -112,6 +114,8 @@ asmlinkage void __exception asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 	struct irq_desc *desc = irq_desc + irq;
+
+	ftrace_event_irq(irq, user_mode(regs), instruction_pointer(regs));
 
 	/*
 	 * Some hardware gives randomly wrong interrupts.  Rather
