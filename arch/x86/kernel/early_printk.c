@@ -198,7 +198,7 @@ static int early_console_initialized = 0;
 
 void early_printk(const char *fmt, ...)
 {
-	char buf[512];
+	static char buf[512];
 	int n;
 	va_list ap;
 

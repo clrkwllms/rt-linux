@@ -8,14 +8,20 @@
 
 static inline void __flush_tlb(void)
 {
+	preempt_disable();
 	write_cr3(read_cr3());
+	preempt_enable();
 }
 
 static inline void __flush_tlb_all(void)
 {
-	unsigned long cr4 = read_cr4();
+	unsigned long cr4;
+
+	preempt_disable();
+	cr4 = read_cr4();
 	write_cr4(cr4 & ~X86_CR4_PGE);	/* clear PGE */
 	write_cr4(cr4);			/* write old PGE again and flush TLBs */
+	preempt_enable();
 }
 
 #define __flush_tlb_one(addr) \

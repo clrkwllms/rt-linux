@@ -220,7 +220,7 @@ void dump_trace(struct task_struct *tsk, struct pt_regs *regs,
 		unsigned long *stack,
 		const struct stacktrace_ops *ops, void *data)
 {
-	const unsigned cpu = get_cpu();
+	const unsigned cpu = raw_smp_processor_id();
 	unsigned long *irqstack_end = (unsigned long*)cpu_pda(cpu)->irqstackptr;
 	unsigned used = 0;
 	struct thread_info *tinfo;
@@ -311,7 +311,6 @@ void dump_trace(struct task_struct *tsk, struct pt_regs *regs,
 	tinfo = task_thread_info(tsk);
 	HANDLE_STACK (valid_stack_ptr(tinfo, stack));
 #undef HANDLE_STACK
-	put_cpu();
 }
 EXPORT_SYMBOL(dump_trace);
 
@@ -361,7 +360,7 @@ _show_stack(struct task_struct *tsk, struct pt_regs *regs, unsigned long *rsp)
 {
 	unsigned long *stack;
 	int i;
-	const int cpu = smp_processor_id();
+	const int cpu = raw_smp_processor_id();
 	unsigned long *irqstack_end = (unsigned long *) (cpu_pda(cpu)->irqstackptr);
 	unsigned long *irqstack = (unsigned long *) (cpu_pda(cpu)->irqstackptr - IRQSTACKSIZE);
 
@@ -473,7 +472,7 @@ void out_of_line_bug(void)
 EXPORT_SYMBOL(out_of_line_bug);
 #endif
 
-static raw_spinlock_t die_lock = __RAW_SPIN_LOCK_UNLOCKED;
+static raw_spinlock_t die_lock = RAW_SPIN_LOCK_UNLOCKED(die_lock);
 static int die_owner = -1;
 static unsigned int die_nest_count;
 
@@ -487,11 +486,11 @@ unsigned __kprobes long oops_begin(void)
 	/* racy, but better than risking deadlock. */
 	raw_local_irq_save(flags);
 	cpu = smp_processor_id();
-	if (!__raw_spin_trylock(&die_lock)) {
+	if (!spin_trylock(&die_lock)) {
 		if (cpu == die_owner) 
 			/* nested oops. should stop eventually */;
 		else
-			__raw_spin_lock(&die_lock);
+			spin_lock(&die_lock);
 	}
 	die_nest_count++;
 	die_owner = cpu;
@@ -507,7 +506,7 @@ void __kprobes oops_end(unsigned long flags)
 	die_nest_count--;
 	if (!die_nest_count)
 		/* Nest count reaches zero, release the lock. */
-		__raw_spin_unlock(&die_lock);
+		spin_unlock(&die_lock);
 	raw_local_irq_restore(flags);
 	if (panic_on_oops)
 		panic("Fatal exception");

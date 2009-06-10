@@ -131,7 +131,7 @@ extern int sis_apic_bug; /* dummy */
 
 void enable_NMI_through_LVT0(void);
 
-extern spinlock_t i8259A_lock;
+extern raw_spinlock_t i8259A_lock;
 
 extern int timer_over_8254;
 

@@ -160,8 +160,8 @@ static inline void __raw_write_unlock(__raw_rwlock_t *rw)
 				: "=m" (rw->lock) : : "memory");
 }
 
-#define _raw_spin_relax(lock)	cpu_relax()
-#define _raw_read_relax(lock)	cpu_relax()
-#define _raw_write_relax(lock)	cpu_relax()
+#define __raw_spin_relax(lock)	cpu_relax()
+#define __raw_read_relax(lock)	cpu_relax()
+#define __raw_write_relax(lock)	cpu_relax()
 
 #endif /* __ASM_SPINLOCK_H */

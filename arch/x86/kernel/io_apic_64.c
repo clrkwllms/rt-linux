@@ -91,8 +91,8 @@ int timer_over_8254 __initdata = 1;
 /* Where if anywhere is the i8259 connect in external int mode */
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
-static DEFINE_SPINLOCK(ioapic_lock);
-DEFINE_SPINLOCK(vector_lock);
+static DEFINE_RAW_SPINLOCK(ioapic_lock);
+DEFINE_RAW_SPINLOCK(vector_lock);
 
 /*
  * # of IRQ routing registers
@@ -205,6 +205,9 @@ static inline void io_apic_sync(unsigned int apic)
 		reg ACTION;						\
 		io_apic_modify(entry->apic, reg);			\
 		FINAL;							\
+		 /* Force POST flush by reading: */			\
+		reg = io_apic_read(entry->apic, 0x10 + R + pin*2);	\
+									\
 		if (!entry->next)					\
 			break;						\
 		entry = irq_2_pin + entry->next;			\
@@ -349,10 +352,8 @@ static void add_pin_to_irq(unsigned int irq, int apic, int pin)
 	static void name##_IO_APIC_irq (unsigned int irq)		\
 	__DO_ACTION(R, ACTION, FINAL)
 
-DO_ACTION( __mask,             0, |= 0x00010000, io_apic_sync(entry->apic) )
-						/* mask = 1 */
-DO_ACTION( __unmask,           0, &= 0xfffeffff, )
-						/* mask = 0 */
+DO_ACTION( __mask,             0, |= 0x00010000, ) /* mask = 1 */
+DO_ACTION( __unmask,           0, &= 0xfffeffff, ) /* mask = 0 */
 
 DO_ACTION( __pcix_mask,   0, &= 0xffff7fff, ) /* edge */
 DO_ACTION( __pcix_unmask, 0, = (reg & 0xfffeffff) | 0x00008000, ) /* level */
