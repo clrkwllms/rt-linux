@@ -443,6 +443,8 @@ static void rcu_offline_cpu(int cpu)
 static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 					struct rcu_data *rdp)
 {
+	unsigned long flags;
+
 	if (rdp->curlist && !rcu_batch_before(rcp->completed, rdp->batch)) {
 		*rdp->donetail = rdp->curlist;
 		rdp->donetail = rdp->curtail;
@@ -451,12 +453,12 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 	}
 
 	if (rdp->nxtlist && !rdp->curlist) {
-		local_irq_disable();
+		local_irq_save(flags);
 		rdp->curlist = rdp->nxtlist;
 		rdp->curtail = rdp->nxttail;
 		rdp->nxtlist = NULL;
 		rdp->nxttail = &rdp->nxtlist;
-		local_irq_enable();
+		local_irq_restore(flags);
 
 		/*
 		 * start the next batch of callbacks
@@ -483,7 +485,7 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 		rcu_do_batch(rdp);
 }
 
-static void rcu_process_callbacks(struct softirq_action *unused)
+void rcu_process_callbacks(struct softirq_action *unused)
 {
 	__rcu_process_callbacks(&rcu_ctrlblk, &__get_cpu_var(rcu_data));
 	__rcu_process_callbacks(&rcu_bh_ctrlblk, &__get_cpu_var(rcu_bh_data));
@@ -539,6 +541,17 @@ int rcu_needs_cpu(int cpu)
 
 	return (!!rdp->curlist || !!rdp_bh->curlist || rcu_pending(cpu) ||
 		rcu_needs_cpu_rt(cpu));
+}
+
+void rcu_advance_callbacks(int cpu, int user)
+{
+	if (user ||
+	    (idle_cpu(cpu) && !in_softirq() &&
+				hardirq_count() <= (1 << HARDIRQ_SHIFT))) {
+		rcu_qsctr_inc(cpu);
+		rcu_bh_qsctr_inc(cpu);
+	} else if (!in_softirq())
+		rcu_bh_qsctr_inc(cpu);
 }
 
 void rcu_check_callbacks(int cpu, int user)

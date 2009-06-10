@@ -99,5 +99,7 @@ static inline void rcu_exit_nohz(void)
 #define rcu_exit_nohz()		do { } while (0)
 #endif /* CONFIG_NO_HZ */
 
+extern void rcu_process_callbacks(struct softirq_action *unused);
+
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUPREEMPT_H */

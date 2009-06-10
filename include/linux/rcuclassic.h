@@ -92,5 +92,8 @@ static inline void rcu_bh_qsctr_inc(int cpu)
 extern void FASTCALL(call_rcu_classic(struct rcu_head *head,
 		     void (*func)(struct rcu_head *head)));
 
+struct softirq_action;
+extern void rcu_process_callbacks(struct softirq_action *unused);
+
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUCLASSIC_H */
