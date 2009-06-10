@@ -261,18 +261,48 @@ void free_pgd_range(struct mmu_gather **tlb,
 	} while (pgd++, addr = next, addr != end);
 }
 
+#ifdef CONFIG_IA64
+#define tlb_start_addr(tlb)	(tlb)->start_addr
+#define tlb_end_addr(tlb)	(tlb)->end_addr
+#else
+#define tlb_start_addr(tlb)	0UL	/* only ia64 really uses it */
+#define tlb_end_addr(tlb)	0UL	/* only ia64 really uses it */
+#endif
+
 void free_pgtables(struct mmu_gather **tlb, struct vm_area_struct *vma,
 		unsigned long floor, unsigned long ceiling)
 {
+#ifdef CONFIG_PREEMPT
+	struct vm_area_struct *unlink = vma;
+	int fullmm = (*tlb)->fullmm;
+
+	if (!vma)	/* Sometimes when exiting after an oops */
+		return;
+	if (vma->vm_next)
+		tlb_finish_mmu(*tlb, tlb_start_addr(*tlb), tlb_end_addr(*tlb));
+	/*
+	 * Hide vma from rmap and vmtruncate before freeeing pgtables,
+	 * with preemption enabled, except when unmapping just one area.
+	 */
+	while (unlink) {
+		anon_vma_unlink(unlink);
+		unlink_file_vma(unlink);
+		unlink = unlink->vm_next;
+	}
+	if (vma->vm_next)
+		*tlb = tlb_gather_mmu(vma->vm_mm, fullmm);
+#endif
 	while (vma) {
 		struct vm_area_struct *next = vma->vm_next;
 		unsigned long addr = vma->vm_start;
 
+#ifndef CONFIG_PREEMPT
 		/*
 		 * Hide vma from rmap and vmtruncate before freeing pgtables
 		 */
 		anon_vma_unlink(vma);
 		unlink_file_vma(vma);
+#endif
 
 		if (is_vm_hugetlb_page(vma)) {
 			hugetlb_free_pgd_range(tlb, addr, vma->vm_end,
@@ -285,8 +315,10 @@ void free_pgtables(struct mmu_gather **tlb, struct vm_area_struct *vma,
 			       && !is_vm_hugetlb_page(next)) {
 				vma = next;
 				next = vma->vm_next;
+#ifndef CONFIG_PREEMPT
 				anon_vma_unlink(vma);
 				unlink_file_vma(vma);
+#endif
 			}
 			free_pgd_range(tlb, addr, vma->vm_end,
 				floor, next? next->vm_start: ceiling);
