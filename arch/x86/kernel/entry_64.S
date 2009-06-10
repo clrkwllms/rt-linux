@@ -375,8 +375,8 @@ sysret_check:
 	/* Handle reschedules */
 	/* edx:	work, edi: workmask */	
 sysret_careful:
-	bt $TIF_NEED_RESCHED,%edx
-	jnc sysret_signal
+	testl $(_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED),%edx
+	jz sysret_signal
 	TRACE_IRQS_ON
 	sti
 	pushq %rdi
@@ -399,7 +399,7 @@ sysret_signal:
 	leaq -ARGOFFSET(%rsp),%rdi # &pt_regs -> arg1
 	xorl %esi,%esi # oldset -> arg2
 	call ptregscall_common
-1:	movl $_TIF_NEED_RESCHED,%edi
+1:	movl $(_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED),%edi
 	/* Use IRET because user could have changed frame. This
 	   works because ptregscall_common has called FIXUP_TOP_OF_STACK. */
 	cli
@@ -456,8 +456,8 @@ int_with_check:
 	/* First do a reschedule test. */
 	/* edx:	work, edi: workmask */
 int_careful:
-	bt $TIF_NEED_RESCHED,%edx
-	jnc  int_very_careful
+	testl $(_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED),%edx
+	jz int_very_careful
 	TRACE_IRQS_ON
 	sti
 	pushq %rdi
@@ -492,7 +492,7 @@ int_signal:
 	movq %rsp,%rdi		# &ptregs -> arg1
 	xorl %esi,%esi		# oldset -> arg2
 	call do_notify_resume
-1:	movl $_TIF_NEED_RESCHED,%edi	
+1:	movl $(_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED),%edi
 int_restore_rest:
 	RESTORE_REST
 	cli
@@ -698,8 +698,8 @@ bad_iret:
 	/* edi: workmask, edx: work */
 retint_careful:
 	CFI_RESTORE_STATE
-	bt    $TIF_NEED_RESCHED,%edx
-	jnc   retint_signal
+	testl $(_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED),%edx
+	jz    retint_signal
 	TRACE_IRQS_ON
 	sti
 	pushq %rdi
@@ -725,7 +725,7 @@ retint_signal:
 	RESTORE_REST
 	cli
 	TRACE_IRQS_OFF
-	movl $_TIF_NEED_RESCHED,%edi
+	movl $(_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED),%edi
 	GET_THREAD_INFO(%rcx)
 	jmp retint_check
 

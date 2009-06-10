@@ -17,10 +17,12 @@ EXPORT_SYMBOL(mcount);
 
 EXPORT_SYMBOL(kernel_thread);
 
-EXPORT_SYMBOL(__down_failed);
-EXPORT_SYMBOL(__down_failed_interruptible);
-EXPORT_SYMBOL(__down_failed_trylock);
-EXPORT_SYMBOL(__up_wakeup);
+#ifdef CONFIG_RWSEM_GENERIC_SPINLOCK
+EXPORT_SYMBOL(__compat_down_failed);
+EXPORT_SYMBOL(__compat_down_failed_interruptible);
+EXPORT_SYMBOL(__compat_down_failed_trylock);
+EXPORT_SYMBOL(__compat_up_wakeup);
+#endif
 
 EXPORT_SYMBOL(__get_user_1);
 EXPORT_SYMBOL(__get_user_2);

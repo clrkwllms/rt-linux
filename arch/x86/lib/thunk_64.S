@@ -40,11 +40,13 @@
 	thunk rwsem_wake_thunk,rwsem_wake
 	thunk rwsem_downgrade_thunk,rwsem_downgrade_wake
 #endif	
-	
-	thunk __down_failed,__down
-	thunk_retrax __down_failed_interruptible,__down_interruptible
-	thunk_retrax __down_failed_trylock,__down_trylock
-	thunk __up_wakeup,__up
+
+#ifdef CONFIG_RWSEM_GENERIC_SPINLOCK
+	thunk __compat_down_failed,__compat_down
+	thunk_retrax __compat_down_failed_interruptible,__compat_down_interruptible
+	thunk_retrax __compat_down_failed_trylock,__compat_down_trylock
+	thunk __compat_up_wakeup,__compat_up
+#endif
 
 #ifdef CONFIG_TRACE_IRQFLAGS
 	/* put return address in rdi (arg1) */
