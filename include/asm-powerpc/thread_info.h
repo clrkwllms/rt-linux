@@ -121,11 +121,11 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_RESTOREALL		11	/* Restore all regs (implies NOERROR) */
 #define TIF_NOERROR		12	/* Force successful syscall return */
 #define TIF_RESTORE_SIGMASK	13	/* Restore signal mask in do_signal */
-#define TIF_FREEZE		14	/* Freezing for suspend */
-#define TIF_RUNLATCH		15	/* Is the runlatch enabled? */
-#define TIF_ABI_PENDING		16	/* 32/64 bit switch needed */
 #define TIF_NEED_RESCHED_DELAYED \
-				17	/* reschedule on return to userspace */
+				14	/* reschedule on return to userspace */
+#define TIF_FREEZE		15	/* Freezing for suspend */
+#define TIF_RUNLATCH		16	/* Is the runlatch enabled? */
+#define TIF_ABI_PENDING		17	/* 32/64 bit switch needed */
 
 
 /* as above, but as bit values */
@@ -142,10 +142,10 @@ static inline struct thread_info *current_thread_info(void)
 #define _TIF_RESTOREALL		(1<<TIF_RESTOREALL)
 #define _TIF_NOERROR		(1<<TIF_NOERROR)
 #define _TIF_RESTORE_SIGMASK	(1<<TIF_RESTORE_SIGMASK)
+#define _TIF_NEED_RESCHED_DELAYED (1<<TIF_NEED_RESCHED_DELAYED)
 #define _TIF_FREEZE		(1<<TIF_FREEZE)
 #define _TIF_RUNLATCH		(1<<TIF_RUNLATCH)
 #define _TIF_ABI_PENDING	(1<<TIF_ABI_PENDING)
-#define _TIF_NEED_RESCHED_DELAYED (1<<TIF_NEED_RESCHED_DELAYED)
 
 #define _TIF_SYSCALL_T_OR_A	(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SECCOMP)
 
