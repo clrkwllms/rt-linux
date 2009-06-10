@@ -1402,7 +1402,7 @@ rt_read_slowlock(struct rw_mutex *rwm, int mtx)
 
 		debug_rt_mutex_print_deadlock(&waiter);
 
-		if (!mtx || waiter.task)
+		if (waiter.task)
 			schedule_rt_mutex(mutex);
 
 		spin_lock_irqsave(&mutex->wait_lock, flags);
@@ -1548,7 +1548,7 @@ rt_write_slowlock(struct rw_mutex *rwm, int mtx)
 
 		debug_rt_mutex_print_deadlock(&waiter);
 
-		if (!mtx || waiter.task)
+		if (waiter.task)
 			schedule_rt_mutex(mutex);
 
 		spin_lock_irqsave(&mutex->wait_lock, flags);
