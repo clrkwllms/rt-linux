@@ -181,11 +181,16 @@ unsigned long rt_nr_uninterruptible_cpu(int cpu)
 	return cpu_rq(cpu)->rt.rt_nr_uninterruptible;
 }
 
-static void enqueue_task_rt(struct rq *rq, struct task_struct *p, int wakeup)
+static void enqueue_task_rt(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct rt_prio_array *array = &rq->rt.active;
 
-	list_add_tail(&p->run_list, array->queue + p->prio);
+
+ 	if (unlikely(flags & ENQUEUE_HEAD))
+		list_add(&p->run_list, array->queue + p->prio);
+ 	else
+		list_add_tail(&p->run_list, array->queue + p->prio);
+
 	__set_bit(p->prio, array->bitmap);
 	inc_rt_tasks(p, rq);
 
@@ -196,7 +201,7 @@ static void enqueue_task_rt(struct rq *rq, struct task_struct *p, int wakeup)
 /*
  * Adding/removing a task to/from a priority array:
  */
-static void dequeue_task_rt(struct rq *rq, struct task_struct *p, int sleep)
+static void dequeue_task_rt(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct rt_prio_array *array = &rq->rt.active;
 
@@ -306,7 +311,7 @@ static void put_prev_task_rt(struct rq *rq, struct task_struct *p)
 #define RT_MAX_TRIES 3
 
 static int double_lock_balance(struct rq *this_rq, struct rq *busiest);
-static void deactivate_task(struct rq *rq, struct task_struct *p, int sleep);
+static void deactivate_task(struct rq *rq, struct task_struct *p, int flags);
 
 static int pick_rt_task(struct rq *rq, struct task_struct *p, int cpu)
 {

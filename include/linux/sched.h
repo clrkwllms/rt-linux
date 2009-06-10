@@ -897,11 +897,16 @@ struct uts_namespace;
 struct rq;
 struct sched_domain;
 
+#define ENQUEUE_WAKEUP	0x01
+#define ENQUEUE_HEAD	0x02
+
+#define DEQUEUE_SLEEP	0x01
+
 struct sched_class {
 	const struct sched_class *next;
 
-	void (*enqueue_task) (struct rq *rq, struct task_struct *p, int wakeup);
-	void (*dequeue_task) (struct rq *rq, struct task_struct *p, int sleep);
+	void (*enqueue_task) (struct rq *rq, struct task_struct *p, int flags);
+	void (*dequeue_task) (struct rq *rq, struct task_struct *p, int flags);
 	void (*yield_task) (struct rq *rq);
 	int  (*select_task_rq)(struct task_struct *p, int sync);
 

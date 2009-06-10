@@ -1046,7 +1046,7 @@ static const u32 prio_to_wmult[40] = {
  /*  15 */ 119304647, 148102320, 186737708, 238609294, 286331153,
 };
 
-static void activate_task(struct rq *rq, struct task_struct *p, int wakeup);
+static void activate_task(struct rq *rq, struct task_struct *p, int flags);
 
 /*
  * runqueue iterator, to support SMP load-balancing between different
@@ -1155,16 +1155,16 @@ static void set_load_weight(struct task_struct *p)
 	p->se.load.inv_weight = prio_to_wmult[p->static_prio - MAX_RT_PRIO];
 }
 
-static void enqueue_task(struct rq *rq, struct task_struct *p, int wakeup)
+static void enqueue_task(struct rq *rq, struct task_struct *p, int flags)
 {
 	sched_info_queued(p);
-	p->sched_class->enqueue_task(rq, p, wakeup);
+	p->sched_class->enqueue_task(rq, p, flags);
 	p->se.on_rq = 1;
 }
 
-static void dequeue_task(struct rq *rq, struct task_struct *p, int sleep)
+static void dequeue_task(struct rq *rq, struct task_struct *p, int flags)
 {
-	p->sched_class->dequeue_task(rq, p, sleep);
+	p->sched_class->dequeue_task(rq, p, flags);
 	p->se.on_rq = 0;
 }
 
@@ -1219,26 +1219,26 @@ static int effective_prio(struct task_struct *p)
 /*
  * activate_task - move a task to the runqueue.
  */
-static void activate_task(struct rq *rq, struct task_struct *p, int wakeup)
+static void activate_task(struct rq *rq, struct task_struct *p, int flags)
 {
 	if (p->state == TASK_UNINTERRUPTIBLE)
 		rq->nr_uninterruptible--;
 
 	ftrace_event_task_activate(p, cpu_of(rq));
-	enqueue_task(rq, p, wakeup);
+	enqueue_task(rq, p, flags);
 	inc_nr_running(p, rq);
 }
 
 /*
  * deactivate_task - remove a task from the runqueue.
  */
-static void deactivate_task(struct rq *rq, struct task_struct *p, int sleep)
+static void deactivate_task(struct rq *rq, struct task_struct *p, int flags)
 {
 	if (p->state == TASK_UNINTERRUPTIBLE)
 		rq->nr_uninterruptible++;
 
 	ftrace_event_task_deactivate(p, cpu_of(rq));
-	dequeue_task(rq, p, sleep);
+	dequeue_task(rq, p, flags);
 	dec_nr_running(p, rq);
 }
 
@@ -1759,7 +1759,7 @@ out_activate:
 	else
 		schedstat_inc(p, se.nr_wakeups_remote);
 	update_rq_clock(rq);
-	activate_task(rq, p, 1);
+	activate_task(rq, p, ENQUEUE_WAKEUP);
 	check_preempt_curr(rq, p);
 	success = 1;
 
@@ -3968,7 +3968,7 @@ asmlinkage void __sched __schedule(void)
 			prev->state = TASK_RUNNING;
 		} else {
 			touch_softlockup_watchdog();
-			deactivate_task(rq, prev, 1);
+			deactivate_task(rq, prev, DEQUEUE_SLEEP);
 		}
 		switch_count = &prev->nvcsw;
 	}
@@ -4431,7 +4431,7 @@ EXPORT_SYMBOL(sleep_on_timeout);
 void task_setprio(struct task_struct *p, int prio)
 {
 	unsigned long flags;
-	int oldprio, prev_resched, on_rq, running;
+	int oldprio, prev_resched, on_rq, running, down;
 	struct rq *rq;
 	const struct sched_class *prev_class = p->sched_class;
 
@@ -4472,6 +4472,7 @@ void task_setprio(struct task_struct *p, int prio)
 	else
 		p->sched_class = &fair_sched_class;
 
+ 	down = (prio > p->prio) ? ENQUEUE_HEAD : 0;
 	p->prio = prio;
 
 //	trace_special_pid(p->pid, __PRIO(oldprio), PRIO(p));
@@ -4480,7 +4481,7 @@ void task_setprio(struct task_struct *p, int prio)
 	if (running)
 		p->sched_class->set_curr_task(rq);
 	if (on_rq) {
-		enqueue_task(rq, p, 0);
+ 		enqueue_task(rq, p, down);
 		check_class_changed(rq, p, prev_class, oldprio, running);
 	}
 //	trace_special(prev_resched, _need_resched(), 0);
