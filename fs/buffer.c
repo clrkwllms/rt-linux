@@ -347,7 +347,7 @@ void invalidate_bdev(struct block_device *bdev)
 {
 	struct address_space *mapping = bdev->bd_inode->i_mapping;
 
-	if (mapping->nrpages == 0)
+	if (mapping_nrpages(mapping) == 0)
 		return;
 
 	invalidate_bh_lrus();

@@ -271,7 +271,7 @@ static inline void vn_atime_to_time_t(bhv_vnode_t *vp, time_t *tt)
  * Some useful predicates.
  */
 #define VN_MAPPED(vp)	mapping_mapped(vn_to_inode(vp)->i_mapping)
-#define VN_CACHED(vp)	(vn_to_inode(vp)->i_mapping->nrpages)
+#define VN_CACHED(vp)	mapping_nrpages(vn_to_inode(vp)->i_mapping)
 #define VN_DIRTY(vp)	mapping_tagged(vn_to_inode(vp)->i_mapping, \
 					PAGECACHE_TAG_DIRTY)
 

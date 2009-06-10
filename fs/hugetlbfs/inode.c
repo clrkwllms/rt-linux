@@ -368,7 +368,7 @@ static void truncate_hugepages(struct inode *inode, loff_t lstart)
 		}
 		huge_pagevec_release(&pvec);
 	}
-	BUG_ON(!lstart && mapping->nrpages);
+	BUG_ON(!lstart && mapping_nrpages(mapping));
 	hugetlb_unreserve_pages(inode, start, freed);
 }
 

@@ -120,7 +120,7 @@ int nfs_sync_mapping(struct address_space *mapping)
 {
 	int ret;
 
-	if (mapping->nrpages == 0)
+	if (mapping_nrpages(mapping) == 0)
 		return 0;
 	unmap_mapping_range(mapping, 0, 0, 0);
 	ret = filemap_write_and_wait(mapping);
@@ -160,7 +160,7 @@ void nfs_zap_caches(struct inode *inode)
 
 void nfs_zap_mapping(struct inode *inode, struct address_space *mapping)
 {
-	if (mapping->nrpages != 0) {
+	if (mapping_nrpages(mapping) != 0) {
 		spin_lock(&inode->i_lock);
 		NFS_I(inode)->cache_validity |= NFS_INO_INVALID_DATA;
 		spin_unlock(&inode->i_lock);
@@ -718,7 +718,7 @@ static int nfs_invalidate_mapping_nolock(struct inode *inode, struct address_spa
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 	
-	if (mapping->nrpages != 0) {
+	if (mapping_nrpages(mapping) != 0) {
 		int ret = invalidate_inode_pages2(mapping);
 		if (ret < 0)
 			return ret;

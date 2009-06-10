@@ -215,8 +215,8 @@ static void shmem_free_blocks(struct inode *inode, long pages)
  * We have to calculate the free blocks since the mm can drop
  * undirtied hole pages behind our back.
  *
- * But normally   info->alloced == inode->i_mapping->nrpages + info->swapped
- * So mm freed is info->alloced - (inode->i_mapping->nrpages + info->swapped)
+ * But normally   info->alloced == mapping_nrpages(inode->i_mapping) + info->swapped
+ * So mm freed is info->alloced - (mapping_nrpages(inode->i_mapping) + info->swapped)
  *
  * It has to be called with the spinlock held.
  */
@@ -225,7 +225,7 @@ static void shmem_recalc_inode(struct inode *inode)
 	struct shmem_inode_info *info = SHMEM_I(inode);
 	long freed;
 
-	freed = info->alloced - info->swapped - inode->i_mapping->nrpages;
+	freed = info->alloced - info->swapped - mapping_nrpages(inode->i_mapping);
 	if (freed > 0) {
 		info->alloced -= freed;
 		shmem_unacct_blocks(info->flags, freed);
@@ -671,7 +671,7 @@ static void shmem_truncate_range(struct inode *inode, loff_t start, loff_t end)
 done1:
 	shmem_dir_unmap(dir);
 done2:
-	if (inode->i_mapping->nrpages && (info->flags & SHMEM_PAGEIN)) {
+	if (mapping_nrpages(inode->i_mapping) && (info->flags & SHMEM_PAGEIN)) {
 		/*
 		 * Call truncate_inode_pages again: racing shmem_unuse_inode
 		 * may have swizzled a page in from swap since vmtruncate or

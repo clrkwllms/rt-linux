@@ -104,7 +104,7 @@ void gfs2_meta_inval(struct gfs2_glock *gl)
 	truncate_inode_pages(mapping, 0);
 	atomic_dec(&aspace->i_writecount);
 
-	gfs2_assert_withdraw(sdp, !mapping->nrpages);
+	gfs2_assert_withdraw(sdp, !mapping_nrpages(mapping));
 }
 
 /**

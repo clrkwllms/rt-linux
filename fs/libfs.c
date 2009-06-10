@@ -17,7 +17,7 @@ int simple_getattr(struct vfsmount *mnt, struct dentry *dentry,
 {
 	struct inode *inode = dentry->d_inode;
 	generic_fillattr(inode, stat);
-	stat->blocks = inode->i_mapping->nrpages << (PAGE_CACHE_SHIFT - 9);
+	stat->blocks = mapping_nrpages(inode->i_mapping) << (PAGE_CACHE_SHIFT - 9);
 	return 0;
 }
 

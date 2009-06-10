@@ -1916,7 +1916,7 @@ static int dump_glock(struct glock_iter *gi, struct gfs2_glock *gl)
 		   (list_empty(&gl->gl_reclaim)) ? "no" : "yes");
 	if (gl->gl_aspace)
 		print_dbg(gi, "  aspace = 0x%p nrpages = %lu\n", gl->gl_aspace,
-			   gl->gl_aspace->i_mapping->nrpages);
+		       mapping_nrpages(gl->gl_aspace->i_mapping));
 	else
 		print_dbg(gi, "  aspace = no\n");
 	print_dbg(gi, "  ail = %d\n", atomic_read(&gl->gl_ail_count));

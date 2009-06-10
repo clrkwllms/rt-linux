@@ -425,6 +425,6 @@ void print_page(struct page *page)
 	printk("  page[%p] -> index 0x%lx,  count 0x%x,  flags 0x%lx\n",
 	       page, page->index, page_count(page), page->flags);
 	printk("       address_space = %p, pages =%ld\n", page->mapping,
-	       page->mapping->nrpages);
+	       mapping_nrpages(page->mapping));
 
 }

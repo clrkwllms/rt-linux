@@ -628,11 +628,11 @@ static void shm_get_stat(struct ipc_namespace *ns, unsigned long *rss,
 
 		if (is_file_hugepages(shp->shm_file)) {
 			struct address_space *mapping = inode->i_mapping;
-			*rss += (HPAGE_SIZE/PAGE_SIZE)*mapping->nrpages;
+			*rss += (HPAGE_SIZE/PAGE_SIZE)*mapping_nrpages(mapping);
 		} else {
 			struct shmem_inode_info *info = SHMEM_I(inode);
 			spin_lock(&info->lock);
-			*rss += inode->i_mapping->nrpages;
+			*rss += mapping_nrpages(inode->i_mapping);
 			*swp += info->swapped;
 			spin_unlock(&info->lock);
 		}

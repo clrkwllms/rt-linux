@@ -294,7 +294,7 @@ void jffs2_read_inode (struct inode *inode)
 		inode->i_op = &jffs2_file_inode_operations;
 		inode->i_fop = &jffs2_file_operations;
 		inode->i_mapping->a_ops = &jffs2_file_address_operations;
-		inode->i_mapping->nrpages = 0;
+		mapping_nrpages_init(inode->i_mapping);
 		break;
 
 	case S_IFBLK:

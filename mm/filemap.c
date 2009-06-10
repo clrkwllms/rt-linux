@@ -121,7 +121,7 @@ void __remove_from_page_cache(struct page *page)
 
 	radix_tree_delete(&mapping->page_tree, page->index);
 	page->mapping = NULL;
-	mapping->nrpages--;
+	mapping_nrpages_dec(mapping);
 	__dec_zone_page_state(page, NR_FILE_PAGES);
 	BUG_ON(page_mapped(page));
 
@@ -206,7 +206,7 @@ int __filemap_fdatawrite_range(struct address_space *mapping, loff_t start,
 	int ret;
 	struct writeback_control wbc = {
 		.sync_mode = sync_mode,
-		.nr_to_write = mapping->nrpages * 2,
+		.nr_to_write = mapping_nrpages(mapping) * 2,
 		.range_start = start,
 		.range_end = end,
 	};
@@ -388,7 +388,7 @@ int filemap_write_and_wait(struct address_space *mapping)
 {
 	int err = 0;
 
-	if (mapping->nrpages) {
+	if (mapping_nrpages(mapping)) {
 		err = filemap_fdatawrite(mapping);
 		/*
 		 * Even if the above returned error, the pages may be
@@ -422,7 +422,7 @@ int filemap_write_and_wait_range(struct address_space *mapping,
 {
 	int err = 0;
 
-	if (mapping->nrpages) {
+	if (mapping_nrpages(mapping)) {
 		err = __filemap_fdatawrite_range(mapping, lstart, lend,
 						 WB_SYNC_ALL);
 		/* See comment of filemap_write_and_wait() */
@@ -464,7 +464,7 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 			SetPageLocked(page);
 			page->mapping = mapping;
 			page->index = offset;
-			mapping->nrpages++;
+			mapping_nrpages_inc(mapping);
 			__inc_zone_page_state(page, NR_FILE_PAGES);
 		}
 		spin_unlock_irq(&mapping->tree_lock);
@@ -2599,7 +2599,7 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	 * about to write.  We do this *before* the write so that we can return
 	 * -EIO without clobbering -EIOCBQUEUED from ->direct_IO().
 	 */
-	if (rw == WRITE && mapping->nrpages) {
+	if (rw == WRITE && mapping_nrpages(mapping)) {
 		retval = invalidate_inode_pages2_range(mapping,
 					offset >> PAGE_CACHE_SHIFT, end);
 		if (retval)
@@ -2616,7 +2616,7 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	 * so we don't support it 100%.  If this invalidation
 	 * fails, tough, the write still worked...
 	 */
-	if (rw == WRITE && mapping->nrpages) {
+	if (rw == WRITE && mapping_nrpages(mapping)) {
 		invalidate_inode_pages2_range(mapping, offset >> PAGE_CACHE_SHIFT, end);
 	}
 out:

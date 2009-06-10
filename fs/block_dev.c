@@ -59,7 +59,7 @@ static sector_t max_block(struct block_device *bdev)
 /* Kill _all_ buffers and pagecache , dirty or not.. */
 static void kill_bdev(struct block_device *bdev)
 {
-	if (bdev->bd_inode->i_mapping->nrpages == 0)
+	if (mapping_nrpages(bdev->bd_inode->i_mapping) == 0)
 		return;
 	invalidate_bh_lrus();
 	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
@@ -604,7 +604,7 @@ long nr_blockdev_pages(void)
 	long ret = 0;
 	spin_lock(&bdev_lock);
 	list_for_each_entry(bdev, &all_bdevs, bd_list) {
-		ret += bdev->bd_inode->i_mapping->nrpages;
+		ret += mapping_nrpages(bdev->bd_inode->i_mapping);
 	}
 	spin_unlock(&bdev_lock);
 	return ret;

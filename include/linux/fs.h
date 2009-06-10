@@ -505,7 +505,7 @@ struct address_space {
 	struct list_head	i_mmap_nonlinear;/*list VM_NONLINEAR mappings */
 	spinlock_t		i_mmap_lock;	/* protect tree, count, list */
 	unsigned int		truncate_count;	/* Cover race condition with truncate */
-	unsigned long		nrpages;	/* number of total pages */
+	unsigned long		__nrpages;	/* number of total pages */
 	pgoff_t			writeback_index;/* writeback starts here */
 	const struct address_space_operations *a_ops;	/* methods */
 	unsigned long		flags;		/* error bits/gfp mask */
@@ -519,6 +519,26 @@ struct address_space {
 	 * must be enforced here for CRIS, to let the least signficant bit
 	 * of struct page's "mapping" pointer be used for PAGE_MAPPING_ANON.
 	 */
+
+static inline void mapping_nrpages_init(struct address_space *mapping)
+{
+	mapping->__nrpages = 0;
+}
+
+static inline unsigned long mapping_nrpages(struct address_space *mapping)
+{
+	return mapping->__nrpages;
+}
+
+static inline void mapping_nrpages_inc(struct address_space *mapping)
+{
+	mapping->__nrpages++;
+}
+
+static inline void mapping_nrpages_dec(struct address_space *mapping)
+{
+	mapping->__nrpages--;
+}
 
 struct block_device {
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */

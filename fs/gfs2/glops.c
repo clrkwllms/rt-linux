@@ -252,7 +252,7 @@ static int inode_go_demote_ok(struct gfs2_glock *gl)
 	struct gfs2_sbd *sdp = gl->gl_sbd;
 	int demote = 0;
 
-	if (!gl->gl_object && !gl->gl_aspace->i_mapping->nrpages)
+	if (!gl->gl_object && !mapping_nrpages(gl->gl_aspace->i_mapping))
 		demote = 1;
 	else if (!sdp->sd_args.ar_localcaching &&
 		 time_after_eq(jiffies, gl->gl_stamp +
@@ -319,7 +319,7 @@ static void inode_go_unlock(struct gfs2_holder *gh)
 
 static int rgrp_go_demote_ok(struct gfs2_glock *gl)
 {
-	return !gl->gl_aspace->i_mapping->nrpages;
+	return !mapping_nrpages(gl->gl_aspace->i_mapping);
 }
 
 /**
