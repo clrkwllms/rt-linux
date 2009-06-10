@@ -8,8 +8,10 @@
  */
 
 #include <linux/irq.h>
-#include <linux/module.h>
 #include <linux/random.h>
+#include <linux/module.h>
+#include <linux/kthread.h>
+#include <linux/syscalls.h>
 #include <linux/interrupt.h>
 
 #include "internals.h"
@@ -41,8 +43,12 @@ void synchronize_irq(unsigned int irq)
 		 * Wait until we're out of the critical section.  This might
 		 * give the wrong answer due to the lack of memory barriers.
 		 */
-		while (desc->status & IRQ_INPROGRESS)
-			cpu_relax();
+		if (hardirq_preemption && !(desc->status & IRQ_NODELAY))
+			wait_event(desc->wait_for_handler,
+				   !(desc->status & IRQ_INPROGRESS));
+		else
+			while (desc->status & IRQ_INPROGRESS)
+				cpu_relax();
 
 		/* Ok, that indicated we're done: double-check carefully. */
 		spin_lock_irqsave(&desc->lock, flags);
@@ -234,6 +240,21 @@ int set_irq_wake(unsigned int irq, unsigned int on)
 EXPORT_SYMBOL(set_irq_wake);
 
 /*
+ * If any action has IRQF_NODELAY then turn IRQ_NODELAY on:
+ */
+void recalculate_desc_flags(struct irq_desc *desc)
+{
+	struct irqaction *action;
+
+	desc->status &= ~IRQ_NODELAY;
+	for (action = desc->action ; action; action = action->next)
+		if (action->flags & IRQF_NODELAY)
+			desc->status |= IRQ_NODELAY;
+}
+
+static int start_irq_thread(int irq, struct irq_desc *desc);
+
+/*
  * Internal function that tells the architecture code whether a
  * particular irq has been exclusively allocated or is available
  * for driver use.
@@ -298,6 +319,9 @@ int setup_irq(unsigned int irq, struct irqaction *new)
 		rand_initialize_irq(irq);
 	}
 
+	if (!(new->flags & IRQF_NODELAY))
+		if (start_irq_thread(irq, desc))
+			return -ENOMEM;
 	/*
 	 * The following block of code has to be executed atomically
 	 */
@@ -337,6 +361,11 @@ int setup_irq(unsigned int irq, struct irqaction *new)
 	/* Exclude IRQ from balancing */
 	if (new->flags & IRQF_NOBALANCING)
 		desc->status |= IRQ_NO_BALANCING;
+
+	/*
+	 * Propagate any possible IRQF_NODELAY flag into IRQ_NODELAY:
+	 */
+	recalculate_desc_flags(desc);
 
 	if (!shared) {
 		irq_chip_set_defaults(desc->chip);
@@ -384,7 +413,7 @@ int setup_irq(unsigned int irq, struct irqaction *new)
 
 	new->irq = irq;
 	register_irq_proc(irq);
-	new->dir = NULL;
+	new->dir = new->threaded = NULL;
 	register_handler_proc(irq, new);
 
 	return 0;
@@ -455,6 +484,7 @@ void free_irq(unsigned int irq, void *dev_id)
 				else
 					desc->chip->disable(irq);
 			}
+			recalculate_desc_flags(desc);
 			spin_unlock_irqrestore(&desc->lock, flags);
 			unregister_handler_proc(irq, action);
 
@@ -577,3 +607,257 @@ int request_irq(unsigned int irq, irq_handler_t handler,
 	return retval;
 }
 EXPORT_SYMBOL(request_irq);
+
+#ifdef CONFIG_PREEMPT_HARDIRQS
+
+int hardirq_preemption = 1;
+
+EXPORT_SYMBOL(hardirq_preemption);
+
+static int __init hardirq_preempt_setup (char *str)
+{
+	if (!strncmp(str, "off", 3))
+		hardirq_preemption = 0;
+	else
+		get_option(&str, &hardirq_preemption);
+	if (!hardirq_preemption)
+		printk("turning off hardirq preemption!\n");
+
+	return 1;
+}
+
+__setup("hardirq-preempt=", hardirq_preempt_setup);
+
+
+/*
+ * threaded simple handler
+ */
+static void thread_simple_irq(irq_desc_t *desc)
+{
+	struct irqaction *action = desc->action;
+	unsigned int irq = desc - irq_desc;
+	irqreturn_t action_ret;
+
+	if (action && !desc->depth) {
+		spin_unlock(&desc->lock);
+		action_ret = handle_IRQ_event(irq, action);
+		cond_resched_hardirq_context();
+		spin_lock_irq(&desc->lock);
+		if (!noirqdebug)
+			note_interrupt(irq, desc, action_ret);
+	}
+	desc->status &= ~IRQ_INPROGRESS;
+}
+
+/*
+ * threaded level type irq handler
+ */
+static void thread_level_irq(irq_desc_t *desc)
+{
+	unsigned int irq = desc - irq_desc;
+
+	thread_simple_irq(desc);
+	if (!(desc->status & IRQ_DISABLED) && desc->chip->unmask)
+		desc->chip->unmask(irq);
+}
+
+/*
+ * threaded fasteoi type irq handler
+ */
+static void thread_fasteoi_irq(irq_desc_t *desc)
+{
+	unsigned int irq = desc - irq_desc;
+
+	thread_simple_irq(desc);
+	if (!(desc->status & IRQ_DISABLED) && desc->chip->unmask)
+		desc->chip->unmask(irq);
+}
+
+/*
+ * threaded edge type IRQ handler
+ */
+static void thread_edge_irq(irq_desc_t *desc)
+{
+	unsigned int irq = desc - irq_desc;
+
+	do {
+		struct irqaction *action = desc->action;
+		irqreturn_t action_ret;
+
+		if (unlikely(!action)) {
+			desc->status &= ~IRQ_INPROGRESS;
+			desc->chip->mask(irq);
+			return;
+		}
+
+		/*
+		 * When another irq arrived while we were handling
+		 * one, we could have masked the irq.
+		 * Renable it, if it was not disabled in meantime.
+		 */
+		if (unlikely(((desc->status & (IRQ_PENDING | IRQ_MASKED)) ==
+			    (IRQ_PENDING | IRQ_MASKED)) && !desc->depth))
+			desc->chip->unmask(irq);
+
+		desc->status &= ~IRQ_PENDING;
+		spin_unlock(&desc->lock);
+		action_ret = handle_IRQ_event(irq, action);
+		cond_resched_hardirq_context();
+		spin_lock_irq(&desc->lock);
+		if (!noirqdebug)
+			note_interrupt(irq, desc, action_ret);
+	} while ((desc->status & IRQ_PENDING) && !desc->depth);
+
+	desc->status &= ~IRQ_INPROGRESS;
+}
+
+/*
+ * threaded edge type IRQ handler
+ */
+static void thread_do_irq(irq_desc_t *desc)
+{
+	unsigned int irq = desc - irq_desc;
+
+	do {
+		struct irqaction *action = desc->action;
+		irqreturn_t action_ret;
+
+		if (unlikely(!action)) {
+			desc->status &= ~IRQ_INPROGRESS;
+			desc->chip->disable(irq);
+			return;
+		}
+
+		desc->status &= ~IRQ_PENDING;
+		spin_unlock(&desc->lock);
+		action_ret = handle_IRQ_event(irq, action);
+		cond_resched_hardirq_context();
+		spin_lock_irq(&desc->lock);
+		if (!noirqdebug)
+			note_interrupt(irq, desc, action_ret);
+	} while ((desc->status & IRQ_PENDING) && !desc->depth);
+
+	desc->status &= ~IRQ_INPROGRESS;
+	desc->chip->end(irq);
+}
+
+static void do_hardirq(struct irq_desc *desc)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&desc->lock, flags);
+
+	if (!(desc->status & IRQ_INPROGRESS))
+		goto out;
+
+	if (desc->handle_irq == handle_simple_irq)
+		thread_simple_irq(desc);
+	else if (desc->handle_irq == handle_level_irq)
+		thread_level_irq(desc);
+	else if (desc->handle_irq == handle_fasteoi_irq)
+		thread_fasteoi_irq(desc);
+	else if (desc->handle_irq == handle_edge_irq)
+		thread_edge_irq(desc);
+	else
+		thread_do_irq(desc);
+ out:
+	spin_unlock_irqrestore(&desc->lock, flags);
+
+	if (waitqueue_active(&desc->wait_for_handler))
+		wake_up(&desc->wait_for_handler);
+}
+
+extern asmlinkage void __do_softirq(void);
+
+static int do_irqd(void * __desc)
+{
+	struct sched_param param = { 0, };
+	struct irq_desc *desc = __desc;
+
+#ifdef CONFIG_SMP
+	set_cpus_allowed(current, desc->affinity);
+#endif
+	current->flags |= PF_NOFREEZE | PF_HARDIRQ;
+
+	/*
+	 * Set irq thread priority to SCHED_FIFO/50:
+	 */
+	param.sched_priority = MAX_USER_RT_PRIO/2;
+
+	sys_sched_setscheduler(current->pid, SCHED_FIFO, &param);
+
+	while (!kthread_should_stop()) {
+		local_irq_disable();
+		set_current_state(TASK_INTERRUPTIBLE);
+		irq_enter();
+		do_hardirq(desc);
+		irq_exit();
+		local_irq_enable();
+		cond_resched();
+#ifdef CONFIG_SMP
+		/*
+		 * Did IRQ affinities change?
+		 */
+		if (!cpus_equal(current->cpus_allowed, desc->affinity))
+			set_cpus_allowed(current, desc->affinity);
+#endif
+		schedule();
+	}
+	__set_current_state(TASK_RUNNING);
+
+	return 0;
+}
+
+static int ok_to_create_irq_threads;
+
+static int start_irq_thread(int irq, struct irq_desc *desc)
+{
+	if (desc->thread || !ok_to_create_irq_threads)
+		return 0;
+
+	desc->thread = kthread_create(do_irqd, desc, "IRQ-%d", irq);
+	if (!desc->thread) {
+		printk(KERN_ERR "irqd: could not create IRQ thread %d!\n", irq);
+		return -ENOMEM;
+	}
+
+	/*
+	 * An interrupt may have come in before the thread pointer was
+	 * stored in desc->thread; make sure the thread gets woken up in
+	 * such a case:
+	 */
+	smp_mb();
+	wake_up_process(desc->thread);
+
+	return 0;
+}
+
+void __init init_hardirqs(void)
+{
+	int i;
+	ok_to_create_irq_threads = 1;
+
+	for (i = 0; i < NR_IRQS; i++) {
+		irq_desc_t *desc = irq_desc + i;
+
+		if (desc->action && !(desc->status & IRQ_NODELAY))
+			start_irq_thread(i, desc);
+	}
+}
+
+#else
+
+static int start_irq_thread(int irq, struct irq_desc *desc)
+{
+	return 0;
+}
+
+#endif
+
+void __init early_init_hardirqs(void)
+{
+	int i;
+
+	for (i = 0; i < NR_IRQS; i++)
+		init_waitqueue_head(&irq_desc[i].wait_for_handler);
+}

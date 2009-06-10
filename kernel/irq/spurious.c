@@ -10,6 +10,10 @@
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/interrupt.h>
+#ifdef CONFIG_X86_IO_APIC
+# include <asm/apicdef.h>
+# include <asm/io_apic.h>
+#endif
 
 static int irqfixup __read_mostly;
 
@@ -203,6 +207,12 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		 * The interrupt is stuck
 		 */
 		__report_bad_irq(irq, desc, action_ret);
+#ifdef CONFIG_X86_IO_APIC
+		if (!sis_apic_bug) {
+			sis_apic_bug = 1;
+			printk(KERN_ERR "turning off IO-APIC fast mode.\n");
+		}
+#else
 		/*
 		 * Now kill the IRQ
 		 */
@@ -210,6 +220,7 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		desc->status |= IRQ_DISABLED;
 		desc->depth = 1;
 		desc->chip->disable(irq);
+#endif
 	}
 	desc->irqs_unhandled = 0;
 }

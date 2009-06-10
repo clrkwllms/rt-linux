@@ -287,8 +287,10 @@ static inline void mask_ack_irq(struct irq_desc *desc, int irq)
 	if (desc->chip->mask_ack)
 		desc->chip->mask_ack(irq);
 	else {
-		desc->chip->mask(irq);
-		desc->chip->ack(irq);
+		if (desc->chip->mask)
+			desc->chip->mask(irq);
+		if (desc->chip->ack)
+			desc->chip->ack(irq);
 	}
 }
 
@@ -313,8 +315,10 @@ handle_simple_irq(unsigned int irq, struct irq_desc *desc)
 
 	spin_lock(&desc->lock);
 
-	if (unlikely(desc->status & IRQ_INPROGRESS))
+	if (unlikely(desc->status & IRQ_INPROGRESS)) {
+		desc->status |= IRQ_PENDING;
 		goto out_unlock;
+	}
 	desc->status &= ~(IRQ_REPLAY | IRQ_WAITING);
 	kstat_cpu(cpu).irqs[irq]++;
 
@@ -323,6 +327,11 @@ handle_simple_irq(unsigned int irq, struct irq_desc *desc)
 		goto out_unlock;
 
 	desc->status |= IRQ_INPROGRESS;
+	/*
+	 * hardirq redirection to the irqd process context:
+	 */
+	if (redirect_hardirq(desc))
+		goto out_unlock;
 	spin_unlock(&desc->lock);
 
 	action_ret = handle_IRQ_event(irq, action);
@@ -369,6 +378,13 @@ handle_level_irq(unsigned int irq, struct irq_desc *desc)
 		goto out_unlock;
 
 	desc->status |= IRQ_INPROGRESS;
+
+	/*
+	 * hardirq redirection to the irqd process context:
+	 */
+	if (redirect_hardirq(desc))
+		goto out_unlock;
+
 	spin_unlock(&desc->lock);
 
 	action_ret = handle_IRQ_event(irq, action);
@@ -421,6 +437,15 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
 	}
 
 	desc->status |= IRQ_INPROGRESS;
+	/*
+	 * In the threaded case we fall back to a mask+eoi sequence:
+	 */
+	if (redirect_hardirq(desc)) {
+		if (desc->chip->mask)
+			desc->chip->mask(irq);
+		goto out;
+	}
+
 	desc->status &= ~IRQ_PENDING;
 	spin_unlock(&desc->lock);
 
@@ -432,7 +457,6 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
 	desc->status &= ~IRQ_INPROGRESS;
 out:
 	desc->chip->eoi(irq);
-
 	spin_unlock(&desc->lock);
 }
 
@@ -480,6 +504,12 @@ handle_edge_irq(unsigned int irq, struct irq_desc *desc)
 
 	/* Mark the IRQ currently in progress.*/
 	desc->status |= IRQ_INPROGRESS;
+
+	/*
+	 * hardirq redirection to the irqd process context:
+	 */
+	if (redirect_hardirq(desc))
+		goto out_unlock;
 
 	do {
 		struct irqaction *action = desc->action;

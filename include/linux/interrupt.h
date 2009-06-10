@@ -50,10 +50,12 @@
 #define IRQF_SAMPLE_RANDOM	0x00000040
 #define IRQF_SHARED		0x00000080
 #define IRQF_PROBE_SHARED	0x00000100
-#define IRQF_TIMER		0x00000200
+#define __IRQF_TIMER		0x00000200
 #define IRQF_PERCPU		0x00000400
 #define IRQF_NOBALANCING	0x00000800
 #define IRQF_IRQPOLL		0x00001000
+#define IRQF_NODELAY		0x00002000
+#define IRQF_TIMER		(__IRQF_TIMER | IRQF_NODELAY)
 
 typedef irqreturn_t (*irq_handler_t)(int, void *);
 
@@ -65,7 +67,7 @@ struct irqaction {
 	void *dev_id;
 	struct irqaction *next;
 	int irq;
-	struct proc_dir_entry *dir;
+	struct proc_dir_entry *dir, *threaded;
 };
 
 extern irqreturn_t no_action(int cpl, void *dev_id);
@@ -196,6 +198,7 @@ static inline int disable_irq_wake(unsigned int irq)
 
 #ifndef __ARCH_SET_SOFTIRQ_PENDING
 #define set_softirq_pending(x) (local_softirq_pending() = (x))
+// FIXME: PREEMPT_RT: set_bit()?
 #define or_softirq_pending(x)  (local_softirq_pending() |= (x))
 #endif
 
@@ -271,12 +274,18 @@ struct softirq_action
 	void	*data;
 };
 
-#define __raise_softirq_irqoff(nr) do { or_softirq_pending(1UL << (nr)); } while (0)
-#define __do_raise_softirq_irqoff(nr) __raise_softirq_irqoff(nr)
-
 asmlinkage void do_softirq(void);
 extern void open_softirq(int nr, void (*action)(struct softirq_action*), void *data);
 extern void softirq_init(void);
+
+#ifdef CONFIG_PREEMPT_HARDIRQS
+# define __raise_softirq_irqoff(nr) raise_softirq_irqoff(nr)
+# define __do_raise_softirq_irqoff(nr) do { or_softirq_pending(1UL << (nr)); } while (0)
+#else
+# define __raise_softirq_irqoff(nr) do { or_softirq_pending(1UL << (nr)); } while (0)
+# define __do_raise_softirq_irqoff(nr) __raise_softirq_irqoff(nr)
+#endif
+
 extern void FASTCALL(raise_softirq_irqoff(unsigned int nr));
 extern void FASTCALL(raise_softirq(unsigned int nr));
 extern void wakeup_irqd(void);
