@@ -117,7 +117,7 @@ EXPORT_SYMBOL(__write_trylock_irqsave);
  * not re-enabled during lock-acquire (which the preempt-spin-ops do):
  */
 #if !defined(CONFIG_PREEMPT) || !defined(CONFIG_SMP) || \
-	defined(CONFIG_DEBUG_LOCK_ALLOC) || defined(CONFIG_PREEMPT_RT)
+	defined(CONFIG_DEBUG_LOCK_ALLOC)
 
 void __lockfunc __read_lock(raw_rwlock_t *lock)
 {
