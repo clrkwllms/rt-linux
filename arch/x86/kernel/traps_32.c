@@ -385,6 +385,8 @@ void die(const char * str, struct pt_regs * regs, long err)
 	static int die_counter;
 	unsigned long flags;
 
+	ftrace_stop();
+
 	oops_enter();
 
 	if (die.lock_owner != raw_smp_processor_id()) {

@@ -1490,6 +1490,23 @@ void ftrace_kill(void)
 }
 
 /**
+ * __ftrace_kill - shutdown ftrace in a mean fashion
+ *
+ * In case of system failure we want to stop ftrace as soon as
+ * possible. This is like ftrace_kill but does not grab the
+ * mutexes nor does it call the kstop machine.
+ *
+ * This one is save to use in atomic.
+ */
+void __ftrace_kill(void)
+{
+	ftrace_disabled = 1;
+	ftrace_enabled = 0;
+
+	clear_ftrace_function();
+}
+
+/**
  * register_ftrace_function - register a function for profiling
  * @ops - ops structure that holds the function for profiling.
  *

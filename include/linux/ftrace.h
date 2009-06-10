@@ -38,12 +38,18 @@ extern void mcount(void);
 void ftrace_enable(void);
 void ftrace_disable(void);
 
+/* totally disable ftrace - can not re-enable after this */
+void ftrace_kill(void);
+void __ftrace_kill(void);
+
 #else /* !CONFIG_FTRACE */
 # define register_ftrace_function(ops)		do { } while (0)
 # define unregister_ftrace_function(ops)	do { } while (0)
 # define clear_ftrace_function(ops)		do { } while (0)
 # define ftrace_enable()			do { } while (0)
 # define ftrace_disable()			do { } while (0)
+# define ftrace_kill()				do { } while (0)
+# define __ftrace_kill()			do { } while (0)
 #endif /* CONFIG_FTRACE */
 
 #ifdef CONFIG_DYNAMIC_FTRACE
@@ -90,9 +96,6 @@ void ftrace_enable_daemon(void);
 # define ftrace_enable_daemon()			do { } while (0)
 #endif
 
-/* totally disable ftrace - can not re-enable after this */
-void ftrace_kill(void);
-
 static inline void tracer_disable(void)
 {
 #ifdef CONFIG_FTRACE
@@ -138,9 +141,11 @@ static inline void tracer_disable(void)
 #ifdef CONFIG_TRACING
 extern void
 ftrace_special(unsigned long arg1, unsigned long arg2, unsigned long arg3);
+void ftrace_stop(void);
 #else
 static inline void
 ftrace_special(unsigned long arg1, unsigned long arg2, unsigned long arg3) { }
+static inline void ftrace_stop(void) { }
 #endif
 
 #ifdef CONFIG_EVENT_TRACER

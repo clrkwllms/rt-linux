@@ -3243,6 +3243,37 @@ static __init void tracer_init_debugfs(void)
 #endif
 }
 
+/**
+ * ftrace_stop - called when we need to drastically disable the tracer.
+ */
+void ftrace_stop(void)
+{
+	struct tracer *saved_tracer = current_trace;
+	struct trace_array *tr = &global_trace;
+	struct trace_array_cpu *data;
+	int i;
+
+	__ftrace_kill();
+	for_each_tracing_cpu(i) {
+		data = tr->data[i];
+		atomic_inc(&data->disabled);
+	}
+	tracer_enabled = 0;
+
+	/*
+	 * TODO: make a safe method to ctrl_update.
+	 *  ctrl_update may schedule, but currently only
+	 *  does when ftrace is enabled.
+	 */
+	if (tr->ctrl) {
+		tr->ctrl = 0;
+		if (saved_tracer && saved_tracer->ctrl_update)
+			saved_tracer->ctrl_update;
+	}
+
+
+}
+
 static int trace_alloc_page(void)
 {
 	struct trace_array_cpu *data;
