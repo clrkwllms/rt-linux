@@ -19,43 +19,58 @@ int in_lock_functions(unsigned long addr);
 
 #define assert_spin_locked(x)	BUG_ON(!spin_is_locked(x))
 
-void __lockfunc _spin_lock(spinlock_t *lock)		__acquires(lock);
-void __lockfunc _spin_lock_nested(spinlock_t *lock, int subclass)
-							__acquires(lock);
-void __lockfunc _read_lock(rwlock_t *lock)		__acquires(lock);
-void __lockfunc _write_lock(rwlock_t *lock)		__acquires(lock);
-void __lockfunc _spin_lock_bh(spinlock_t *lock)		__acquires(lock);
-void __lockfunc _read_lock_bh(rwlock_t *lock)		__acquires(lock);
-void __lockfunc _write_lock_bh(rwlock_t *lock)		__acquires(lock);
-void __lockfunc _spin_lock_irq(spinlock_t *lock)	__acquires(lock);
-void __lockfunc _read_lock_irq(rwlock_t *lock)		__acquires(lock);
-void __lockfunc _write_lock_irq(rwlock_t *lock)		__acquires(lock);
-unsigned long __lockfunc _spin_lock_irqsave(spinlock_t *lock)
-							__acquires(lock);
-unsigned long __lockfunc _spin_lock_irqsave_nested(spinlock_t *lock, int subclass)
-							__acquires(lock);
-unsigned long __lockfunc _read_lock_irqsave(rwlock_t *lock)
-							__acquires(lock);
-unsigned long __lockfunc _write_lock_irqsave(rwlock_t *lock)
-							__acquires(lock);
-int __lockfunc _spin_trylock(spinlock_t *lock);
-int __lockfunc _read_trylock(rwlock_t *lock);
-int __lockfunc _write_trylock(rwlock_t *lock);
-int __lockfunc _spin_trylock_bh(spinlock_t *lock);
-void __lockfunc _spin_unlock(spinlock_t *lock)		__releases(lock);
-void __lockfunc _read_unlock(rwlock_t *lock)		__releases(lock);
-void __lockfunc _write_unlock(rwlock_t *lock)		__releases(lock);
-void __lockfunc _spin_unlock_bh(spinlock_t *lock)	__releases(lock);
-void __lockfunc _read_unlock_bh(rwlock_t *lock)		__releases(lock);
-void __lockfunc _write_unlock_bh(rwlock_t *lock)	__releases(lock);
-void __lockfunc _spin_unlock_irq(spinlock_t *lock)	__releases(lock);
-void __lockfunc _read_unlock_irq(rwlock_t *lock)	__releases(lock);
-void __lockfunc _write_unlock_irq(rwlock_t *lock)	__releases(lock);
-void __lockfunc _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)
-							__releases(lock);
-void __lockfunc _read_unlock_irqrestore(rwlock_t *lock, unsigned long flags)
-							__releases(lock);
-void __lockfunc _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags)
-							__releases(lock);
+#define ACQUIRE_SPIN		__acquires(lock)
+#define ACQUIRE_RW		__acquires(lock)
+#define RELEASE_SPIN		__releases(lock)
+#define RELEASE_RW		__releases(lock)
+
+void __lockfunc __spin_lock(raw_spinlock_t *lock)		ACQUIRE_SPIN;
+void __lockfunc __spin_lock_nested(raw_spinlock_t *lock, int subclass)
+								ACQUIRE_SPIN;
+void __lockfunc __read_lock(raw_rwlock_t *lock)			ACQUIRE_RW;
+void __lockfunc __write_lock(raw_rwlock_t *lock)		ACQUIRE_RW;
+void __lockfunc __spin_lock_bh(raw_spinlock_t *lock)		ACQUIRE_SPIN;
+void __lockfunc __read_lock_bh(raw_rwlock_t *lock)		ACQUIRE_RW;
+void __lockfunc __write_lock_bh(raw_rwlock_t *lock)		ACQUIRE_RW;
+void __lockfunc __spin_lock_irq(raw_spinlock_t *lock)		ACQUIRE_SPIN;
+void __lockfunc __read_lock_irq(raw_rwlock_t *lock)		ACQUIRE_RW;
+void __lockfunc __write_lock_irq(raw_rwlock_t *lock)		ACQUIRE_RW;
+unsigned long __lockfunc __spin_lock_irqsave(raw_spinlock_t *lock)
+								ACQUIRE_SPIN;
+unsigned long __lockfunc
+__spin_lock_irqsave_nested(raw_spinlock_t *lock, int subclass)	ACQUIRE_SPIN;
+unsigned long __lockfunc __read_lock_irqsave(raw_rwlock_t *lock)
+								ACQUIRE_RW;
+unsigned long __lockfunc __write_lock_irqsave(raw_rwlock_t *lock)
+								ACQUIRE_RW;
+int __lockfunc __spin_trylock(raw_spinlock_t *lock);
+int __lockfunc
+__spin_trylock_irqsave(raw_spinlock_t *lock, unsigned long *flags);
+int __lockfunc __read_trylock(raw_rwlock_t *lock);
+int __lockfunc __write_trylock(raw_rwlock_t *lock);
+int __lockfunc
+__write_trylock_irqsave(raw_rwlock_t *lock, unsigned long *flags);
+int __lockfunc __spin_trylock_bh(raw_spinlock_t *lock);
+int __lockfunc __spin_trylock_irq(raw_spinlock_t *lock);
+void __lockfunc __spin_unlock(raw_spinlock_t *lock)		RELEASE_SPIN;
+void __lockfunc __spin_unlock_no_resched(raw_spinlock_t *lock)
+								RELEASE_SPIN;
+void __lockfunc __read_unlock(raw_rwlock_t *lock)		RELEASE_RW;
+void __lockfunc __write_unlock(raw_rwlock_t *lock)		RELEASE_RW;
+void __lockfunc __spin_unlock_bh(raw_spinlock_t *lock)		RELEASE_SPIN;
+void __lockfunc __read_unlock_bh(raw_rwlock_t *lock)		RELEASE_RW;
+void __lockfunc __write_unlock_bh(raw_rwlock_t *lock)		RELEASE_RW;
+void __lockfunc __spin_unlock_irq(raw_spinlock_t *lock)		RELEASE_SPIN;
+void __lockfunc __read_unlock_irq(raw_rwlock_t *lock)		RELEASE_RW;
+void __lockfunc __write_unlock_irq(raw_rwlock_t *lock)		RELEASE_RW;
+void __lockfunc
+__spin_unlock_irqrestore(raw_spinlock_t *lock, unsigned long flags)
+								RELEASE_SPIN;
+void __lockfunc
+__read_unlock_irqrestore(raw_rwlock_t *lock, unsigned long flags)
+								RELEASE_RW;
+void
+__lockfunc __write_unlock_irqrestore(raw_rwlock_t *lock, unsigned long flags)
+								RELEASE_RW;
 
 #endif /* __LINUX_SPINLOCK_API_SMP_H */

@@ -16,13 +16,13 @@
 
 typedef struct {
 	volatile unsigned int slock;
-} raw_spinlock_t;
+} __raw_spinlock_t;
 
 #define __RAW_SPIN_LOCK_UNLOCKED { 1 }
 
 #else
 
-typedef struct { } raw_spinlock_t;
+typedef struct { } __raw_spinlock_t;
 
 #define __RAW_SPIN_LOCK_UNLOCKED { }
 
@@ -30,7 +30,7 @@ typedef struct { } raw_spinlock_t;
 
 typedef struct {
 	/* no debug version on UP */
-} raw_rwlock_t;
+} __raw_rwlock_t;
 
 #define __RAW_RW_LOCK_UNLOCKED { }
 

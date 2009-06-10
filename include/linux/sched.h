@@ -168,6 +168,10 @@ print_cfs_rq(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq)
 }
 #endif
 
+#ifdef CONFIG_PREEMPT_BKL
+extern struct semaphore kernel_sem;
+#endif
+
 /*
  * Task state bitmask. NOTE! These bits are also
  * encoded in fs/proc/array.c: get_task_state().
@@ -179,15 +183,17 @@ print_cfs_rq(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq)
  * mistake.
  */
 #define TASK_RUNNING		0
-#define TASK_INTERRUPTIBLE	1
-#define TASK_UNINTERRUPTIBLE	2
-#define TASK_STOPPED		4
-#define TASK_TRACED		8
+#define TASK_RUNNING_MUTEX	1
+#define TASK_INTERRUPTIBLE	2
+#define TASK_UNINTERRUPTIBLE	4
+#define TASK_STOPPED		8
+#define TASK_TRACED		16
 /* in tsk->exit_state */
-#define EXIT_ZOMBIE		16
-#define EXIT_DEAD		32
+#define EXIT_ZOMBIE		32
+#define EXIT_DEAD		64
 /* in tsk->state again */
-#define TASK_DEAD		64
+#define TASK_NONINTERACTIVE	128
+#define TASK_DEAD		256
 
 #define __set_task_state(tsk, state_value)		\
 	do { (tsk)->state = (state_value); } while (0)
@@ -1120,7 +1126,7 @@ struct task_struct {
 	spinlock_t alloc_lock;
 
 	/* Protection of the PI data structures: */
-	spinlock_t pi_lock;
+	raw_spinlock_t pi_lock;
 
 #ifdef CONFIG_RT_MUTEXES
 	/* PI waiters blocked on a rt_mutex held by this task */
@@ -1161,6 +1167,25 @@ struct task_struct {
 #ifdef CONFIG_PREEMPT_TRACE
 	unsigned long preempt_trace_eip[MAX_PREEMPT_TRACE];
 	unsigned long preempt_trace_parent_eip[MAX_PREEMPT_TRACE];
+#endif
+
+#define MAX_LOCK_STACK	MAX_PREEMPT_TRACE
+#ifdef CONFIG_DEBUG_PREEMPT
+	int lock_count;
+# ifdef CONFIG_PREEMPT_RT
+	struct rt_mutex *owned_lock[MAX_LOCK_STACK];
+# endif
+#endif
+#ifdef CONFIG_DETECT_SOFTLOCKUP
+	unsigned long	softlockup_count; /* Count to keep track how long the
+					   *  thread is in the kernel without
+					   *  sleeping.
+					   */
+#endif
+	/* realtime bits */
+
+#ifdef CONFIG_DEBUG_RT_MUTEXES
+	void *last_kernel_lock;
 #endif
 
 /* journalling filesystem info */
@@ -1409,6 +1434,7 @@ static inline void put_task_struct(struct task_struct *t)
 #define PF_EXITING	0x00000004	/* getting shut down */
 #define PF_EXITPIDONE	0x00000008	/* pi exit done on shut down */
 #define PF_VCPU		0x00000010	/* I'm a virtual CPU */
+#define PF_NOSCHED	0x00000020	/* Userspace does not expect scheduling */
 #define PF_FORKNOEXEC	0x00000040	/* forked but didn't exec */
 #define PF_SUPERPRIV	0x00000100	/* used super-user privileges */
 #define PF_DUMPCORE	0x00000200	/* dumped core */
@@ -1545,6 +1571,7 @@ extern struct task_struct *curr_task(int cpu);
 extern void set_curr_task(int cpu, struct task_struct *p);
 
 void yield(void);
+void __yield(void);
 
 /*
  * The default (Linux) execution domain.
@@ -1616,6 +1643,9 @@ extern void do_timer(unsigned long ticks);
 
 extern int FASTCALL(wake_up_state(struct task_struct * tsk, unsigned int state));
 extern int FASTCALL(wake_up_process(struct task_struct * tsk));
+extern int FASTCALL(wake_up_process_mutex(struct task_struct * tsk));
+extern int FASTCALL(wake_up_process_sync(struct task_struct * tsk));
+extern int FASTCALL(wake_up_process_mutex_sync(struct task_struct * tsk));
 extern void FASTCALL(wake_up_new_task(struct task_struct * tsk,
 						unsigned long clone_flags));
 #ifdef CONFIG_SMP
@@ -1926,7 +1956,22 @@ static inline int need_resched_delayed(void)
  * cond_resched_softirq() will enable bhs before scheduling.
  */
 extern int cond_resched(void);
-extern int cond_resched_lock(spinlock_t * lock);
+extern int __cond_resched_raw_spinlock(raw_spinlock_t *lock);
+extern int __cond_resched_spinlock(spinlock_t *spinlock);
+
+#define cond_resched_lock(lock) \
+({								\
+	int __ret;						\
+								\
+	if (TYPE_EQUAL((lock), raw_spinlock_t))	 		\
+		__ret = __cond_resched_raw_spinlock((raw_spinlock_t *)lock);\
+	else if (TYPE_EQUAL(lock, spinlock_t))			\
+		__ret = __cond_resched_spinlock((spinlock_t *)lock); \
+	else __ret = __bad_spinlock_type();			\
+								\
+	__ret;							\
+})
+
 extern int cond_resched_softirq(void);
 extern int cond_resched_softirq_context(void);
 extern int cond_resched_hardirq_context(void);
@@ -1935,10 +1980,16 @@ extern int cond_resched_hardirq_context(void);
  * Does a critical section need to be broken due to another
  * task waiting?:
  */
-#if defined(CONFIG_PREEMPT) && defined(CONFIG_SMP)
-# define need_lockbreak(lock) ((lock)->break_lock)
+#if (defined(CONFIG_PREEMPT) && defined(CONFIG_SMP)) || defined(CONFIG_PREEMPT_RT)
+# define need_lockbreak(lock) ({ int __need = ((lock)->break_lock); if (__need) (lock)->break_lock = 0; __need; })
 #else
 # define need_lockbreak(lock) 0
+#endif
+
+#if defined(CONFIG_PREEMPT) && defined(CONFIG_SMP)
+# define need_lockbreak_raw(lock) ({ int __need = ((lock)->break_lock); if (__need) (lock)->break_lock = 0; __need; })
+#else
+# define need_lockbreak_raw(lock) 0
 #endif
 
 /*
@@ -2092,7 +2143,7 @@ static inline void migration_init(void)
 }
 #endif
 
-#define TASK_STATE_TO_CHAR_STR "RSDTtZX"
+#define TASK_STATE_TO_CHAR_STR "RMSDTtZX"
 
 #endif /* __KERNEL__ */
 

@@ -15,6 +15,7 @@
 #include <linux/sched.h>
 #include <linux/err.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <asm/semaphore.h>
 
 /*
@@ -48,12 +49,12 @@
  *    we cannot lose wakeup events.
  */
 
-fastcall void __up(struct semaphore *sem)
+fastcall void __compat_up(struct compat_semaphore *sem)
 {
 	wake_up(&sem->wait);
 }
 
-fastcall void __sched __down(struct semaphore * sem)
+fastcall void __sched __compat_down(struct compat_semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -90,7 +91,7 @@ fastcall void __sched __down(struct semaphore * sem)
 	tsk->state = TASK_RUNNING;
 }
 
-fastcall int __sched __down_interruptible(struct semaphore * sem)
+fastcall int __sched __compat_down_interruptible(struct compat_semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;
@@ -153,7 +154,7 @@ fastcall int __sched __down_interruptible(struct semaphore * sem)
  * single "cmpxchg" without failure cases,
  * but then it wouldn't work on a 386.
  */
-fastcall int __down_trylock(struct semaphore * sem)
+fastcall int __compat_down_trylock(struct compat_semaphore * sem)
 {
 	int sleepers;
 	unsigned long flags;
@@ -174,3 +175,10 @@ fastcall int __down_trylock(struct semaphore * sem)
 	spin_unlock_irqrestore(&sem->wait.lock, flags);
 	return 1;
 }
+
+int fastcall compat_sem_is_locked(struct compat_semaphore *sem)
+{
+	return (int) atomic_read(&sem->count) < 0;
+}
+
+EXPORT_SYMBOL(compat_sem_is_locked);

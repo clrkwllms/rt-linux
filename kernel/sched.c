@@ -1585,7 +1585,8 @@ static int sched_balance_self(int cpu, int flag)
  *
  * returns failure only if the task is already active.
  */
-static int try_to_wake_up(struct task_struct *p, unsigned int state, int sync)
+static int
+try_to_wake_up(struct task_struct *p, unsigned int state, int sync, int mutex)
 {
 	int cpu, orig_cpu, this_cpu, success = 0;
 	unsigned long flags;
@@ -1671,13 +1672,38 @@ out:
 int fastcall wake_up_process(struct task_struct *p)
 {
 	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
-				 TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0);
+			      TASK_RUNNING_MUTEX | TASK_INTERRUPTIBLE |
+			      TASK_UNINTERRUPTIBLE, 0, 0);
 }
 EXPORT_SYMBOL(wake_up_process);
 
+int fastcall wake_up_process_sync(struct task_struct * p)
+{
+	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
+			      TASK_RUNNING_MUTEX | TASK_INTERRUPTIBLE |
+			      TASK_UNINTERRUPTIBLE, 1, 0);
+}
+EXPORT_SYMBOL(wake_up_process_sync);
+
+int fastcall wake_up_process_mutex(struct task_struct * p)
+{
+	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
+			      TASK_RUNNING_MUTEX | TASK_INTERRUPTIBLE |
+			      TASK_UNINTERRUPTIBLE, 0, 1);
+}
+EXPORT_SYMBOL(wake_up_process_mutex);
+
+int fastcall wake_up_process_mutex_sync(struct task_struct * p)
+{
+	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
+			      TASK_RUNNING_MUTEX | TASK_INTERRUPTIBLE |
+			      TASK_UNINTERRUPTIBLE, 1, 1);
+}
+EXPORT_SYMBOL(wake_up_process_mutex_sync);
+
 int fastcall wake_up_state(struct task_struct *p, unsigned int state)
 {
-	return try_to_wake_up(p, state, 0);
+	return try_to_wake_up(p, state | TASK_RUNNING_MUTEX, 0, 0);
 }
 
 /*
@@ -3877,7 +3903,8 @@ asmlinkage void __sched preempt_schedule_irq(void)
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync,
 			  void *key)
 {
-	return try_to_wake_up(curr->private, mode, sync);
+	return try_to_wake_up(curr->private, mode | TASK_RUNNING_MUTEX,
+			      sync, 0);
 }
 EXPORT_SYMBOL(default_wake_function);
 
@@ -3917,8 +3944,9 @@ void fastcall __wake_up(wait_queue_head_t *q, unsigned int mode,
 	unsigned long flags;
 
 	spin_lock_irqsave(&q->lock, flags);
-	__wake_up_common(q, mode, nr_exclusive, 0, key);
+	__wake_up_common(q, mode, nr_exclusive, 1, key);
 	spin_unlock_irqrestore(&q->lock, flags);
+	preempt_check_resched_delayed();
 }
 EXPORT_SYMBOL(__wake_up);
 
@@ -3968,8 +3996,9 @@ void complete(struct completion *x)
 	spin_lock_irqsave(&x->wait.lock, flags);
 	x->done++;
 	__wake_up_common(&x->wait, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE,
-			 1, 0, NULL);
+			 1, 1, NULL);
 	spin_unlock_irqrestore(&x->wait.lock, flags);
+	preempt_check_resched_delayed();
 }
 EXPORT_SYMBOL(complete);
 
@@ -3980,10 +4009,17 @@ void complete_all(struct completion *x)
 	spin_lock_irqsave(&x->wait.lock, flags);
 	x->done += UINT_MAX/2;
 	__wake_up_common(&x->wait, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE,
-			 0, 0, NULL);
+			 0, 1, NULL);
 	spin_unlock_irqrestore(&x->wait.lock, flags);
+	preempt_check_resched_delayed();
 }
 EXPORT_SYMBOL(complete_all);
+
+unsigned int fastcall completion_done(struct completion *x)
+{
+	return x->done;
+}
+EXPORT_SYMBOL(completion_done);
 
 static inline long __sched
 do_wait_for_common(struct completion *x, long timeout, int state)
@@ -4735,10 +4771,7 @@ asmlinkage long sys_sched_yield(void)
 	 * Since we are going to call schedule() anyway, there's
 	 * no need to preempt or enable interrupts:
 	 */
-	__release(rq->lock);
-	spin_release(&rq->lock.dep_map, 1, _THIS_IP_);
-	_raw_spin_unlock(&rq->lock);
-	preempt_enable_no_resched();
+	spin_unlock_no_resched(&rq->lock);
 
 	schedule();
 
@@ -4781,7 +4814,7 @@ EXPORT_SYMBOL(cond_resched);
  * operations here to prevent schedule() from being called twice (once via
  * spin_unlock(), once by hand).
  */
-int cond_resched_lock(spinlock_t *lock)
+int __cond_resched_raw_spinlock(raw_spinlock_t *lock)
 {
 	int ret = 0;
 
@@ -4792,24 +4825,23 @@ int cond_resched_lock(spinlock_t *lock)
 		spin_lock(lock);
 	}
 	if (need_resched() && system_state == SYSTEM_RUNNING) {
-		spin_release(&lock->dep_map, 1, _THIS_IP_);
-		_raw_spin_unlock(lock);
-		preempt_enable_no_resched();
+		spin_unlock_no_resched(lock);
 		__cond_resched();
 		ret = 1;
 		spin_lock(lock);
 	}
 	return ret;
 }
-EXPORT_SYMBOL(cond_resched_lock);
+EXPORT_SYMBOL(__cond_resched_raw_spinlock);
 
 /*
  * Voluntarily preempt a process context that has softirqs disabled:
  */
 int __sched cond_resched_softirq(void)
 {
+#ifndef CONFIG_PREEMPT_RT
 	WARN_ON_ONCE(!in_softirq());
-
+#endif
 	if (need_resched() && system_state == SYSTEM_RUNNING) {
 		local_bh_enable();
 		__cond_resched();
@@ -5018,19 +5050,23 @@ static void show_task(struct task_struct *p)
 	unsigned state;
 
 	state = p->state ? __ffs(p->state) + 1 : 0;
-	printk(KERN_INFO "%-13.13s %c", p->comm,
-		state < sizeof(stat_nam) - 1 ? stat_nam[state] : '?');
+	printk("%-13.13s %c [%p]", p->comm,
+		state < sizeof(stat_nam) - 1 ? stat_nam[state] : '?', p);
 #if BITS_PER_LONG == 32
-	if (state == TASK_RUNNING)
+	if (0 && (state == TASK_RUNNING))
 		printk(KERN_CONT " running  ");
 	else
 		printk(KERN_CONT " %08lx ", thread_saved_pc(p));
 #else
-	if (state == TASK_RUNNING)
+	if (0 && (state == TASK_RUNNING))
 		printk(KERN_CONT "  running task    ");
 	else
 		printk(KERN_CONT " %016lx ", thread_saved_pc(p));
 #endif
+	if (task_curr(p))
+		printk("[curr] ");
+	else if (p->se.on_rq)
+		printk("[on rq #%d] ", task_cpu(p));
 #ifdef CONFIG_DEBUG_STACK_USAGE
 	{
 		unsigned long *n = end_of_stack(p);

@@ -131,17 +131,19 @@ static inline char *task_name(struct task_struct *p, char *buf)
  */
 static const char *task_state_array[] = {
 	"R (running)",		/*  0 */
-	"S (sleeping)",		/*  1 */
-	"D (disk sleep)",	/*  2 */
-	"T (stopped)",		/*  4 */
-	"T (tracing stop)",	/*  8 */
-	"Z (zombie)",		/* 16 */
-	"X (dead)"		/* 32 */
+	"M (running-mutex)",	/*  1 */
+	"S (sleeping)",		/*  2 */
+	"D (disk sleep)",	/*  4 */
+	"T (stopped)",		/*  8 */
+	"T (tracing stop)",	/* 16 */
+	"Z (zombie)",		/* 32 */
+	"X (dead)"		/* 64 */
 };
 
 static inline const char *get_task_state(struct task_struct *tsk)
 {
 	unsigned int state = (tsk->state & (TASK_RUNNING |
+					    TASK_RUNNING_MUTEX |
 					    TASK_INTERRUPTIBLE |
 					    TASK_UNINTERRUPTIBLE |
 					    TASK_STOPPED |
@@ -305,6 +307,19 @@ static inline char *task_context_switch_counts(struct task_struct *p,
 			    p->nivcsw);
 }
 
+#define get_blocked_on(t)	(-1)
+
+static char *show_blocked_on(struct task_struct *task, char *buffer)
+{
+	pid_t pid = get_blocked_on(task);
+
+	if (pid < 0)
+		return buffer;
+
+	return buffer + sprintf(buffer,"BlckOn: %d\n",pid);
+}
+
+
 int proc_pid_status(struct task_struct *task, char *buffer)
 {
 	char *orig = buffer;
@@ -324,6 +339,7 @@ int proc_pid_status(struct task_struct *task, char *buffer)
 	buffer = task_show_regs(task, buffer);
 #endif
 	buffer = task_context_switch_counts(task, buffer);
+	buffer = show_blocked_on(task,buffer);
 	return buffer - orig;
 }
 

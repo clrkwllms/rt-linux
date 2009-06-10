@@ -24,7 +24,7 @@
  *
  * Don't use in new code.
  */
-static DECLARE_MUTEX(kernel_sem);
+DECLARE_MUTEX(kernel_sem);
 
 /*
  * Re-acquire the kernel semaphore.
@@ -44,7 +44,7 @@ int __lockfunc __reacquire_kernel_lock(void)
 	BUG_ON(saved_lock_depth < 0);
 
 	task->lock_depth = -1;
-	preempt_enable_no_resched();
+	__preempt_enable_no_resched();
 
 	down(&kernel_sem);
 

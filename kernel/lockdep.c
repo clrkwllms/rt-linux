@@ -67,7 +67,7 @@ module_param(lock_stat, int, 0644);
  * to use a raw spinlock - we really dont want the spinlock
  * code to recurse back into the lockdep code...
  */
-static raw_spinlock_t lockdep_lock = (raw_spinlock_t)__RAW_SPIN_LOCK_UNLOCKED;
+static __raw_spinlock_t lockdep_lock = (__raw_spinlock_t)__RAW_SPIN_LOCK_UNLOCKED;
 
 static int graph_lock(void)
 {

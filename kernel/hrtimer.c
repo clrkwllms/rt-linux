@@ -1544,7 +1544,7 @@ static void migrate_hrtimers(int cpu)
 	tick_cancel_sched_timer(cpu);
 
 	local_irq_disable();
-	double_spin_lock(&new_base->lock, &old_base->lock,
+	raw_double_spin_lock(&new_base->lock, &old_base->lock,
 			 smp_processor_id() < cpu);
 
 	for (i = 0; i < HRTIMER_MAX_CLOCK_BASES; i++) {
@@ -1552,7 +1552,7 @@ static void migrate_hrtimers(int cpu)
 				     &new_base->clock_base[i]);
 	}
 
-	double_spin_unlock(&new_base->lock, &old_base->lock,
+	raw_double_spin_unlock(&new_base->lock, &old_base->lock,
 			   smp_processor_id() < cpu);
 	local_irq_enable();
 	put_cpu_var(hrtimer_bases);
