@@ -101,6 +101,8 @@ void __init init_vectors(void)
 	IMR = ~0;
 }
 
+void do_IRQ(int irq, struct pt_regs *fp);
+
 /* The 68k family did not have a good way to determine the source
  * of interrupts until later in the family.  The EC000 core does
  * not provide the vector number on the stack, we vector everything

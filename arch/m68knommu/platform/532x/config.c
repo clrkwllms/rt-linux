@@ -21,10 +21,11 @@
 #include <linux/param.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
-#include <asm/dma.h>
+#include <linux/io.h>
 #include <asm/machdep.h>
 #include <asm/coldfire.h>
 #include <asm/mcfsim.h>
+#include <asm/mcfuart.h>
 #include <asm/mcfdma.h>
 #include <asm/mcfwdebug.h>
 
@@ -38,11 +39,75 @@ extern unsigned int mcf_timerlevel;
 
 /***************************************************************************/
 
-/*
- *	DMA channel base address table.
- */
-unsigned int dma_base_addr[MAX_M68K_DMA_CHANNELS] = { };
-unsigned int dma_device_address[MAX_M68K_DMA_CHANNELS];
+int sys_clk_khz = 0;
+int sys_clk_mhz = 0;
+
+void wtm_init(void);
+void scm_init(void);
+void gpio_init(void);
+void fbcs_init(void);
+void sdramc_init(void);
+int  clock_pll (int fsys, int flags);
+int  clock_limp (int);
+int  clock_exit_limp (void);
+int  get_sys_clock (void);
+
+/***************************************************************************/
+
+static struct mcf_platform_uart m532x_uart_platform[] = {
+	{
+		.mapbase	= MCF_MBAR + MCFUART_BASE1,
+		.irq		= MCFINT_VECBASE + MCFINT_UART0,
+	},
+	{
+		.mapbase 	= MCF_MBAR + MCFUART_BASE2,
+		.irq		= MCFINT_VECBASE + MCFINT_UART1,
+	},
+	{
+		.mapbase 	= MCF_MBAR + MCFUART_BASE3,
+		.irq		= MCFINT_VECBASE + MCFINT_UART2,
+	},
+	{ },
+};
+
+static struct platform_device m532x_uart = {
+	.name			= "mcfuart",
+	.id			= 0,
+	.dev.platform_data	= m532x_uart_platform,
+};
+
+static struct platform_device *m532x_devices[] __initdata = {
+	&m532x_uart,
+};
+
+/***************************************************************************/
+
+static void __init m532x_uart_init_line(int line, int irq)
+{
+	if (line == 0) {
+		MCF_INTC0_ICR26 = 0x3;
+		MCF_INTC0_CIMR = 26;
+		/* GPIO initialization */
+		MCF_GPIO_PAR_UART |= 0x000F;
+	} else if (line == 1) {
+		MCF_INTC0_ICR27 = 0x3;
+		MCF_INTC0_CIMR = 27;
+		/* GPIO initialization */
+		MCF_GPIO_PAR_UART |= 0x0FF0;
+	} else if (line == 2) {
+		MCF_INTC0_ICR28 = 0x3;
+		MCF_INTC0_CIMR = 28;
+	}
+}
+
+static void __init m532x_uarts_init(void)
+{
+	const int nrlines = ARRAY_SIZE(m532x_uart_platform);
+	int line;
+
+	for (line = 0; (line < nrlines); line++)
+		m532x_uart_init_line(line, m532x_uart_platform[line].irq);
+}
 
 /***************************************************************************/
 
@@ -66,22 +131,11 @@ void mcf_settimericr(unsigned int timer, unsigned int level)
 
 /***************************************************************************/
 
-int mcf_timerirqpending(int timer)
+void __init config_BSP(char *commandp, int size)
 {
-	unsigned int imr = 0;
+	sys_clk_khz = get_sys_clock();
+	sys_clk_mhz = sys_clk_khz/1000;
 
-	switch (timer) {
-	case 1:  imr = 0x1; break;
-	case 2:  imr = 0x2; break;
-	default: break;
-	}
-	return (mcf_getiprh() & imr);
-}
-
-/***************************************************************************/
-
-void config_BSP(char *commandp, int size)
-{
 	mcf_setimr(MCFSIM_IMR_MASKALL);
 
 #if !defined(CONFIG_BOOTPARAM)
@@ -99,7 +153,7 @@ void config_BSP(char *commandp, int size)
 	mcf_profilevector = 64+33;
 	mach_reset = coldfire_reset;
 
-#ifdef MCF_BDM_DISABLE
+#ifdef CONFIG_BDM_DISABLE
 	/*
 	 * Disable the BDM clocking.  This also turns off most of the rest of
 	 * the BDM device.  This is good for EMC reasons. This option is not
@@ -108,6 +162,17 @@ void config_BSP(char *commandp, int size)
 	wdebug(MCFDEBUG_CSR, MCFDEBUG_CSR_PSTCLK);
 #endif
 }
+
+/***************************************************************************/
+
+static int __init init_BSP(void)
+{
+	m532x_uarts_init();
+	platform_add_devices(m532x_devices, ARRAY_SIZE(m532x_devices));
+	return 0;
+}
+
+arch_initcall(init_BSP);
 
 /***************************************************************************/
 /* Board initialization */
@@ -152,24 +217,9 @@ void config_BSP(char *commandp, int size)
 
 #define NAND_FLASH_ADDRESS	(0xD0000000)
 
-int sys_clk_khz = 0;
-int sys_clk_mhz = 0;
-
-void wtm_init(void);
-void scm_init(void);
-void gpio_init(void);
-void fbcs_init(void);
-void sdramc_init(void);
-int  clock_pll (int fsys, int flags);
-int  clock_limp (int);
-int  clock_exit_limp (void);
-int  get_sys_clock (void);
 
 asmlinkage void __init sysinit(void)
 {
-	sys_clk_khz = clock_pll(0, 0);
-	sys_clk_mhz = sys_clk_khz/1000;
-	
 	wtm_init();
 	scm_init();
 	gpio_init();
@@ -207,25 +257,61 @@ void scm_init(void)
 
 void fbcs_init(void)
 {
+#if defined(CONFIG_COBRA5329)
+	/* The COBRA5329 by senTec needs this settings */
+
+	/*
+	 * We need to give the LCD enough bandwidth
+	 */
+
+        MCF_XBS_PRS1 = MCF_XBS_PRIO_LCD(MCF_PRIO_LVL_1)
+                     | MCF_XBS_PRIO_CORE(MCF_PRIO_LVL_2)
+                     | MCF_XBS_PRIO_FEC(MCF_PRIO_LVL_3)
+                     | MCF_XBS_PRIO_USBHOST(MCF_PRIO_LVL_4)
+                     | MCF_XBS_PRIO_EDMA(MCF_PRIO_LVL_5)
+                     | MCF_XBS_PRIO_USBOTG(MCF_PRIO_LVL_6)
+                     | MCF_XBS_PRIO_FACTTEST(MCF_PRIO_LVL_7);
+
+        /* Boot Flash connected to FBCS0 */
+        MCF_FBCS0_CSAR = FLASH_ADDRESS;
+        MCF_FBCS0_CSCR = (MCF_FBCS_CSCR_PS_16
+                        | MCF_FBCS_CSCR_BEM
+                        | MCF_FBCS_CSCR_AA
+                        | MCF_FBCS_CSCR_WS(8));
+
+        MCF_FBCS0_CSMR = (MCF_FBCS_CSMR_BAM_1G
+                        | MCF_FBCS_CSMR_V);
+
+        /* Fix bug #10 in the errata */
+        MCF_FBCS1_CSAR = 0xC0000000;
+        MCF_FBCS1_CSCR = (MCF_FBCS_CSCR_PS_16
+                        | MCF_FBCS_CSCR_BEM
+                        | MCF_FBCS_CSCR_AA
+                        | MCF_FBCS_CSCR_WS(8));
+
+        MCF_FBCS1_CSMR = (0x30000000
+                        | MCF_FBCS_CSMR_V
+                        | MCF_FBCS_CSMR_WP );
+#else
 	MCF_GPIO_PAR_CS = 0x0000003E;
 
 	/* Latch chip select */
 	MCF_FBCS1_CSAR = 0x10080000;
 
-	MCF_FBCS1_CSCR = 0x002A3780;
+	MCF_FBCS1_CSCR = 0x002A3580 | (MCF_FBCS1_CSCR&0x200);
 	MCF_FBCS1_CSMR = (MCF_FBCS_CSMR_BAM_2M | MCF_FBCS_CSMR_V);
 
 	/* Initialize latch to drive signals to inactive states */
-	*((u16 *)(0x10080000)) = 0xFFFF;
+	*((u16 *)(0x10080000)) = 0xD3FF;
 
-	/* External SRAM */
-	MCF_FBCS1_CSAR = EXT_SRAM_ADDRESS;
-	MCF_FBCS1_CSCR = (MCF_FBCS_CSCR_PS_16
-			| MCF_FBCS_CSCR_AA
-			| MCF_FBCS_CSCR_SBM
-			| MCF_FBCS_CSCR_WS(1));
-	MCF_FBCS1_CSMR = (MCF_FBCS_CSMR_BAM_512K
-			| MCF_FBCS_CSMR_V);
+//	/* External SRAM */
+//	MCF_FBCS1_CSAR = EXT_SRAM_ADDRESS;
+//	MCF_FBCS1_CSCR = (MCF_FBCS_CSCR_PS_16
+//			| MCF_FBCS_CSCR_AA
+//			| MCF_FBCS_CSCR_SBM
+//			| MCF_FBCS_CSCR_WS(1));
+//	MCF_FBCS1_CSMR = (MCF_FBCS_CSMR_BAM_512K
+//			| MCF_FBCS_CSMR_V);
 
 	/* Boot Flash connected to FBCS0 */
 	MCF_FBCS0_CSAR = FLASH_ADDRESS;
@@ -236,6 +322,7 @@ void fbcs_init(void)
 			| MCF_FBCS_CSCR_WS(7));
 	MCF_FBCS0_CSMR = (MCF_FBCS_CSMR_BAM_32M
 			| MCF_FBCS_CSMR_V);
+#endif
 }
 
 void sdramc_init(void)

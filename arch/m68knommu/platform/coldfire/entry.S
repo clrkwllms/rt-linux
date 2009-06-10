@@ -103,8 +103,25 @@ ret_from_signal:
 	addql	#4,%sp
 
 ret_from_exception:
+	move    #0x2700,%sr             /* disable intrs */
 	btst	#5,%sp@(PT_SR)		/* check if returning to kernel */
 	jeq	Luser_return		/* if so, skip resched, signals */
+
+#ifdef CONFIG_PREEMPT
+	movel	%sp,%d1			/* get thread_info pointer */
+	andl	#-THREAD_SIZE,%d1	/* at base of kernel stack */
+	movel	%d1,%a0
+	movel	%a0@(TI_FLAGS),%d1	/* get thread_info->flags */
+	andl	#_TIF_NEED_RESCHED,%d1
+	jeq	Lkernel_return
+
+	movel	%a0@(TI_PREEMPTCOUNT),%d1
+	cmpl	#0,%d1
+	jne	Lkernel_return
+
+	pea	Lkernel_return
+	jmp	preempt_schedule_irq	/* preempt the kernel */
+#endif
 
 Lkernel_return:
 	moveml	%sp@,%d1-%d5/%a0-%a2
@@ -140,6 +157,7 @@ Lreturn:
 
 Lwork_to_do:
 	movel	%a0@(TI_FLAGS),%d1	/* get thread_info->flags */
+	move    #0x2000,%sr             /* enable intrs again */
 	btst	#TIF_NEED_RESCHED,%d1
 	jne	reschedule
 
@@ -197,20 +215,8 @@ ENTRY(fasthandler)
 	RESTORE_LOCAL
 
 ENTRY(ret_from_interrupt)
-	jeq	2f
-1:
-	RESTORE_ALL
-2:
-	moveb	%sp@(PT_SR),%d0
-	andl	#0x7,%d0
-	jhi	1b
-
-	/* check if we need to do software interrupts */
-	movel	irq_stat+CPUSTAT_SOFTIRQ_PENDING,%d0
-	jeq	ret_from_exception
-
-	pea	ret_from_exception
-	jmp	do_softirq
+	/* the fasthandler is confusing me, haven't seen any user */
+	jmp	ret_from_exception
 
 /*
  * Beware - when entering resume, prev (the current task) is

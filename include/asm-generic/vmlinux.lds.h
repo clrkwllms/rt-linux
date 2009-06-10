@@ -6,6 +6,10 @@
 #define VMLINUX_SYMBOL(_sym_) _sym_
 #endif
 
+#ifndef OUTPUT_DATA_SECTION
+#define OUTPUT_DATA_SECTION
+#endif
+
 /* Align . to a 8 byte boundary equals to maximum function alignment. */
 #define ALIGN_FUNCTION()  . = ALIGN(8)
 
@@ -25,11 +29,11 @@
 		*(.rodata) *(.rodata.*)					\
 		*(__vermagic)		/* Kernel version magic */	\
 		*(__markers_strings)	/* Markers: strings */		\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	.rodata1          : AT(ADDR(.rodata1) - LOAD_OFFSET) {		\
 		*(.rodata1)						\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* PCI quirks */						\
 	.pci_fixup        : AT(ADDR(.pci_fixup) - LOAD_OFFSET) {	\
@@ -48,89 +52,89 @@
 		VMLINUX_SYMBOL(__start_pci_fixups_resume) = .;		\
 		*(.pci_fixup_resume)					\
 		VMLINUX_SYMBOL(__end_pci_fixups_resume) = .;		\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* RapidIO route ops */						\
 	.rio_route        : AT(ADDR(.rio_route) - LOAD_OFFSET) {	\
 		VMLINUX_SYMBOL(__start_rio_route_ops) = .;		\
 		*(.rio_route_ops)					\
 		VMLINUX_SYMBOL(__end_rio_route_ops) = .;		\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Kernel symbol table: Normal symbols */			\
 	__ksymtab         : AT(ADDR(__ksymtab) - LOAD_OFFSET) {		\
 		VMLINUX_SYMBOL(__start___ksymtab) = .;			\
 		*(__ksymtab)						\
 		VMLINUX_SYMBOL(__stop___ksymtab) = .;			\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Kernel symbol table: GPL-only symbols */			\
 	__ksymtab_gpl     : AT(ADDR(__ksymtab_gpl) - LOAD_OFFSET) {	\
 		VMLINUX_SYMBOL(__start___ksymtab_gpl) = .;		\
 		*(__ksymtab_gpl)					\
 		VMLINUX_SYMBOL(__stop___ksymtab_gpl) = .;		\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Kernel symbol table: Normal unused symbols */		\
 	__ksymtab_unused  : AT(ADDR(__ksymtab_unused) - LOAD_OFFSET) {	\
 		VMLINUX_SYMBOL(__start___ksymtab_unused) = .;		\
 		*(__ksymtab_unused)					\
 		VMLINUX_SYMBOL(__stop___ksymtab_unused) = .;		\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Kernel symbol table: GPL-only unused symbols */		\
 	__ksymtab_unused_gpl : AT(ADDR(__ksymtab_unused_gpl) - LOAD_OFFSET) { \
 		VMLINUX_SYMBOL(__start___ksymtab_unused_gpl) = .;	\
 		*(__ksymtab_unused_gpl)					\
 		VMLINUX_SYMBOL(__stop___ksymtab_unused_gpl) = .;	\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Kernel symbol table: GPL-future-only symbols */		\
 	__ksymtab_gpl_future : AT(ADDR(__ksymtab_gpl_future) - LOAD_OFFSET) { \
 		VMLINUX_SYMBOL(__start___ksymtab_gpl_future) = .;	\
 		*(__ksymtab_gpl_future)					\
 		VMLINUX_SYMBOL(__stop___ksymtab_gpl_future) = .;	\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Kernel symbol table: Normal symbols */			\
 	__kcrctab         : AT(ADDR(__kcrctab) - LOAD_OFFSET) {		\
 		VMLINUX_SYMBOL(__start___kcrctab) = .;			\
 		*(__kcrctab)						\
 		VMLINUX_SYMBOL(__stop___kcrctab) = .;			\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Kernel symbol table: GPL-only symbols */			\
 	__kcrctab_gpl     : AT(ADDR(__kcrctab_gpl) - LOAD_OFFSET) {	\
 		VMLINUX_SYMBOL(__start___kcrctab_gpl) = .;		\
 		*(__kcrctab_gpl)					\
 		VMLINUX_SYMBOL(__stop___kcrctab_gpl) = .;		\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Kernel symbol table: Normal unused symbols */		\
 	__kcrctab_unused  : AT(ADDR(__kcrctab_unused) - LOAD_OFFSET) {	\
 		VMLINUX_SYMBOL(__start___kcrctab_unused) = .;		\
 		*(__kcrctab_unused)					\
 		VMLINUX_SYMBOL(__stop___kcrctab_unused) = .;		\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Kernel symbol table: GPL-only unused symbols */		\
 	__kcrctab_unused_gpl : AT(ADDR(__kcrctab_unused_gpl) - LOAD_OFFSET) { \
 		VMLINUX_SYMBOL(__start___kcrctab_unused_gpl) = .;	\
 		*(__kcrctab_unused_gpl)					\
 		VMLINUX_SYMBOL(__stop___kcrctab_unused_gpl) = .;	\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Kernel symbol table: GPL-future-only symbols */		\
 	__kcrctab_gpl_future : AT(ADDR(__kcrctab_gpl_future) - LOAD_OFFSET) { \
 		VMLINUX_SYMBOL(__start___kcrctab_gpl_future) = .;	\
 		*(__kcrctab_gpl_future)					\
 		VMLINUX_SYMBOL(__stop___kcrctab_gpl_future) = .;	\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Kernel symbol table: strings */				\
         __ksymtab_strings : AT(ADDR(__ksymtab_strings) - LOAD_OFFSET) {	\
 		*(__ksymtab_strings)					\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	/* Built-in module parameters. */				\
 	__param : AT(ADDR(__param) - LOAD_OFFSET) {			\
@@ -138,7 +142,7 @@
 		*(__param)						\
 		VMLINUX_SYMBOL(__stop___param) = .;			\
 		VMLINUX_SYMBOL(__end_rodata) = .;			\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 									\
 	. = ALIGN((align));
 
@@ -227,7 +231,7 @@
 		__start___bug_table = .;				\
 		*(__bug_table)						\
 		__stop___bug_table = .;					\
-	}
+	} OUTPUT_DATA_SECTION
 
 #define NOTES								\
 	.notes : AT(ADDR(.notes) - LOAD_OFFSET) {			\
@@ -261,5 +265,5 @@
 	.data.percpu  : AT(ADDR(.data.percpu) - LOAD_OFFSET) {		\
 		*(.data.percpu)						\
 		*(.data.percpu.shared_aligned)				\
-	}								\
+	} OUTPUT_DATA_SECTION						\
 	__per_cpu_end = .;

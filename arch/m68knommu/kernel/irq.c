@@ -23,7 +23,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs *regs)
 	struct pt_regs *oldregs = set_irq_regs(regs);
 
 	irq_enter();
-	__do_IRQ(irq);
+	generic_handle_irq(irq);
 	irq_exit();
 
 	set_irq_regs(oldregs);
@@ -34,12 +34,16 @@ void ack_bad_irq(unsigned int irq)
 	printk(KERN_ERR "IRQ: unexpected irq=%d\n", irq);
 }
 
+#ifndef CONFIG_M523x
 static struct irq_chip m_irq_chip = {
 	.name		= "M68K-INTC",
 	.enable		= enable_vector,
 	.disable	= disable_vector,
 	.ack		= ack_vector,
 };
+#else
+void coldfire_init_irq_chip(void);
+#endif
 
 void __init init_IRQ(void)
 {
@@ -47,12 +51,16 @@ void __init init_IRQ(void)
 
 	init_vectors();
 
+#ifndef CONFIG_M523x
 	for (irq = 0; (irq < NR_IRQS); irq++) {
 		irq_desc[irq].status = IRQ_DISABLED;
 		irq_desc[irq].action = NULL;
 		irq_desc[irq].depth = 1;
 		irq_desc[irq].chip = &m_irq_chip;
 	}
+#else
+	coldfire_init_irq_chip();
+#endif
 }
 
 int show_interrupts(struct seq_file *p, void *v)
@@ -79,4 +87,3 @@ int show_interrupts(struct seq_file *p, void *v)
 
 	return 0;
 }
-

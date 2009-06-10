@@ -30,6 +30,9 @@
 #define	MCFINT_VECBASE		64		/* Vector base number */
 #define	MCFINT_UART0		13		/* Interrupt number for UART0 */
 #define	MCFINT_PIT1		55		/* Interrupt number for PIT1 */
+#define	MCFINT_QSPI		18		/* Interrupt number for QSPI */
+
+#define	MCF5282_INTC0		(MCF_IPSBAR + MCFICM_INTC0)
 
 /*
  *	SDRAM configuration registers.
@@ -50,12 +53,21 @@
 /* Port UA Pin Assignment Register (8 Bit) */
 #define MCF5282_GPIO_PUAPAR	0x10005C
 
+#define MCF5282_GPIO_PORTQS     (*(volatile u8 *)  (MCF_IPSBAR + 0x0010000D))
+#define MCF5282_GPIO_DDRQS      (*(volatile u8 *)  (MCF_IPSBAR + 0x00100021))
+#define MCF5282_GPIO_PORTQSP    (*(volatile u8 *)  (MCF_IPSBAR + 0x00100035))
+#define MCF5282_GPIO_PQSPAR     (*(volatile u8 *)  (MCF_IPSBAR + 0x00100059))
+
+#define MCF5282_GPIO_PEPAR      (*(volatile u16 *) (MCF_IPSBAR + 0x00100052))
+
+#define MCF5282_GPIO_PORTE      (*(volatile u8 *)  (MCF_IPSBAR + 0x00100004))
+#define MCF5282_GPIO_DDRE       (*(volatile u8 *)  (MCF_IPSBAR + 0x00100018))
+#define MCF5282_GPIO_PORTEP     (*(volatile u8 *)  (MCF_IPSBAR + 0x0010002C))
+
 /* Interrupt Mask Register Register Low */ 
 #define MCF5282_INTC0_IMRL      (volatile u32 *) (MCF_IPSBAR + 0x0C0C)
 /* Interrupt Control Register 7 */
 #define MCF5282_INTC0_ICR17     (volatile u8 *) (MCF_IPSBAR + 0x0C51)
-
-
 
 /*********************************************************************
 *
@@ -63,31 +75,31 @@
 *
 *********************************************************************/
 /* Read/Write access macros for general use */
-#define MCF5282_I2C_I2ADR       (volatile u8 *) (MCF_IPSBAR + 0x0300) // Address 
-#define MCF5282_I2C_I2FDR       (volatile u8 *) (MCF_IPSBAR + 0x0304) // Freq Divider
-#define MCF5282_I2C_I2CR        (volatile u8 *) (MCF_IPSBAR + 0x0308) // Control
-#define MCF5282_I2C_I2SR        (volatile u8 *) (MCF_IPSBAR + 0x030C) // Status
-#define MCF5282_I2C_I2DR        (volatile u8 *) (MCF_IPSBAR + 0x0310) // Data I/O
+#define MCF_I2C_I2ADR       (volatile u8 *) (MCF_IPSBAR + 0x0300) // Address
+#define MCF_I2C_I2FDR       (volatile u8 *) (MCF_IPSBAR + 0x0304) // Freq Divider
+#define MCF_I2C_I2CR        (volatile u8 *) (MCF_IPSBAR + 0x0308) // Control
+#define MCF_I2C_I2SR        (volatile u8 *) (MCF_IPSBAR + 0x030C) // Status
+#define MCF_I2C_I2DR        (volatile u8 *) (MCF_IPSBAR + 0x0310) // Data I/O
 
 /* Bit level definitions and macros */
-#define MCF5282_I2C_I2ADR_ADDR(x)                       (((x)&0x7F)<<0x01)
+#define MCF_I2C_I2ADR_ADDR(x)                       (((x)&0x7F)<<0x01)
 
-#define MCF5282_I2C_I2FDR_IC(x)                         (((x)&0x3F))
+#define MCF_I2C_I2FDR_IC(x)                         (((x)&0x3F))
 
-#define MCF5282_I2C_I2CR_IEN    (0x80)	// I2C enable
-#define MCF5282_I2C_I2CR_IIEN   (0x40)  // interrupt enable
-#define MCF5282_I2C_I2CR_MSTA   (0x20)  // master/slave mode
-#define MCF5282_I2C_I2CR_MTX    (0x10)  // transmit/receive mode
-#define MCF5282_I2C_I2CR_TXAK   (0x08)  // transmit acknowledge enable
-#define MCF5282_I2C_I2CR_RSTA   (0x04)  // repeat start
+#define MCF_I2C_I2CR_IEN    (0x80)	// I2C enable
+#define MCF_I2C_I2CR_IIEN   (0x40)  // interrupt enable
+#define MCF_I2C_I2CR_MSTA   (0x20)  // master/slave mode
+#define MCF_I2C_I2CR_MTX    (0x10)  // transmit/receive mode
+#define MCF_I2C_I2CR_TXAK   (0x08)  // transmit acknowledge enable
+#define MCF_I2C_I2CR_RSTA   (0x04)  // repeat start
 
-#define MCF5282_I2C_I2SR_ICF    (0x80)  // data transfer bit
-#define MCF5282_I2C_I2SR_IAAS   (0x40)  // I2C addressed as a slave
-#define MCF5282_I2C_I2SR_IBB    (0x20)  // I2C bus busy
-#define MCF5282_I2C_I2SR_IAL    (0x10)  // aribitration lost
-#define MCF5282_I2C_I2SR_SRW    (0x04)  // slave read/write
-#define MCF5282_I2C_I2SR_IIF    (0x02)  // I2C interrupt
-#define MCF5282_I2C_I2SR_RXAK   (0x01)  // received acknowledge
+#define MCF_I2C_I2SR_ICF    (0x80)  // data transfer bit
+#define MCF_I2C_I2SR_IAAS   (0x40)  // I2C addressed as a slave
+#define MCF_I2C_I2SR_IBB    (0x20)  // I2C bus busy
+#define MCF_I2C_I2SR_IAL    (0x10)  // aribitration lost
+#define MCF_I2C_I2SR_SRW    (0x04)  // slave read/write
+#define MCF_I2C_I2SR_IIF    (0x02)  // I2C interrupt
+#define MCF_I2C_I2SR_RXAK   (0x01)  // received acknowledge
 
 
 
@@ -106,6 +118,11 @@
 #define MCF5282_QSPI_QAR        MCF_IPSBAR + 0x0350
 #define MCF5282_QSPI_QDR        MCF_IPSBAR + 0x0354
 #define MCF5282_QSPI_QCR        MCF_IPSBAR + 0x0354
+
+#define MCF5282_QSPI_PAR  	(MCF_IPSBAR + 0x00100059)
+
+#define MCF5282_QSPI_IRQ_SOURCE   18
+#define MCF5282_QSPI_IRQ_VECTOR   (64 + MCF5282_QSPI_IRQ_SOURCE)
 
 /* Bit level definitions and macros */
 #define MCF5282_QSPI_QMR_MSTR                           (0x8000)

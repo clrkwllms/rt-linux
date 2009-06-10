@@ -7,6 +7,8 @@
  *	run kernels.
  */
 
+#define	OUTPUT_DATA_SECTION > DATA
+
 #include <asm-generic/vmlinux.lds.h>
 
 #if defined(CONFIG_RAMKERNEL)
@@ -33,7 +35,6 @@
 #ifndef DATA_ADDR
 #define	DATA_ADDR
 #endif
-
 
 OUTPUT_ARCH(m68k)
 ENTRY(_start)
@@ -64,80 +65,31 @@ SECTIONS {
 		_stext = . ;
 		TEXT_TEXT
 		SCHED_TEXT
+		LOCK_TEXT
         	*(.text.lock)
 
-		. = ALIGN(16);          /* Exception table              */
-		__start___ex_table = .;
-		*(__ex_table)
-		__stop___ex_table = .;
-
-		*(.rodata) *(.rodata.*)
-		*(__vermagic)		/* Kernel version magic */
-		*(.rodata1)
-		*(.rodata.str1.1)
-
-		/* Kernel symbol table: Normal symbols */
-		. = ALIGN(4);
-		__start___ksymtab = .;
-		*(__ksymtab)
-		__stop___ksymtab = .;
-
-		/* Kernel symbol table: GPL-only symbols */
-		__start___ksymtab_gpl = .;
-		*(__ksymtab_gpl)
-		__stop___ksymtab_gpl = .;
-
-		/* Kernel symbol table: Normal unused symbols */
-		__start___ksymtab_unused = .;
-		*(__ksymtab_unused)
-		__stop___ksymtab_unused = .;
-
-		/* Kernel symbol table: GPL-only unused symbols */
-		__start___ksymtab_unused_gpl = .;
-		*(__ksymtab_unused_gpl)
-		__stop___ksymtab_unused_gpl = .;
-
-		/* Kernel symbol table: GPL-future symbols */
-		__start___ksymtab_gpl_future = .;
-		*(__ksymtab_gpl_future)
-		__stop___ksymtab_gpl_future = .;
-
-		/* Kernel symbol table: Normal symbols */
-		__start___kcrctab = .;
-		*(__kcrctab)
-		__stop___kcrctab = .;
-
-		/* Kernel symbol table: GPL-only symbols */
-		__start___kcrctab_gpl = .;
-		*(__kcrctab_gpl)
-		__stop___kcrctab_gpl = .;
-
-		/* Kernel symbol table: GPL-future symbols */
-		__start___kcrctab_gpl_future = .;
-		*(__kcrctab_gpl_future)
-		__stop___kcrctab_gpl_future = .;
-
-		/* Kernel symbol table: strings */
-		*(__ksymtab_strings)
-
-		/* Built-in module parameters */
 		. = ALIGN(4) ;
-		__start___param = .;
-		*(__param)
-		__stop___param = .;
-
-		. = ALIGN(4) ;
-		_etext = . ;
 	} > TEXT
+
+	_etext = . ;
+
+	RODATA
 
 	.data DATA_ADDR : {
 		. = ALIGN(4);
 		_sdata = . ;
 		DATA_DATA
+		. = ALIGN(16);          /* Exception table              */
+		__start___ex_table = .;
+		*(__ex_table)
+		__stop___ex_table = .;
 		. = ALIGN(8192) ;
 		*(.data.init_task)
 		_edata = . ;
 	} > DATA
+
+	BUG_TABLE
+	PERCPU(4096)
 
 	.init : {
 		. = ALIGN(4096);
@@ -169,12 +121,6 @@ SECTIONS {
 		__init_end = .;
 	} > INIT
 
-	/DISCARD/ : {
-		*(.exit.text)
-		*(.exit.data)
-		*(.exitcall.exit)
-	}
-
 	.bss : {
 		. = ALIGN(4);
 		_sbss = . ;
@@ -184,5 +130,11 @@ SECTIONS {
 		_ebss = . ;
 	} > BSS
 
-}
+	_end = . ;
 
+	/DISCARD/ : {
+		*(.exit.text)
+		*(.exit.data)
+		*(.exitcall.exit)
+	}
+}

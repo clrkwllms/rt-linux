@@ -952,6 +952,16 @@ unsigned long do_mmap_pgoff(struct file *file,
 	if (ret < 0)
 		goto error;
 
+	/*
+	 * If the driver implemented his own mmap(), the
+	 * base addr could have changed. Therefor
+	 * vm_end musst be updated to.
+	 *
+	 * See comment of DaveM in mm/mmap.c as reference
+	 */
+	if(addr != vma->vm_start)
+		vma->vm_end = vma->vm_start + len;
+
 	/* okay... we have a mapping; now we have to register it */
 	result = (void *) vma->vm_start;
 

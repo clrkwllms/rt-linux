@@ -65,7 +65,8 @@ struct timer_list mcfrs_timer_struct;
 #define CONSOLE_BAUD_RATE 	115200
 #define DEFAULT_CBAUD		B115200
 #elif defined(CONFIG_ARNEWSH) || defined(CONFIG_FREESCALE) || \
-      defined(CONFIG_senTec) || defined(CONFIG_SNEHA) || defined(CONFIG_AVNET)
+      defined(CONFIG_senTec) || defined(CONFIG_SNEHA) || defined(CONFIG_AVNET) || \
+      defined(CONFIG_SAVANT)
 #define	CONSOLE_BAUD_RATE	19200
 #define	DEFAULT_CBAUD		B19200
 #endif
@@ -324,7 +325,7 @@ static void mcfrs_start(struct tty_struct *tty)
  * -----------------------------------------------------------------------
  */
 
-static inline void receive_chars(struct mcf_serial *info)
+static noinline void receive_chars(struct mcf_serial *info)
 {
 	volatile unsigned char	*uartp;
 	struct tty_struct	*tty = info->tty;
@@ -369,7 +370,7 @@ static inline void receive_chars(struct mcf_serial *info)
 	return;
 }
 
-static inline void transmit_chars(struct mcf_serial *info)
+static noinline void transmit_chars(struct mcf_serial *info)
 {
 	volatile unsigned char	*uartp;
 
@@ -1489,14 +1490,28 @@ int mcfrs_open(struct tty_struct *tty, struct file * filp)
 /*
  *	Based on the line number set up the internal interrupt stuff.
  */
-static void mcfrs_irqinit(struct mcf_serial *info)
+static int mcfrs_irqinit(struct mcf_serial *info)
 {
+	volatile unsigned char *uartp;
+	int ret;
+
+	uartp = info->addr;
+	/* Clear mask, so no surprise interrupts. */
+	uartp[MCFUART_UIMR] = 0;
+
+	ret = request_irq(info->irq, mcfrs_interrupt, IRQF_DISABLED,
+			"ColdFire UART", NULL);
+	if (ret) {
+		printk("MCFRS: Unable to attach ColdFire UART %d interrupt "
+				"vector=%d, error: %d\n", info->line,
+				info->irq, ret);
+		return ret;
+	}
+
 #if defined(CONFIG_M5272)
 	volatile unsigned long	*icrp;
 	volatile unsigned long	*portp;
-	volatile unsigned char	*uartp;
 
-	uartp = info->addr;
 	icrp = (volatile unsigned long *) (MCF_MBAR + MCFSIM_ICR2);
 
 	switch (info->line) {
@@ -1518,10 +1533,9 @@ static void mcfrs_irqinit(struct mcf_serial *info)
 	portp = (volatile unsigned long *) (MCF_MBAR + MCFSIM_PDCNT);
 	*portp = (*portp & ~0x000003fc) | 0x000002a8;
 #elif defined(CONFIG_M523x) || defined(CONFIG_M527x) || defined(CONFIG_M528x)
-	volatile unsigned char *icrp, *uartp;
+#if !defined(CONFIG_M523x)
+	volatile unsigned char *icrp;
 	volatile unsigned long *imrp;
-
-	uartp = info->addr;
 
 	icrp = (volatile unsigned char *) (MCF_MBAR + MCFICM_INTC0 +
 		MCFINTC_ICR0 + MCFINT_UART0 + info->line);
@@ -1530,6 +1544,14 @@ static void mcfrs_irqinit(struct mcf_serial *info)
 	imrp = (volatile unsigned long *) (MCF_MBAR + MCFICM_INTC0 +
 		MCFINTC_IMRL);
 	*imrp &= ~((1 << (info->irq - MCFINT_VECBASE)) | 1);
+#endif
+#if defined(CONFIG_M523x)
+	{
+		volatile unsigned short *par_uartp;
+		par_uartp = (volatile unsigned short *) (MCF_MBAR + MCF523x_GPIO_PAR_UART);
+		*par_uartp = 0x3FFF; /* setup GPIO for UART0, UART1 & UART2 */
+	}
+#endif
 #if defined(CONFIG_M527x)
 	{
 		/*
@@ -1554,37 +1576,38 @@ static void mcfrs_irqinit(struct mcf_serial *info)
 	}
 #endif
 #elif defined(CONFIG_M520x)
-	volatile unsigned char *icrp, *uartp;
-	volatile unsigned long *imrp;
+	{
+		volatile unsigned char *icrp;
+		volatile unsigned long *imrp;
 
-	uartp = info->addr;
+		icrp = (volatile unsigned char *) (MCF_MBAR + MCFICM_INTC0 +
+				MCFINTC_ICR0 + MCFINT_UART0 + info->line);
+		*icrp = 0x03;
 
-	icrp = (volatile unsigned char *) (MCF_MBAR + MCFICM_INTC0 +
-		MCFINTC_ICR0 + MCFINT_UART0 + info->line);
-	*icrp = 0x03;
-
-	imrp = (volatile unsigned long *) (MCF_MBAR + MCFICM_INTC0 +
-		MCFINTC_IMRL);
-	*imrp &= ~((1 << (info->irq - MCFINT_VECBASE)) | 1);
-	if (info->line < 2) {
-		unsigned short *uart_par;
-		uart_par = (unsigned short *)(MCF_IPSBAR + MCF_GPIO_PAR_UART);
-		if (info->line == 0)
-			*uart_par |=  MCF_GPIO_PAR_UART_PAR_UTXD0
-				  | MCF_GPIO_PAR_UART_PAR_URXD0;
-		else if (info->line == 1)
-			*uart_par |=  MCF_GPIO_PAR_UART_PAR_UTXD1
-				  | MCF_GPIO_PAR_UART_PAR_URXD1;
+		imrp = (volatile unsigned long *) (MCF_MBAR + MCFICM_INTC0 +
+				MCFINTC_IMRL);
+		*imrp &= ~((1 << (info->irq - MCFINT_VECBASE)) | 1);
+		if (info->line < 2) {
+			unsigned short *uart_par;
+			uart_par = (unsigned short *)(MCF_IPSBAR +
+					MCF_GPIO_PAR_UART);
+			if (info->line == 0)
+				*uart_par |=  MCF_GPIO_PAR_UART_PAR_UTXD0
+					| MCF_GPIO_PAR_UART_PAR_URXD0;
+			else if (info->line == 1)
+				*uart_par |=  MCF_GPIO_PAR_UART_PAR_UTXD1
+					| MCF_GPIO_PAR_UART_PAR_URXD1;
 		} else if (info->line == 2) {
 			unsigned char *feci2c_par;
-			feci2c_par = (unsigned char *)(MCF_IPSBAR +  MCF_GPIO_PAR_FECI2C);
+			feci2c_par = (unsigned char *)(MCF_IPSBAR +
+					MCF_GPIO_PAR_FECI2C);
 			*feci2c_par &= ~0x0F;
 			*feci2c_par |=  MCF_GPIO_PAR_FECI2C_PAR_SCL_UTXD2
-				    | MCF_GPIO_PAR_FECI2C_PAR_SDA_URXD2;
+				| MCF_GPIO_PAR_FECI2C_PAR_SDA_URXD2;
 		}
+	}
 #elif defined(CONFIG_M532x)
-	volatile unsigned char *uartp;
-	uartp = info->addr;
+
 	switch (info->line) {
 	case 0:
 		MCF_INTC0_ICR26 = 0x3;
@@ -1605,7 +1628,6 @@ static void mcfrs_irqinit(struct mcf_serial *info)
 		break;
 	}
 #else
-	volatile unsigned char	*icrp, *uartp;
 
 	switch (info->line) {
 	case 0:
@@ -1623,23 +1645,12 @@ static void mcfrs_irqinit(struct mcf_serial *info)
 	default:
 		printk("MCFRS: don't know how to handle UART %d interrupt?\n",
 			info->line);
-		return;
+		return -ENODEV;
 	}
 
-	uartp = info->addr;
 	uartp[MCFUART_UIVR] = info->irq;
 #endif
-
-	/* Clear mask, so no surprise interrupts. */
-	uartp[MCFUART_UIMR] = 0;
-
-	if (request_irq(info->irq, mcfrs_interrupt, IRQF_DISABLED,
-	    "ColdFire UART", NULL)) {
-		printk("MCFRS: Unable to attach ColdFire UART %d interrupt "
-			"vector=%d\n", info->line, info->irq);
-	}
-
-	return;
+	return 0;
 }
 
 
@@ -1729,7 +1740,6 @@ static int __init
 mcfrs_init(void)
 {
 	struct mcf_serial	*info;
-	unsigned long		flags;
 	int			i;
 
 	/* Setup base handler, and timer table. */
@@ -1769,12 +1779,12 @@ mcfrs_init(void)
 		return(-EBUSY);
 	}
 
-	local_irq_save(flags);
-
 	/*
 	 *	Configure all the attached serial ports.
 	 */
 	for (i = 0, info = mcfrs_table; (i < NR_PORTS); i++, info++) {
+		int ret;
+
 		info->magic = SERIAL_MAGIC;
 		info->line = i;
 		info->tty = 0;
@@ -1792,14 +1802,11 @@ mcfrs_init(void)
 
 		info->imr = 0;
 		mcfrs_setsignals(info, 0, 0);
-		mcfrs_irqinit(info);
-
-		printk("ttyS%d at 0x%04x (irq = %d)", info->line,
-			(unsigned int) info->addr, info->irq);
-		printk(" is a builtin ColdFire UART\n");
+		ret = mcfrs_irqinit(info);
+		if (!ret)
+			printk("ttyS%d at 0x%p (irq = %d) is a builtin "
+			"ColdFire UART\n", info->line, info->addr, info->irq);
 	}
-
-	local_irq_restore(flags);
 	return 0;
 }
 

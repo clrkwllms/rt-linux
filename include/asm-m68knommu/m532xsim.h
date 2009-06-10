@@ -16,6 +16,7 @@
 #define MCFINT_VECBASE      64
 #define MCFINT_UART0        26          /* Interrupt number for UART0 */
 #define MCFINT_UART1        27          /* Interrupt number for UART1 */
+#define MCFINT_UART2        28          /* Interrupt number for UART2 */
 
 #define MCF_WTM_WCR	MCF_REG16(0xFC098000)
 
@@ -72,8 +73,20 @@
 #define	mcf_getimr()		\
 	*((volatile unsigned long *) (MCF_MBAR + MCFSIM_IMR))
 
+#define	mcf_getimrh()		\
+	*((volatile unsigned long *) (MCF_MBAR + MCFSIM_IMRH))
+
+#define	mcf_getimrl()		\
+	*((volatile unsigned long *) (MCF_MBAR + MCFSIM_IMRL))
+
 #define	mcf_setimr(imr)		\
 	*((volatile unsigned long *) (MCF_MBAR + MCFSIM_IMR)) = (imr);
+
+#define	mcf_setimrh(imr)		\
+	*((volatile unsigned long *) (MCF_MBAR + MCFSIM_IMRH)) = (imr);
+
+#define	mcf_setimrl(imr)		\
+	*((volatile unsigned long *) (MCF_MBAR + MCFSIM_IMRL)) = (imr);
 
 #define	mcf_getipr()		\
 	*((volatile unsigned long *) (MCF_MBAR + MCFSIM_IPR))
@@ -131,31 +144,31 @@
  *********************************************************************/
 
 /* Read/Write access macros for general use */
-#define MCF532x_I2C_I2ADR       (volatile u8 *) (0xFC058000) // Address 
-#define MCF532x_I2C_I2FDR       (volatile u8 *) (0xFC058004) // Freq Divider
-#define MCF532x_I2C_I2CR        (volatile u8 *) (0xFC058008) // Control
-#define MCF532x_I2C_I2SR        (volatile u8 *) (0xFC05800C) // Status
-#define MCF532x_I2C_I2DR        (volatile u8 *) (0xFC058010) // Data I/O
+#define MCF_I2C_I2ADR       (volatile u8 *) (0xFC058000) /* Address */
+#define MCF_I2C_I2FDR       (volatile u8 *) (0xFC058004) /* Freq Divider */
+#define MCF_I2C_I2CR        (volatile u8 *) (0xFC058008) /* Control */
+#define MCF_I2C_I2SR        (volatile u8 *) (0xFC05800C) /* Status */
+#define MCF_I2C_I2DR        (volatile u8 *) (0xFC058010) /* Data I/O */
 
 /* Bit level definitions and macros */
-#define MCF532x_I2C_I2ADR_ADDR(x)                       (((x)&0x7F)<<0x01)
+#define MCF_I2C_I2ADR_ADDR(x)                       (((x)&0x7F)<<0x01)
 
-#define MCF532x_I2C_I2FDR_IC(x)                         (((x)&0x3F))
+#define MCF_I2C_I2FDR_IC(x)                         (((x)&0x3F))
 
-#define MCF532x_I2C_I2CR_IEN    (0x80)	// I2C enable
-#define MCF532x_I2C_I2CR_IIEN   (0x40)  // interrupt enable
-#define MCF532x_I2C_I2CR_MSTA   (0x20)  // master/slave mode
-#define MCF532x_I2C_I2CR_MTX    (0x10)  // transmit/receive mode
-#define MCF532x_I2C_I2CR_TXAK   (0x08)  // transmit acknowledge enable
-#define MCF532x_I2C_I2CR_RSTA   (0x04)  // repeat start
+#define MCF_I2C_I2CR_IEN    (0x80)  /* I2C enable */
+#define MCF_I2C_I2CR_IIEN   (0x40)  /* interrupt enable */
+#define MCF_I2C_I2CR_MSTA   (0x20)  /* master/slave mode */
+#define MCF_I2C_I2CR_MTX    (0x10)  /* transmit/receive mode */
+#define MCF_I2C_I2CR_TXAK   (0x08)  /* transmit acknowledge enable */
+#define MCF_I2C_I2CR_RSTA   (0x04)  /* repeat start */
 
-#define MCF532x_I2C_I2SR_ICF    (0x80)  // data transfer bit
-#define MCF532x_I2C_I2SR_IAAS   (0x40)  // I2C addressed as a slave
-#define MCF532x_I2C_I2SR_IBB    (0x20)  // I2C bus busy
-#define MCF532x_I2C_I2SR_IAL    (0x10)  // aribitration lost
-#define MCF532x_I2C_I2SR_SRW    (0x04)  // slave read/write
-#define MCF532x_I2C_I2SR_IIF    (0x02)  // I2C interrupt
-#define MCF532x_I2C_I2SR_RXAK   (0x01)  // received acknowledge
+#define MCF_I2C_I2SR_ICF    (0x80)  /* data transfer bit */
+#define MCF_I2C_I2SR_IAAS   (0x40)  /* I2C addressed as a slave */
+#define MCF_I2C_I2SR_IBB    (0x20)  /* I2C bus busy */
+#define MCF_I2C_I2SR_IAL    (0x10)  /* aribitration lost */
+#define MCF_I2C_I2SR_SRW    (0x04)  /* slave read/write */
+#define MCF_I2C_I2SR_IIF    (0x02)  /* I2C interrupt */
+#define MCF_I2C_I2SR_RXAK   (0x01)  /* received acknowledge */
 
 #define MCF532x_PAR_FECI2C	(volatile u8 *) (0xFC0A4053)
 
@@ -2233,6 +2246,37 @@
 #define MCF_EPORT_EPFR_EPF5            (0x20)
 #define MCF_EPORT_EPFR_EPF6            (0x40)
 #define MCF_EPORT_EPFR_EPF7            (0x80)
+
+/*********************************************************************
+ *
+ * Cross-Bar Switch (XBS)
+ *
+ *********************************************************************/
+#define MCF_XBS_PRS1                   MCF_REG32(0xFC004100)
+#define MCF_XBS_CRS1                   MCF_REG32(0xFC004110)
+#define MCF_XBS_PRS4                   MCF_REG32(0xFC004400)
+#define MCF_XBS_CRS4                   MCF_REG32(0xFC004410)
+#define MCF_XBS_PRS6                   MCF_REG32(0xFC004600)
+#define MCF_XBS_CRS6                   MCF_REG32(0xFC004610)
+#define MCF_XBS_PRS7                   MCF_REG32(0xFC004700)
+#define MCF_XBS_CRS7                   MCF_REG32(0xFC004710)
+
+#define MCF_XBS_PRIO_FACTTEST(x)       (((x)&0x7) << 28)
+#define MCF_XBS_PRIO_USBOTG(x)         (((x)&0x7) << 24)
+#define MCF_XBS_PRIO_USBHOST(x)        (((x)&0x7) << 20)
+#define MCF_XBS_PRIO_LCD(x)            (((x)&0x7) << 16)
+#define MCF_XBS_PRIO_FEC(x)            (((x)&0x7) << 8)
+#define MCF_XBS_PRIO_EDMA(x)           (((x)&0x7) << 4)
+#define MCF_XBS_PRIO_CORE(x)           (((x)&0x7) << 0)
+
+#define MCF_PRIO_LVL_1                 (0)
+#define MCF_PRIO_LVL_2                 (1)
+#define MCF_PRIO_LVL_3                 (2)
+#define MCF_PRIO_LVL_4                 (3)
+#define MCF_PRIO_LVL_5                 (4)
+#define MCF_PRIO_LVL_6                 (5)
+#define MCF_PRIO_LVL_7                 (6)
+
 
 /********************************************************************/
 #endif	/* m532xsim_h */
