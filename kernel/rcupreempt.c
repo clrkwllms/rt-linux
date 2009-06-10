@@ -995,6 +995,7 @@ void __init rcu_init_rt(void)
 		rdp->donelist = NULL;
 		rdp->donetail = &rdp->donelist;
 	}
+	rcu_preempt_boost_init();
 }
 
 /*

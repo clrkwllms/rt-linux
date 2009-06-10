@@ -60,7 +60,13 @@ enum rcu_boost_state {
 
 #define N_RCU_BOOST_STATE (RCU_BOOST_INVALID + 1)
 
-#endif /* #ifdef CONFIG_PREEMPT_RCU_BOOST */
+int __init rcu_preempt_boost_init(void);
+
+#else /* CONFIG_PREEPMT_RCU_BOOST */
+
+#define rcu_preempt_boost_init() do { } while (0)
+
+#endif /* CONFIG_PREEMPT_RCU_BOOST */
 
 /*
  * Someone might want to pass call_rcu_bh as a function pointer.

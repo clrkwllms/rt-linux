@@ -174,9 +174,9 @@ int rcu_trace_boost_create(struct dentry *rcudir)
 	rcuboostdir = debugfs_create_file("rcuboost", 0444, rcudir,
 					  NULL, &rcuboost_fops);
 	if (!rcuboostdir)
-		return 1;
+		return 0;
 
-	return 0;
+	return 1;
 }
 EXPORT_SYMBOL_GPL(rcu_trace_boost_create);
 
@@ -552,10 +552,9 @@ static int krcupreemptd(void *data)
 	return 0;
 }
 
-static int __init rcu_preempt_boost_init(void)
+int __init rcu_preempt_boost_init(void)
 {
 	struct rcu_boost_dat *rbd;
-	struct task_struct *p;
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
@@ -566,6 +565,13 @@ static int __init rcu_preempt_boost_init(void)
 		INIT_LIST_HEAD(&rbd->rbs_toboost);
 		INIT_LIST_HEAD(&rbd->rbs_boosted);
 	}
+
+	return 0;
+}
+
+static int __init rcu_preempt_start_krcupreemptd(void)
+{
+	struct task_struct *p;
 
 	p = kthread_create(krcupreemptd, NULL,
 			   "krcupreemptd");
@@ -579,4 +585,4 @@ static int __init rcu_preempt_boost_init(void)
 	return 0;
 }
 
-core_initcall(rcu_preempt_boost_init);
+__initcall(rcu_preempt_start_krcupreemptd);
