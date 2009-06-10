@@ -17,6 +17,7 @@
 #include <linux/list.h>
 
 #include <asm/alternative.h>
+#include <asm/processor.h>
 #include <asm/asm.h>
 
 #define CALL_BACK		5
@@ -31,16 +32,6 @@ union ftrace_code_union {
 		int offset;
 	} __attribute__((packed));
 };
-
-notrace int ftrace_ip_converted(unsigned long ip)
-{
-	unsigned long save;
-
-	ip -= CALL_BACK;
-	save = *(long *)ip;
-
-	return save == *ftrace_nop;
-}
 
 static int notrace ftrace_calc_offset(long ip, long addr)
 {
@@ -57,7 +48,7 @@ notrace unsigned char *ftrace_call_replace(unsigned long ip, unsigned long addr)
 	static union ftrace_code_union calc;
 
 	calc.e8		= 0xe8;
-	calc.offset	= ftrace_calc_offset(ip, addr);
+	calc.offset	= ftrace_calc_offset(ip + CALL_BACK, addr);
 
 	/*
 	 * No locking needed, this must be called via kstop_machine
@@ -75,9 +66,6 @@ ftrace_modify_code(unsigned long ip, unsigned char *old_code,
 	unsigned new = *(unsigned *)new_code; /* 4 bytes */
 	unsigned char newch = new_code[4];
 	int faulted = 0;
-
-	/* move the IP back to the start of the call */
-	ip -= CALL_BACK;
 
 	/*
 	 * Note: Due to modules and __init, code can
@@ -116,8 +104,6 @@ notrace int ftrace_update_ftrace_func(ftrace_func_t func)
 	unsigned char old[5], *new;
 	int ret;
 
-	ip += CALL_BACK;
-
 	memcpy(old, &ftrace_call, 5);
 	new = ftrace_call_replace(ip, (unsigned long)func);
 	ret = ftrace_modify_code(ip, old, new);
@@ -127,33 +113,22 @@ notrace int ftrace_update_ftrace_func(ftrace_func_t func)
 
 notrace int ftrace_mcount_set(unsigned long *data)
 {
-	unsigned long ip = (long)(&mcount_call);
-	unsigned long *addr = data;
-	unsigned char old[5], *new;
-
-	/* ip is at the location, but modify code will subtact this */
-	ip += CALL_BACK;
-
-	/*
-	 * Replace the mcount stub with a pointer to the
-	 * ip recorder function.
-	 */
-	memcpy(old, &mcount_call, 5);
-	new = ftrace_call_replace(ip, *addr);
-	*addr = ftrace_modify_code(ip, old, new);
-
+	*data = 0;
 	return 0;
 }
 
+asm("\t.section .rodata, \"a\"\nftrace_nop5: "
+    P6_NOP5
+    "\t.previous");
+extern const unsigned char ftrace_nop5[];
+
 int __init ftrace_dyn_arch_init(void *data)
 {
-	const unsigned char *const *noptable = find_nop_table();
-
 	/* This is running in kstop_machine */
 
 	ftrace_mcount_set(data);
 
-	ftrace_nop = (unsigned long *)noptable[CALL_BACK];
+	ftrace_nop = (unsigned long *)ftrace_nop5;
 
 	return 0;
 }

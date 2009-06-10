@@ -159,7 +159,10 @@ SECTIONS
 	_einittext = .;
   }
   __initdata_begin = .;
-  .init.data : AT(ADDR(.init.data) - LOAD_OFFSET) { *(.init.data) }
+  .init.data : AT(ADDR(.init.data) - LOAD_OFFSET) {
+	*(.init.data)
+	MCOUNT_REC()
+    }
   __initdata_end = .;
   . = ALIGN(16);
   __setup_start = .;

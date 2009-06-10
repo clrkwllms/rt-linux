@@ -203,4 +203,30 @@ static inline void ftrace_event_program_event(ktime_t *expires, int64_t *delta)
 # define ftrace_event_program_event(p, d)	do { } while (0)
 #endif /* CONFIG_TRACE_EVENTS */
 
+#ifdef CONFIG_FTRACE_MCOUNT_RECORD
+extern void ftrace_init(void);
+extern void ftrace_init_module(unsigned long *start, unsigned long *end);
+#else
+static inline void ftrace_init(void) { }
+static inline void
+ftrace_init_module(unsigned long *start, unsigned long *end) { }
+#endif
+
+/* Upstream has include/asm-x86/ftrace.h, but we'll hack this for now */
+#ifdef CONFIG_X86
+static inline unsigned long ftrace_call_adjust(unsigned long addr)
+{
+	/*
+	 * call mcount is "e8 <4 byte offset>"
+	 * The addr points to the 4 byte offset and the caller of this
+	 * function wants the pointer to e8. Simply subtract one.
+	 */
+	return addr - 1;
+}
+#else
+static inline unsigned long ftrace_call_adjust(unsigned long addr)
+{
+	return addr;
+}
+#endif
 #endif /* _LINUX_FTRACE_H */

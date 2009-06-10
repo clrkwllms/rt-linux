@@ -1132,19 +1132,6 @@ ENDPROC(xen_failsafe_callback)
 #ifdef CONFIG_DYNAMIC_FTRACE
 
 ENTRY(mcount)
-	pushl %eax
-	pushl %ecx
-	pushl %edx
-	movl 0xc(%esp), %eax
-
-.globl mcount_call
-mcount_call:
-	call ftrace_stub
-
-	popl %edx
-	popl %ecx
-	popl %eax
-
 	ret
 END(mcount)
 
