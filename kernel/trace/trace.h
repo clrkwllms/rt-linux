@@ -162,7 +162,7 @@ struct trace_entry {
 struct trace_array_cpu {
 	struct list_head	trace_pages;
 	atomic_t		disabled;
-	raw_spinlock_t		lock;
+	__raw_spinlock_t	lock;
 	struct lock_class_key	lock_key;
 
 	/* these fields get copied into max-trace: */

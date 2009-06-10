@@ -412,7 +412,7 @@ int tracing_wakeup_hist __read_mostly = 1;
 static unsigned wakeup_prio = (unsigned)-1 ;
 static struct task_struct *wakeup_task;
 static cycle_t wakeup_start;
-static DEFINE_SPINLOCK(wakeup_lock);
+static DEFINE_RAW_SPINLOCK(wakeup_lock);
 
 notrace void tracing_hist_wakeup_start(struct task_struct *p,
 				       struct task_struct *curr)

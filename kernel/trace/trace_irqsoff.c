@@ -24,7 +24,7 @@ static int				tracer_enabled __read_mostly;
 
 static DEFINE_PER_CPU(int, tracing_cpu);
 
-static DEFINE_SPINLOCK(max_trace_lock);
+static DEFINE_RAW_SPINLOCK(max_trace_lock);
 
 enum {
 	TRACER_IRQS_OFF		= (1 << 1),

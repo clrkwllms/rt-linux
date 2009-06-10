@@ -26,7 +26,7 @@ static struct task_struct	*wakeup_task;
 static int			wakeup_cpu;
 static unsigned			wakeup_prio = -1;
 
-static DEFINE_SPINLOCK(wakeup_lock);
+static DEFINE_RAW_SPINLOCK(wakeup_lock);
 
 static void __wakeup_reset(struct trace_array *tr);
 
