@@ -74,7 +74,9 @@ void cpu_idle(void)
 				local_irq_disable();
 
 				/* check again after disabling irqs */
-				if (!need_resched() && !cpu_should_die())
+				if (!need_resched() &&
+				    !need_resched_delayed() &&
+				    !cpu_should_die())
 					ppc_md.power_save();
 
 				local_irq_enable();
