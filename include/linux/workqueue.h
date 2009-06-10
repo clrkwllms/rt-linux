@@ -9,6 +9,7 @@
 #include <linux/linkage.h>
 #include <linux/bitops.h>
 #include <linux/lockdep.h>
+#include <linux/plist.h>
 #include <asm/atomic.h>
 
 struct workqueue_struct;
@@ -27,7 +28,7 @@ struct work_struct {
 #define WORK_STRUCT_PENDING 0		/* T if work item pending execution */
 #define WORK_STRUCT_FLAG_MASK (3UL)
 #define WORK_STRUCT_WQ_DATA_MASK (~WORK_STRUCT_FLAG_MASK)
-	struct list_head entry;
+	struct plist_node entry;
 	work_func_t func;
 #ifdef CONFIG_LOCKDEP
 	struct lockdep_map lockdep_map;
@@ -59,7 +60,7 @@ struct execute_work {
 
 #define __WORK_INITIALIZER(n, f) {				\
 	.data = WORK_DATA_INIT(),				\
-	.entry	= { &(n).entry, &(n).entry },			\
+	.entry	= PLIST_NODE_INIT(n.entry, MAX_PRIO),		\
 	.func = (f),						\
 	__WORK_INIT_LOCKDEP_MAP(#n, &(n))			\
 	}
@@ -100,14 +101,14 @@ struct execute_work {
 									\
 		(_work)->data = (atomic_long_t) WORK_DATA_INIT();	\
 		lockdep_init_map(&(_work)->lockdep_map, #_work, &__key, 0);\
-		INIT_LIST_HEAD(&(_work)->entry);			\
+		plist_node_init(&(_work)->entry, -1);			\
 		PREPARE_WORK((_work), (_func));				\
 	} while (0)
 #else
 #define INIT_WORK(_work, _func)						\
 	do {								\
 		(_work)->data = (atomic_long_t) WORK_DATA_INIT();	\
-		INIT_LIST_HEAD(&(_work)->entry);			\
+		plist_node_init(&(_work)->entry, -1);			\
 		PREPARE_WORK((_work), (_func));				\
 	} while (0)
 #endif
