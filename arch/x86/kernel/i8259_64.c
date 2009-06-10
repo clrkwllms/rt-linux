@@ -397,6 +397,7 @@ device_initcall(i8259A_init_sysfs);
 
 static struct irqaction irq2 = {
 	.handler = no_action,
+	.flags = IRQF_NODELAY,
 	.mask = CPU_MASK_NONE,
 	.name = "cascade",
 };

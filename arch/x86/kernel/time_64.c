@@ -259,7 +259,8 @@ static unsigned int __init tsc_calibrate_cpu_khz(void)
 
 static struct irqaction irq0 = {
 	.handler	= timer_event_interrupt,
-	.flags		= IRQF_DISABLED | IRQF_IRQPOLL | IRQF_NOBALANCING,
+	.flags		= IRQF_DISABLED | IRQF_IRQPOLL | IRQF_NOBALANCING |
+			  IRQF_NODELAY,
 	.mask		= CPU_MASK_NONE,
 	.name		= "timer"
 };
