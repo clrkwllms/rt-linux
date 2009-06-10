@@ -11,6 +11,13 @@ static inline int trace_valid_entry(struct trace_entry *entry)
 	case TRACE_WAKE:
 	case TRACE_STACK:
 	case TRACE_SPECIAL:
+	case TRACE_IRQ:
+	case TRACE_FAULT:
+	case TRACE_TIMER_SET:
+	case TRACE_TIMER_TRIG:
+	case TRACE_TIMESTAMP:
+	case TRACE_TASK_ACT:
+	case TRACE_TASK_DEACT:
 		return 1;
 	}
 	return 0;

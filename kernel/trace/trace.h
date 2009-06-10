@@ -17,6 +17,13 @@ enum trace_type {
 	TRACE_SPECIAL,
 	TRACE_MMIO_RW,
 	TRACE_MMIO_MAP,
+	TRACE_IRQ,
+	TRACE_FAULT,
+	TRACE_TIMER_SET,
+	TRACE_TIMER_TRIG,
+	TRACE_TIMESTAMP,
+	TRACE_TASK_ACT,
+	TRACE_TASK_DEACT,
 
 	__TRACE_LAST_TYPE
 };
@@ -50,6 +57,45 @@ struct special_entry {
 	unsigned long		arg3;
 };
 
+struct irq_entry {
+	unsigned long		ip;
+	unsigned long		ret_ip;
+	unsigned		irq;
+	unsigned		usermode;
+};
+
+struct fault_entry {
+	unsigned long		ip;
+	unsigned long		ret_ip;
+	unsigned long		errorcode;
+	unsigned long		address;
+};
+
+struct timer_entry {
+	unsigned long		ip;
+	ktime_t			expire;
+	void			*timer;
+};
+
+struct timestamp_entry {
+	unsigned long		ip;
+	ktime_t			now;
+};
+
+struct task_entry {
+	unsigned long		ip;
+	pid_t			pid;
+	unsigned		prio;
+	int			cpu;
+};
+
+struct wakeup_entry {
+	unsigned long		ip;
+	pid_t			pid;
+	unsigned		prio;
+	unsigned		curr_prio;
+};
+
 /*
  * Stack-trace entry:
  */
@@ -80,6 +126,12 @@ struct trace_entry {
 		struct stack_entry		stack;
 		struct mmiotrace_rw		mmiorw;
 		struct mmiotrace_map		mmiomap;
+		struct irq_entry		irq;
+		struct fault_entry		fault;
+		struct timer_entry		timer;
+		struct timestamp_entry		timestamp;
+		struct task_entry		task;
+		struct wakeup_entry		wakeup;
 	};
 };
 
@@ -222,6 +274,52 @@ void trace_function(struct trace_array *tr,
 		    unsigned long ip,
 		    unsigned long parent_ip,
 		    unsigned long flags);
+void tracing_event_irq(struct trace_array *tr,
+		       struct trace_array_cpu *data,
+		       unsigned long flags,
+		       unsigned long ip,
+		       int irq, int usermode,
+		       unsigned long retip);
+void tracing_event_fault(struct trace_array *tr,
+			 struct trace_array_cpu *data,
+			 unsigned long flags,
+			 unsigned long ip,
+			 unsigned long retip,
+			 unsigned long error_code,
+			 unsigned long address);
+void tracing_event_timer_set(struct trace_array *tr,
+			     struct trace_array_cpu *data,
+			     unsigned long flags,
+			     unsigned long ip,
+			     ktime_t *expires, void *timer);
+void tracing_event_timer_triggered(struct trace_array *tr,
+				   struct trace_array_cpu *data,
+				   unsigned long flags,
+				   unsigned long ip,
+				   ktime_t *expired, void *timer);
+void tracing_event_timestamp(struct trace_array *tr,
+			     struct trace_array_cpu *data,
+			     unsigned long flags,
+			     unsigned long ip,
+			     ktime_t *now);
+void tracing_event_task_activate(struct trace_array *tr,
+				 struct trace_array_cpu *data,
+				 unsigned long flags,
+				 unsigned long ip,
+				 struct task_struct *p,
+				 int cpu);
+void tracing_event_task_deactivate(struct trace_array *tr,
+				   struct trace_array_cpu *data,
+				   unsigned long flags,
+				   unsigned long ip,
+				   struct task_struct *p,
+				   int cpu);
+void tracing_event_wakeup(struct trace_array *tr,
+			  struct trace_array_cpu *data,
+			  unsigned long flags,
+			  unsigned long ip,
+			  pid_t pid, int prio,
+			  int curr_prio);
 
 void tracing_start_cmdline_record(void);
 void tracing_stop_cmdline_record(void);

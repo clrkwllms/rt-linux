@@ -19,5 +19,6 @@ obj-$(CONFIG_IRQSOFF_TRACER) += trace_irqsoff.o
 obj-$(CONFIG_PREEMPT_TRACER) += trace_irqsoff.o
 obj-$(CONFIG_SCHED_TRACER) += trace_sched_wakeup.o
 obj-$(CONFIG_MMIOTRACE) += trace_mmiotrace.o
+obj-$(CONFIG_EVENT_TRACER) += trace_events.o
 
 libftrace-y := ftrace.o
