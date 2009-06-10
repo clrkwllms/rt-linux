@@ -176,7 +176,19 @@ static inline void __lock_cpu_pcp(unsigned long *flags, int cpu)
 static inline void lock_cpu_pcp(unsigned long *flags, int *this_cpu)
 {
 #ifdef CONFIG_PREEMPT_RT
-	(void)get_cpu_var_locked(pcp_locks, this_cpu);
+	spinlock_t *lock;
+	int cpu;
+
+again:
+	cpu = raw_smp_processor_id();
+	lock = &__get_cpu_lock(pcp_locks, cpu);
+
+	spin_lock(lock);
+	if (unlikely(!cpu_online(cpu))) {
+		spin_unlock(lock);
+		goto again;
+	}
+	*this_cpu = cpu;
 	flags = 0;
 #else
 	local_irq_save(*flags);
@@ -2781,12 +2793,17 @@ static inline void free_zone_pagesets(int cpu)
 	struct zone *zone;
 
 	for_each_zone(zone) {
-		struct per_cpu_pageset *pset = zone_pcp(zone, cpu);
+		struct per_cpu_pageset *pset;
+		unsigned long flags;
+
+		__lock_cpu_pcp(&flags, cpu);
+		pset = zone_pcp(zone, cpu);
+		zone_pcp(zone, cpu) = NULL;
+		unlock_cpu_pcp(flags, cpu);
 
 		/* Free per_cpu_pageset if it is slab allocated */
 		if (pset != &boot_pageset[cpu])
 			kfree(pset);
-		zone_pcp(zone, cpu) = NULL;
 	}
 }
 
@@ -2812,6 +2829,7 @@ static int __cpuinit pageset_cpuup_callback(struct notifier_block *nfb,
 	default:
 		break;
 	}
+
 	return ret;
 }
 
