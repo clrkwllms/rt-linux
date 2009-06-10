@@ -1011,12 +1011,17 @@ struct file *create_write_pipe(void)
 	return ERR_PTR(err);
 }
 
-void free_write_pipe(struct file *f)
+void free_write_pipe(struct file *file)
 {
-	free_pipe_info(f->f_dentry->d_inode);
-	dput(f->f_path.dentry);
-	mntput(f->f_path.mnt);
-	put_filp(f);
+	struct dentry *dentry = file->f_path.dentry;
+	struct vfsmount *mnt = file->f_path.mnt;
+
+	free_pipe_info(file->f_dentry->d_inode);
+	file->f_path.dentry = NULL;
+	file->f_path.mnt = NULL;
+	put_filp(file);
+	dput(dentry);
+	mntput(mnt);
 }
 
 struct file *create_read_pipe(struct file *wrf)
