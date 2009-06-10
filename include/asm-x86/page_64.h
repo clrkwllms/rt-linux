@@ -22,12 +22,21 @@
 #define IRQSTACK_ORDER 2
 #define IRQSTACKSIZE (PAGE_SIZE << IRQSTACK_ORDER)
 
+#ifdef CONFIG_PREEMPT_RT
+#define STACKFAULT_STACK 0
+#define DOUBLEFAULT_STACK 1
+#define NMI_STACK 2
+#define DEBUG_STACK 0
+#define MCE_STACK 3
+#define N_EXCEPTION_STACKS 3  /* hw limit: 7 */
+#else
 #define STACKFAULT_STACK 1
 #define DOUBLEFAULT_STACK 2
 #define NMI_STACK 3
 #define DEBUG_STACK 4
 #define MCE_STACK 5
 #define N_EXCEPTION_STACKS 5  /* hw limit: 7 */
+#endif
 
 #define LARGE_PAGE_MASK (~(LARGE_PAGE_SIZE-1))
 #define LARGE_PAGE_SIZE (_AC(1,UL) << PMD_SHIFT)

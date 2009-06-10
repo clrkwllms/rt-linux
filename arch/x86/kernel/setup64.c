@@ -248,7 +248,9 @@ void __cpuinit cpu_init (void)
 	for (v = 0; v < N_EXCEPTION_STACKS; v++) {
 		static const unsigned int order[N_EXCEPTION_STACKS] = {
 			[0 ... N_EXCEPTION_STACKS - 1] = EXCEPTION_STACK_ORDER,
+#if DEBUG_STACK > 0
 			[DEBUG_STACK - 1] = DEBUG_STACK_ORDER
+#endif
 		};
 		if (cpu) {
 			estacks = (char *)__get_free_pages(GFP_ATOMIC, order[v]);
