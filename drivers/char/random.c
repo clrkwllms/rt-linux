@@ -580,8 +580,11 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	preempt_disable();
 	/* if over the trickle threshold, use only 1 in 4096 samples */
 	if (input_pool.entropy_count > trickle_thresh &&
-	    (__get_cpu_var(trickle_count)++ & 0xfff))
-		goto out;
+	    (__get_cpu_var(trickle_count)++ & 0xfff)) {
+		preempt_enable();
+		return;
+	}
+	preempt_enable();
 
 	sample.jiffies = jiffies;
 	sample.cycles = get_cycles();
@@ -626,9 +629,6 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 
 	if(input_pool.entropy_count >= random_read_wakeup_thresh)
 		wake_up_interruptible(&random_read_wait);
-
-out:
-	preempt_enable();
 }
 
 void add_input_randomness(unsigned int type, unsigned int code,
