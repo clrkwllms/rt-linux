@@ -1188,6 +1188,12 @@ move_one_task_fair(struct rq *this_rq, int this_cpu, struct rq *busiest,
 
 	return 0;
 }
+
+static int
+is_runnable_fair(struct rq *this_rq)
+{
+	return !!this_rq->cfs.nr_running;
+}
 #endif
 
 /*
@@ -1307,6 +1313,7 @@ static const struct sched_class fair_sched_class = {
 #ifdef CONFIG_SMP
 	.load_balance		= load_balance_fair,
 	.move_one_task		= move_one_task_fair,
+	.is_runnable		= is_runnable_fair,
 #endif
 
 	.set_curr_task          = set_curr_task_fair,

@@ -792,6 +792,11 @@ static void switched_from_rt(struct rq *rq, struct task_struct *p,
 	if (!rq->rt.rt_nr_running)
 		pull_rt_task(rq);
 }
+
+static int is_runnable_rt(struct rq *rq)
+{
+	return !!rq->rt.rt_nr_running;
+}
 #endif /* CONFIG_SMP */
 
 /*
@@ -920,6 +925,7 @@ const struct sched_class rt_sched_class = {
 	.post_schedule		= post_schedule_rt,
 	.task_wake_up		= task_wake_up_rt,
 	.switched_from		= switched_from_rt,
+	.is_runnable		= is_runnable_rt,
 #endif
 
 	.set_curr_task          = set_curr_task_rt,

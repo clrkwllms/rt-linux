@@ -59,6 +59,12 @@ move_one_task_idle(struct rq *this_rq, int this_cpu, struct rq *busiest,
 {
 	return 0;
 }
+
+static int
+is_runnable_idle(struct rq *this_rq)
+{
+	return 1;
+}
 #endif
 
 static void task_tick_idle(struct rq *rq, struct task_struct *curr)
@@ -117,6 +123,7 @@ const struct sched_class idle_sched_class = {
 #ifdef CONFIG_SMP
 	.load_balance		= load_balance_idle,
 	.move_one_task		= move_one_task_idle,
+	.is_runnable		= is_runnable_idle,
 #endif
 
 	.set_curr_task          = set_curr_task_idle,

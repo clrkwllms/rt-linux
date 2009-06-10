@@ -2533,6 +2533,21 @@ out:
 	return max_load_move - rem_load_move;
 }
 
+static int is_runnable(struct rq *this_rq, const struct sched_class *target_class)
+{
+	const struct sched_class *class = sched_class_highest;
+
+	for (; class; class = class->next) {
+		if (class->is_runnable(this_rq))
+			return 1;
+
+		if (class == target_class)
+			break;
+	}
+
+	return 0;
+}
+
 /*
  * move_tasks tries to move up to max_load_move weighted load from busiest to
  * this_rq, as part of a balancing operation within domain "sd".
@@ -2552,15 +2567,15 @@ static int move_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 	*lb_flags |= LB_START;
 
 	do {
-		unsigned long load_moved;
-
 		*lb_flags |= LB_COMPLETE;
 
-		load_moved = class->load_balance(this_rq, this_cpu, busiest,
-				max_load_move - total_load_moved,
+		total_load_moved += class->load_balance(this_rq, this_cpu,
+				busiest, max_load_move - total_load_moved,
 				sd, idle, lb_flags, &this_best_prio);
 
-		total_load_moved += load_moved;
+		if (idle == CPU_NEWLY_IDLE &&
+				is_runnable(this_rq, class))
+			return 1;
 
 		if (*lb_flags & LB_COMPLETE) {
 			class = class->next;
@@ -2568,9 +2583,6 @@ static int move_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 		} else if (sched_feat(LB_BREAK)) {
 			*lb_flags &= ~LB_START;
 			schedstat_inc(this_rq, lb_breaks);
-
-			if (idle == CPU_NEWLY_IDLE && total_load_moved)
-				break;
 
 			double_rq_unlock(this_rq, busiest);
 			local_irq_enable();

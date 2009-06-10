@@ -922,6 +922,8 @@ struct sched_class {
 	void (*pre_schedule) (struct rq *this_rq, struct task_struct *task);
 	void (*post_schedule) (struct rq *this_rq);
 	void (*task_wake_up) (struct rq *this_rq, struct task_struct *task);
+
+	int (*is_runnable) (struct rq *this_rq);
 #endif
 
 	void (*set_curr_task) (struct rq *rq);
