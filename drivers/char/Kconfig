@@ -753,6 +753,46 @@ config JS_RTC
 	  To compile this driver as a module, choose M here: the
 	  module will be called js-rtc.
 
+config RTC_HISTOGRAM
+	bool "Real Time Clock Histogram Support"
+	default n
+	depends on RTC
+	---help---
+	  If you say Y here then the kernel will track the delivery and
+	  wakeup latency of /dev/rtc using tasks and will report a
+	  histogram to the kernel log when the application closes /dev/rtc.
+
+config BLOCKER
+	tristate "Priority Inheritance Debugging (Blocker) Device Support"
+	depends on X86
+	default y
+	---help---
+	  If you say Y here then a device will be created that the userspace
+	  pi_test suite uses to test and measure kernel locking primitives.
+
+config LPPTEST
+	tristate "Parallel Port Based Latency Measurement Device"
+	depends on !PARPORT && X86
+	default y
+	---help---
+	  If you say Y here then a device will be created that the userspace
+	  testlpp utility uses to measure IRQ latencies of a target system
+	  from an independent measurement system.
+
+	  NOTE: this code assumes x86 PCs and that the parallel port is
+	  bidirectional and is on IRQ 7.
+
+	  to use the device, both the target and the source system needs to
+	  run a kernel with CONFIG_LPPTEST enabled. To measure latencies,
+	  use the scripts/testlpp utility in your kernel source directory,
+	  and run it (as root) on the source system - it will start printing
+	  out the latencies it took to get a response from the target system:
+
+	    Latency of response: 12.2 usecs (121265 cycles)
+
+	  then generate various workloads on the target system to see how
+	  (worst-case-) latencies are impacted.
+
 config SGI_DS1286
 	tristate "SGI DS1286 RTC support"
 	depends on SGI_IP22

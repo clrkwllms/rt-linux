@@ -90,6 +90,32 @@
 #include <linux/pci.h>
 #include <asm/ebus.h>
 
+#ifdef CONFIG_MIPS
+# include <asm/time.h>
+#endif
+
+#ifdef CONFIG_RTC_HISTOGRAM
+
+static cycles_t last_interrupt_time;
+
+#include <asm/timex.h>
+
+#define CPU_MHZ		(cpu_khz / 1000)
+
+#define HISTSIZE	10000
+static int histogram[HISTSIZE];
+
+static int rtc_state;
+
+enum rtc_states {
+	S_STARTUP,		/* First round - let the application start */
+	S_IDLE,			/* Waiting for an interrupt */
+	S_WAITING_FOR_READ,	/* Signal delivered. waiting for rtc_read() */
+	S_READ_MISSED,		/* Signal delivered, read() deadline missed */
+};
+
+#endif
+
 static unsigned long rtc_port;
 static int rtc_irq = PCI_IRQ_NONE;
 #endif
@@ -222,7 +248,146 @@ static inline unsigned char rtc_is_updating(void)
 	return uip;
 }
 
+#ifndef RTC_IRQ
+# undef CONFIG_RTC_HISTOGRAM
+#endif
+
+static inline void rtc_open_event(void)
+{
+#ifdef CONFIG_RTC_HISTOGRAM
+	int i;
+
+	last_interrupt_time = 0;
+	rtc_state = S_STARTUP;
+	rtc_irq_data = 0;
+
+	for (i = 0; i < HISTSIZE; i++)
+		histogram[i] = 0;
+#endif
+}
+
+static inline void rtc_wake_event(void)
+{
+#ifndef CONFIG_RTC_HISTOGRAM
+	kill_fasync (&rtc_async_queue, SIGIO, POLL_IN);
+#else
+	if (!(rtc_status & RTC_IS_OPEN))
+		return;
+
+	switch (rtc_state) {
+	/* Startup */
+	case S_STARTUP:
+		kill_fasync (&rtc_async_queue, SIGIO, POLL_IN);
+		break;
+	/* Waiting for an interrupt */
+	case S_IDLE:
+		kill_fasync (&rtc_async_queue, SIGIO, POLL_IN);
+		last_interrupt_time = get_cycles();
+		rtc_state = S_WAITING_FOR_READ;
+		break;
+
+	/* Signal has been delivered. waiting for rtc_read() */
+	case S_WAITING_FOR_READ:
+		/*
+		 * Well foo.  The usermode application didn't
+		 * schedule and read in time.
+		 */
+		last_interrupt_time = get_cycles();
+		rtc_state = S_READ_MISSED;
+		printk("Read missed before next interrupt\n");
+		break;
+	/* Signal has been delivered, read() deadline was missed */
+	case S_READ_MISSED:
+		/*
+		 * Not much we can do here.  We're waiting for the usermode
+		 * application to read the rtc
+		 */
+		last_interrupt_time = get_cycles();
+		break;
+	}
+#endif
+}
+
+static inline void rtc_read_event(void)
+{
+#ifdef CONFIG_RTC_HISTOGRAM
+	cycles_t now = get_cycles();
+
+	switch (rtc_state) {
+	/* Startup */
+	case S_STARTUP:
+		rtc_state = S_IDLE;
+		break;
+
+	/* Waiting for an interrupt */
+	case S_IDLE:
+		printk("bug in rtc_read(): called in state S_IDLE!\n");
+		break;
+	case S_WAITING_FOR_READ:	/*
+					 * Signal has been delivered.
+					 * waiting for rtc_read()
+					 */
+		/*
+		 * Well done
+		 */
+	case S_READ_MISSED:		/*
+					 * Signal has been delivered, read()
+					 * deadline was missed
+					 */
+		/*
+		 * So, you finally got here.
+		 */
+		if (!last_interrupt_time)
+			printk("bug in rtc_read(): last_interrupt_time = 0\n");
+		rtc_state = S_IDLE;
+		{
+			cycles_t latency = now - last_interrupt_time;
+			unsigned long delta;	/* Microseconds */
+
+			delta = latency;
+			delta /= CPU_MHZ;
+
+			if (delta > 1000 * 1000) {
+				printk("rtc: eek\n");
+			} else {
+				unsigned long slot = delta;
+				if (slot >= HISTSIZE)
+					slot = HISTSIZE - 1;
+				histogram[slot]++;
+				if (delta > 2000)
+					printk("wow!  That was a "
+							"%ld millisec bump\n",
+						delta / 1000);
+			}
+		}
+		rtc_state = S_IDLE;
+		break;
+	}
+#endif
+}
+
+static inline void rtc_close_event(void)
+{
+#ifdef CONFIG_RTC_HISTOGRAM
+	int i = 0;
+	unsigned long total = 0;
+
+	for (i = 0; i < HISTSIZE; i++)
+		total += histogram[i];
+	if (!total)
+		return;
+
+	printk("\nrtc latency histogram of {%s/%d, %lu samples}:\n",
+		current->comm, current->pid, total);
+	for (i = 0; i < HISTSIZE; i++) {
+		if (histogram[i])
+			printk("%d %d\n", i, histogram[i]);
+	}
+#endif
+}
+
 #ifdef RTC_IRQ
+
 /*
  *	A very tiny interrupt handler. It runs with IRQF_DISABLED set,
  *	but there is possibility of conflicting with the set_rtc_mmss()
@@ -266,9 +431,9 @@ irqreturn_t rtc_interrupt(int irq, void *dev_id)
 	if (rtc_callback)
 		rtc_callback->func(rtc_callback->private_data);
 	spin_unlock(&rtc_task_lock);
-	wake_up_interruptible(&rtc_wait);	
 
-	kill_fasync (&rtc_async_queue, SIGIO, POLL_IN);
+	rtc_wake_event();
+	wake_up_interruptible(&rtc_wait);
 
 	return IRQ_HANDLED;
 }
@@ -377,6 +542,8 @@ static ssize_t rtc_read(struct file *file, char __user *buf,
 		}
 		schedule();
 	} while (1);
+
+	rtc_read_event();
 
 	if (count == sizeof(unsigned int))
 		retval = put_user(data, (unsigned int __user *)buf) ?: sizeof(int);
@@ -610,6 +777,11 @@ static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 		save_freq_select = CMOS_READ(RTC_FREQ_SELECT);
 		CMOS_WRITE((save_freq_select|RTC_DIV_RESET2), RTC_FREQ_SELECT);
 
+		/*
+		 * Make CMOS date writes nonpreemptible even on PREEMPT_RT.
+		 * There's a limit to everything! =B-)
+		 */
+		preempt_disable();
 #ifdef CONFIG_MACH_DECSTATION
 		CMOS_WRITE(real_yrs, RTC_DEC_YEAR);
 #endif
@@ -619,6 +791,7 @@ static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 		CMOS_WRITE(hrs, RTC_HOURS);
 		CMOS_WRITE(min, RTC_MINUTES);
 		CMOS_WRITE(sec, RTC_SECONDS);
+		preempt_enable();
 
 		CMOS_WRITE(save_control, RTC_CONTROL);
 		CMOS_WRITE(save_freq_select, RTC_FREQ_SELECT);
@@ -717,6 +890,7 @@ static int rtc_open(struct inode *inode, struct file *file)
 	if(rtc_status & RTC_IS_OPEN)
 		goto out_busy;
 
+	rtc_open_event();
 	rtc_status |= RTC_IS_OPEN;
 
 	rtc_irq_data = 0;
@@ -772,6 +946,7 @@ no_irq:
 	rtc_irq_data = 0;
 	rtc_status &= ~RTC_IS_OPEN;
 	spin_unlock_irq (&rtc_lock);
+	rtc_close_event();
 	return 0;
 }
 

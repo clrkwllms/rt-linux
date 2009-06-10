@@ -12,6 +12,9 @@ hostprogs-$(CONFIG_LOGO)         += pnmtologo
 hostprogs-$(CONFIG_VT)           += conmakehash
 hostprogs-$(CONFIG_PROM_CONSOLE) += conmakehash
 hostprogs-$(CONFIG_IKCONFIG)     += bin2c
+ifdef CONFIG_LPPTEST
+hostprogs-y      += testlpp
+endif
 
 always		:= $(hostprogs-y) $(hostprogs-m)
 
