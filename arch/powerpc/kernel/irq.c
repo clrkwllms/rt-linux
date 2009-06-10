@@ -403,7 +403,7 @@ void do_softirq(void)
 #ifdef CONFIG_PPC_MERGE
 
 static LIST_HEAD(irq_hosts);
-static DEFINE_SPINLOCK(irq_big_lock);
+static DEFINE_RAW_SPINLOCK(irq_big_lock);
 static DEFINE_PER_CPU(unsigned int, irq_radix_reader);
 static unsigned int irq_radix_writer;
 struct irq_map_entry irq_map[NR_IRQS];
