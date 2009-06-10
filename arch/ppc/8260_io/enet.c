@@ -115,7 +115,7 @@ struct scc_enet_private {
 	scc_t	*sccp;
 	struct	net_device_stats stats;
 	uint	tx_full;
-	spinlock_t lock;
+	raw_spinlock_t lock;
 };
 
 static int scc_enet_open(struct net_device *dev);

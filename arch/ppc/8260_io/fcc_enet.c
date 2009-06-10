@@ -375,7 +375,7 @@ struct fcc_enet_private {
 	volatile fcc_enet_t	*ep;
 	struct	net_device_stats stats;
 	uint	tx_free;
-	spinlock_t lock;
+	raw_spinlock_t lock;
 
 #ifdef	CONFIG_USE_MDIO
 	uint	phy_id;

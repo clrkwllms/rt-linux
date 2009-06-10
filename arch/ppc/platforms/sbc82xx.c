@@ -65,7 +65,7 @@ static void sbc82xx_time_init(void)
 
 static volatile char *sbc82xx_i8259_map;
 static char sbc82xx_i8259_mask = 0xff;
-static DEFINE_SPINLOCK(sbc82xx_i8259_lock);
+static DEFINE_RAW_SPINLOCK(sbc82xx_i8259_lock);
 
 static void sbc82xx_i8259_mask_and_ack_irq(unsigned int irq_nr)
 {

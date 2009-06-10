@@ -126,6 +126,16 @@ void smp_send_reschedule(int cpu)
 		smp_ops->message_pass(cpu, PPC_MSG_RESCHEDULE);
 }
 
+/*
+ * this function sends a 'reschedule' IPI to all other CPUs.
+ * This is used when RT tasks are starving and other CPUs
+ * might be able to run them:
+ */
+void smp_send_reschedule_allbutself(void)
+{
+	smp_ops->message_pass(MSG_ALL_BUT_SELF, PPC_MSG_RESCHEDULE);
+}
+
 #ifdef CONFIG_DEBUGGER
 void smp_send_debugger_break(int cpu)
 {
@@ -157,7 +167,7 @@ static void stop_this_cpu(void *dummy)
  * static memory requirements. It also looks cleaner.
  * Stolen from the i386 version.
  */
-static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(call_lock);
+static  __cacheline_aligned_in_smp DEFINE_RAW_SPINLOCK(call_lock);
 
 static struct call_data_struct {
 	void (*func) (void *info);

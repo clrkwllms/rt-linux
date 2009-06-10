@@ -134,7 +134,7 @@ static void __devinit smp_iic_setup_cpu(int cpu)
 		iic_setup_cpu();
 }
 
-static DEFINE_SPINLOCK(timebase_lock);
+static DEFINE_RAW_SPINLOCK(timebase_lock);
 static unsigned long timebase = 0;
 
 static void __devinit cell_give_timebase(void)

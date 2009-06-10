@@ -526,7 +526,7 @@ void openpic_reset_processor_phys(u_int mask)
 }
 
 #if defined(CONFIG_SMP) || defined(CONFIG_PM)
-static DEFINE_SPINLOCK(openpic_setup_lock);
+static DEFINE_RAW_SPINLOCK(openpic_setup_lock);
 #endif
 
 #ifdef CONFIG_SMP

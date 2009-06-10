@@ -370,7 +370,7 @@ cpm_setbrg(uint brg, uint rate)
 /*
  * dpalloc / dpfree bits.
  */
-static spinlock_t cpm_dpmem_lock;
+static raw_spinlock_t cpm_dpmem_lock;
 /*
  * 16 blocks should be enough to satisfy all requests
  * until the memory subsystem goes up...

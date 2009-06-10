@@ -143,7 +143,7 @@ struct scc_enet_private {
 	unsigned char *rx_vaddr[RX_RING_SIZE];
 	struct	net_device_stats stats;
 	uint	tx_full;
-	spinlock_t lock;
+	raw_spinlock_t lock;
 };
 
 static int scc_enet_open(struct net_device *dev);

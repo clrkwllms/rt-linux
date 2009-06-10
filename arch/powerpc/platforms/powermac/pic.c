@@ -63,7 +63,7 @@ static int max_irqs;
 static int max_real_irqs;
 static u32 level_mask[4];
 
-static DEFINE_SPINLOCK(pmac_pic_lock);
+static DEFINE_RAW_SPINLOCK(pmac_pic_lock);
 
 #define NR_MASK_WORDS	((NR_IRQS + 31) / 32)
 static unsigned long ppc_lost_interrupts[NR_MASK_WORDS];

@@ -154,7 +154,7 @@ static void __devinit smp_xics_setup_cpu(int cpu)
 }
 #endif /* CONFIG_XICS */
 
-static DEFINE_SPINLOCK(timebase_lock);
+static DEFINE_RAW_SPINLOCK(timebase_lock);
 static unsigned long timebase = 0;
 
 static void __devinit pSeries_give_timebase(void)

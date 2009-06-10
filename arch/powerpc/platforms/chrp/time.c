@@ -27,7 +27,7 @@
 #include <asm/sections.h>
 #include <asm/time.h>
 
-extern spinlock_t rtc_lock;
+extern raw_spinlock_t rtc_lock;
 
 static int nvram_as1 = NVRAM_AS1;
 static int nvram_as0 = NVRAM_AS0;

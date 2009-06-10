@@ -98,11 +98,11 @@ static inline void pmac_backlight_unblank(void) { }
 int die(const char *str, struct pt_regs *regs, long err)
 {
 	static struct {
-		spinlock_t lock;
+		raw_spinlock_t lock;
 		u32 lock_owner;
 		int lock_owner_depth;
 	} die = {
-		.lock =			__SPIN_LOCK_UNLOCKED(die.lock),
+		.lock =			_RAW_SPIN_LOCK_UNLOCKED(die.lock),
 		.lock_owner =		-1,
 		.lock_owner_depth =	0
 	};
@@ -190,6 +190,11 @@ void _exception(int signr, struct pt_regs *regs, int code, unsigned long addr)
 				current->comm, current->pid, signr,
 				addr, regs->nip, regs->link, code);
 		}
+
+#ifdef CONFIG_PREEMPT_RT
+	local_irq_enable();
+	preempt_check_resched();
+#endif
 
 	memset(&info, 0, sizeof(info));
 	info.si_signo = signr;

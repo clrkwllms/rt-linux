@@ -72,7 +72,7 @@ void (*debugger_fault_handler)(struct pt_regs *regs);
  * Trap & Exception support
  */
 
-DEFINE_SPINLOCK(die_lock);
+DEFINE_RAW_SPINLOCK(die_lock);
 
 int die(const char * str, struct pt_regs * fp, long err)
 {
@@ -108,6 +108,10 @@ void _exception(int signr, struct pt_regs *regs, int code, unsigned long addr)
 		debugger(regs);
 		die("Exception in kernel mode", regs, signr);
 	}
+#ifdef CONFIG_PREEMPT_RT
+	local_irq_enable();
+	preempt_check_resched();
+#endif
 	info.si_signo = signr;
 	info.si_errno = 0;
 	info.si_code = code;

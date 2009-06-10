@@ -164,7 +164,7 @@ struct fec_enet_private {
 
 	struct	net_device_stats stats;
 	uint	tx_full;
-	spinlock_t lock;
+	raw_spinlock_t lock;
 
 #ifdef	CONFIG_USE_MDIO
 	uint	phy_id;
