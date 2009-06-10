@@ -3735,6 +3735,7 @@ need_resched_nonpreemptible:
 	__update_rq_clock(rq);
 	spin_lock(&rq->lock);
 	clear_tsk_need_resched(prev);
+	clear_tsk_need_resched_delayed(prev);
 
 	if (prev->state && !(preempt_count() & PREEMPT_ACTIVE)) {
 		if (unlikely((prev->state & TASK_INTERRUPTIBLE) &&
@@ -3774,7 +3775,8 @@ need_resched_nonpreemptible:
 		goto need_resched_nonpreemptible;
 	}
 	__preempt_enable_no_resched();
-	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
+	if (unlikely(test_thread_flag(TIF_NEED_RESCHED) ||
+		     test_thread_flag(TIF_NEED_RESCHED_DELAYED)))
 		goto need_resched;
 }
 EXPORT_SYMBOL(schedule);

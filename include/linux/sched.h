@@ -1893,9 +1893,29 @@ static inline int signal_pending(struct task_struct *p)
 	return unlikely(test_tsk_thread_flag(p,TIF_SIGPENDING));
 }
   
-static inline int need_resched(void)
+static inline int _need_resched(void)
 {
 	return unlikely(test_thread_flag(TIF_NEED_RESCHED));
+}
+
+static inline int need_resched(void)
+{
+	return _need_resched();
+}
+
+static inline void set_tsk_need_resched_delayed(struct task_struct *tsk)
+{
+	set_tsk_thread_flag(tsk,TIF_NEED_RESCHED_DELAYED);
+}
+
+static inline void clear_tsk_need_resched_delayed(struct task_struct *tsk)
+{
+	clear_tsk_thread_flag(tsk,TIF_NEED_RESCHED_DELAYED);
+}
+
+static inline int need_resched_delayed(void)
+{
+	return unlikely(test_thread_flag(TIF_NEED_RESCHED_DELAYED));
 }
 
 /*

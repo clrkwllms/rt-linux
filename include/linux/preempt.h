@@ -55,6 +55,21 @@ do { \
 		preempt_schedule(); \
 } while (0)
 
+
+/*
+ * If the architecture doens't have TIF_NEED_RESCHED_DELAYED
+ * help it out and define it back to TIF_NEED_RESCHED
+ */
+#ifndef TIF_NEED_RESCHED_DELAYED
+# define TIF_NEED_RESCHED_DELAYED TIF_NEED_RESCHED
+#endif
+
+#define preempt_check_resched_delayed() \
+do { \
+	if (unlikely(test_thread_flag(TIF_NEED_RESCHED_DELAYED))) \
+		preempt_schedule(); \
+} while (0)
+
 #define preempt_enable() \
 do { \
 	__preempt_enable_no_resched(); \
@@ -97,6 +112,7 @@ do { \
 #define __preempt_enable_no_resched()	do { } while (0)
 #define preempt_enable()		do { } while (0)
 #define preempt_check_resched()		do { } while (0)
+#define preempt_check_resched_delayed()	do { } while (0)
 
 #define preempt_disable_notrace()		do { } while (0)
 #define preempt_enable_no_resched_notrace()	do { } while (0)
