@@ -1918,7 +1918,6 @@ rt_write_slowunlock(struct rw_mutex *rwm, int mtx)
 	if (!rt_mutex_has_waiters(mutex))
 		goto out;
 
-	spin_lock(&pendowner->pi_lock);
 	/*
 	 * Wake up all readers.
 	 * This gets a bit more complex. More than one reader can't
@@ -1933,13 +1932,17 @@ rt_write_slowunlock(struct rw_mutex *rwm, int mtx)
 	while (waiter && !waiter->write_lock) {
 		struct task_struct *reader = waiter->task;
 
+		spin_lock(&pendowner->pi_lock);
 		plist_del(&waiter->list_entry, &mutex->wait_list);
 
 		/* nop if not on a list */
 		plist_del(&waiter->pi_list_entry, &pendowner->pi_waiters);
+		spin_unlock(&pendowner->pi_lock);
 
+		spin_lock(&reader->pi_lock);
 		waiter->task = NULL;
 		reader->pi_blocked_on = NULL;
+		spin_unlock(&reader->pi_lock);
 
 		if (savestate)
 			wake_up_process_mutex(reader);
@@ -1957,6 +1960,8 @@ rt_write_slowunlock(struct rw_mutex *rwm, int mtx)
 		struct rt_mutex_waiter *next;
 
 		next = rt_mutex_top_waiter(mutex);
+
+		spin_lock(&pendowner->pi_lock);
 		/* delete incase we didn't go through the loop */
 		plist_del(&next->pi_list_entry, &pendowner->pi_waiters);
 
@@ -1964,12 +1969,11 @@ rt_write_slowunlock(struct rw_mutex *rwm, int mtx)
 		if (next->write_lock)
 			/* add back in as top waiter */
 			plist_add(&next->pi_list_entry, &pendowner->pi_waiters);
+		spin_unlock(&pendowner->pi_lock);
 
 		rwm->prio = next->task->prio;
 	} else
 		rwm->prio = MAX_PRIO;
-
-	spin_unlock(&pendowner->pi_lock);
 
  out:
 
@@ -2052,18 +2056,21 @@ rt_mutex_downgrade_write(struct rw_mutex *rwm)
 	 * waiting, until we hit the reader limit, or a writer.
 	 */
 
-	spin_lock(&current->pi_lock);
 	waiter = rt_mutex_top_waiter(mutex);
 	while (waiter && !waiter->write_lock) {
 		struct task_struct *reader = waiter->task;
 
+		spin_lock(&current->pi_lock);
 		plist_del(&waiter->list_entry, &mutex->wait_list);
 
 		/* nop if not on a list */
 		plist_del(&waiter->pi_list_entry, &current->pi_waiters);
+		spin_unlock(&current->pi_lock);
 
+		spin_lock(&reader->pi_lock);
 		waiter->task = NULL;
 		reader->pi_blocked_on = NULL;
+		spin_unlock(&reader->pi_lock);
 
 		/* downgrade is only for mutexes */
 		wake_up_process(reader);
@@ -2083,13 +2090,13 @@ rt_mutex_downgrade_write(struct rw_mutex *rwm)
 		/* setup this mutex prio for read */
 		rwm->prio = next->task->prio;
 
+		spin_lock(&current->pi_lock);
 		/* delete incase we didn't go through the loop */
 		plist_del(&next->pi_list_entry, &current->pi_waiters);
+		spin_unlock(&current->pi_lock);
 		/* No need to add back since readers don't have PI waiters */
 	} else
 		rwm->prio = MAX_PRIO;
-
-	spin_unlock(&current->pi_lock);
 
 	rt_mutex_set_owner(mutex, RT_RW_READER, 0);
 
