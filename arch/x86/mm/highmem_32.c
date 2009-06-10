@@ -18,6 +18,26 @@ void kunmap(struct page *page)
 	kunmap_high(page);
 }
 
+void kunmap_virt(void *ptr)
+{
+	struct page *page;
+
+	if ((unsigned long)ptr < PKMAP_ADDR(0))
+		return;
+	page = pte_page(pkmap_page_table[PKMAP_NR((unsigned long)ptr)]);
+	kunmap(page);
+}
+
+struct page *kmap_to_page(void *ptr)
+{
+	struct page *page;
+
+	if ((unsigned long)ptr < PKMAP_ADDR(0))
+		return virt_to_page(ptr);
+	page = pte_page(pkmap_page_table[PKMAP_NR((unsigned long)ptr)]);
+	return page;
+}
+
 /*
  * kmap_atomic/kunmap_atomic is significantly faster than kmap/kunmap because
  * no global lock is needed and because the kmap code must perform a global TLB
@@ -26,7 +46,7 @@ void kunmap(struct page *page)
  * However when holding an atomic kmap is is not legal to sleep, so atomic
  * kmaps are appropriate for short, tight code paths only.
  */
-void *kmap_atomic_prot(struct page *page, enum km_type type, pgprot_t prot)
+void *__kmap_atomic_prot(struct page *page, enum km_type type, pgprot_t prot)
 {
 	enum fixed_addresses idx;
 	unsigned long vaddr;
@@ -46,12 +66,12 @@ void *kmap_atomic_prot(struct page *page, enum km_type type, pgprot_t prot)
 	return (void *)vaddr;
 }
 
-void *kmap_atomic(struct page *page, enum km_type type)
+void *__kmap_atomic(struct page *page, enum km_type type)
 {
 	return kmap_atomic_prot(page, type, kmap_prot);
 }
 
-void kunmap_atomic(void *kvaddr, enum km_type type)
+void __kunmap_atomic(void *kvaddr, enum km_type type)
 {
 	unsigned long vaddr = (unsigned long) kvaddr & PAGE_MASK;
 	enum fixed_addresses idx = type + KM_TYPE_NR*smp_processor_id();
@@ -78,7 +98,7 @@ void kunmap_atomic(void *kvaddr, enum km_type type)
 /* This is the same as kmap_atomic() but can map memory that doesn't
  * have a struct page associated with it.
  */
-void *kmap_atomic_pfn(unsigned long pfn, enum km_type type)
+void *__kmap_atomic_pfn(unsigned long pfn, enum km_type type)
 {
 	enum fixed_addresses idx;
 	unsigned long vaddr;
@@ -93,7 +113,7 @@ void *kmap_atomic_pfn(unsigned long pfn, enum km_type type)
 	return (void*) vaddr;
 }
 
-struct page *kmap_atomic_to_page(void *ptr)
+struct page *__kmap_atomic_to_page(void *ptr)
 {
 	unsigned long idx, vaddr = (unsigned long)ptr;
 	pte_t *pte;
@@ -108,6 +128,7 @@ struct page *kmap_atomic_to_page(void *ptr)
 
 EXPORT_SYMBOL(kmap);
 EXPORT_SYMBOL(kunmap);
-EXPORT_SYMBOL(kmap_atomic);
-EXPORT_SYMBOL(kunmap_atomic);
-EXPORT_SYMBOL(kmap_atomic_to_page);
+EXPORT_SYMBOL(kunmap_virt);
+EXPORT_SYMBOL(__kmap_atomic);
+EXPORT_SYMBOL(__kunmap_atomic);
+EXPORT_SYMBOL(__kmap_atomic_to_page);

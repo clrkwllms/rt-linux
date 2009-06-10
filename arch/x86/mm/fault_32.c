@@ -502,6 +502,7 @@ bad_area_nosemaphore:
 		nr = (address - idt_descr.address) >> 3;
 
 		if (nr == 6) {
+			zap_rt_locks();
 			do_invalid_op(regs, 0);
 			return;
 		}

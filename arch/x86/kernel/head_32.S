@@ -533,6 +533,7 @@ ignore_int:
 	call printk
 #endif
 	addl $(5*4),%esp
+	call dump_stack
 	popl %ds
 	popl %es
 	popl %edx

@@ -33,7 +33,7 @@ struct vm_area_struct;
 extern unsigned long empty_zero_page[1024];
 extern pgd_t swapper_pg_dir[1024];
 extern struct kmem_cache *pmd_cache;
-extern spinlock_t pgd_lock;
+extern raw_spinlock_t pgd_lock;
 extern struct page *pgd_list;
 void check_pgt_cache(void);
 

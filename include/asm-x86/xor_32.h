@@ -862,7 +862,21 @@ static struct xor_block_template xor_block_pIII_sse = {
 #include <asm-generic/xor.h>
 
 #undef XOR_TRY_TEMPLATES
-#define XOR_TRY_TEMPLATES				\
+/*
+ * MMX/SSE ops disable preemption for long periods of time,
+ * so on PREEMPT_RT use the register-based ops only:
+ */
+#ifdef CONFIG_PREEMPT_RT
+# define XOR_TRY_TEMPLATES				\
+	do {						\
+		xor_speed(&xor_block_8regs);		\
+		xor_speed(&xor_block_8regs_p);		\
+		xor_speed(&xor_block_32regs);		\
+		xor_speed(&xor_block_32regs_p);		\
+	} while (0)
+# define XOR_SELECT_TEMPLATE(FASTEST) (FASTEST)
+#else
+# define XOR_TRY_TEMPLATES				\
 	do {						\
 		xor_speed(&xor_block_8regs);		\
 		xor_speed(&xor_block_8regs_p);		\
@@ -875,9 +889,10 @@ static struct xor_block_template xor_block_pIII_sse = {
 	                xor_speed(&xor_block_p5_mmx);	\
 	        }					\
 	} while (0)
-
 /* We force the use of the SSE xor block because it can write around L2.
    We may also be able to load into the L1 only depending on how the cpu
    deals with a load to a line that is being prefetched.  */
-#define XOR_SELECT_TEMPLATE(FASTEST) \
+# define XOR_SELECT_TEMPLATE(FASTEST) \
 	(cpu_has_xmm ? &xor_block_pIII_sse : FASTEST)
+#endif
+

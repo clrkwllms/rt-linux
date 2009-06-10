@@ -29,6 +29,11 @@ config OPROFILE
 
 	  If unsure, say N.
 
+config PROFILE_NMI
+	bool
+	depends on OPROFILE
+	default y
+
 config KPROBES
 	bool "Kprobes"
 	depends on KALLSYMS && MODULES && !UML

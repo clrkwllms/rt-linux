@@ -72,7 +72,7 @@ static inline unsigned char current_lock_cmos_reg(void)
 		lock_cmos(reg)
 #define lock_cmos_suffix(reg) \
 		unlock_cmos();			\
-		local_irq_restore(cmos_flags);	\
+		local_irq_restore(cmos_flags); \
 	} while (0)
 #else
 #define lock_cmos_prefix(reg) do {} while (0)

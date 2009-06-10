@@ -247,7 +247,7 @@ void send_IPI_mask_sequence(cpumask_t mask, int vector)
 static cpumask_t flush_cpumask;
 static struct mm_struct * flush_mm;
 static unsigned long flush_va;
-static DEFINE_SPINLOCK(tlbstate_lock);
+static DEFINE_RAW_SPINLOCK(tlbstate_lock);
 
 /*
  * We cannot call mmdrop() because we are in interrupt context,
@@ -476,10 +476,20 @@ static void native_smp_send_reschedule(int cpu)
 }
 
 /*
+ * this function sends a 'reschedule' IPI to all other CPUs.
+ * This is used when RT tasks are starving and other CPUs
+ * might be able to run them:
+ */
+void smp_send_reschedule_allbutself(void)
+{
+	send_IPI_allbutself(RESCHEDULE_VECTOR);
+}
+
+/*
  * Structure and data for smp_call_function(). This is designed to minimise
  * static memory requirements. It also looks cleaner.
  */
-static DEFINE_SPINLOCK(call_lock);
+static DEFINE_RAW_SPINLOCK(call_lock);
 
 struct call_data_struct {
 	void (*func) (void *info);
@@ -634,9 +644,8 @@ static void native_smp_send_stop(void)
 }
 
 /*
- * Reschedule call back. Nothing to do,
- * all the work is done automatically when
- * we return from the interrupt.
+ * Reschedule call back. Trigger a reschedule pass so that
+ * RT-overload balancing can pass tasks around.
  */
 fastcall void smp_reschedule_interrupt(struct pt_regs *regs)
 {

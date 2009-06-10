@@ -33,7 +33,7 @@
  */
 
 static int i8259A_auto_eoi;
-DEFINE_SPINLOCK(i8259A_lock);
+DEFINE_RAW_SPINLOCK(i8259A_lock);
 static void mask_and_ack_8259A(unsigned int);
 
 static struct irq_chip i8259A_chip = {

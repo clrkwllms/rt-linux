@@ -342,9 +342,10 @@ void __show_registers(struct pt_regs *regs, int all)
 		regs->eax, regs->ebx, regs->ecx, regs->edx);
 	printk("ESI: %08lx EDI: %08lx EBP: %08lx ESP: %08lx\n",
 		regs->esi, regs->edi, regs->ebp, esp);
-	printk(" DS: %04x ES: %04x FS: %04x GS: %04x SS: %04x\n",
+	printk(" DS: %04x ES: %04x FS: %04x GS: %04x SS: %04x"
+	       " preempt:%08x\n",
 	       regs->xds & 0xffff, regs->xes & 0xffff,
-	       regs->xfs & 0xffff, gs, ss);
+	       regs->xfs & 0xffff, gs, ss, preempt_count());
 
 	if (!all)
 		return;
@@ -416,15 +417,23 @@ void exit_thread(void)
 	if (unlikely(test_thread_flag(TIF_IO_BITMAP))) {
 		struct task_struct *tsk = current;
 		struct thread_struct *t = &tsk->thread;
-		int cpu = get_cpu();
-		struct tss_struct *tss = &per_cpu(init_tss, cpu);
+		void *io_bitmap_ptr = t->io_bitmap_ptr;
+		int cpu;
+		struct tss_struct *tss;
 
-		kfree(t->io_bitmap_ptr);
+		/*
+		 * On PREEMPT_RT we must not call kfree() with
+		 * preemption disabled, so we first zap the pointer:
+		 */
 		t->io_bitmap_ptr = NULL;
+		kfree(io_bitmap_ptr);
+
 		clear_thread_flag(TIF_IO_BITMAP);
 		/*
 		 * Careful, clear this in the TSS too:
 		 */
+		cpu = get_cpu();
+		tss = &per_cpu(init_tss, cpu);
 		memset(tss->io_bitmap, 0xff, tss->io_bitmap_max);
 		t->io_bitmap_max = 0;
 		tss->io_bitmap_owner = NULL;

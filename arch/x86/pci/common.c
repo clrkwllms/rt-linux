@@ -54,7 +54,7 @@ int pcibios_scanned;
  * This interrupt-safe spinlock protects all accesses to PCI
  * configuration space.
  */
-DEFINE_SPINLOCK(pci_config_lock);
+DEFINE_RAW_SPINLOCK(pci_config_lock);
 
 /*
  * Several buggy motherboards address only 16 devices and mirror

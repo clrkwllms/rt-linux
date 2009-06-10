@@ -220,16 +220,23 @@ static int __init pci_check_type1(void)
 	unsigned int tmp;
 	int works = 0;
 
-	local_irq_save(flags);
+	spin_lock_irqsave(&pci_config_lock, flags);
 
 	outb(0x01, 0xCFB);
 	tmp = inl(0xCF8);
 	outl(0x80000000, 0xCF8);
-	if (inl(0xCF8) == 0x80000000 && pci_sanity_check(&pci_direct_conf1)) {
-		works = 1;
+
+	if (inl(0xCF8) == 0x80000000) {
+		spin_unlock_irqrestore(&pci_config_lock, flags);
+
+		if (pci_sanity_check(&pci_direct_conf1))
+			works = 1;
+
+		spin_lock_irqsave(&pci_config_lock, flags);
 	}
 	outl(tmp, 0xCF8);
-	local_irq_restore(flags);
+
+	spin_unlock_irqrestore(&pci_config_lock, flags);
 
 	return works;
 }
@@ -239,17 +246,19 @@ static int __init pci_check_type2(void)
 	unsigned long flags;
 	int works = 0;
 
-	local_irq_save(flags);
+	spin_lock_irqsave(&pci_config_lock, flags);
 
 	outb(0x00, 0xCFB);
 	outb(0x00, 0xCF8);
 	outb(0x00, 0xCFA);
-	if (inb(0xCF8) == 0x00 && inb(0xCFA) == 0x00 &&
-	    pci_sanity_check(&pci_direct_conf2)) {
-		works = 1;
-	}
 
-	local_irq_restore(flags);
+	if (inb(0xCF8) == 0x00 && inb(0xCFA) == 0x00) {
+		spin_unlock_irqrestore(&pci_config_lock, flags);
+
+		if (pci_sanity_check(&pci_direct_conf2))
+			works = 1;
+	} else
+		spin_unlock_irqrestore(&pci_config_lock, flags);
 
 	return works;
 }

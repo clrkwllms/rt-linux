@@ -135,6 +135,7 @@ struct pt_regs * fastcall save_v86_state(struct kernel_vm86_regs * regs)
 	local_irq_enable();
 
 	if (!current->thread.vm86_info) {
+		local_irq_disable();
 		printk("no vm86_info: BAD\n");
 		do_exit(SIGSEGV);
 	}

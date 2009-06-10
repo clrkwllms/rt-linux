@@ -14,7 +14,7 @@
 #include <asm/i8253.h>
 #include <asm/io.h>
 
-DEFINE_SPINLOCK(i8253_lock);
+DEFINE_RAW_SPINLOCK(i8253_lock);
 EXPORT_SYMBOL(i8253_lock);
 
 /*

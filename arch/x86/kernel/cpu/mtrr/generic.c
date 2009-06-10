@@ -330,7 +330,7 @@ static unsigned long set_mtrr_state(void)
 
 
 static unsigned long cr4 = 0;
-static DEFINE_SPINLOCK(set_atomicity_lock);
+static DEFINE_RAW_SPINLOCK(set_atomicity_lock);
 
 /*
  * Since we are disabling the cache don't allow any interrupts - they
