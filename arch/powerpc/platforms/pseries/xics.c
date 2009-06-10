@@ -262,12 +262,6 @@ static void xics_mask_irq(unsigned int virq)
 
 static unsigned int xics_startup(unsigned int virq)
 {
-	unsigned int irq;
-
-	/* force a reverse mapping of the interrupt so it gets in the cache */
-	irq = (unsigned int)irq_map[virq].hwirq;
-	irq_radix_revmap(xics_host, irq);
-
 	/* unmask it */
 	xics_unmask_irq(virq);
 	return 0;
@@ -488,7 +482,13 @@ static int xics_host_match(struct irq_host *h, struct device_node *node)
 static int xics_host_map_direct(struct irq_host *h, unsigned int virq,
 				irq_hw_number_t hw)
 {
+	unsigned int irq;
+
 	pr_debug("xics: map_direct virq %d, hwirq 0x%lx\n", virq, hw);
+
+	/* force a reverse mapping of the interrupt so it gets in the cache */
+	irq = (unsigned int)irq_map[virq].hwirq;
+	irq_radix_revmap(xics_host, irq);
 
 	get_irq_desc(virq)->status |= IRQ_LEVEL;
 	set_irq_chip_and_handler(virq, &xics_pic_direct, handle_fasteoi_irq);
@@ -498,7 +498,13 @@ static int xics_host_map_direct(struct irq_host *h, unsigned int virq,
 static int xics_host_map_lpar(struct irq_host *h, unsigned int virq,
 			      irq_hw_number_t hw)
 {
+	unsigned int irq;
+
 	pr_debug("xics: map_direct virq %d, hwirq 0x%lx\n", virq, hw);
+
+	/* force a reverse mapping of the interrupt so it gets in the cache */
+	irq = (unsigned int)irq_map[virq].hwirq;
+	irq_radix_revmap(xics_host, irq);
 
 	get_irq_desc(virq)->status |= IRQ_LEVEL;
 	set_irq_chip_and_handler(virq, &xics_pic_lpar, handle_fasteoi_irq);
