@@ -186,17 +186,33 @@ static void print_cpu(struct seq_file *m, int cpu)
 	P(cpu_load[2]);
 	P(cpu_load[3]);
 	P(cpu_load[4]);
-#ifdef CONFIG_PREEMPT_RT
-	/* Print rt related rq stats */
-	P(rt.rt_nr_running);
-	P(rt.rt_nr_uninterruptible);
-# ifdef CONFIG_SCHEDSTATS
+#ifdef CONFIG_SCHEDSTATS
+	P(yld_exp_empty);
+	P(yld_act_empty);
+	P(yld_both_empty);
+	P(yld_count);
+
+	P(sched_switch);
+	P(sched_count);
+	P(sched_goidle);
+
+	P(ttwu_count);
+	P(ttwu_local);
+
+	P(bkl_count);
+
 	P(rto_schedule);
 	P(rto_schedule_tail);
 	P(rto_wakeup);
 	P(rto_pulled);
 	P(rto_pushed);
-# endif
+
+	P(lb_breaks);
+#endif
+#ifdef CONFIG_PREEMPT_RT
+	/* Print rt related rq stats */
+	P(rt.rt_nr_running);
+	P(rt.rt_nr_uninterruptible);
 #endif
 
 #undef P

@@ -461,6 +461,8 @@ struct rq {
 	unsigned long rto_wakeup;
 	unsigned long rto_pulled;
 	unsigned long rto_pushed;
+
+	unsigned long lb_breaks;
 #endif
 	struct lock_class_key rq_lock_key;
 };
@@ -587,6 +589,7 @@ enum {
 	SCHED_FEAT_START_DEBIT		= 4,
 	SCHED_FEAT_TREE_AVG		= 8,
 	SCHED_FEAT_APPROX_AVG		= 16,
+	SCHED_FEAT_LB_BREAK		= 32,
 };
 
 const_debug unsigned int sysctl_sched_features =
@@ -594,7 +597,8 @@ const_debug unsigned int sysctl_sched_features =
 		SCHED_FEAT_WAKEUP_PREEMPT	* 1 |
 		SCHED_FEAT_START_DEBIT		* 1 |
 		SCHED_FEAT_TREE_AVG		* 0 |
-		SCHED_FEAT_APPROX_AVG		* 0;
+		SCHED_FEAT_APPROX_AVG		* 0 |
+		SCHED_FEAT_LB_BREAK		* 1;
 
 #define sched_feat(x) (sysctl_sched_features & SCHED_FEAT_##x)
 
@@ -2270,6 +2274,7 @@ static void update_cpu_load(struct rq *this_rq)
 #ifdef CONFIG_SMP
 
 #define LB_ALL_PINNED	0x01
+#define LB_COMPLETE	0x02
 
 /*
  * double_rq_lock - safely lock two runqueues
@@ -2476,8 +2481,13 @@ balance_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 	if (p)
 		pinned = 1;
 next:
-	if (!p || loops++ > sysctl_sched_nr_migrate)
+	if (!p)
+	       goto out;
+
+	if (loops++ > sysctl_sched_nr_migrate) {
+		*lb_flags &= ~LB_COMPLETE;
 		goto out;
+	}
 	/*
 	 * To help distribute high priority tasks across CPUs we don't
 	 * skip a task if it will be the highest priority task (i.e. smallest
@@ -2535,11 +2545,30 @@ static int move_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 	int this_best_prio = this_rq->curr->prio;
 
 	do {
-		total_load_moved +=
-			class->load_balance(this_rq, this_cpu, busiest,
+		unsigned long load_moved;
+
+		*lb_flags |= LB_COMPLETE;
+
+		load_moved = class->load_balance(this_rq, this_cpu, busiest,
 				max_load_move - total_load_moved,
 				sd, idle, lb_flags, &this_best_prio);
-		class = class->next;
+
+		total_load_moved += load_moved;
+
+		if (!load_moved || *lb_flags & LB_COMPLETE) {
+			class = class->next;
+		} else if (sched_feat(LB_BREAK)) {
+			schedstat_inc(this_rq, lb_breaks);
+
+			double_rq_unlock(this_rq, busiest);
+			local_irq_enable();
+
+			if (!in_atomic())
+				cond_resched();
+
+			local_irq_disable();
+			double_rq_lock(this_rq, busiest);
+		}
 	} while (class && max_load_move > total_load_moved);
 
 	return total_load_moved > 0;
@@ -2983,6 +3012,9 @@ redo:
 
 	ld_moved = 0;
 	if (busiest->nr_running > 1) {
+
+		WARN_ON(irqs_disabled());
+
 		/*
 		 * Attempt to move tasks. If find_busiest_group has found
 		 * an imbalance but busiest->nr_running <= 1, the group is
