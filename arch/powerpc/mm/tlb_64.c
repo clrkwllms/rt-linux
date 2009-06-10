@@ -215,7 +215,7 @@ void hpte_need_flush(struct mm_struct *mm, unsigned long addr,
 	 * always flush it on RT to reduce scheduling latency.
 	 */
 	if (machine_is(celleb)) {
-		flush_tlb_pending();
+		__flush_tlb_pending(batch);
 		return;
 	}
 #endif /* CONFIG_PREEMPT_RT */
