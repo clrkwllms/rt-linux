@@ -82,6 +82,8 @@ static inline void rcu_bh_qsctr_inc(int cpu)
 #define rcu_check_callbacks_rt(cpu, user) do { } while (0)
 #define rcu_init_rt() do { } while (0)
 #define rcu_needs_cpu_rt(cpu) 0
+#define rcu_offline_cpu_rt(cpu)
+#define rcu_online_cpu_rt(cpu)
 #define rcu_pending_rt(cpu) 0
 #define rcu_process_callbacks_rt(unused) do { } while (0)
 

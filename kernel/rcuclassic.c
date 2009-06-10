@@ -414,14 +414,19 @@ static void __rcu_offline_cpu(struct rcu_data *this_rdp,
 static void rcu_offline_cpu(int cpu)
 {
 	struct rcu_data *this_rdp = &get_cpu_var(rcu_data);
+#ifdef CONFIG_CLASSIC_RCU
 	struct rcu_data *this_bh_rdp = &get_cpu_var(rcu_bh_data);
+#endif /* #ifdef CONFIG_CLASSIC_RCU */
 
 	__rcu_offline_cpu(this_rdp, &rcu_ctrlblk,
 					&per_cpu(rcu_data, cpu));
+#ifdef CONFIG_CLASSIC_RCU
 	__rcu_offline_cpu(this_bh_rdp, &rcu_bh_ctrlblk,
 					&per_cpu(rcu_bh_data, cpu));
-	put_cpu_var(rcu_data);
 	put_cpu_var(rcu_bh_data);
+#endif /* #ifdef CONFIG_CLASSIC_RCU */
+	put_cpu_var(rcu_data);
+	rcu_offline_cpu_rt(cpu);
 }
 
 #else
@@ -571,6 +576,7 @@ static void __cpuinit rcu_online_cpu(int cpu)
 	rdp->passed_quiesc = &per_cpu(rcu_data_passed_quiesc, cpu);
 	rcu_init_percpu_data(cpu, &rcu_bh_ctrlblk, bh_rdp);
 	bh_rdp->passed_quiesc = &per_cpu(rcu_data_bh_passed_quiesc, cpu);
+	rcu_online_cpu_rt(cpu);
 }
 
 static int __cpuinit rcu_cpu_notify(struct notifier_block *self,

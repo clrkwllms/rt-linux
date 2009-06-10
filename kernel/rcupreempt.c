@@ -125,6 +125,8 @@ enum rcu_mb_flag_values {
 };
 static DEFINE_PER_CPU(enum rcu_mb_flag_values, rcu_mb_flag) = rcu_mb_done;
 
+static cpumask_t rcu_cpu_online_map = CPU_MASK_NONE;
+
 /*
  * Macro that prevents the compiler from reordering accesses, but does
  * absolutely -nothing- to prevent CPUs from reordering.  This is used
@@ -404,7 +406,7 @@ rcu_try_flip_idle(void)
 
 	/* Now ask each CPU for acknowledgement of the flip. */
 
-	for_each_possible_cpu(cpu)
+	for_each_cpu_mask(cpu, rcu_cpu_online_map)
 		per_cpu(rcu_flip_flag, cpu) = rcu_flipped;
 
 	return 1;
@@ -420,7 +422,7 @@ rcu_try_flip_waitack(void)
 	int cpu;
 
 	RCU_TRACE_ME(rcupreempt_trace_try_flip_a1);
-	for_each_possible_cpu(cpu)
+	for_each_cpu_mask(cpu, rcu_cpu_online_map)
 		if (per_cpu(rcu_flip_flag, cpu) != rcu_flip_seen) {
 			RCU_TRACE_ME(rcupreempt_trace_try_flip_ae1);
 			return 0;
@@ -462,7 +464,7 @@ rcu_try_flip_waitzero(void)
 
 	/* Call for a memory barrier from each CPU. */
 
-	for_each_possible_cpu(cpu)
+	for_each_cpu_mask(cpu, rcu_cpu_online_map)
 		per_cpu(rcu_mb_flag, cpu) = rcu_mb_needed;
 
 	RCU_TRACE_ME(rcupreempt_trace_try_flip_z2);
@@ -480,7 +482,7 @@ rcu_try_flip_waitmb(void)
 	int cpu;
 
 	RCU_TRACE_ME(rcupreempt_trace_try_flip_m1);
-	for_each_possible_cpu(cpu)
+	for_each_cpu_mask(cpu, rcu_cpu_online_map)
 		if (per_cpu(rcu_mb_flag, cpu) != rcu_mb_done) {
 			RCU_TRACE_ME(rcupreempt_trace_try_flip_me1);
 			return 0;
@@ -582,6 +584,89 @@ void rcu_advance_callbacks_rt(int cpu, int user)
 	__rcu_advance_callbacks(rdp);
 	spin_unlock_irqrestore(&rdp->lock, oldirq);
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+
+#define rcu_offline_cpu_rt_enqueue(srclist, srctail, dstlist, dsttail) do { \
+		*dsttail = srclist; \
+		if (srclist != NULL) { \
+			dsttail = srctail; \
+			srclist = NULL; \
+			srctail = &srclist;\
+		} \
+	} while (0)
+
+
+void rcu_offline_cpu_rt(int cpu)
+{
+	int i;
+	struct rcu_head *list = NULL;
+	unsigned long oldirq;
+	struct rcu_data *rdp = RCU_DATA_CPU(cpu);
+	struct rcu_head **tail = &list;
+
+	/* Remove all callbacks from the newly dead CPU, retaining order. */
+
+	spin_lock_irqsave(&rdp->lock, oldirq);
+	rcu_offline_cpu_rt_enqueue(rdp->donelist, rdp->donetail, list, tail);
+	for (i = GP_STAGES - 1; i >= 0; i--)
+		rcu_offline_cpu_rt_enqueue(rdp->waitlist[i], rdp->waittail[i],
+					   list, tail);
+	rcu_offline_cpu_rt_enqueue(rdp->nextlist, rdp->nexttail, list, tail);
+	spin_unlock_irqrestore(&rdp->lock, oldirq);
+	rdp->waitlistcount = 0;
+
+	/* Disengage the newly dead CPU from grace-period computation. */
+
+	spin_lock_irqsave(&rcu_ctrlblk.fliplock, oldirq);
+	rcu_check_mb(cpu);
+	if (per_cpu(rcu_flip_flag, cpu) == rcu_flipped) {
+		smp_mb();  /* Subsequent counter accesses must see new value */
+		per_cpu(rcu_flip_flag, cpu) = rcu_flip_seen;
+		smp_mb();  /* Subsequent RCU read-side critical sections */
+			   /*  seen -after- acknowledgement. */
+	}
+	cpu_clear(cpu, rcu_cpu_online_map);
+	spin_unlock_irqrestore(&rcu_ctrlblk.fliplock, oldirq);
+
+	/*
+	 * Place the removed callbacks on the current CPU's queue.
+	 * Make them all start a new grace period: simple approach,
+	 * in theory could starve a given set of callbacks, but
+	 * you would need to be doing some serious CPU hotplugging
+	 * to make this happen.  If this becomes a problem, adding
+	 * a synchronize_rcu() to the hotplug path would be a simple
+	 * fix.
+	 */
+
+	rdp = RCU_DATA_ME();
+	spin_lock_irqsave(&rdp->lock, oldirq);
+	*rdp->nexttail = list;
+	if (list)
+		rdp->nexttail = tail;
+	spin_unlock_irqrestore(&rdp->lock, oldirq);
+}
+
+void __devinit rcu_online_cpu_rt(int cpu)
+{
+	unsigned long oldirq;
+
+	spin_lock_irqsave(&rcu_ctrlblk.fliplock, oldirq);
+	cpu_set(cpu, rcu_cpu_online_map);
+	spin_unlock_irqrestore(&rcu_ctrlblk.fliplock, oldirq);
+}
+
+#else /* #ifdef CONFIG_HOTPLUG_CPU */
+
+void rcu_offline_cpu(int cpu)
+{
+}
+
+void __devinit rcu_online_cpu_rt(int cpu)
+{
+}
+
+#endif /* #else #ifdef CONFIG_HOTPLUG_CPU */
 
 void rcu_process_callbacks_rt(struct softirq_action *unused)
 {

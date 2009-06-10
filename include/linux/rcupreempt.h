@@ -59,6 +59,8 @@ extern void rcu_advance_callbacks_rt(int cpu, int user);
 extern void rcu_check_callbacks_rt(int cpu, int user);
 extern void rcu_init_rt(void);
 extern int  rcu_needs_cpu_rt(int cpu);
+extern void rcu_offline_cpu_rt(int cpu);
+extern void rcu_online_cpu_rt(int cpu);
 extern int  rcu_pending_rt(int cpu);
 struct softirq_action;
 extern void rcu_process_callbacks_rt(struct softirq_action *unused);
