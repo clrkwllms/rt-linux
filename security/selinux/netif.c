@@ -210,6 +210,7 @@ static void sel_netif_flush(void)
 {
 	int idx;
 
+	rcu_read_lock();
 	spin_lock_bh(&sel_netif_lock);
 	for (idx = 0; idx < SEL_NETIF_HASH_SIZE; idx++) {
 		struct sel_netif *netif;
@@ -218,6 +219,7 @@ static void sel_netif_flush(void)
 			sel_netif_destroy(netif);
 	}
 	spin_unlock_bh(&sel_netif_lock);
+	rcu_read_unlock();
 }
 
 static int sel_netif_avc_callback(u32 event, u32 ssid, u32 tsid,
