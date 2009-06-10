@@ -570,7 +570,9 @@ static int run_test(unsigned long time)
 		run_two_locks(time, read);
 	}
 
+#ifdef CONFIG_PREEMPT_RT
 	WARN_ON_ONCE(current->reader_lock_count);
+#endif
 
 	return ret;
 }
