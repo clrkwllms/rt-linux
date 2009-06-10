@@ -580,14 +580,9 @@ do_work:
 	cmpdi	r0,0
 	crandc	eq,cr1*4+eq,eq
 	bne	restore
-	/* here we are preempting the current task */
 1:
-	li	r0,1
-	stb	r0,PACASOFTIRQEN(r13)
-	stb	r0,PACAHARDIRQEN(r13)
-	ori	r10,r10,MSR_EE
-	mtmsrd	r10,1		/* reenable interrupts */
-	bl	.preempt_schedule
+	/* preempt_schedule_irq() expects interrupts disabled. */
+	bl	.preempt_schedule_irq
 	mfmsr	r10
 	clrrdi	r9,r1,THREAD_SHIFT
 	rldicl	r10,r10,48,1	/* disable interrupts again */
