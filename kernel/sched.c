@@ -5888,6 +5888,15 @@ void sched_idle_next(void)
 	spin_unlock_irqrestore(&rq->lock, flags);
 }
 
+#ifdef CONFIG_PREEMPT_RT
+void mmdrop_rcu(struct rcu_head *head)
+{
+	struct mm_struct *mm = container_of(head, struct mm_struct, rcu_head);
+
+	mmdrop(mm);
+}
+#endif
+
 /*
  * Ensures that the idle task is using init_mm right before its cpu goes
  * offline.
@@ -5900,7 +5909,11 @@ void idle_task_exit(void)
 
 	if (mm != &init_mm)
 		switch_mm(mm, &init_mm, current);
+#ifdef CONFIG_PREEMPT_RT
+	call_rcu_preempt_online(&mm->rcu_head, mmdrop_rcu);
+#else
 	mmdrop(mm);
+#endif
 }
 
 /* called under rq->lock with disabled interrupts */

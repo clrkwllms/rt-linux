@@ -916,6 +916,35 @@ void fastcall call_rcu_preempt(struct rcu_head *head,
 }
 EXPORT_SYMBOL_GPL(call_rcu_preempt);
 
+void fastcall call_rcu_preempt_online(struct rcu_head *head,
+		void (*func)(struct rcu_head *rcu))
+{
+	struct rcu_data *rdp;
+	unsigned long flags;
+	int cpu;
+
+	head->func = func;
+	head->next = NULL;
+again:
+	cpu = first_cpu(cpu_online_map);
+	rdp = RCU_DATA_CPU(cpu);
+
+	spin_lock_irqsave(&rdp->lock, flags);
+	if (unlikely(!cpu_online(cpu))) {
+		/*
+		 * cpu is removed from the online map before rcu_offline_cpu
+		 * is called.
+		 */
+		spin_unlock_irqrestore(&rdp->lock, flags);
+		goto again;
+	}
+
+	*rdp->nexttail = head;
+	rdp->nexttail = &head->next;
+	spin_unlock_irqrestore(&rdp->lock, flags);
+
+}
+
 /*
  * Check to see if any future RCU-related work will need to be done
  * by the current CPU, even if none need be done immediately, returning

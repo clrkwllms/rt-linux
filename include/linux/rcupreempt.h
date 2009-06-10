@@ -83,6 +83,8 @@ extern void FASTCALL(call_rcu_classic(struct rcu_head *head,
 		     void (*func)(struct rcu_head *head)));
 extern void FASTCALL(call_rcu_preempt(struct rcu_head *head,
 		     void (*func)(struct rcu_head *head)));
+extern void FASTCALL(call_rcu_preempt_online(struct rcu_head *head,
+		     void (*func)(struct rcu_head *head)));
 extern void __rcu_read_lock(void);
 extern void __rcu_read_unlock(void);
 extern void __synchronize_sched(void);
