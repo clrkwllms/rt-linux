@@ -366,6 +366,7 @@ int remove_exclusive_swap_page(struct page *page)
 	/* Is the only swap cache user the cache itself? */
 	retval = 0;
 	if (p->swap_map[swp_offset(entry)] == 1) {
+		spin_unlock(&swap_lock);
 		/* Recheck the page count with the swapcache lock held.. */
 		lock_page_ref_irq(page);
 		if ((page_count(page) == 2) && !PageWriteback(page)) {
@@ -374,8 +375,8 @@ int remove_exclusive_swap_page(struct page *page)
 			retval = 1;
 		}
 		unlock_page_ref_irq(page);
-	}
-	spin_unlock(&swap_lock);
+	} else
+		spin_unlock(&swap_lock);
 
 	if (retval) {
 		swap_free(entry);
