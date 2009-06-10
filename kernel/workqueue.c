@@ -244,6 +244,20 @@ int queue_delayed_work_on(int cpu, struct workqueue_struct *wq,
 }
 EXPORT_SYMBOL_GPL(queue_delayed_work_on);
 
+static void leak_check(void *func)
+{
+	if (!in_atomic() && lockdep_depth(current) <= 0)
+		return;
+	printk(KERN_ERR "BUG: workqueue leaked lock or atomic: "
+				"%s/0x%08x/%d\n",
+				current->comm, preempt_count(),
+				current->pid);
+	printk(KERN_ERR "    last function: ");
+	print_symbol("%s\n", (unsigned long)func);
+	debug_show_held_locks(current);
+	dump_stack();
+}
+
 static void run_workqueue(struct cpu_workqueue_struct *cwq)
 {
 	spin_lock_irq(&cwq->lock);
@@ -276,22 +290,13 @@ static void run_workqueue(struct cpu_workqueue_struct *cwq)
 
 		BUG_ON(get_wq_data(work) != cwq);
 		work_clear_pending(work);
+		leak_check(NULL);
 		lock_acquire(&cwq->wq->lockdep_map, 0, 0, 0, 2, _THIS_IP_);
 		lock_acquire(&lockdep_map, 0, 0, 0, 2, _THIS_IP_);
 		f(work);
 		lock_release(&lockdep_map, 1, _THIS_IP_);
 		lock_release(&cwq->wq->lockdep_map, 1, _THIS_IP_);
-
-		if (unlikely(in_atomic() || lockdep_depth(current) > 0)) {
-			printk(KERN_ERR "BUG: workqueue leaked lock or atomic: "
-					"%s/0x%08x/%d\n",
-					current->comm, preempt_count(),
-				       	task_pid_nr(current));
-			printk(KERN_ERR "    last function: ");
-			print_symbol("%s\n", (unsigned long)f);
-			debug_show_held_locks(current);
-			dump_stack();
-		}
+		leak_check(f);
 
 		spin_lock_irq(&cwq->lock);
 		cwq->current_work = NULL;
@@ -622,6 +627,44 @@ int schedule_on_each_cpu(work_func_t func)
 	free_percpu(works);
 	return 0;
 }
+
+/**
+ * schedule_on_each_cpu_wq - call a function on each online CPU on a per-CPU wq
+ * @func: the function to call
+ *
+ * Returns zero on success.
+ * Returns -ve errno on failure.
+ *
+ * Appears to be racy against CPU hotplug.
+ *
+ * schedule_on_each_cpu() is very slow.
+ */
+int schedule_on_each_cpu_wq(struct workqueue_struct *wq, work_func_t func)
+{
+	int cpu;
+	struct work_struct *works;
+
+	if (is_single_threaded(wq)) {
+		WARN_ON(1);
+		return -EINVAL;
+	}
+	works = alloc_percpu(struct work_struct);
+	if (!works)
+		return -ENOMEM;
+
+	for_each_online_cpu(cpu) {
+		struct work_struct *work = per_cpu_ptr(works, cpu);
+
+		INIT_WORK(work, func);
+		set_bit(WORK_STRUCT_PENDING, work_data_bits(work));
+		__queue_work(per_cpu_ptr(wq->cpu_wq, cpu), work);
+	}
+	flush_workqueue(wq);
+	free_percpu(works);
+
+	return 0;
+}
+
 
 void flush_scheduled_work(void)
 {
