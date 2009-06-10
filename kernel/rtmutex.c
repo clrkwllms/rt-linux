@@ -1921,6 +1921,105 @@ void fastcall rt_rwlock_write_unlock(struct rw_mutex *rwm)
 	rt_write_fastunlock(rwm, rt_write_slowunlock, 0);
 }
 
+/*
+ * We own the lock for write, and we want to convert it to a read,
+ * so we simply take the lock as read, and wake up all other readers.
+ */
+void fastcall __sched
+rt_mutex_downgrade_write(struct rw_mutex *rwm)
+{
+	struct rt_mutex *mutex = &rwm->mutex;
+	struct reader_lock_struct *rls;
+	struct rt_mutex_waiter *waiter;
+	unsigned long flags;
+	int reader_count;
+
+	spin_lock_irqsave(&mutex->wait_lock, flags);
+	init_rw_lists(rwm);
+
+	/* we have the lock and are sole owner, then update the accounting */
+	atomic_inc(&rwm->count);
+	atomic_inc(&rwm->owners);
+	reader_count = current->reader_lock_count++;
+	rls = &current->owned_read_locks[reader_count];
+	if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
+		rls->lock = rwm;
+		rls->count = 1;
+	} else
+		WARN_ON_ONCE(1);
+
+	if (!rt_mutex_has_waiters(mutex)) {
+		/* We are sole owner, we are done */
+		rwm->owner = current;
+		rwm->prio = MAX_PRIO;
+		mutex->owner = NULL;
+		spin_unlock_irqrestore(&mutex->wait_lock, flags);
+		return;
+	}
+
+	/* Set us up for multiple readers or conflicts */
+
+	list_add(&rls->list, &rwm->readers);
+	rwm->owner = RT_RW_READER;
+
+	/*
+	 * This is like the write unlock, but we already own the
+	 * reader. We still want to wake up other readers that are
+	 * waiting, until we hit the reader limit, or a writer.
+	 */
+
+	spin_lock(&current->pi_lock);
+	waiter = rt_mutex_top_waiter(mutex);
+	while (waiter && !waiter->write_lock) {
+		struct task_struct *reader = waiter->task;
+
+		plist_del(&waiter->list_entry, &mutex->wait_list);
+
+		/* nop if not on a list */
+		plist_del(&waiter->pi_list_entry, &current->pi_waiters);
+
+		waiter->task = NULL;
+		reader->pi_blocked_on = NULL;
+
+		/* downgrade is only for mutexes */
+		wake_up_process(reader);
+
+		if (rt_mutex_has_waiters(mutex))
+			waiter = rt_mutex_top_waiter(mutex);
+		else
+			waiter = NULL;
+	}
+
+	/* If a writer is still pending, then update its plist. */
+	if (rt_mutex_has_waiters(mutex)) {
+		struct rt_mutex_waiter *next;
+
+		next = rt_mutex_top_waiter(mutex);
+
+		/* setup this mutex prio for read */
+		rwm->prio = next->task->prio;
+
+		/* delete incase we didn't go through the loop */
+		plist_del(&next->pi_list_entry, &current->pi_waiters);
+		/* add back in as top waiter */
+		plist_add(&next->pi_list_entry, &current->pi_waiters);
+	} else
+		rwm->prio = MAX_PRIO;
+
+	spin_unlock(&current->pi_lock);
+
+	rt_mutex_set_owner(mutex, RT_RW_READER, 0);
+
+	spin_unlock_irqrestore(&mutex->wait_lock, flags);
+
+	/*
+	 * Undo pi boosting when necessary.
+	 * If one of the awoken readers boosted us, we don't want to keep
+	 * that priority.
+	 */
+	rt_mutex_adjust_prio(current);
+}
+
 void rt_mutex_rwsem_init(struct rw_mutex *rwm, const char *name)
 {
 	struct rt_mutex *mutex = &rwm->mutex;
