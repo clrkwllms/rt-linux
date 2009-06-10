@@ -3,6 +3,8 @@
 
 #include <linux/compiler.h>
 
+extern void __WARN_ON(const char *func, const char *file, const int line);
+
 #ifdef CONFIG_BUG
 
 #ifdef CONFIG_GENERIC_BUG
@@ -74,6 +76,18 @@ struct bug_entry {
 # define WARN_ON_SMP(x)			WARN_ON(x)
 #else
 # define WARN_ON_SMP(x)			do { } while (0)
+#endif
+
+#ifdef CONFIG_PREEMPT_RT
+# define BUG_ON_RT(c)			BUG_ON(c)
+# define BUG_ON_NONRT(c)		do { } while (0)
+# define WARN_ON_RT(condition)		WARN_ON(condition)
+# define WARN_ON_NONRT(condition)	do { } while (0)
+#else
+# define BUG_ON_RT(c)			do { } while (0)
+# define BUG_ON_NONRT(c)		BUG_ON(c)
+# define WARN_ON_RT(condition)		do { } while (0)
+# define WARN_ON_NONRT(condition)	WARN_ON(condition)
 #endif
 
 #endif
