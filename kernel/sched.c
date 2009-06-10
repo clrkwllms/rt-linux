@@ -2569,6 +2569,9 @@ static int move_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 			*lb_flags &= ~LB_START;
 			schedstat_inc(this_rq, lb_breaks);
 
+			if (idle == CPU_NEWLY_IDLE && total_load_moved)
+				break;
+
 			double_rq_unlock(this_rq, busiest);
 			local_irq_enable();
 
