@@ -355,13 +355,13 @@ notrace int irq_show_regs_callback(int cpu, struct pt_regs *regs)
 	if (!nmi_show_regs[cpu])
 		return 0;
 
-	nmi_show_regs[cpu] = 0;
 	spin_lock(&nmi_print_lock);
 	printk(KERN_WARNING "NMI show regs on CPU#%d:\n", cpu);
 	printk(KERN_WARNING "apic_timer_irqs: %d\n",
 		per_cpu(irq_stat, cpu).apic_timer_irqs);
 	show_regs(regs);
 	spin_unlock(&nmi_print_lock);
+	nmi_show_regs[cpu] = 0;
 	return 1;
 }
 
