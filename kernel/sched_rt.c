@@ -33,6 +33,9 @@ static inline void rt_clear_overload(struct rq *rq)
 
 static void update_rt_migration(struct rq *rq)
 {
+	if (unlikely(num_online_cpus() == 1))
+		return;
+
 	if (rq->rt.rt_nr_migratory && (rq->rt.rt_nr_running > 1)) {
 		if (!rq->rt.overloaded) {
 			rt_set_overload(rq);
@@ -105,8 +108,10 @@ static inline void dec_rt_tasks(struct task_struct *p, struct rq *rq)
 		} /* otherwise leave rq->highest prio alone */
 	} else
 		rq->rt.highest_prio = MAX_RT_PRIO;
-	if (p->nr_cpus_allowed > 1)
+	if (p->nr_cpus_allowed > 1) {
+		BUG_ON(!rq->rt.rt_nr_migratory);
 		rq->rt.rt_nr_migratory--;
+	}
 
 	if (rq->rt.highest_prio != highest_prio)
 		cpupri_set(&rq->rd->cpupri, rq->cpu, rq->rt.highest_prio);
