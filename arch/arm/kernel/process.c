@@ -37,7 +37,7 @@
 #include <asm/uaccess.h>
 #include <asm/mach/time.h>
 
-DEFINE_SPINLOCK(futex_atomic_lock);
+DEFINE_RAW_SPINLOCK(futex_atomic_lock);
 
 static const char *processor_modes[] = {
   "USER_26", "FIQ_26" , "IRQ_26" , "SVC_26" , "UK4_26" , "UK5_26" , "UK6_26" , "UK7_26" ,

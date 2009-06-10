@@ -7,7 +7,7 @@
 #include <linux/errno.h>
 #include <linux/uaccess.h>
 
-extern spinlock_t  futex_atomic_lock;
+extern raw_spinlock_t  futex_atomic_lock;
 
 #define __futex_atomic_op(insn, ret, oldval, uaddr, oparg) \
 	__asm__ __volatile__ (						\

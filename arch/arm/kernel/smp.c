@@ -522,7 +522,7 @@ static void ipi_call_function(unsigned int cpu)
 		cpu_clear(cpu, data->unfinished);
 }
 
-static DEFINE_SPINLOCK(stop_lock);
+static DEFINE_RAW_SPINLOCK(stop_lock);
 
 /*
  * ipi_cpu_stop - handle IPI from smp_send_stop()

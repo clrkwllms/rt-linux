@@ -26,7 +26,7 @@
 #define from_address	(0xffff8000)
 #define to_address	(0xffffc000)
 
-static DEFINE_SPINLOCK(v6_lock);
+static DEFINE_RAW_SPINLOCK(v6_lock);
 
 /*
  * Copy the user page.  No aliasing to deal with so we can just

@@ -27,7 +27,7 @@ typedef unsigned int dmamode_t;
 #define DMA_MODE_CASCADE 2
 #define DMA_AUTOINIT	 4
 
-extern spinlock_t  dma_spin_lock;
+extern raw_spinlock_t  dma_spin_lock;
 
 static inline unsigned long claim_dma_lock(void)
 {

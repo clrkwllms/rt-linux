@@ -32,7 +32,7 @@
 #define minicache_pgprot __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | \
 				  L_PTE_CACHEABLE)
 
-static DEFINE_SPINLOCK(minicache_lock);
+static DEFINE_RAW_SPINLOCK(minicache_lock);
 
 /*
  * XScale mini-dcache optimised copy_user_page
