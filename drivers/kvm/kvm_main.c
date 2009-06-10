@@ -1987,8 +1987,8 @@ static int __vcpu_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 	int r;
 
 	if (unlikely(vcpu->mp_state == VCPU_MP_STATE_SIPI_RECEIVED)) {
-		printk("vcpu %d received sipi with vector # %x\n",
-		       vcpu->vcpu_id, vcpu->sipi_vector);
+		vcpu_printf(vcpu, "vcpu %d received sipi with vector # %x\n",
+			    vcpu->vcpu_id, vcpu->sipi_vector);
 		kvm_lapic_reset(vcpu);
 		kvm_x86_ops->vcpu_reset(vcpu);
 		vcpu->mp_state = VCPU_MP_STATE_RUNNABLE;

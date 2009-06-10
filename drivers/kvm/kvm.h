@@ -509,6 +509,7 @@ struct kvm_x86_ops {
 
 extern struct kvm_x86_ops *kvm_x86_ops;
 
+#ifdef KVM_DEBUG
 /* The guest did something we don't support. */
 #define pr_unimpl(vcpu, fmt, ...)					\
  do {									\
@@ -518,6 +519,11 @@ extern struct kvm_x86_ops *kvm_x86_ops;
  } while(0)
 
 #define kvm_printf(kvm, fmt ...) printk(KERN_DEBUG fmt)
+#else
+#define pr_unimpl(vcpu, fmt ...) do { } while(0)
+#define kvm_printf(kvm, fmt ...) do { } while(0)
+#endif
+
 #define vcpu_printf(vcpu, fmt...) kvm_printf(vcpu->kvm, fmt)
 
 int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id);

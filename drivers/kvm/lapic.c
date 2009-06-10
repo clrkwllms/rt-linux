@@ -347,35 +347,35 @@ static int __apic_accept_irq(struct kvm_lapic *apic, int delivery_mode,
 		break;
 
 	case APIC_DM_REMRD:
-		printk(KERN_DEBUG "Ignoring delivery mode 3\n");
+		vcpu_printf(vcpu "Ignoring delivery mode 3\n");
 		break;
 
 	case APIC_DM_SMI:
-		printk(KERN_DEBUG "Ignoring guest SMI\n");
+		vcpu_printf(vcpu, "Ignoring guest SMI\n");
 		break;
 	case APIC_DM_NMI:
-		printk(KERN_DEBUG "Ignoring guest NMI\n");
+		vcpu_printf(vcpu, "Ignoring guest NMI\n");
 		break;
 
 	case APIC_DM_INIT:
 		if (level) {
 			if (vcpu->mp_state == VCPU_MP_STATE_RUNNABLE)
-				printk(KERN_DEBUG
-				       "INIT on a runnable vcpu %d\n",
-				       vcpu->vcpu_id);
+				vcpu_printf(vcpu,
+					    "INIT on a runnable vcpu %d\n",
+					    vcpu->vcpu_id);
 			vcpu->mp_state = VCPU_MP_STATE_INIT_RECEIVED;
 			kvm_vcpu_kick(vcpu);
 		} else {
-			printk(KERN_DEBUG
-			       "Ignoring de-assert INIT to vcpu %d\n",
-			       vcpu->vcpu_id);
+			vcpu_printf(vcpu,
+				    "Ignoring de-assert INIT to vcpu %d\n",
+				    vcpu->vcpu_id);
 		}
 
 		break;
 
 	case APIC_DM_STARTUP:
-		printk(KERN_DEBUG "SIPI to vcpu %d vector 0x%02x\n",
-		       vcpu->vcpu_id, vector);
+		vcpu_printf(vcpu, "SIPI to vcpu %d vector 0x%02x\n",
+			    vcpu->vcpu_id, vector);
 		if (vcpu->mp_state == VCPU_MP_STATE_INIT_RECEIVED) {
 			vcpu->sipi_vector = vector;
 			vcpu->mp_state = VCPU_MP_STATE_SIPI_RECEIVED;
