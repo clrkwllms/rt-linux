@@ -192,19 +192,35 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
  * indicated by comparing RETURN with OLD.
  */
 #define __HAVE_ARCH_CMPXCHG	1
+extern unsigned long __cmpxchg_called_with_bad_pointer(volatile void *p,
+		unsigned long old, unsigned long new, int size);
 
-static __inline__ unsigned long
-cmpxchg(volatile int *p, int old, int new)
+static inline unsigned long
+__cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 {
-	unsigned long flags;
-	int prev;
+	unsigned long flags, prev;
+	volatile unsigned int *p = ptr;
 
-	local_irq_save(flags);
-	if ((prev = *p) == old)
-		*p = new;
-	local_irq_restore(flags);
-	return(prev);
+	if (size == 4) {
+
+		local_irq_save(flags);
+		if ((prev = *p) == old)
+			*p = new;
+		local_irq_restore(flags);
+		return prev;
+	}
+
+	/* we should not get here, if you do we end up with a linker error */
+	return __cmpxchg_called_with_bad_pointer(p, old, new, size);
 }
+
+#define cmpxchg(ptr,o,n)					\
+	({							\
+	 __typeof__(*(ptr)) _o_ = (o);				\
+	 __typeof__(*(ptr)) _n_ = (n);				\
+	 (__typeof__(*(ptr))) __cmpxchg((ptr), (unsigned long)_o_,	\
+		 (unsigned long)_n_, sizeof(*(ptr)));			\
+	 })
 
 
 #ifdef CONFIG_M68332
