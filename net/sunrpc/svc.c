@@ -547,7 +547,7 @@ __svc_create_thread(svc_thread_fn func, struct svc_serv *serv,
 	struct svc_rqst	*rqstp;
 	int		error = -ENOMEM;
 	int		have_oldmask = 0;
-	cpumask_t	oldmask;
+	cpumask_t	oldmask = CPU_MASK_NONE /* shut up GCC */;
 
 	rqstp = kzalloc(sizeof(*rqstp), GFP_KERNEL);
 	if (!rqstp)

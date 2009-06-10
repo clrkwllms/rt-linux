@@ -219,7 +219,7 @@ static int copy_ctl_value_from_user(struct snd_card *card,
 				    struct snd_ctl_elem_value32 __user *data32,
 				    int *typep, int *countp)
 {
-	int i, type, count, size;
+	int i, type, count = 0 /* shut up gcc warning */, size;
 	unsigned int indirect;
 
 	if (copy_from_user(&data->id, &data32->id, sizeof(data->id)))
