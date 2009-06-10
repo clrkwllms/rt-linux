@@ -76,8 +76,8 @@ struct rcupreempt_probe_data {
 };
 
 #define DEFINE_RCUPREEMPT_MARKER_HANDLER(rcupreempt_trace_worker) \
-void rcupreempt_trace_worker##_callback(const struct marker *mdata, \
-				void *private_data, const char *format, ...) \
+void rcupreempt_trace_worker##_callback(void *private_data, void *call_data, \
+					const char *format, va_list *args) \
 { \
 	struct rcupreempt_trace *trace; \
 	trace = (&per_cpu(trace_data, smp_processor_id())); \
@@ -113,8 +113,8 @@ struct preempt_rcu_boost_trace {
 };
 
 #define DEFINE_PREEMPT_RCU_BOOST_MARKER_HANDLER(preempt_rcu_boost_var) \
-void preempt_rcu_boost_var##_callback(const struct marker *mdata, \
-				void *private_data, const char *format, ...) \
+void preempt_rcu_boost_var##_callback(void *private_data, void *call_data, \
+				const char *format, va_list *args) \
 { \
 	struct preempt_rcu_boost_trace *boost_trace; \
 	boost_trace = (&per_cpu(boost_trace_data, smp_processor_id())); \

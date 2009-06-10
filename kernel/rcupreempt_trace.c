@@ -536,10 +536,6 @@ static int __init rcupreempt_trace_init(void)
 		if (ret)
 			printk(KERN_INFO "Unable to register rcupreempt \
 				probe %s\n", rcupreempt_probe_array[i].name);
-		ret = marker_arm(p->name);
-		if (ret)
-			printk(KERN_INFO "Unable to arm rcupreempt probe %s\n",
-				p->name);
 	}
 	printk(KERN_INFO "RCU Preempt markers registered\n");
 
@@ -552,10 +548,6 @@ static int __init rcupreempt_trace_init(void)
 		if (ret)
 			printk(KERN_INFO "Unable to register Preempt RCU Boost \
 			probe %s\n", preempt_rcu_boost_probe_array[i].name);
-		ret = marker_arm(p->name);
-		if (ret)
-			printk(KERN_INFO "Unable to arm Preempt RCU Boost \
-				markers %s\n", p->name);
 }
 #endif /* CONFIG_PREEMPT_RCU_BOOST */
 
@@ -573,14 +565,19 @@ static void __exit rcupreempt_trace_cleanup(void)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(rcupreempt_probe_array); i++)
-		marker_probe_unregister(rcupreempt_probe_array[i].name);
+	for (i = 0; i < ARRAY_SIZE(rcupreempt_probe_array); i++) {
+		struct rcupreempt_probe_data *p = &rcupreempt_probe_array[i];
+		marker_probe_unregister(p->name, p->probe_func, p);
+	}
 	printk(KERN_INFO "RCU Preempt markers unregistered\n");
 
 #ifdef CONFIG_PREEMPT_RCU_BOOST
 	rcu_trace_boost_destroy();
-	for (i = 0; i < ARRAY_SIZE(preempt_rcu_boost_probe_array); i++)
-		marker_probe_unregister(preempt_rcu_boost_probe_array[i].name);
+	for (i = 0; i < ARRAY_SIZE(preempt_rcu_boost_probe_array); i++) {
+		struct preempt_rcu_boost_probe *p = \
+					&preempt_rcu_boost_probe_array[i];
+		marker_probe_unregister(p->name, p->probe_func, p);
+	}
 	printk(KERN_INFO "Preempt RCU Boost markers unregistered\n");
 #endif /* CONFIG_PREEMPT_RCU_BOOST */
 	debugfs_remove(statdir);
