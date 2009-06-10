@@ -12,6 +12,7 @@
  * See the file COPYING for more details.
  */
 
+#include <linux/immediate.h>
 #include <linux/types.h>
 
 struct module;
@@ -19,25 +20,35 @@ struct marker;
 
 /**
  * marker_probe_func - Type of a marker probe function
- * @mdata: pointer of type struct marker
- * @private_data: caller site private data
+ * @probe_private: probe private data
+ * @call_private: call site private data
  * @fmt: format string
- * @...: variable argument list
+ * @args: variable argument list pointer. Use a pointer to overcome C's
+ *        inability to pass this around as a pointer in a portable manner in
+ *        the callee otherwise.
  *
  * Type of marker probe functions. They receive the mdata and need to parse the
  * format string to recover the variable argument list.
  */
-typedef void marker_probe_func(const struct marker *mdata,
-	void *private_data, const char *fmt, ...);
+typedef void marker_probe_func(void *probe_private, void *call_private,
+		const char *fmt, va_list *args);
+
+struct marker_probe_closure {
+	marker_probe_func *func;	/* Callback */
+	void *probe_private;		/* Private probe data */
+};
 
 struct marker {
 	const char *name;	/* Marker name */
 	const char *format;	/* Marker format string, describing the
 				 * variable argument list.
 				 */
-	char state;		/* Marker state. */
-	marker_probe_func *call;/* Probe handler function pointer */
-	void *private;		/* Private probe data */
+	DEFINE_IMV(char, state);/* Immediate value state. */
+	char ptype;		/* probe type : 0 : single, 1 : multi */
+				/* Probe wrapper */
+	void (*call)(const struct marker *mdata, void *call_private, ...);
+	struct marker_probe_closure single;
+	struct marker_probe_closure *multi;
 } __attribute__((aligned(8)));
 
 #ifdef CONFIG_MARKERS
@@ -48,51 +59,73 @@ struct marker {
  * Make sure the alignment of the structure in the __markers section will
  * not add unwanted padding between the beginning of the section and the
  * structure. Force alignment to the same alignment as the section start.
+ *
+ * The "generic" argument controls which marker enabling mechanism must be used.
+ * If generic is true, a variable read is used.
+ * If generic is false, immediate values are used.
  */
-#define __trace_mark(name, call_data, format, args...)			\
+#define __trace_mark(generic, name, call_private, format, args...)	\
 	do {								\
-		static const char __mstrtab_name_##name[]		\
+		static const char __mstrtab_##name[]			\
 		__attribute__((section("__markers_strings")))		\
-		= #name;						\
-		static const char __mstrtab_format_##name[]		\
-		__attribute__((section("__markers_strings")))		\
-		= format;						\
+		= #name "\0" format;					\
 		static struct marker __mark_##name			\
 		__attribute__((section("__markers"), aligned(8))) =	\
-		{ __mstrtab_name_##name, __mstrtab_format_##name,	\
-		0, __mark_empty_function, NULL };			\
+		{ __mstrtab_##name, &__mstrtab_##name[sizeof(#name)],	\
+		0, 0, marker_probe_cb,					\
+		{ __mark_empty_function, NULL}, NULL };			\
 		__mark_check_format(format, ## args);			\
-		if (unlikely(__mark_##name.state)) {			\
-			preempt_disable();				\
-			(*__mark_##name.call)				\
-				(&__mark_##name, call_data,		\
-				format, ## args);			\
-			preempt_enable();				\
+		if (!generic) {						\
+			if (unlikely(imv_cond(__mark_##name.state))) {	\
+				imv_cond_end();				\
+				(*__mark_##name.call)			\
+					(&__mark_##name, call_private,	\
+					## args);			\
+			} else						\
+				imv_cond_end();				\
+		} else {						\
+			if (unlikely(_imv_read(__mark_##name.state)))	\
+				(*__mark_##name.call)			\
+					(&__mark_##name, call_private,	\
+					## args);			\
 		}							\
 	} while (0)
 
 extern void marker_update_probe_range(struct marker *begin,
-	struct marker *end, struct module *probe_module, int *refcount);
+	struct marker *end);
 #else /* !CONFIG_MARKERS */
-#define __trace_mark(name, call_data, format, args...) \
+#define __trace_mark(generic, name, call_private, format, args...) \
 		__mark_check_format(format, ## args)
 static inline void marker_update_probe_range(struct marker *begin,
-	struct marker *end, struct module *probe_module, int *refcount)
+	struct marker *end)
 { }
 #endif /* CONFIG_MARKERS */
 
 /**
- * trace_mark - Marker
+ * trace_mark - Marker using code patching
  * @name: marker name, not quoted.
  * @format: format string
  * @args...: variable argument list
  *
- * Places a marker.
+ * Places a marker using optimized code patching technique (imv_read())
+ * to be enabled when immediate values are present.
  */
 #define trace_mark(name, format, args...) \
-	__trace_mark(name, NULL, format, ## args)
+	__trace_mark(0, name, NULL, format, ## args)
 
-#define MARK_MAX_FORMAT_LEN	1024
+/**
+ * _trace_mark - Marker using variable read
+ * @name: marker name, not quoted.
+ * @format: format string
+ * @args...: variable argument list
+ *
+ * Places a marker using a standard memory read (_imv_read()) to be
+ * enabled. Should be used for markers in code paths where instruction
+ * modification based enabling is not welcome. (__init and __exit functions,
+ * lockdep, some traps, printk).
+ */
+#define _trace_mark(name, format, args...) \
+	__trace_mark(1, name, NULL, format, ## args)
 
 /**
  * MARK_NOARGS - Format string for a marker with no argument.
@@ -100,30 +133,42 @@ static inline void marker_update_probe_range(struct marker *begin,
 #define MARK_NOARGS " "
 
 /* To be used for string format validity checking with gcc */
-static inline void __printf(1, 2) __mark_check_format(const char *fmt, ...)
+static inline void __printf(1, 2) ___mark_check_format(const char *fmt, ...)
 {
 }
 
+#define __mark_check_format(format, args...)				\
+	do {								\
+		if (0)							\
+			___mark_check_format(format, ## args);		\
+	} while (0)
+
 extern marker_probe_func __mark_empty_function;
+
+extern void marker_probe_cb(const struct marker *mdata,
+	void *call_private, ...);
+extern void marker_probe_cb_noarg(const struct marker *mdata,
+	void *call_private, ...);
 
 /*
  * Connect a probe to a marker.
  * private data pointer must be a valid allocated memory address, or NULL.
  */
 extern int marker_probe_register(const char *name, const char *format,
-				marker_probe_func *probe, void *private);
+				marker_probe_func *probe, void *probe_private);
 
 /*
  * Returns the private data given to marker_probe_register.
  */
-extern void *marker_probe_unregister(const char *name);
+extern int marker_probe_unregister(const char *name,
+	marker_probe_func *probe, void *probe_private);
 /*
  * Unregister a marker by providing the registered private data.
  */
-extern void *marker_probe_unregister_private_data(void *private);
+extern int marker_probe_unregister_private_data(marker_probe_func *probe,
+	void *probe_private);
 
-extern int marker_arm(const char *name);
-extern int marker_disarm(const char *name);
-extern void *marker_get_private_data(const char *name);
+extern void *marker_get_private_data(const char *name, marker_probe_func *probe,
+	int num);
 
 #endif
