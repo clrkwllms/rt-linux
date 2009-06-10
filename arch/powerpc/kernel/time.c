@@ -751,7 +751,7 @@ static cycle_t rtc_read(void)
 	return (cycle_t)get_rtc();
 }
 
-static cycle_t timebase_read(void)
+static cycle_t notrace timebase_read(void)
 {
 	return (cycle_t)get_tb();
 }
