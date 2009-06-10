@@ -150,7 +150,7 @@ void tick_nohz_update_jiffies(void)
  * Called either from the idle loop or from irq_exit() when an idle period was
  * just interrupted by an interrupt which did not cause a reschedule.
  */
-void tick_nohz_stop_sched_tick(void)
+void tick_nohz_stop_sched_tick(int inidle)
 {
 	unsigned long seq, last_jiffies, next_jiffies, delta_jiffies, flags;
 	struct tick_sched *ts;
@@ -177,6 +177,11 @@ void tick_nohz_stop_sched_tick(void)
 
 	if (unlikely(ts->nohz_mode == NOHZ_MODE_INACTIVE))
 		goto end;
+
+	if (!inidle && !ts->inidle)
+		goto end;
+
+	ts->inidle = 1;
 
 	if (need_resched() || need_resched_delayed())
 		goto end;
@@ -338,8 +343,12 @@ void tick_nohz_restart_sched_tick(void)
 	unsigned long ticks;
 	ktime_t now, delta;
 
-	if (!ts->tick_stopped)
+	if (!ts->inidle || !ts->tick_stopped) {
+		ts->inidle = 0;
 		return;
+	}
+
+	ts->inidle = 0;
 
 	rcu_exit_nohz();
 

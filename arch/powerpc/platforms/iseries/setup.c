@@ -563,7 +563,7 @@ static void yield_shared_processor(void)
 static void iseries_shared_idle(void)
 {
 	while (1) {
-		tick_nohz_stop_sched_tick();
+		tick_nohz_stop_sched_tick(1);
 		while (!need_resched() && !need_resched_delayed()
 				&& !hvlpevent_is_pending()) {
 			local_irq_disable();
@@ -595,7 +595,7 @@ static void iseries_dedicated_idle(void)
 	set_thread_flag(TIF_POLLING_NRFLAG);
 
 	while (1) {
-		tick_nohz_stop_sched_tick();
+		tick_nohz_stop_sched_tick(1);
 		if (!need_resched()) {
 			while (!need_resched()) {
 				ppc64_runlatch_off();
