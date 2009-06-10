@@ -1311,6 +1311,7 @@ void smp_error_interrupt(struct pt_regs *regs)
 	*/
 	printk (KERN_DEBUG "APIC error on CPU%d: %02lx(%02lx)\n",
 		smp_processor_id(), v , v1);
+	dump_stack();
 	irq_exit();
 }
 
