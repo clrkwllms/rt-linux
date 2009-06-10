@@ -15,6 +15,9 @@
 #include <linux/page-flags.h>
 #include <linux/hardirq.h> /* for in_interrupt() */
 #include <linux/bit_spinlock.h>
+#include <linux/wait.h>
+#include <linux/hash.h>
+#include <linux/interrupt.h>
 
 /*
  * Bits in mapping->flags.  The lower __GFP_BITS_SHIFT bits are the page
@@ -65,6 +68,26 @@ static inline void mapping_set_gfp_mask(struct address_space *m, gfp_t mask)
 #define page_cache_release(page)	put_page(page)
 void release_pages(struct page **pages, int nr, int cold);
 
+/*
+ * In order to wait for pages to become available there must be
+ * waitqueues associated with pages. By using a hash table of
+ * waitqueues where the bucket discipline is to maintain all
+ * waiters on the same queue and wake all when any of the pages
+ * become available, and for the woken contexts to check to be
+ * sure the appropriate page became available, this saves space
+ * at a cost of "thundering herd" phenomena during rare hash
+ * collisions.
+ */
+static inline wait_queue_head_t *page_waitqueue(struct page *page)
+{
+	const struct zone *zone = page_zone(page);
+
+	return &zone->wait_table[hash_ptr(page, zone->wait_table_bits)];
+}
+
+extern int __sleep_on_page(void *);
+
+#ifndef CONFIG_PREEMPT_RT
 static inline void lock_page_ref(struct page *page)
 {
 	bit_spin_lock(PG_nonewrefs, &page->flags);
@@ -81,29 +104,58 @@ static inline void wait_on_page_ref(struct page *page)
 	while (unlikely(test_bit(PG_nonewrefs, &page->flags)))
 		cpu_relax();
 }
+#else // CONFIG_PREEMPT_RT
+static inline void wait_on_page_ref(struct page *page)
+{
+	might_sleep();
+	if (unlikely(PageNoNewRefs(page))) {
+		DEFINE_WAIT_BIT(wait, &page->flags, PG_nonewrefs);
+		__wait_on_bit(page_waitqueue(page), &wait, __sleep_on_page,
+				TASK_UNINTERRUPTIBLE);
+	}
+}
+
+static inline void lock_page_ref(struct page *page)
+{
+	while (test_and_set_bit(PG_nonewrefs, &page->flags))
+		wait_on_page_ref(page);
+	__acquire(bitlock);
+	smp_wmb();
+}
+
+static inline void unlock_page_ref(struct page *page)
+{
+	VM_BUG_ON(!PageNoNewRefs(page));
+	smp_mb__before_clear_bit();
+	ClearPageNoNewRefs(page);
+	smp_mb__after_clear_bit();
+	__wake_up_bit(page_waitqueue(page), &page->flags, PG_nonewrefs);
+	__release(bitlock);
+}
+#endif // CONFIG_PREEMPT_RT
 
 #define lock_page_ref_irq(page)					\
 	do {							\
-		local_irq_disable();				\
+		local_irq_disable_nort();			\
 		lock_page_ref(page);				\
 	} while (0)
 
 #define unlock_page_ref_irq(page)				\
 	do {							\
 		unlock_page_ref(page);				\
-		local_irq_enable();				\
+		local_irq_enable_nort();			\
 	} while (0)
 
 #define lock_page_ref_irqsave(page, flags)			\
 	do {							\
-		local_irq_save(flags);				\
+		local_irq_save_nort(flags);			\
 		lock_page_ref(page);				\
 	} while (0)
 
 #define unlock_page_ref_irqrestore(page, flags)			\
 	do {							\
 		unlock_page_ref(page);				\
-		local_irq_restore(flags);			\
+		local_irq_restore_nort(flags);			\
 	} while (0)
 
 /*
@@ -155,7 +207,7 @@ static inline int page_cache_get_speculative(struct page *page)
 {
 	VM_BUG_ON(in_interrupt());
 
-#ifndef CONFIG_SMP
+#if !defined(CONFIG_SMP) && !defined(CONFIG_PREEMPT_RT)
 # ifdef CONFIG_PREEMPT
 	VM_BUG_ON(!in_atomic());
 # endif

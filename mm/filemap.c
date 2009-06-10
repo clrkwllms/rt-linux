@@ -505,21 +505,10 @@ static int __sleep_on_page_lock(void *word)
 	return 0;
 }
 
-/*
- * In order to wait for pages to become available there must be
- * waitqueues associated with pages. By using a hash table of
- * waitqueues where the bucket discipline is to maintain all
- * waiters on the same queue and wake all when any of the pages
- * become available, and for the woken contexts to check to be
- * sure the appropriate page became available, this saves space
- * at a cost of "thundering herd" phenomena during rare hash
- * collisions.
- */
-static wait_queue_head_t *page_waitqueue(struct page *page)
+int __sleep_on_page(void *word)
 {
-	const struct zone *zone = page_zone(page);
-
-	return &zone->wait_table[hash_ptr(page, zone->wait_table_bits)];
+	schedule();
+	return 0;
 }
 
 static inline void wake_up_page(struct page *page, int bit)
