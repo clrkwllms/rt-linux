@@ -30,6 +30,7 @@
 #include <asm/tlbflush.h>
 #include <asm/tlb.h>
 #include <asm/bug.h>
+#include <asm/machdep.h>
 
 DEFINE_PER_CPU(struct ppc64_tlb_batch, ppc64_tlb_batch);
 
@@ -207,6 +208,18 @@ void hpte_need_flush(struct mm_struct *mm, unsigned long addr,
 	batch->pte[i] = rpte;
 	batch->vaddr[i] = vaddr;
 	batch->index = ++i;
+
+#ifdef CONFIG_PREEMPT_RT
+	/*
+	 * Since flushing tlb needs expensive hypervisor call(s) on celleb,
+	 * always flush it on RT to reduce scheduling latency.
+	 */
+	if (machine_is(celleb)) {
+		flush_tlb_pending();
+		return;
+	}
+#endif /* CONFIG_PREEMPT_RT */
+
 	if (i >= PPC64_TLB_BATCH_NR)
 		__flush_tlb_pending(batch);
 }
