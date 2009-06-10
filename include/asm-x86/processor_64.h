@@ -197,6 +197,10 @@ struct tss_struct {
 	 * 8 bytes, for an extra "long" of ~0UL
 	 */
 	unsigned long io_bitmap[IO_BITMAP_LONGS + 1];
+
+	void *irqstack;
+	void *estacks[N_EXCEPTION_STACKS];
+
 } __attribute__((packed)) ____cacheline_aligned;
 
 

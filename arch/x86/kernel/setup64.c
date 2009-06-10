@@ -137,18 +137,11 @@ void pda_init(int cpu)
 		pda->pcurrent = &init_task;
 		pda->irqstackptr = boot_cpu_stack; 
 	} else {
-		pda->irqstackptr = (char *)
-			__get_free_pages(GFP_ATOMIC, IRQSTACK_ORDER);
-		if (!pda->irqstackptr)
-			panic("cannot allocate irqstack for cpu %d", cpu); 
+		pda->irqstackptr = (char *)per_cpu(init_tss, cpu).irqstack;
 	}
-
 
 	pda->irqstackptr += IRQSTACKSIZE-64;
 } 
-
-char boot_exception_stacks[(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_STKSZ]
-__attribute__((section(".bss.page_aligned")));
 
 extern asmlinkage void ignore_sysret(void);
 
@@ -203,15 +196,13 @@ void __cpuinit cpu_init (void)
 	struct tss_struct *t = &per_cpu(init_tss, cpu);
 	struct orig_ist *orig_ist = &per_cpu(orig_ist, cpu);
 	unsigned long v; 
-	char *estacks = NULL; 
 	struct task_struct *me;
 	int i;
 
 	/* CPU 0 is initialised in head64.c */
 	if (cpu != 0) {
 		pda_init(cpu);
-	} else 
-		estacks = boot_exception_stacks; 
+	}
 
 	me = current;
 
@@ -245,22 +236,8 @@ void __cpuinit cpu_init (void)
 	/*
 	 * set up and load the per-CPU TSS
 	 */
-	for (v = 0; v < N_EXCEPTION_STACKS; v++) {
-		static const unsigned int order[N_EXCEPTION_STACKS] = {
-			[0 ... N_EXCEPTION_STACKS - 1] = EXCEPTION_STACK_ORDER,
-#if DEBUG_STACK > 0
-			[DEBUG_STACK - 1] = DEBUG_STACK_ORDER
-#endif
-		};
-		if (cpu) {
-			estacks = (char *)__get_free_pages(GFP_ATOMIC, order[v]);
-			if (!estacks)
-				panic("Cannot allocate exception stack %ld %d\n",
-				      v, cpu); 
-		}
-		estacks += PAGE_SIZE << order[v];
-		orig_ist->ist[v] = t->ist[v] = (unsigned long)estacks;
-	}
+	for (v = 0; v < N_EXCEPTION_STACKS; v++)
+		orig_ist->ist[v] = t->ist[v] = (unsigned long)t->estacks[v];
 
 	t->io_bitmap_base = offsetof(struct tss_struct, io_bitmap);
 	/*

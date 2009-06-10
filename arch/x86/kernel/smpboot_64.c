@@ -535,6 +535,60 @@ static void __cpuinit do_fork_idle(struct work_struct *work)
 	complete(&c_idle->done);
 }
 
+static char boot_exception_stacks[(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_STKSZ]
+__attribute__((section(".bss.page_aligned")));
+
+static int __cpuinit allocate_stacks(int cpu)
+{
+	static const unsigned int order[N_EXCEPTION_STACKS] = {
+		[0 ... N_EXCEPTION_STACKS - 1] = EXCEPTION_STACK_ORDER,
+#if DEBUG_STACK > 0
+		[DEBUG_STACK - 1] = DEBUG_STACK_ORDER
+#endif
+	};
+	struct tss_struct *t = &per_cpu(init_tss, cpu);
+	int node = cpu_to_node(cpu);
+	struct page *page;
+	char *estack;
+	int v;
+
+	if (cpu && !t->irqstack) {
+		page = alloc_pages_node(node, GFP_KERNEL,
+				IRQSTACK_ORDER);
+		if (!page)
+			goto fail_oom;
+		t->irqstack = page_address(page);
+	}
+
+	if (!cpu)
+		estack = boot_exception_stacks;
+
+	for (v = 0; v < N_EXCEPTION_STACKS; v++) {
+		if (t->estacks[v])
+			continue;
+
+		if (cpu) {
+			page = alloc_pages_node(node, GFP_KERNEL, order[v]);
+			if (!page)
+				goto fail_oom;
+			estack = page_address(page);
+		}
+		estack += PAGE_SIZE << order[v];
+		/*
+		 * XXX: can we set t->isr[v] here directly, or will that be
+		 * modified later? - the existance of orig_ist seems to suggest
+		 * it _can_ be modified, which would imply we'd need to reset
+		 * it.
+		 */
+		t->estacks[v] = estack;
+	}
+
+	return 0;
+
+fail_oom:
+	return -ENOMEM;
+}
+
 /*
  * Boot one CPU.
  */
@@ -604,6 +658,9 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 		printk("failed fork for CPU %d\n", cpu);
 		return PTR_ERR(c_idle.idle);
 	}
+
+	if (allocate_stacks(cpu))
+		return -ENOMEM;
 
 	set_idle_for_cpu(cpu, c_idle.idle);
 
