@@ -236,6 +236,13 @@ static inline void do_leds(void)
 #define	do_leds()
 #endif
 
+void arch_tick_leds(void)
+{
+#ifdef CONFIG_LEDS_TIMER
+	do_leds();
+#endif
+}
+
 #ifndef CONFIG_GENERIC_TIME
 void do_gettimeofday(struct timeval *tv)
 {
