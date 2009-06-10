@@ -77,10 +77,10 @@ struct radix_tree_path {
 static unsigned long height_to_maxindex[RADIX_TREE_MAX_PATH + 1] __read_mostly;
 
 #ifdef CONFIG_RADIX_TREE_CONCURRENT
-static struct lock_class_key radix_node_class[RADIX_TREE_MAX_PATH];
+static struct lock_class_key radix_node_class[RADIX_TREE_MAX_PATH + 1];
 #endif
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
-static const char *radix_node_key_string[RADIX_TREE_MAX_PATH] = {
+static const char *radix_node_key_string[RADIX_TREE_MAX_PATH + 1] = {
 	"radix-node-00",
 	"radix-node-01",
 	"radix-node-02",
