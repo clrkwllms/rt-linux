@@ -151,7 +151,10 @@ void trace_wake_up(void)
 	 * have for now:
 	 */
 	if (!(trace_flags & TRACE_ITER_BLOCK) && !runqueue_is_locked())
-		wake_up(&trace_wait);
+#ifdef CONFIG_PREEMPT_RT
+		if (!irqs_disabled())
+#endif
+			wake_up(&trace_wait);
 }
 
 #define ENTRIES_PER_PAGE (PAGE_SIZE / sizeof(struct trace_entry))
