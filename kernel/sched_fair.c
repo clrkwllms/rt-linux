@@ -1115,7 +1115,7 @@ static unsigned long
 load_balance_fair(struct rq *this_rq, int this_cpu, struct rq *busiest,
 		  unsigned long max_load_move,
 		  struct sched_domain *sd, enum cpu_idle_type idle,
-		  int *all_pinned, int *this_best_prio)
+		  int *lb_flags, int *this_best_prio)
 {
 	struct cfs_rq *busy_cfs_rq;
 	long rem_load_move = max_load_move;
@@ -1151,7 +1151,7 @@ load_balance_fair(struct rq *this_rq, int this_cpu, struct rq *busiest,
 		 */
 		cfs_rq_iterator.arg = busy_cfs_rq;
 		rem_load_move -= balance_tasks(this_rq, this_cpu, busiest,
-					       maxload, sd, idle, all_pinned,
+					       maxload, sd, idle, lb_flags,
 					       this_best_prio,
 					       &cfs_rq_iterator);
 

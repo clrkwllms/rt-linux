@@ -1043,7 +1043,7 @@ struct rq_iterator {
 static unsigned long
 balance_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 	      unsigned long max_load_move, struct sched_domain *sd,
-	      enum cpu_idle_type idle, int *all_pinned,
+	      enum cpu_idle_type idle, int *lb_flags,
 	      int *this_best_prio, struct rq_iterator *iterator);
 
 static int
@@ -2269,6 +2269,8 @@ static void update_cpu_load(struct rq *this_rq)
 
 #ifdef CONFIG_SMP
 
+#define LB_ALL_PINNED	0x01
+
 /*
  * double_rq_lock - safely lock two runqueues
  *
@@ -2411,7 +2413,7 @@ static void pull_task(struct rq *src_rq, struct task_struct *p,
 static
 int can_migrate_task(struct task_struct *p, struct rq *rq, int this_cpu,
 		     struct sched_domain *sd, enum cpu_idle_type idle,
-		     int *all_pinned)
+		     int *lb_flags)
 {
 	/*
 	 * We do not migrate tasks that are:
@@ -2423,7 +2425,7 @@ int can_migrate_task(struct task_struct *p, struct rq *rq, int this_cpu,
 		schedstat_inc(p, se.nr_failed_migrations_affine);
 		return 0;
 	}
-	*all_pinned = 0;
+	*lb_flags &= ~LB_ALL_PINNED;
 
 	if (task_running(rq, p)) {
 		schedstat_inc(p, se.nr_failed_migrations_running);
@@ -2457,7 +2459,7 @@ int can_migrate_task(struct task_struct *p, struct rq *rq, int this_cpu,
 static unsigned long
 balance_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 	      unsigned long max_load_move, struct sched_domain *sd,
-	      enum cpu_idle_type idle, int *all_pinned,
+	      enum cpu_idle_type idle, int *lb_flags,
 	      int *this_best_prio, struct rq_iterator *iterator)
 {
 	int loops = 0, pulled = 0, pinned = 0, skip_for_load;
@@ -2467,12 +2469,12 @@ balance_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 	if (max_load_move == 0)
 		goto out;
 
-	pinned = 1;
-
 	/*
 	 * Start the load-balancing iterator:
 	 */
 	p = iterator->start(iterator->arg);
+	if (p)
+		pinned = 1;
 next:
 	if (!p || loops++ > sysctl_sched_nr_migrate)
 		goto out;
@@ -2510,8 +2512,8 @@ out:
 	 */
 	schedstat_add(sd, lb_gained[idle], pulled);
 
-	if (all_pinned)
-		*all_pinned = pinned;
+	if (pinned)
+		*lb_flags |= LB_ALL_PINNED;
 
 	return max_load_move - rem_load_move;
 }
@@ -2526,7 +2528,7 @@ out:
 static int move_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 		      unsigned long max_load_move,
 		      struct sched_domain *sd, enum cpu_idle_type idle,
-		      int *all_pinned)
+		      int *lb_flags)
 {
 	const struct sched_class *class = sched_class_highest;
 	unsigned long total_load_moved = 0;
@@ -2536,7 +2538,7 @@ static int move_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 		total_load_moved +=
 			class->load_balance(this_rq, this_cpu, busiest,
 				max_load_move - total_load_moved,
-				sd, idle, all_pinned, &this_best_prio);
+				sd, idle, lb_flags, &this_best_prio);
 		class = class->next;
 	} while (class && max_load_move > total_load_moved);
 
@@ -2938,7 +2940,7 @@ static int load_balance(int this_cpu, struct rq *this_rq,
 			struct sched_domain *sd, enum cpu_idle_type idle,
 			int *balance)
 {
-	int ld_moved, all_pinned = 0, active_balance = 0, sd_idle = 0;
+	int ld_moved, lb_flags = 0, active_balance = 0, sd_idle = 0;
 	struct sched_group *group;
 	unsigned long imbalance;
 	struct rq *busiest;
@@ -2990,7 +2992,7 @@ redo:
 		local_irq_save(flags);
 		double_rq_lock(this_rq, busiest);
 		ld_moved = move_tasks(this_rq, this_cpu, busiest,
-				      imbalance, sd, idle, &all_pinned);
+				      imbalance, sd, idle, &lb_flags);
 		double_rq_unlock(this_rq, busiest);
 		local_irq_restore(flags);
 
@@ -3001,7 +3003,7 @@ redo:
 			resched_cpu(this_cpu);
 
 		/* All tasks on this runqueue were pinned by CPU affinity */
-		if (unlikely(all_pinned)) {
+		if (unlikely(lb_flags & LB_ALL_PINNED)) {
 			cpu_clear(cpu_of(busiest), cpus);
 			if (!cpus_empty(cpus))
 				goto redo;
@@ -3022,7 +3024,7 @@ redo:
 			 */
 			if (!cpu_isset(this_cpu, busiest->curr->cpus_allowed)) {
 				spin_unlock_irqrestore(&busiest->lock, flags);
-				all_pinned = 1;
+				lb_flags |= LB_ALL_PINNED;
 				goto out_one_pinned;
 			}
 
@@ -3070,7 +3072,8 @@ out_balanced:
 
 out_one_pinned:
 	/* tune up the balancing interval */
-	if ((all_pinned && sd->balance_interval < MAX_PINNED_INTERVAL) ||
+	if (((lb_flags & LB_ALL_PINNED) &&
+			sd->balance_interval < MAX_PINNED_INTERVAL) ||
 			(sd->balance_interval < sd->max_interval))
 		sd->balance_interval *= 2;
 
@@ -3095,7 +3098,7 @@ load_balance_newidle(int this_cpu, struct rq *this_rq, struct sched_domain *sd)
 	unsigned long imbalance;
 	int ld_moved = 0;
 	int sd_idle = 0;
-	int all_pinned = 0;
+	int lb_flags = 0;
 	cpumask_t cpus = CPU_MASK_ALL;
 
 	/*
@@ -3136,10 +3139,10 @@ redo:
 		update_rq_clock(busiest);
 		ld_moved = move_tasks(this_rq, this_cpu, busiest,
 					imbalance, sd, CPU_NEWLY_IDLE,
-					&all_pinned);
+					&lb_flags);
 		spin_unlock(&busiest->lock);
 
-		if (unlikely(all_pinned)) {
+		if (unlikely(lb_flags & LB_ALL_PINNED)) {
 			cpu_clear(cpu_of(busiest), cpus);
 			if (!cpus_empty(cpus))
 				goto redo;

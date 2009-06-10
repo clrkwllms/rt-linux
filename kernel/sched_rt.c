@@ -718,7 +718,7 @@ static unsigned long
 load_balance_rt(struct rq *this_rq, int this_cpu, struct rq *busiest,
 		unsigned long max_load_move,
 		struct sched_domain *sd, enum cpu_idle_type idle,
-		int *all_pinned, int *this_best_prio)
+		int *lb_flags, int *this_best_prio)
 {
 	/* don't touch RT tasks */
 	return 0;
