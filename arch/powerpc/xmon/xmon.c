@@ -2129,7 +2129,7 @@ print_address(unsigned long addr)
 static unsigned long mdest;		/* destination address */
 static unsigned long msrc;		/* source address */
 static unsigned long mval;		/* byte value to set memory to */
-static unsigned long mcount;		/* # bytes to affect */
+static unsigned long xmon_mcount;	/* # bytes to affect */
 static unsigned long mdiffs;		/* max # differences to print */
 
 void
@@ -2141,19 +2141,20 @@ memops(int cmd)
 	scanhex((void *)(cmd == 's'? &mval: &msrc));
 	if( termch != '\n' )
 		termch = 0;
-	scanhex((void *)&mcount);
+	scanhex((void *)&xmon_mcount);
 	switch( cmd ){
 	case 'm':
-		memmove((void *)mdest, (void *)msrc, mcount);
+		memmove((void *)mdest, (void *)msrc, xmon_mcount);
 		break;
 	case 's':
-		memset((void *)mdest, mval, mcount);
+		memset((void *)mdest, mval, xmon_mcount);
 		break;
 	case 'd':
 		if( termch != '\n' )
 			termch = 0;
 		scanhex((void *)&mdiffs);
-		memdiffs((unsigned char *)mdest, (unsigned char *)msrc, mcount, mdiffs);
+		memdiffs((unsigned char *)mdest, (unsigned char *)msrc,
+			 xmon_mcount, mdiffs);
 		break;
 	}
 }
