@@ -1692,18 +1692,10 @@ gso:
 	   Either shot noqueue qdisc, it is even simpler 8)
 	 */
 	if (dev->flags & IFF_UP) {
-		int cpu = raw_smp_processor_id(); /* ok because BHs are off */
 
-		/*
-		 * No need to check for recursion with threaded interrupts:
-		 */
-#ifdef CONFIG_PREEMPT_RT
-		if (1) {
-#else
-		if (dev->xmit_lock_owner != cpu) {
-#endif
+		if (dev->xmit_lock_owner != (void *)current) {
 
-			HARD_TX_LOCK(dev, cpu);
+			HARD_TX_LOCK(dev);
 
 			if (!netif_queue_stopped(dev) &&
 			    !netif_subqueue_stopped(dev, skb)) {
@@ -3634,7 +3626,7 @@ int register_netdevice(struct net_device *dev)
 	spin_lock_init(&dev->queue_lock);
 	spin_lock_init(&dev->_xmit_lock);
 	netdev_set_lockdep_class(&dev->_xmit_lock, dev->type);
-	dev->xmit_lock_owner = -1;
+	dev->xmit_lock_owner = (void *)-1;
 	spin_lock_init(&dev->ingress_lock);
 
 	dev->iflink = -1;
