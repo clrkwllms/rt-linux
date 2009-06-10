@@ -1203,7 +1203,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	if (retval)
 		goto bad_fork_cleanup_namespaces;
 #ifdef CONFIG_DEBUG_PREEMPT
-	p->lock_count = 0;
+	atomic_set(&p->lock_count, 0);
 #endif
 
 #ifdef CONFIG_PREEMPT_RT
