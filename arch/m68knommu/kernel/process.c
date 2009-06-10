@@ -54,9 +54,9 @@ EXPORT_SYMBOL(pm_power_off);
 static void default_idle(void)
 {
 	local_irq_disable();
- 	while (!need_resched()) {
+	while (!need_resched() && !need_resched_delayed()) {
 		/* This stop will re-enable interrupts */
- 		__asm__("stop #0x2000" : : : "cc");
+		__asm__("stop #0x2000" : : : "cc");
 		local_irq_disable();
 	}
 	local_irq_enable();

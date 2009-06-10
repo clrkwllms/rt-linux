@@ -145,7 +145,7 @@ ret_from_exception:
 	andl	#-THREAD_SIZE,%d1	/* at base of kernel stack */
 	movel	%d1,%a0
 	movel	%a0@(TI_FLAGS),%d1	/* get thread_info->flags */
-	andl	#_TIF_NEED_RESCHED,%d1
+	andl	#_TIF_RESCHED_MASK,%d1
 	jeq	Lkernel_return
 
 	movel	%a0@(TI_PREEMPTCOUNT),%d1
@@ -191,7 +191,7 @@ Lreturn:
 Lwork_to_do:
 	movel	%a0@(TI_FLAGS),%d1	/* get thread_info->flags */
 	move    #0x2000,%sr             /* enable intrs again */
-	btst	#TIF_NEED_RESCHED,%d1
+	andl	#_TIF_RESCHED_MASK, %d1
 	jne	reschedule
 
 	/* GERG: do we need something here for TRACEing?? */

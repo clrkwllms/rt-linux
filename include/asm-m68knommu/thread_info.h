@@ -88,12 +88,20 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_POLLING_NRFLAG	3	/* true if poll_idle() is polling
 					   TIF_NEED_RESCHED */
 #define TIF_MEMDIE		4
+#define TIF_NEED_RESCHED_DELAYED	6	/* reschedule on return to userspace */
 
 /* as above, but as bit values */
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
 #define _TIF_SIGPENDING		(1<<TIF_SIGPENDING)
 #define _TIF_NEED_RESCHED	(1<<TIF_NEED_RESCHED)
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
+#define _TIF_NEED_RESCHED_DELAYED	(1<<TIF_NEED_RESCHED_DELAYED)
+
+/*
+ * the compiler does not accept
+ * #define _TIF_RESCHED_MASK	(_TIF_NEED_RESCHED | _TIF_NEED_RESCHED_DELAYED)
+ */
+#define _TIF_RESCHED_MASK	(0x44)
 
 #define _TIF_WORK_MASK		0x0000FFFE	/* work to do on interrupt/exception return */
 
