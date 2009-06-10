@@ -1175,7 +1175,6 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 	struct rt_mutex_waiter *waiter;
 	struct reader_lock_struct *rls;
 	struct task_struct *mtxowner;
-	int owners;
 	int reader_count, i;
 	int incr = 1;
 
@@ -1214,13 +1213,6 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 		rt_rwlock_set_owner(rwm, RT_RW_READER, 0);
 		goto taken;
 	}
-
-	owners = atomic_read(&rwm->owners);
-	rt_rwlock_update_owner(rwm, rt_rwlock_owner(rwm));
-
-	/* Check for rwlock limits */
-	if (rt_rwlock_limit && owners >= rt_rwlock_limit)
-		return 0;
 
 	if (mtxowner && mtxowner != RT_RW_READER) {
 		int mode = mtx ? STEAL_NORMAL : STEAL_LATERAL;
@@ -1261,6 +1253,18 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 		}
 		/* Readers never own the mutex */
 		rt_mutex_set_owner(mutex, RT_RW_READER, 0);
+	} else {
+		int owners;
+		/*
+		 * Only check the owner condition when the lock is
+		 * held for readers.
+		 */
+		owners = atomic_read(&rwm->owners);
+		rt_rwlock_update_owner(rwm, rt_rwlock_owner(rwm));
+
+		/* Check for rwlock limits */
+		if (rt_rwlock_limit && owners >= rt_rwlock_limit)
+			return 0;
 	}
 
 	/* RT_RW_READER forces slow paths */
