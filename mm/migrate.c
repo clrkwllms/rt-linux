@@ -295,6 +295,7 @@ static int migrate_page_move_mapping(struct address_space *mapping,
 		struct page *newpage, struct page *page)
 {
 	void **pslot;
+	struct radix_tree_context ctx;
 
 	if (!mapping) {
 		/* Anonymous page without mapping */
@@ -303,15 +304,14 @@ static int migrate_page_move_mapping(struct address_space *mapping,
 		return 0;
 	}
 
+	init_radix_tree_context(&ctx, &mapping->page_tree);
 	lock_page_ref_irq(page);
-	spin_lock(&mapping->tree_lock);
-
-	pslot = radix_tree_lookup_slot(&mapping->page_tree,
- 					page_index(page));
+	radix_tree_lock(&ctx);
+	pslot = radix_tree_lookup_slot(ctx.tree, page_index(page));
 
 	if (page_count(page) != 2 + !!PagePrivate(page) ||
 			(struct page *)radix_tree_deref_slot(pslot) != page) {
-		spin_unlock(&mapping->tree_lock);
+		radix_tree_unlock(&ctx);
 		unlock_page_ref_irq(page);
 		return -EAGAIN;
 	}
@@ -329,7 +329,7 @@ static int migrate_page_move_mapping(struct address_space *mapping,
 
 	radix_tree_replace_slot(pslot, newpage);
 	page->mapping = NULL;
-  	spin_unlock(&mapping->tree_lock);
+	radix_tree_unlock(&ctx);
 
 	/*
 	 * If moved to a different zone then also account

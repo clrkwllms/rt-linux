@@ -698,8 +698,8 @@ static int __set_page_dirty(struct page *page,
 		return 0;
 
 	lock_page_ref_irq(page);
-	spin_lock(&mapping->tree_lock);
 	if (page->mapping) {	/* Race with truncate? */
+		DEFINE_RADIX_TREE_CONTEXT(ctx, &mapping->page_tree);
 		WARN_ON_ONCE(warn && !PageUptodate(page));
 
 		if (mapping_cap_account_dirty(mapping)) {
@@ -708,10 +708,11 @@ static int __set_page_dirty(struct page *page,
 					BDI_RECLAIMABLE);
 			task_io_account_write(PAGE_CACHE_SIZE);
 		}
-		radix_tree_tag_set(&mapping->page_tree,
+		radix_tree_lock(&ctx);
+		radix_tree_tag_set(ctx.tree,
 				page_index(page), PAGECACHE_TAG_DIRTY);
+		radix_tree_unlock(&ctx);
 	}
-	spin_unlock(&mapping->tree_lock);
 	unlock_page_ref_irq(page);
 	__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
 

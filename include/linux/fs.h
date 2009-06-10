@@ -499,13 +499,13 @@ struct backing_dev_info;
 struct address_space {
 	struct inode		*host;		/* owner: inode, block_device */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
-	spinlock_t		tree_lock;	/* and lock protecting it */
+	spinlock_t		priv_lock;	/* spinlock protecting various stuffs */
 	unsigned int		i_mmap_writable;/* count VM_SHARED mappings */
 	struct prio_tree_root	i_mmap;		/* tree of private and shared mappings */
 	struct list_head	i_mmap_nonlinear;/*list VM_NONLINEAR mappings */
 	spinlock_t		i_mmap_lock;	/* protect tree, count, list */
 	unsigned int		truncate_count;	/* Cover race condition with truncate */
-	unsigned long		__nrpages;	/* number of total pages */
+	atomic_long_t		__nrpages;	/* number of total pages */
 	pgoff_t			writeback_index;/* writeback starts here */
 	const struct address_space_operations *a_ops;	/* methods */
 	unsigned long		flags;		/* error bits/gfp mask */
@@ -522,22 +522,22 @@ struct address_space {
 
 static inline void mapping_nrpages_init(struct address_space *mapping)
 {
-	mapping->__nrpages = 0;
+	mapping->__nrpages = (atomic_long_t)ATOMIC_LONG_INIT(0);
 }
 
 static inline unsigned long mapping_nrpages(struct address_space *mapping)
 {
-	return mapping->__nrpages;
+	return (unsigned long)atomic_long_read(&mapping->__nrpages);
 }
 
 static inline void mapping_nrpages_inc(struct address_space *mapping)
 {
-	mapping->__nrpages++;
+	atomic_long_inc(&mapping->__nrpages);
 }
 
 static inline void mapping_nrpages_dec(struct address_space *mapping)
 {
-	mapping->__nrpages--;
+	atomic_long_dec(&mapping->__nrpages);
 }
 
 struct block_device {

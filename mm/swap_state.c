@@ -38,7 +38,6 @@ static struct backing_dev_info swap_backing_dev_info = {
 
 struct address_space swapper_space = {
 	.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC|__GFP_NOWARN),
-	.tree_lock	= __SPIN_LOCK_UNLOCKED(swapper_space.tree_lock),
 	.a_ops		= &swap_aops,
 	.i_mmap_nonlinear = LIST_HEAD_INIT(swapper_space.i_mmap_nonlinear),
 	.backing_dev_info = &swap_backing_dev_info,
@@ -79,10 +78,12 @@ static int __add_to_swap_cache(struct page *page, swp_entry_t entry,
 	BUG_ON(PagePrivate(page));
 	error = radix_tree_preload(gfp_mask);
 	if (!error) {
+		DEFINE_RADIX_TREE_CONTEXT(ctx, &swapper_space.page_tree);
+
 		lock_page_ref_irq(page);
-		spin_lock(&swapper_space.tree_lock);
-		error = radix_tree_insert(&swapper_space.page_tree,
-						entry.val, page);
+		radix_tree_lock(&ctx);
+		error = radix_tree_insert(ctx.tree, entry.val, page);
+		radix_tree_unlock(&ctx);
 		if (!error) {
 			page_cache_get(page);
 			SetPageSwapCache(page);
@@ -90,7 +91,6 @@ static int __add_to_swap_cache(struct page *page, swp_entry_t entry,
 			mapping_nrpages_inc(&swapper_space);
 			__inc_zone_page_state(page, NR_FILE_PAGES);
 		}
-		spin_unlock(&swapper_space.tree_lock);
 		unlock_page_ref_irq(page);
 		radix_tree_preload_end();
 	}
@@ -128,12 +128,16 @@ static int add_to_swap_cache(struct page *page, swp_entry_t entry)
  */
 void __delete_from_swap_cache(struct page *page)
 {
+	DEFINE_RADIX_TREE_CONTEXT(ctx, &swapper_space.page_tree);
+
 	BUG_ON(!PageLocked(page));
 	BUG_ON(!PageSwapCache(page));
 	BUG_ON(PageWriteback(page));
 	BUG_ON(PagePrivate(page));
 
-	radix_tree_delete(&swapper_space.page_tree, page_private(page));
+	radix_tree_lock(&ctx);
+	radix_tree_delete(ctx.tree, page_private(page));
+	radix_tree_unlock(&ctx);
 	set_page_private(page, 0);
 	ClearPageSwapCache(page);
 	mapping_nrpages_dec(&swapper_space);
@@ -206,9 +210,7 @@ void delete_from_swap_cache(struct page *page)
 	entry.val = page_private(page);
 
 	lock_page_ref_irq(page);
-	spin_lock(&swapper_space.tree_lock);
 	__delete_from_swap_cache(page);
-	spin_unlock(&swapper_space.tree_lock);
 	unlock_page_ref_irq(page);
 
 	swap_free(entry);

@@ -368,13 +368,11 @@ int remove_exclusive_swap_page(struct page *page)
 	if (p->swap_map[swp_offset(entry)] == 1) {
 		/* Recheck the page count with the swapcache lock held.. */
 		lock_page_ref_irq(page);
-		spin_lock(&swapper_space.tree_lock);
 		if ((page_count(page) == 2) && !PageWriteback(page)) {
 			__delete_from_swap_cache(page);
 			SetPageDirty(page);
 			retval = 1;
 		}
-		spin_unlock(&swapper_space.tree_lock);
 		unlock_page_ref_irq(page);
 	}
 	spin_unlock(&swap_lock);

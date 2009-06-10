@@ -118,8 +118,11 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 void __remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
+	DEFINE_RADIX_TREE_CONTEXT(ctx, &mapping->page_tree);
 
-	radix_tree_delete(&mapping->page_tree, page->index);
+	radix_tree_lock(&ctx);
+	radix_tree_delete(ctx.tree, page->index);
+	radix_tree_unlock(&ctx);
 	page->mapping = NULL;
 	mapping_nrpages_dec(mapping);
 	__dec_zone_page_state(page, NR_FILE_PAGES);
@@ -140,14 +143,10 @@ void __remove_from_page_cache(struct page *page)
 
 void remove_from_page_cache(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
-
 	BUG_ON(!PageLocked(page));
 
 	lock_page_ref_irq(page);
-	spin_lock(&mapping->tree_lock);
 	__remove_from_page_cache(page);
-	spin_unlock(&mapping->tree_lock);
 	unlock_page_ref_irq(page);
 }
 
@@ -458,9 +457,12 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 	int error = radix_tree_preload(gfp_mask & ~__GFP_HIGHMEM);
 
 	if (error == 0) {
+		DEFINE_RADIX_TREE_CONTEXT(ctx, &mapping->page_tree);
+
 		lock_page_ref_irq(page);
-		spin_lock(&mapping->tree_lock);
-		error = radix_tree_insert(&mapping->page_tree, offset, page);
+		radix_tree_lock(&ctx);
+		error = radix_tree_insert(ctx.tree, offset, page);
+		radix_tree_unlock(&ctx);
 		if (!error) {
 			page_cache_get(page);
 			SetPageLocked(page);
@@ -469,7 +471,6 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 			mapping_nrpages_inc(mapping);
 			__inc_zone_page_state(page, NR_FILE_PAGES);
 		}
-		spin_unlock(&mapping->tree_lock);
 		unlock_page_ref_irq(page);
 		radix_tree_preload_end();
 	}
