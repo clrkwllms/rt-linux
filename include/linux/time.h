@@ -169,7 +169,7 @@ extern struct timeval ns_to_timeval(const s64 nsec);
  * @a:		pointer to timespec to be incremented
  * @ns:		unsigned nanoseconds value to be added
  */
-static inline void timespec_add_ns(struct timespec *a, u64 ns)
+static inline void timespec_add_ns(struct timespec *a, volatile u64 ns)
 {
 	ns += a->tv_nsec;
 	while(unlikely(ns >= NSEC_PER_SEC)) {
