@@ -326,28 +326,6 @@ extern void die_nmi(struct pt_regs *, const char *msg);
 
 int nmi_show_regs[NR_CPUS];
 
-void nmi_show_all_regs(void)
-{
-	int i;
-
-	if (system_state == SYSTEM_BOOTING)
-		return;
-
-	printk(KERN_WARNING "nmi_show_all_regs(): start on CPU#%d.\n",
-		raw_smp_processor_id());
-	dump_stack();
-
-	for_each_online_cpu(i)
-		nmi_show_regs[i] = 1;
-
-	smp_send_nmi_allbutself();
-
-	for_each_online_cpu(i) {
-		while (nmi_show_regs[i] == 1)
-			barrier();
-	}
-}
-
 static DEFINE_RAW_SPINLOCK(nmi_print_lock);
 
 notrace int irq_show_regs_callback(int cpu, struct pt_regs *regs)
@@ -363,6 +341,39 @@ notrace int irq_show_regs_callback(int cpu, struct pt_regs *regs)
 	spin_unlock(&nmi_print_lock);
 	nmi_show_regs[cpu] = 0;
 	return 1;
+}
+
+void nmi_show_all_regs(void)
+{
+	struct pt_regs *regs;
+	int i, cpu;
+
+	if (system_state == SYSTEM_BOOTING)
+		return;
+
+	preempt_disable();
+
+	regs = get_irq_regs();
+	cpu = smp_processor_id();
+
+	printk(KERN_WARNING "nmi_show_all_regs(): start on CPU#%d.\n", cpu);
+	dump_stack();
+
+	for_each_online_cpu(i)
+		nmi_show_regs[i] = 1;
+
+	if (regs)
+		irq_show_regs_callback(cpu, regs);
+	else
+		nmi_show_regs[cpu] = 0;
+
+	smp_send_nmi_allbutself();
+	preempt_enable();
+
+	for_each_online_cpu(i) {
+		while (nmi_show_regs[i] == 1)
+			barrier();
+	}
 }
 
 notrace __kprobes int
