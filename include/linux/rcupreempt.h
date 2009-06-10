@@ -105,6 +105,7 @@ DECLARE_PER_CPU(long, dynticks_progress_counter);
 
 static inline void rcu_enter_nohz(void)
 {
+	smp_mb(); /* CPUs seeing ++ must see prior RCU read-side crit sects */
 	__get_cpu_var(dynticks_progress_counter)++;
 	if (unlikely(__get_cpu_var(dynticks_progress_counter) & 0x1)) {
 		printk("BUG: bad accounting of dynamic ticks\n");
@@ -113,13 +114,12 @@ static inline void rcu_enter_nohz(void)
 		/* try to fix it */
 		__get_cpu_var(dynticks_progress_counter)++;
 	}
-	mb();
 }
 
 static inline void rcu_exit_nohz(void)
 {
-	mb();
 	__get_cpu_var(dynticks_progress_counter)++;
+	smp_mb(); /* CPUs seeing ++ must see later RCU read-side crit sects */
 	if (unlikely(!(__get_cpu_var(dynticks_progress_counter) & 0x1))) {
 		printk("BUG: bad accounting of dynamic ticks\n");
 		printk("   will try to fix, but it is best to reboot\n");
