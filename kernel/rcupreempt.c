@@ -309,6 +309,7 @@ void __rcu_read_unlock(void)
 		 */
 
 		ACCESS_ONCE(__get_cpu_var(rcu_flipctr)[idx])--;
+
 		local_irq_restore(oldirq);
 
 		__rcu_preempt_unboost();
