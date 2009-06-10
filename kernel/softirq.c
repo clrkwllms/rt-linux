@@ -114,7 +114,14 @@ static void wakeup_softirqd(int softirq)
 	 * context processing it later on.
 	 */
 	if ((current->flags & PF_HARDIRQ) && !hardirq_count() &&
-			(tsk->normal_prio == current->normal_prio))
+			(tsk->normal_prio == current->normal_prio) &&
+	    /*
+	     * The hard irq thread must be bound to a single CPU to run
+	     * a softirq. Don't worry about locking, the irq thread
+	     * should be the only one to modify the cpus_allowed, when
+	     * the irq affinity changes.
+	     */
+	    (cpus_weight(current->cpus_allowed) == 1))
 		return;
 #endif
 	/*
