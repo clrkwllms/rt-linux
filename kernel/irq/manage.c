@@ -652,14 +652,17 @@ static void thread_simple_irq(irq_desc_t *desc)
 	unsigned int irq = desc - irq_desc;
 	irqreturn_t action_ret;
 
-	if (action && !desc->depth) {
+	do {
+		if (!action || desc->depth)
+			break;
+		desc->status &= ~IRQ_PENDING;
 		spin_unlock(&desc->lock);
 		action_ret = handle_IRQ_event(irq, action);
 		cond_resched_hardirq_context();
 		spin_lock_irq(&desc->lock);
 		if (!noirqdebug)
 			note_interrupt(irq, desc, action_ret);
-	}
+	} while (desc->status & IRQ_PENDING);
 	desc->status &= ~IRQ_INPROGRESS;
 }
 
