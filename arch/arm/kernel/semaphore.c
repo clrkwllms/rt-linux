@@ -154,7 +154,7 @@ EXPORT_SYMBOL(__compat_down_interruptible);
  * single "cmpxchg" without failure cases,
  * but then it wouldn't work on a 386.
  */
-fastcall int __attribute_used__ __compat_down_trylock(struct compat_semaphore * sem)
+fastcall int __attribute_used__ __sched __compat_down_trylock(struct compat_semaphore * sem)
 {
 	int sleepers;
 	unsigned long flags;
@@ -176,7 +176,7 @@ fastcall int __attribute_used__ __compat_down_trylock(struct compat_semaphore * 
 
 EXPORT_SYMBOL(__compat_down_trylock);
 
-fastcall int compat_sem_is_locked(struct compat_semaphore *sem)
+fastcall int __sched compat_sem_is_locked(struct compat_semaphore *sem)
 {
 	return (int) atomic_read(&sem->count) < 0;
 }
