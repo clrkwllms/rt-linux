@@ -99,6 +99,13 @@ extern struct nsproxy init_nsproxy;
 #define INIT_PREEMPT_RCU_BOOST(tsk)
 #endif /* #else #ifdef CONFIG_PREEMPT_RCU_BOOST */
 
+#ifdef CONFIG_PREEMPT_RT
+# define INIT_RW_OWNERS(tsk) .owned_read_locks = {			\
+		[0 ... (MAX_RWLOCK_DEPTH - 1) ] = { .task = &tsk } },
+#else
+# define INIT_RW_OWNERS(tsk)
+#endif
+
 extern struct group_info init_groups;
 
 #define INIT_STRUCT_PID {						\
@@ -189,6 +196,7 @@ extern struct group_info init_groups;
 	INIT_TRACE_IRQFLAGS						\
 	INIT_LOCKDEP							\
 	INIT_PREEMPT_RCU_BOOST(tsk)					\
+	INIT_RW_OWNERS(tsk)						\
 }
 
 

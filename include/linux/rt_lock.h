@@ -13,6 +13,7 @@
 #include <linux/rtmutex.h>
 #include <asm/atomic.h>
 #include <linux/spinlock_types.h>
+#include <linux/sched_prio.h>
 
 #ifdef CONFIG_PREEMPT_RT
 /*
@@ -66,6 +67,7 @@ struct rw_mutex {
 	atomic_t		count;	/* number of times held for read */
 	atomic_t		owners; /* number of owners as readers */
 	struct list_head	readers;
+	int prio;
 };
 
 /*
@@ -98,6 +100,7 @@ typedef struct {
 
 #define __RW_LOCK_UNLOCKED(name) (rwlock_t) \
 	{ .owners.mutex = __RT_SPIN_INITIALIZER(name.owners.mutex),	\
+	  .owners.prio = MAX_PRIO,					\
 	  RW_DEP_MAP_INIT(name) }
 #else /* !PREEMPT_RT */
 
@@ -196,6 +199,7 @@ extern int __bad_func_type(void);
 
 #define __RWSEM_INITIALIZER(name) \
 	{ .owners.mutex = __RT_MUTEX_INITIALIZER(name.owners.mutex),	\
+	  .owners.prio = MAX_PRIO,					\
 	  RW_DEP_MAP_INIT(name) }
 
 #define DECLARE_RWSEM(lockname) \

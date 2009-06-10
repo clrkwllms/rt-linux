@@ -1214,6 +1214,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 			INIT_LIST_HEAD(&p->owned_read_locks[i].list);
 			p->owned_read_locks[i].count = 0;
 			p->owned_read_locks[i].lock = NULL;
+			p->owned_read_locks[i].task = p;
 		}
 	}
 #endif

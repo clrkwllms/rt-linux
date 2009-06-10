@@ -139,6 +139,8 @@ static inline void init_lists(struct rt_mutex *lock)
 	}
 }
 
+static int rt_mutex_get_readers_prio(struct task_struct *task, int prio);
+
 /*
  * Calculate task priority from the waiter list priority
  *
@@ -148,6 +150,8 @@ static inline void init_lists(struct rt_mutex *lock)
 int rt_mutex_getprio(struct task_struct *task)
 {
 	int prio = min(task->normal_prio, get_rcu_prio(task));
+
+	prio = rt_mutex_get_readers_prio(task, prio);
 
 	if (likely(!task_has_pi_waiters(task)))
 		return prio;
@@ -191,6 +195,11 @@ static void rt_mutex_adjust_prio(struct task_struct *task)
  */
 int max_lock_depth = 1024;
 
+static int rt_mutex_adjust_readers(struct rt_mutex *orig_lock,
+				   struct rt_mutex_waiter *orig_waiter,
+				   struct task_struct *top_task,
+				   struct rt_mutex *lock,
+				   int recursion_depth);
 /*
  * Adjust the priority chain. Also used for deadlock detection.
  * Decreases task's usage by one - may thus free the task.
@@ -200,7 +209,8 @@ static int rt_mutex_adjust_prio_chain(struct task_struct *task,
 				      int deadlock_detect,
 				      struct rt_mutex *orig_lock,
 				      struct rt_mutex_waiter *orig_waiter,
-				      struct task_struct *top_task)
+				      struct task_struct *top_task,
+				      int recursion_depth)
 {
 	struct rt_mutex *lock;
 	struct rt_mutex_waiter *waiter, *top_waiter = orig_waiter;
@@ -302,8 +312,13 @@ static int rt_mutex_adjust_prio_chain(struct task_struct *task,
 	/* Grab the next task */
 	task = rt_mutex_owner(lock);
 
-	/* Writers do not boost their readers. */
+	/*
+	 * Readers are special. We may need to boost more than one owner.
+	 */
 	if (task == RT_RW_READER) {
+		ret = rt_mutex_adjust_readers(orig_lock, orig_waiter,
+					      top_task, lock,
+					      recursion_depth);
 		spin_unlock_irqrestore(&lock->wait_lock, flags);
 		goto out;
 	}
@@ -490,9 +505,12 @@ static int task_blocks_on_rt_mutex(struct rt_mutex *lock,
 	spin_unlock(&current->pi_lock);
 
 	if (waiter == rt_mutex_top_waiter(lock)) {
-		/* readers are not handled */
-		if (owner == RT_RW_READER)
-			return 0;
+		/* readers are handled differently */
+		if (owner == RT_RW_READER) {
+			res = rt_mutex_adjust_readers(lock, waiter,
+						      current, lock, 0);
+			return res;
+		}
 
 		spin_lock(&owner->pi_lock);
 		plist_del(&top_waiter->pi_list_entry, &owner->pi_waiters);
@@ -519,7 +537,7 @@ static int task_blocks_on_rt_mutex(struct rt_mutex *lock,
 	spin_unlock_irqrestore(&lock->wait_lock, flags);
 
 	res = rt_mutex_adjust_prio_chain(owner, detect_deadlock, lock, waiter,
-					 current);
+					 current, 0);
 
 	spin_lock_irq(&lock->wait_lock);
 
@@ -636,7 +654,7 @@ static void remove_waiter(struct rt_mutex *lock,
 
 	spin_unlock_irqrestore(&lock->wait_lock, flags);
 
-	rt_mutex_adjust_prio_chain(owner, 0, lock, NULL, current);
+	rt_mutex_adjust_prio_chain(owner, 0, lock, NULL, current, 0);
 
 	spin_lock_irq(&lock->wait_lock);
 }
@@ -663,7 +681,7 @@ void rt_mutex_adjust_pi(struct task_struct *task)
 	get_task_struct(task);
 	spin_unlock_irqrestore(&task->pi_lock, flags);
 
-	rt_mutex_adjust_prio_chain(task, 0, NULL, NULL, task);
+	rt_mutex_adjust_prio_chain(task, 0, NULL, NULL, task, 0);
 }
 
 /*
@@ -1160,7 +1178,6 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 			if (rt_rwlock_pending_writer(rwm))
 				return 0;
 			if (rt_mutex_has_waiters(mutex)) {
-				/* readers don't do PI */
 				waiter = rt_mutex_top_waiter(mutex);
 				if (!lock_is_stealable(waiter->task, mode))
 					return 0;
@@ -1174,7 +1191,7 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 				spin_unlock(&mtxowner->pi_lock);
 			}
 		} else if (rt_mutex_has_waiters(mutex)) {
-			/* Readers don't do PI */
+			/* Readers do things differently with respect to PI */
 			waiter = rt_mutex_top_waiter(mutex);
 			spin_lock(&current->pi_lock);
 			plist_del(&waiter->pi_list_entry, &current->pi_waiters);
@@ -1680,6 +1697,7 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 
 	/* If no one is blocked, then clear all ownership */
 	if (!rt_mutex_has_waiters(mutex)) {
+		rwm->prio = MAX_PRIO;
 		/*
 		 * If count is not zero, we are under the limit with
 		 * no other readers.
@@ -1910,11 +1928,88 @@ void rt_mutex_rwsem_init(struct rw_mutex *rwm, const char *name)
 	rwm->owner = NULL;
 	atomic_set(&rwm->count, 0);
 	atomic_set(&rwm->owners, 0);
+	rwm->prio = MAX_PRIO;
 	INIT_LIST_HEAD(&rwm->readers);
 
 	__rt_mutex_init(mutex, name);
 }
 
+static int rt_mutex_get_readers_prio(struct task_struct *task, int prio)
+{
+	struct reader_lock_struct *rls;
+	struct rw_mutex *rwm;
+	int lock_prio;
+	int i;
+
+	for (i = 0; i < task->reader_lock_count; i++) {
+		rls = &task->owned_read_locks[i];
+		rwm = rls->lock;
+		if (rwm) {
+			lock_prio = rwm->prio;
+			if (prio > lock_prio)
+				prio = lock_prio;
+		}
+	}
+
+	return prio;
+}
+
+static int rt_mutex_adjust_readers(struct rt_mutex *orig_lock,
+				   struct rt_mutex_waiter *orig_waiter,
+				   struct task_struct *top_task,
+				   struct rt_mutex *lock,
+				   int recursion_depth)
+{
+	struct reader_lock_struct *rls;
+	struct rt_mutex_waiter *waiter;
+	struct task_struct *task;
+	struct rw_mutex *rwm = container_of(lock, struct rw_mutex, mutex);
+
+	if (rt_mutex_has_waiters(lock)) {
+		waiter = rt_mutex_top_waiter(lock);
+		/*
+		 * Do we need to grab the task->pi_lock?
+		 * Really, we are only reading it. If it
+		 * changes, then that should follow this chain
+		 * too.
+		 */
+		rwm->prio = waiter->task->prio;
+	} else
+		rwm->prio = MAX_PRIO;
+
+	if (recursion_depth >= MAX_RWLOCK_DEPTH) {
+		WARN_ON(1);
+		return 1;
+	}
+
+	list_for_each_entry(rls, &rwm->readers, list) {
+		task = rls->task;
+		get_task_struct(task);
+		/*
+		 * rt_mutex_adjust_prio_chain will do
+		 * the put_task_struct
+		 */
+		rt_mutex_adjust_prio_chain(task, 0, orig_lock,
+					   orig_waiter, top_task,
+					   recursion_depth+1);
+	}
+
+	return 0;
+}
+#else
+static int rt_mutex_adjust_readers(struct rt_mutex *orig_lock,
+				   struct rt_mutex_waiter *orig_waiter,
+				   struct task_struct *top_task,
+				   struct rt_mutex *lock,
+				   int recursion_depth)
+{
+	return 0;
+}
+
+static int rt_mutex_get_readers_prio(struct task_struct *task, int prio)
+{
+	return prio;
+}
 #endif /* CONFIG_PREEMPT_RT */
 
 #ifdef CONFIG_PREEMPT_BKL
