@@ -98,9 +98,9 @@ static struct clock_event_device clockevent_ep93xx;
 
 static int ep93xx_timer_interrupt(int irq, void *dev_id)
 {
- 	__raw_writel(EP93XX_TC_CLEAR, EP93XX_TIMER1_CLEAR);
+	__raw_writel(EP93XX_TC_CLEAR, EP93XX_TIMER1_CLEAR);
 
- 	clockevent_ep93xx.event_handler(&clockevent_ep93xx);
+	clockevent_ep93xx.event_handler(&clockevent_ep93xx);
 
 	return IRQ_HANDLED;
 }
@@ -108,7 +108,15 @@ static int ep93xx_timer_interrupt(int irq, void *dev_id)
 static int ep93xx_set_next_event(unsigned long evt,
 				  struct clock_event_device *unused)
 {
+	u32 tmode = __raw_readl(EP93XX_TIMER1_CONTROL);
+
+	/* stop timer */
+	__raw_writel(tmode & ~EP93XX_TC123_ENABLE, EP93XX_TIMER1_CONTROL);
+	/* program timer */
 	__raw_writel(evt, EP93XX_TIMER1_LOAD);
+	/* start timer */
+	__raw_writel(tmode | EP93XX_TC123_ENABLE, EP93XX_TIMER1_CONTROL);
+
 	return 0;
 }
 
