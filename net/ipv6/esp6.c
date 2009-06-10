@@ -155,7 +155,7 @@ static int esp6_input(struct xfrm_state *x, struct sk_buff *skb)
 	int nfrags;
 	int ret = 0;
 
-	if (!pskb_may_pull(skb, sizeof(*esph))) {
+	if (!pskb_may_pull(skb, sizeof(*esph) + esp->conf.ivlen)) {
 		ret = -EINVAL;
 		goto out;
 	}

@@ -165,7 +165,7 @@ static int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 	int padlen;
 	int err;
 
-	if (!pskb_may_pull(skb, sizeof(*esph)))
+	if (!pskb_may_pull(skb, sizeof(*esph) + esp->conf.ivlen))
 		goto out;
 
 	if (elen <= 0 || (elen & (blksize-1)))
