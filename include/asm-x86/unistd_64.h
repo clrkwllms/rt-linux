@@ -11,6 +11,8 @@
  * Note: holes are not allowed.
  */
 
+#define NR_syscalls (__NR_syscall_max+1)
+
 /* at least 8 syscall per cacheline */
 #define __NR_read				0
 __SYSCALL(__NR_read, sys_read)

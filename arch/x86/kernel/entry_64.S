@@ -338,7 +338,10 @@ ENTRY(system_call)
 	cmpq $__NR_syscall_max,%rax
 	ja badsys
 	movq %r10,%rcx
+	TRACE_SYS_CALL
 	call *sys_call_table(,%rax,8)  # XXX:	 rip relative
+system_call_ret:
+	TRACE_SYS_RET
 	movq %rax,RAX-ARGOFFSET(%rsp)
 /*
  * Syscall return path ending with SYSRET (fast path)
@@ -408,7 +411,7 @@ badsys:
 	jmp ret_from_sys_call
 
 	/* Do syscall tracing */
-tracesys:			 
+tracesys:
 	SAVE_REST
 	movq $-ENOSYS,RAX(%rsp)
 	FIXUP_TOP_OF_STACK %rdi
@@ -421,7 +424,10 @@ tracesys:
 	cmova %rcx,%rax
 	ja  1f
 	movq %r10,%rcx	/* fixup for C */
+	TRACE_SYS_CALL
 	call *sys_call_table(,%rax,8)
+traceret:
+ 	TRACE_SYS_RET
 1:	movq %rax,RAX-ARGOFFSET(%rsp)
 	/* Use IRET because user could have changed frame */
 		
