@@ -162,7 +162,7 @@
  *	 7:2	register number
  *  
  */
-static DEFINE_SPINLOCK(v3_lock);
+static DEFINE_RAW_SPINLOCK(v3_lock);
 
 #define PCI_BUS_NONMEM_START	0x00000000
 #define PCI_BUS_NONMEM_SIZE	SZ_256M
