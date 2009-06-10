@@ -47,6 +47,7 @@
 #include <linux/acpi.h>
 #include <linux/reboot.h>
 #include <linux/ftrace.h>
+#include <linux/profile.h>
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
