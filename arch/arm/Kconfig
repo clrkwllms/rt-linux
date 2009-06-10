@@ -33,6 +33,10 @@ config GENERIC_CLOCKEVENTS
 	bool
 	default n
 
+config STACKTRACE_SUPPORT
+	bool
+	default y
+
 config MMU
 	bool
 	default y

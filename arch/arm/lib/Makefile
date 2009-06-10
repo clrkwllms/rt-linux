@@ -41,6 +41,7 @@ lib-$(CONFIG_ARCH_RPC)		+= ecard.o io-acorn.o floppydma.o
 lib-$(CONFIG_ARCH_CLPS7500)	+= io-acorn.o
 lib-$(CONFIG_ARCH_L7200)	+= io-acorn.o
 lib-$(CONFIG_ARCH_SHARK)	+= io-shark.o
+lib-$(CONFIG_STACKTRACE)	+= stacktrace.o
 
 $(obj)/csumpartialcopy.o:	$(obj)/csumpartialcopygeneric.S
 $(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
