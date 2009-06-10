@@ -4,12 +4,17 @@
 #include <linux/preempt.h>
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_MMU
 /*
  * These routines enable/disable the pagefault handler in that
  * it will not take any MM locks and go straight to the fixup table.
  */
 extern void pagefault_disable(void);
 extern void pagefault_enable(void);
+#else
+static inline void pagefault_disable(void) { }
+static inline void pagefault_enable(void) { }
+#endif
 
 #ifndef ARCH_HAS_NOCACHE_UACCESS
 
