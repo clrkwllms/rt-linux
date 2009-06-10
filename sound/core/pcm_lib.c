@@ -30,6 +30,7 @@
 #include <sound/pcm_params.h>
 #include <sound/timer.h>
 
+#include <linux/ftrace.h>
 /*
  * fill ring buffer with silence
  * runtime->silence_start: starting pointer to silence area
@@ -130,6 +131,7 @@ static void xrun(struct snd_pcm_substream *substream)
 	snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
 #ifdef CONFIG_SND_PCM_XRUN_DEBUG
 	if (substream->pstr->xrun_debug) {
+		user_trace_stop();
 		snd_printd(KERN_DEBUG "XRUN: pcmC%dD%d%c\n",
 			   substream->pcm->card->number,
 			   substream->pcm->device,
