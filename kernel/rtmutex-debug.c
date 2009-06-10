@@ -59,6 +59,9 @@ void rt_mutex_debug_task_free(struct task_struct *task)
 {
 	DEBUG_LOCKS_WARN_ON(!plist_head_empty(&task->pi_waiters));
 	DEBUG_LOCKS_WARN_ON(task->pi_blocked_on);
+#ifdef CONFIG_PREEMPT_RT
+	WARN_ON(task->reader_lock_count);
+#endif
 }
 
 /*
