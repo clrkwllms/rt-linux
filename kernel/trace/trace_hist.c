@@ -17,7 +17,6 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/percpu.h>
-#include <linux/spinlock.h>
 #include <linux/marker.h>
 #include <asm/atomic.h>
 #include <asm/div64.h>
@@ -68,15 +67,10 @@ static DEFINE_PER_CPU(struct hist_data, wakeup_latency_hist);
 static char *wakeup_latency_hist_dir = "wakeup_latency";
 #endif
 
-static inline u64 u64_div(u64 x, u64 y)
-{
-	do_div(x, y);
-	return x;
-}
-
 void notrace latency_hist(int latency_type, int cpu, unsigned long latency)
 {
 	struct hist_data *my_hist;
+	unsigned long long total_samples;
 
 	if ((cpu < 0) || (cpu >= NR_CPUS) || (latency_type < INTERRUPT_LATENCY)
 			|| (latency_type > WAKEUP_LATENCY) || (latency < 0))
@@ -123,10 +117,11 @@ void notrace latency_hist(int latency_type, int cpu, unsigned long latency)
 	else if (latency > my_hist->max_lat)
 		my_hist->max_lat = latency;
 
-	my_hist->total_samples++;
+	total_samples = my_hist->total_samples++;
 	my_hist->accumulate_lat += latency;
-	my_hist->avg_lat = (unsigned long) u64_div(my_hist->accumulate_lat,
-						  my_hist->total_samples);
+	if (likely(total_samples))
+		my_hist->avg_lat = (unsigned long)
+		    div64_64(my_hist->accumulate_lat, total_samples);
 	return;
 }
 
@@ -220,11 +215,11 @@ static void hist_reset(struct hist_data *hist)
 	atomic_dec(&hist->hist_mode);
 
 	memset(hist->hist_array, 0, sizeof(hist->hist_array));
-	hist->beyond_hist_bound_samples = 0UL;
+	hist->beyond_hist_bound_samples = 0ULL;
 	hist->min_lat = 0xFFFFFFFFUL;
 	hist->max_lat = 0UL;
-	hist->total_samples = 0UL;
-	hist->accumulate_lat = 0UL;
+	hist->total_samples = 0ULL;
+	hist->accumulate_lat = 0ULL;
 	hist->avg_lat = 0UL;
 
 	atomic_inc(&hist->hist_mode);
