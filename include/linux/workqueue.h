@@ -10,6 +10,7 @@
 #include <linux/bitops.h>
 #include <linux/lockdep.h>
 #include <linux/plist.h>
+#include <linux/sched_prio.h>
 #include <asm/atomic.h>
 
 struct workqueue_struct;
