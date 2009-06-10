@@ -267,6 +267,16 @@ static int putreg(struct task_struct *child,
 				return -EIO;
 			child->thread.gs = value;
 			return 0;
+		case offsetof(struct user_regs_struct, orig_rax):
+			/*
+			 * Orig_rax is really just a flag with small positive
+			 * and negative values, so make sure to always
+			 * sign-extend it from 32 bits so that it works
+			 * correctly regardless of whether we come from a
+			 * 32-bit environment or not.
+			 */
+			value = (long) (s32) value;
+			break;
 		case offsetof(struct user_regs_struct, eflags):
 			value &= FLAG_MASK;
 			tmp = get_stack_long(child, EFL_OFFSET); 
