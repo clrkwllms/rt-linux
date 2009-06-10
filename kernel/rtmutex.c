@@ -1137,16 +1137,13 @@ rt_rwlock_update_owner(struct rw_mutex *rwm, struct task_struct *own)
 	if (own == RT_RW_READER)
 		return;
 
-	/*
-	 * We don't need to grab the pi_lock to look at the reader list
-	 * since we hold the rwm wait_lock. We only care about the pointer
-	 * to this lock, and we own the wait_lock, so that pointer
-	 * can't be changed.
-	 */
+	spin_lock(&own->pi_lock);
 	for (i = own->reader_lock_count - 1; i >= 0; i--) {
 		if (own->owned_read_locks[i].lock == rwm)
 			break;
 	}
+	spin_unlock(&own->pi_lock);
+
 	/* It is possible the owner didn't add it yet */
 	if (i < 0)
 		return;
@@ -1453,7 +1450,6 @@ __rt_read_fasttrylock(struct rw_mutex *rwm)
 			current->owned_read_locks[reader_count].count = 1;
 		} else
 			WARN_ON_ONCE(1);
-		spin_unlock(&current->pi_lock);
 		/*
 		 * If this task is no longer the sole owner of the lock
 		 * or someone is blocking, then we need to add the task
@@ -1463,12 +1459,16 @@ __rt_read_fasttrylock(struct rw_mutex *rwm)
 			struct rt_mutex *mutex = &rwm->mutex;
 			struct reader_lock_struct *rls;
 
+			/* preserve lock order, we only need wait_lock now */
+			spin_unlock(&current->pi_lock);
+
 			spin_lock(&mutex->wait_lock);
 			rls = &current->owned_read_locks[reader_count];
 			if (!rls->list.prev || list_empty(&rls->list))
 				list_add(&rls->list, &rwm->readers);
 			spin_unlock(&mutex->wait_lock);
-		}
+		} else
+			spin_unlock(&current->pi_lock);
 		local_irq_restore(flags);
 		return 1;
 	}
