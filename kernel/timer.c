@@ -939,18 +939,20 @@ static unsigned long count_active_tasks(void)
 #endif
 }
 
-#ifdef CONFIG_PREEMPT_RT
 /*
  * Nr of active tasks - counted in fixed-point numbers
  */
 static unsigned long count_active_rt_tasks(void)
 {
+#ifdef CONFIG_PREEMPT_RT
 	extern unsigned long rt_nr_running(void);
 	extern unsigned long rt_nr_uninterruptible(void);
 
 	return (rt_nr_running() + rt_nr_uninterruptible()) * FIXED_1;
-}
+#else
+	return 0;
 #endif
+}
 
 /*
  * Hmm.. Changed this, as the GNU make sources (load.c) seems to
