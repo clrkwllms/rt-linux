@@ -16,6 +16,8 @@
 #define CLOCK_TICK_RATE 3686400
 #elif defined(CONFIG_PXA27x)
 /* PXA27x timer base */
+#include <asm-arm/arch-pxa/hardware.h>
+#include <asm-arm/arch-pxa/pxa-regs.h>
 #ifdef CONFIG_MACH_MAINSTONE
 #define CLOCK_TICK_RATE 3249600
 #else
@@ -24,3 +26,7 @@
 #else
 #define CLOCK_TICK_RATE 3250000
 #endif
+
+#define mach_read_cycles() OSCR
+#define mach_cycles_to_usecs(d) (((d) * ((1000000LL << 32) / CLOCK_TICK_RATE)) >> 32)
+#define mach_usecs_to_cycles(d) (((d) * (((long long)CLOCK_TICK_RATE << 32) / 1000000)) >> 32)
