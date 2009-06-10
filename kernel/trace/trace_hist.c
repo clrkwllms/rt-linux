@@ -356,6 +356,7 @@ notrace void tracing_hist_preempt_stop(int irqs_on)
 #ifdef CONFIG_INTERRUPT_OFF_HIST
 	if (irqs_on &&
 	    per_cpu(hist_irqsoff_tracing, cpu)) {
+		WARN_ON(!irqs_disabled());
 		stop = ftrace_now(cpu);
 		stop_set++;
 		start = per_cpu(hist_irqsoff_start, cpu);
