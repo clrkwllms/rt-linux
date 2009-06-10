@@ -148,6 +148,8 @@ static inline void plist_node_init(struct plist_node *node, int prio)
 extern void plist_add(struct plist_node *node, struct plist_head *head);
 extern void plist_del(struct plist_node *node, struct plist_head *head);
 
+extern void plist_head_splice(struct plist_head *src, struct plist_head *dst);
+
 /**
  * plist_for_each - iterate over the plist
  * @pos:	the type * to use as a loop counter
