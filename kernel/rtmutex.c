@@ -124,9 +124,12 @@ static inline void mark_rt_rwlock_check(struct rw_mutex *rwm)
 #endif
 
 #ifdef CONFIG_PREEMPT_RT
-#define task_is_reader(task) ((task) == RT_RW_READER)
+static inline int task_is_reader(struct task_struct *task)
+{
+	return task == RT_RW_READER;
+}
 #else
-#define task_is_reader(task) (0)
+static inline int task_is_reader(struct task_struct *task) { return 0; }
 #endif
 
 int pi_initialized;
