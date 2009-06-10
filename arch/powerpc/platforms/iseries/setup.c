@@ -564,12 +564,14 @@ static void iseries_shared_idle(void)
 {
 	while (1) {
 		tick_nohz_stop_sched_tick();
-		while (!need_resched() && !hvlpevent_is_pending()) {
+		while (!need_resched() && !need_resched_delayed()
+				&& !hvlpevent_is_pending()) {
 			local_irq_disable();
 			ppc64_runlatch_off();
 
 			/* Recheck with irqs off */
-			if (!need_resched() && !hvlpevent_is_pending())
+			if (!need_resched() && !need_resched_delayed()
+					&& !hvlpevent_is_pending())
 				yield_shared_processor();
 
 			HMT_medium();

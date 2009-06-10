@@ -662,7 +662,7 @@ user_exc_return:		/* r10 contains MSR_KERNEL here */
 	/* Check current_thread_info()->flags */
 	rlwinm	r9,r1,0,0,(31-THREAD_SHIFT)
 	lwz	r9,TI_FLAGS(r9)
-	andi.	r0,r9,(_TIF_SIGPENDING|_TIF_RESTORE_SIGMASK|_TIF_NEED_RESCHED)
+	andi.	r0,r9,(_TIF_SIGPENDING|_TIF_RESTORE_SIGMASK|_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED)
 	bne	do_work
 
 restore_user:
@@ -897,7 +897,7 @@ global_dbcr0:
 #endif /* !(CONFIG_4xx || CONFIG_BOOKE) */
 
 do_work:			/* r10 contains MSR_KERNEL here */
-	andi.	r0,r9,_TIF_NEED_RESCHED
+	andi.	r0,r9,(_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED)
 	beq	do_user_signal
 
 do_resched:			/* r10 contains MSR_KERNEL here */
@@ -911,7 +911,7 @@ recheck:
 	MTMSRD(r10)		/* disable interrupts */
 	rlwinm	r9,r1,0,0,(31-THREAD_SHIFT)
 	lwz	r9,TI_FLAGS(r9)
-	andi.	r0,r9,_TIF_NEED_RESCHED
+	andi.	r0,r9,(_TIF_NEED_RESCHED|_TIF_NEED_RESCHED_DELAYED)
 	bne-	do_resched
 	andi.	r0,r9,_TIF_SIGPENDING|_TIF_RESTORE_SIGMASK
 	beq	restore_user

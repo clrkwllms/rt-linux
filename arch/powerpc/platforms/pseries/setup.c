@@ -413,7 +413,8 @@ static void pseries_dedicated_idle_sleep(void)
 		set_thread_flag(TIF_POLLING_NRFLAG);
 
 		while (get_tb() < start_snooze) {
-			if (need_resched() || cpu_is_offline(cpu))
+			if (need_resched() || need_resched_delayed() ||
+			    cpu_is_offline(cpu))
 				goto out;
 			ppc64_runlatch_off();
 			HMT_low();
@@ -424,7 +425,8 @@ static void pseries_dedicated_idle_sleep(void)
 		clear_thread_flag(TIF_POLLING_NRFLAG);
 		smp_mb();
 		local_irq_disable();
-		if (need_resched() || cpu_is_offline(cpu))
+		if (need_resched() || need_resched_delayed() ||
+		    cpu_is_offline(cpu))
 			goto out;
 	}
 
