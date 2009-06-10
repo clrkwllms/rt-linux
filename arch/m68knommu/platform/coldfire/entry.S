@@ -55,6 +55,39 @@ sw_usp:
 .globl inthandler
 .globl fasthandler
 
+#ifdef CONFIG_FTRACE
+ENTRY(_mcount)
+	linkw	%fp, #0
+
+	moveal	ftrace_trace_function, %a0
+	movel	#ftrace_stub, %d0
+	cmpl	%a0@, %d0
+
+	bnew	do_mcount
+
+	unlk	%fp
+	rts
+
+do_mcount:
+
+	movel	%fp, %d0
+	moveal	%d0, %a1
+
+	moveal	%a1@, %a0
+	movel	%a0@(4), %sp@-	/* push parent ip */
+	movel	%a1@(4), %sp@-	/* push ip */
+
+	moveal	ftrace_trace_function, %a0
+	jsr	%a0@
+
+	unlk %fp
+
+.globl ftrace_stub
+ftrace_stub:
+	rts
+END(mcount)
+#endif
+
 enosys:
 	mov.l	#sys_ni_syscall,%d3
 	bra	1f

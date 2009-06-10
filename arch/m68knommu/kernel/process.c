@@ -74,7 +74,9 @@ void cpu_idle(void)
 {
 	/* endless idle loop with no priority at all */
 	while (1) {
+		stop_critical_timings();
 		idle();
+		start_critical_timings();
 		preempt_enable_no_resched();
 		schedule();
 		preempt_disable();

@@ -31,7 +31,6 @@
 
 #include <linux/stacktrace.h>
 
-#include <asm/asm-offsets.h>
 #include <asm/unistd.h>
 
 #include "trace.h"
