@@ -371,7 +371,6 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 		touched = 1;
 	}
 
-	sum = read_pda(apic_timer_irqs) + read_pda(irq0_irqs);
 	if (__get_cpu_var(nmi_touch)) {
 		__get_cpu_var(nmi_touch) = 0;
 		touched = 1;
@@ -386,6 +385,12 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 		spin_unlock(&lock);
 		cpu_clear(cpu, backtrace_mask);
 	}
+
+	/*
+	 * Take the local apic timer and PIT/HPET into account. We don't
+	 * know which one is active, when we have highres/dyntick on
+	 */
+	sum = read_pda(apic_timer_irqs) + kstat_cpu(cpu).irqs[0];
 
 #ifdef CONFIG_X86_MCE
 	/* Could check oops_in_progress here too, but it's safer
