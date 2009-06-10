@@ -318,7 +318,7 @@ static int rt_mutex_adjust_prio_chain(struct task_struct *task,
  * assigned pending owner [which might not have taken the
  * lock yet]:
  */
-static inline int try_to_steal_lock(struct rt_mutex *lock)
+static inline int try_to_steal_lock(struct rt_mutex *lock, int mode)
 {
 	struct task_struct *pendowner = rt_mutex_owner(lock);
 	struct rt_mutex_waiter *next;
@@ -330,7 +330,7 @@ static inline int try_to_steal_lock(struct rt_mutex *lock)
 		return 1;
 
 	spin_lock(&pendowner->pi_lock);
-	if (current->prio >= pendowner->prio) {
+	if (!lock_is_stealable(pendowner, mode)) {
 		spin_unlock(&pendowner->pi_lock);
 		return 0;
 	}
@@ -383,7 +383,7 @@ static inline int try_to_steal_lock(struct rt_mutex *lock)
  *
  * Must be called with lock->wait_lock held.
  */
-static int try_to_take_rt_mutex(struct rt_mutex *lock)
+static int do_try_to_take_rt_mutex(struct rt_mutex *lock, int mode)
 {
 	/*
 	 * We have to be careful here if the atomic speedups are
@@ -406,7 +406,7 @@ static int try_to_take_rt_mutex(struct rt_mutex *lock)
 	 */
 	mark_rt_mutex_waiters(lock);
 
-	if (rt_mutex_owner(lock) && !try_to_steal_lock(lock))
+	if (rt_mutex_owner(lock) && !try_to_steal_lock(lock, mode))
 		return 0;
 
 	/* We got the lock. */
@@ -417,6 +417,11 @@ static int try_to_take_rt_mutex(struct rt_mutex *lock)
 	rt_mutex_deadlock_account_lock(lock, current);
 
 	return 1;
+}
+
+static inline int try_to_take_rt_mutex(struct rt_mutex *lock)
+{
+	return do_try_to_take_rt_mutex(lock, STEAL_NORMAL);
 }
 
 /*
@@ -684,7 +689,7 @@ rt_spin_lock_slowlock(struct rt_mutex *lock)
 	init_lists(lock);
 
 	/* Try to acquire the lock again: */
-	if (try_to_take_rt_mutex(lock)) {
+	if (do_try_to_take_rt_mutex(lock, STEAL_LATERAL)) {
 		spin_unlock_irqrestore(&lock->wait_lock, flags);
 		return;
 	}
@@ -707,7 +712,7 @@ rt_spin_lock_slowlock(struct rt_mutex *lock)
 		int saved_lock_depth = current->lock_depth;
 
 		/* Try to acquire the lock */
-		if (try_to_take_rt_mutex(lock))
+		if (do_try_to_take_rt_mutex(lock, STEAL_LATERAL))
 			break;
 		/*
 		 * waiter.task is NULL the first time we come here and
