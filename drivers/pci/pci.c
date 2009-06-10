@@ -170,6 +170,42 @@ int pci_find_capability(struct pci_dev *dev, int cap)
 }
 
 /**
+ * pci_find_capability_cached - query for devices' capabilities, cached version
+ * @dev: PCI device to query
+ * @cap: capability code
+ *
+ * Tell if a device supports a given PCI capability.
+ * Returns the address of the requested capability structure within the
+ * device's PCI configuration space or 0 in case the device does not
+ * support it.  Possible values for @cap:
+ *
+ *  %PCI_CAP_ID_PM           Power Management
+ *  %PCI_CAP_ID_AGP          Accelerated Graphics Port
+ *  %PCI_CAP_ID_VPD          Vital Product Data
+ *  %PCI_CAP_ID_SLOTID       Slot Identification
+ *  %PCI_CAP_ID_MSI          Message Signalled Interrupts
+ *  %PCI_CAP_ID_CHSWP        CompactPCI HotSwap
+ *  %PCI_CAP_ID_PCIX         PCI-X
+ *  %PCI_CAP_ID_EXP          PCI Express
+ */
+int pci_find_capability_cached(struct pci_dev *dev, int cap)
+{
+       int pos = 0;
+
+       WARN_ON_ONCE(cap <= 0 || cap > PCI_CAP_LIST_NR_ENTRIES);
+
+       if (cap <= PCI_CAP_LIST_NR_ENTRIES) {
+               const int i = cap - 1;
+               if (dev->cached_capabilities[i] == -1)
+                       dev->cached_capabilities[i] = pci_find_capability(dev, cap);
+
+               pos = dev->cached_capabilities[i];
+       }
+
+       return pos;
+}
+
+/**
  * pci_bus_find_capability - query for devices' capabilities 
  * @bus:   the PCI bus to query
  * @devfn: PCI device to query

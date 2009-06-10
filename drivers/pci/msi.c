@@ -30,7 +30,7 @@ static void msi_set_enable(struct pci_dev *dev, int enable)
 	int pos;
 	u16 control;
 
-	pos = pci_find_capability(dev, PCI_CAP_ID_MSI);
+	pos = pci_find_capability_cached(dev, PCI_CAP_ID_MSI);
 	if (pos) {
 		pci_read_config_word(dev, pos + PCI_MSI_FLAGS, &control);
 		control &= ~PCI_MSI_FLAGS_ENABLE;
@@ -45,7 +45,7 @@ static void msix_set_enable(struct pci_dev *dev, int enable)
 	int pos;
 	u16 control;
 
-	pos = pci_find_capability(dev, PCI_CAP_ID_MSIX);
+	pos = pci_find_capability_cached(dev, PCI_CAP_ID_MSIX);
 	if (pos) {
 		pci_read_config_word(dev, pos + PCI_MSIX_FLAGS, &control);
 		control &= ~PCI_MSIX_FLAGS_ENABLE;
@@ -311,7 +311,7 @@ static int msi_capability_init(struct pci_dev *dev)
 
 	msi_set_enable(dev, 0);	/* Ensure msi is disabled as I set it up */
 
-   	pos = pci_find_capability(dev, PCI_CAP_ID_MSI);
+   	pos = pci_find_capability_cached(dev, PCI_CAP_ID_MSI);
 	pci_read_config_word(dev, msi_control_reg(pos), &control);
 	/* MSI Entry Initialization */
 	entry = alloc_msi_entry();
@@ -384,7 +384,7 @@ static int msix_capability_init(struct pci_dev *dev,
 
 	msix_set_enable(dev, 0);/* Ensure msix is disabled as I set it up */
 
-   	pos = pci_find_capability(dev, PCI_CAP_ID_MSIX);
+   	pos = pci_find_capability_cached(dev, PCI_CAP_ID_MSIX);
 	/* Request & Map MSI-X table region */
  	pci_read_config_word(dev, msi_control_reg(pos), &control);
 	nr_entries = multi_msix_capable(control);
@@ -491,7 +491,7 @@ static int pci_msi_check_device(struct pci_dev* dev, int nvec, int type)
 	if (ret)
 		return ret;
 
-	if (!pci_find_capability(dev, type))
+	if (!pci_find_capability_cached(dev, type))
 		return -EINVAL;
 
 	return 0;
@@ -610,7 +610,7 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry *entries, int nvec)
 	if (status)
 		return status;
 
-	pos = pci_find_capability(dev, PCI_CAP_ID_MSIX);
+	pos = pci_find_capability_cached(dev, PCI_CAP_ID_MSIX);
 	pci_read_config_word(dev, msi_control_reg(pos), &control);
 	nr_entries = multi_msix_capable(control);
 	if (nvec > nr_entries)
