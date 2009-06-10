@@ -27,6 +27,8 @@
 #include <linux/kdebug.h>
 #include <linux/kprobes.h>
 
+#include <linux/ftrace.h>
+
 #include <asm/system.h>
 #include <asm/desc.h>
 #include <asm/segment.h>
@@ -310,6 +312,8 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 
 	/* get the address */
         address = read_cr2();
+
+	ftrace_event_fault(regs->eip, error_code, address);
 
 	tsk = current;
 

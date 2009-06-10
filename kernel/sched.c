@@ -91,6 +91,11 @@ unsigned long long __attribute__((weak)) sched_clock(void)
 #define PRIO_TO_NICE(prio)	((prio) - MAX_RT_PRIO - 20)
 #define TASK_NICE(p)		PRIO_TO_NICE((p)->static_prio)
 
+#define __PRIO(prio) \
+	((prio) <= 99 ? 199 - (prio) : (prio) - 120)
+
+#define PRIO(p) __PRIO((p)->prio)
+
 /*
  * 'User priority' is the nice value converted to something we
  * can work with better when scaling various scheduler parameters,
@@ -1119,6 +1124,7 @@ static void activate_task(struct rq *rq, struct task_struct *p, int wakeup)
 	if (p->state == TASK_UNINTERRUPTIBLE)
 		rq->nr_uninterruptible--;
 
+	ftrace_event_task_activate(p, cpu_of(rq));
 	enqueue_task(rq, p, wakeup);
 	inc_nr_running(p, rq);
 }
@@ -1131,6 +1137,7 @@ static void deactivate_task(struct rq *rq, struct task_struct *p, int sleep)
 	if (p->state == TASK_UNINTERRUPTIBLE)
 		rq->nr_uninterruptible++;
 
+	ftrace_event_task_deactivate(p, cpu_of(rq));
 	dequeue_task(rq, p, sleep);
 	dec_nr_running(p, rq);
 }

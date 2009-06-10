@@ -4,6 +4,7 @@
 #ifdef CONFIG_FTRACE
 
 #include <linux/linkage.h>
+#include <linux/ktime.h>
 #include <linux/fs.h>
 
 extern int ftrace_enabled;
@@ -135,5 +136,53 @@ ftrace_special(unsigned long arg1, unsigned long arg2, unsigned long arg3);
 static inline void
 ftrace_special(unsigned long arg1, unsigned long arg2, unsigned long arg3) { }
 #endif
+
+#ifdef CONFIG_EVENT_TRACER
+#include <linux/marker.h>
+
+static inline void ftrace_event_irq(int irq, int user, unsigned long ip)
+{
+	trace_mark(ftrace_event_irq, "%d %d %ld", irq, user, ip);
+}
+
+static inline void ftrace_event_fault(unsigned long ip, unsigned long error,
+				      unsigned long addr)
+{
+	trace_mark(ftrace_event_fault, "%ld %ld %ld", ip, error, addr);
+}
+
+static inline void ftrace_event_timer_set(void *p1, void *p2)
+{
+	trace_mark(ftrace_event_timer_set, "%p %p", p1, p2);
+}
+
+static inline void ftrace_event_timer_triggered(void *p1, void *p2)
+{
+	trace_mark(ftrace_event_timer_triggered, "%p %p", p1, p2);
+}
+
+static inline void ftrace_event_timestamp(ktime_t *time)
+{
+	trace_mark(ftrace_event_hrtimer, "%p", time);
+}
+
+static inline void ftrace_event_task_activate(struct task_struct *p, int cpu)
+{
+	trace_mark(ftrace_event_task_activate, "%p %d", p, cpu);
+}
+
+static inline void ftrace_event_task_deactivate(struct task_struct *p, int cpu)
+{
+	trace_mark(ftrace_event_task_deactivate, "%p %d", p, cpu);
+}
+#else
+# define ftrace_event_irq(irq, user, ip)	do { } while (0)
+# define ftrace_event_fault(ip, error, addr)	do { } while (0)
+# define ftrace_event_timer_set(p1, p2)		do { } while (0)
+# define ftrace_event_timer_triggered(p1, p2)	do { } while (0)
+# define ftrace_event_timestamp(now)		do { } while (0)
+# define ftrace_event_task_activate(p, cpu)	do { } while (0)
+# define ftrace_event_task_deactivate(p, cpu)	do { } while (0)
+#endif /* CONFIG_TRACE_EVENTS */
 
 #endif /* _LINUX_FTRACE_H */

@@ -45,6 +45,8 @@
 
 #include "io_ports.h"
 
+#include <linux/ftrace.h>
+
 /*
  * Sanity check
  */
@@ -581,6 +583,7 @@ void fastcall smp_apic_timer_interrupt(struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
+	ftrace_event_irq(-1, user_mode(regs), regs->eip);
 	/*
 	 * NOTE! We'd better ACK the irq immediately,
 	 * because timer handling can be slow.

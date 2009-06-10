@@ -27,6 +27,8 @@
 #include <linux/kdebug.h>
 #include <linux/kprobes.h>
 
+#include <linux/ftrace.h>
+
 #include <asm/system.h>
 #include <asm/pgalloc.h>
 #include <asm/smp.h>
@@ -315,6 +317,8 @@ asmlinkage void __kprobes do_page_fault(struct pt_regs *regs,
 
 	/* get the address */
 	address = read_cr2();
+
+	ftrace_event_fault(regs->rip, error_code, address);
 
 	info.si_code = SEGV_MAPERR;
 

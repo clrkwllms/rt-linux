@@ -18,6 +18,8 @@
 #include <asm/idle.h>
 #include <asm/smp.h>
 
+#include <linux/ftrace.h>
+
 atomic_t irq_err_count;
 
 #ifdef CONFIG_DEBUG_STACKOVERFLOW
@@ -148,6 +150,8 @@ asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 	exit_idle();
 	irq_enter();
 	irq = __get_cpu_var(vector_irq)[vector];
+
+	ftrace_event_irq(irq, user_mode(regs), regs->rip);
 
 #ifdef CONFIG_DEBUG_STACKOVERFLOW
 	stack_overflow_check(regs);

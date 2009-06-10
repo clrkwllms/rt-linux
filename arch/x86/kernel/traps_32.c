@@ -30,6 +30,8 @@
 #include <linux/nmi.h>
 #include <linux/bug.h>
 
+#include <linux/ftrace.h>
+
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
 #include <linux/eisa.h>
@@ -768,6 +770,8 @@ fastcall __kprobes void do_nmi(struct pt_regs * regs, long error_code)
 	int cpu;
 
 	nmi_enter();
+
+	ftrace_event_irq(-1, user_mode(regs), regs->eip);
 
 	cpu = smp_processor_id();
 
