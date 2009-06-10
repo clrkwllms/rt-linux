@@ -294,6 +294,8 @@ do {									\
 extern void __lockfunc rt_write_lock(rwlock_t *rwlock);
 extern void __lockfunc rt_read_lock(rwlock_t *rwlock);
 extern int __lockfunc rt_write_trylock(rwlock_t *rwlock);
+extern int __lockfunc rt_write_trylock_irqsave(rwlock_t *trylock,
+					       unsigned long *flags);
 extern int __lockfunc rt_read_trylock(rwlock_t *rwlock);
 extern void __lockfunc rt_write_unlock(rwlock_t *rwlock);
 extern void __lockfunc rt_read_unlock(rwlock_t *rwlock);
