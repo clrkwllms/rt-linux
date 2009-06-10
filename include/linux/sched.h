@@ -91,6 +91,16 @@ struct sched_param {
 
 #include <asm/processor.h>
 
+#ifdef CONFIG_PREEMPT
+extern int kernel_preemption;
+#else
+# define kernel_preemption 0
+#endif
+#ifdef CONFIG_PREEMPT_VOLUNTARY
+extern int voluntary_preemption;
+#else
+# define voluntary_preemption 0
+#endif
 #ifdef CONFIG_PREEMPT_SOFTIRQS
 extern int softirq_preemption;
 #else
@@ -199,6 +209,28 @@ extern struct semaphore kernel_sem;
 	do { (tsk)->state = (state_value); } while (0)
 #define set_task_state(tsk, state_value)		\
 	set_mb((tsk)->state, (state_value))
+
+// #define PREEMPT_DIRECT
+
+#ifdef CONFIG_X86_LOCAL_APIC
+extern void nmi_show_all_regs(void);
+#else
+# define nmi_show_all_regs() do { } while (0)
+#endif
+
+#include <linux/smp.h>
+#include <linux/sem.h>
+#include <linux/signal.h>
+#include <linux/securebits.h>
+#include <linux/fs_struct.h>
+#include <linux/compiler.h>
+#include <linux/completion.h>
+#include <linux/pid.h>
+#include <linux/percpu.h>
+#include <linux/topology.h>
+#include <linux/seccomp.h>
+
+struct exec_domain;
 
 /*
  * set_current_state() includes a barrier so that the write of current->state
@@ -319,6 +351,11 @@ extern signed long FASTCALL(schedule_timeout(signed long timeout));
 extern signed long schedule_timeout_interruptible(signed long timeout);
 extern signed long schedule_timeout_uninterruptible(signed long timeout);
 asmlinkage void schedule(void);
+/*
+ * This one can be called with interrupts disabled, only
+ * to be used by lowlevel arch code!
+ */
+asmlinkage void __sched __schedule(void);
 
 struct nsproxy;
 struct user_namespace;
@@ -1419,6 +1456,15 @@ extern struct pid *cad_pid;
 extern void free_task(struct task_struct *tsk);
 #define get_task_struct(tsk) do { atomic_inc(&(tsk)->usage); } while(0)
 
+#ifdef CONFIG_PREEMPT_RT
+extern void __put_task_struct_cb(struct rcu_head *rhp);
+
+static inline void put_task_struct(struct task_struct *t)
+{
+	if (atomic_dec_and_test(&t->usage))
+		call_rcu(&t->rcu, __put_task_struct_cb);
+}
+#else
 extern void __put_task_struct(struct task_struct *t);
 
 static inline void put_task_struct(struct task_struct *t)
@@ -1426,6 +1472,7 @@ static inline void put_task_struct(struct task_struct *t)
 	if (atomic_dec_and_test(&t->usage))
 		__put_task_struct(t);
 }
+#endif
 
 /*
  * Per process flags
