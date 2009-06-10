@@ -23,6 +23,7 @@ struct notifier_block;
 
 /* init basic kernel profiler */
 void __init profile_init(void);
+void __profile_tick(int type, struct pt_regs *regs);
 void profile_tick(int);
 
 /*

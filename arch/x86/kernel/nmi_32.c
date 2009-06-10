@@ -25,6 +25,7 @@
 
 #include <asm/smp.h>
 #include <asm/nmi.h>
+#include <asm/mach-default/mach_ipi.h>
 
 #include "mach_traps.h"
 
@@ -42,7 +43,7 @@ static cpumask_t backtrace_mask = CPU_MASK_NONE;
 atomic_t nmi_active = ATOMIC_INIT(0);		/* oprofile uses this */
 
 unsigned int nmi_watchdog = NMI_DEFAULT;
-static unsigned int nmi_hz = HZ;
+static unsigned int nmi_hz = 1000;
 
 static DEFINE_PER_CPU(short, wd_enabled);
 
@@ -93,7 +94,7 @@ static int __init check_nmi_watchdog(void)
 	for_each_possible_cpu(cpu)
 		prev_nmi_count[cpu] = per_cpu(irq_stat, cpu).__nmi_count;
 	local_irq_enable();
-	mdelay((20*1000)/nmi_hz); // wait 20 ticks
+	mdelay((100*1000)/nmi_hz); /* wait 100 ticks */
 
 	for_each_possible_cpu(cpu) {
 #ifdef CONFIG_SMP
@@ -318,6 +319,46 @@ EXPORT_SYMBOL(touch_nmi_watchdog);
 
 extern void die_nmi(struct pt_regs *, const char *msg);
 
+int nmi_show_regs[NR_CPUS];
+
+void nmi_show_all_regs(void)
+{
+	int i;
+
+	if (system_state == SYSTEM_BOOTING)
+		return;
+
+	printk(KERN_WARNING "nmi_show_all_regs(): start on CPU#%d.\n",
+		raw_smp_processor_id());
+	dump_stack();
+
+	for_each_online_cpu(i)
+		nmi_show_regs[i] = 1;
+
+	smp_send_nmi_allbutself();
+
+	for_each_online_cpu(i) {
+		while (nmi_show_regs[i] == 1)
+			barrier();
+	}
+}
+
+static DEFINE_SPINLOCK(nmi_print_lock);
+
+void irq_show_regs_callback(int cpu, struct pt_regs *regs)
+{
+	if (!nmi_show_regs[cpu])
+		return;
+
+	nmi_show_regs[cpu] = 0;
+	spin_lock(&nmi_print_lock);
+	printk(KERN_WARNING "NMI show regs on CPU#%d:\n", cpu);
+	printk(KERN_WARNING "apic_timer_irqs: %d\n",
+		per_cpu(irq_stat, cpu).apic_timer_irqs);
+	show_regs(regs);
+	spin_unlock(&nmi_print_lock);
+}
+
 notrace __kprobes int
 nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 {
@@ -331,6 +372,8 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	int touched = 0;
 	int cpu = smp_processor_id();
 	int rc=0;
+
+	__profile_tick(CPU_PROFILING, regs);
 
 	/* check for other users first */
 	if (notify_die(DIE_NMI, "nmi", regs, reason, 2, SIGINT)
@@ -356,6 +399,9 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	sum = per_cpu(irq_stat, cpu).apic_timer_irqs +
 		per_cpu(irq_stat, cpu).irq0_irqs;
 
+	irq_show_regs_callback(cpu, regs);
+
+	/* if the apic timer isn't firing, this cpu isn't doing much */
 	/* if the none of the timers isn't firing, this cpu isn't doing much */
 	if (!touched && last_irq_sums[cpu] == sum) {
 		/*
@@ -363,11 +409,30 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 		 * wait a few IRQs (5 seconds) before doing the oops ...
 		 */
 		alert_counter[cpu]++;
-		if (alert_counter[cpu] == 5*nmi_hz)
-			/*
-			 * die_nmi will return ONLY if NOTIFY_STOP happens..
-			 */
-			die_nmi(regs, "BUG: NMI Watchdog detected LOCKUP");
+		if (alert_counter[cpu] && !(alert_counter[cpu] % (5*nmi_hz))) {
+			int i;
+
+			spin_lock(&nmi_print_lock);
+			printk(KERN_WARNING "NMI watchdog detected lockup on "
+				"CPU#%d (%d/%d)\n", cpu, alert_counter[cpu],
+						    5*nmi_hz);
+			show_regs(regs);
+			spin_unlock(&nmi_print_lock);
+
+			for_each_online_cpu(i) {
+				if (i == cpu)
+					continue;
+				nmi_show_regs[i] = 1;
+				while (nmi_show_regs[i] == 1)
+					cpu_relax();
+			}
+			printk(KERN_WARNING "NMI watchdog running again ...\n");
+			for_each_online_cpu(i)
+				alert_counter[i] = 0;
+
+
+		}
+
 	} else {
 		last_irq_sums[cpu] = sum;
 		alert_counter[cpu] = 0;
@@ -463,6 +528,16 @@ void __trigger_all_cpu_backtrace(void)
 			break;
 		mdelay(1);
 	}
+}
+
+void smp_send_nmi_allbutself(void)
+{
+#ifdef CONFIG_SMP
+	cpumask_t mask = cpu_online_map;
+	cpu_clear(safe_smp_processor_id(), mask);
+	if (!cpus_empty(mask))
+		send_IPI_mask(mask, NMI_VECTOR);
+#endif
 }
 
 EXPORT_SYMBOL(nmi_active);

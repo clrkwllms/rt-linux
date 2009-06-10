@@ -118,6 +118,8 @@ extern int local_apic_timer_c2_ok;
 
 extern int local_apic_timer_disabled;
 
+extern void smp_send_nmi_allbutself(void);
+
 #else /* !CONFIG_X86_LOCAL_APIC */
 static inline void lapic_shutdown(void) { }
 #define local_apic_timer_c2_ok		1

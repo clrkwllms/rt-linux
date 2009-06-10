@@ -147,6 +147,8 @@ asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 	unsigned vector = ~regs->orig_rax;
 	unsigned irq;
 
+	irq_show_regs_callback(smp_processor_id(), regs);
+
 	exit_idle();
 	irq_enter();
 	irq = __get_cpu_var(vector_irq)[vector];

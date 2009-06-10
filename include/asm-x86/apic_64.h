@@ -87,6 +87,8 @@ extern void setup_APIC_extended_lvt(unsigned char lvt_off, unsigned char vector,
 
 extern int apic_is_clustered_box(void);
 
+extern void smp_send_nmi_allbutself(void);
+
 #define K8_APIC_EXT_LVT_BASE    0x500
 #define K8_APIC_EXT_INT_MSG_FIX 0x0
 #define K8_APIC_EXT_INT_MSG_SMI 0x2

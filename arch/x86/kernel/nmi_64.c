@@ -20,11 +20,13 @@
 #include <linux/kprobes.h>
 #include <linux/cpumask.h>
 #include <linux/kdebug.h>
+#include <linux/kernel_stat.h>
 
 #include <asm/smp.h>
 #include <asm/nmi.h>
 #include <asm/proto.h>
 #include <asm/mce.h>
+#include <asm/mach_apic.h>
 
 int unknown_nmi_panic;
 int nmi_watchdog_enabled;
@@ -42,7 +44,7 @@ atomic_t nmi_active = ATOMIC_INIT(0);		/* oprofile uses this */
 int panic_on_timeout;
 
 unsigned int nmi_watchdog = NMI_DEFAULT;
-static unsigned int nmi_hz = HZ;
+static unsigned int nmi_hz = 1000;
 
 static DEFINE_PER_CPU(short, wd_enabled);
 
@@ -301,7 +303,7 @@ void touch_nmi_watchdog(void)
 		unsigned cpu;
 
 		/*
- 		 * Tell other CPUs to reset their alert counters. We cannot
+		 * Tell other CPUs to reset their alert counters. We cannot
 		 * do it ourselves because the alert count increase is not
 		 * atomic.
 		 */
@@ -314,6 +316,41 @@ void touch_nmi_watchdog(void)
  	touch_softlockup_watchdog();
 }
 
+int nmi_show_regs[NR_CPUS];
+
+void nmi_show_all_regs(void)
+{
+	int i;
+
+	if (system_state == SYSTEM_BOOTING)
+		return;
+
+	smp_send_nmi_allbutself();
+
+	for_each_online_cpu(i)
+		nmi_show_regs[i] = 1;
+
+	for_each_online_cpu(i) {
+		while (nmi_show_regs[i] == 1)
+			barrier();
+	}
+}
+
+static DEFINE_SPINLOCK(nmi_print_lock);
+
+void irq_show_regs_callback(int cpu, struct pt_regs *regs)
+{
+	if (!nmi_show_regs[cpu])
+		return;
+
+	nmi_show_regs[cpu] = 0;
+	spin_lock(&nmi_print_lock);
+	printk(KERN_WARNING "NMI show regs on CPU#%d:\n", cpu);
+	printk(KERN_WARNING "apic_timer_irqs: %d\n", read_pda(apic_timer_irqs));
+	show_regs(regs);
+	spin_unlock(&nmi_print_lock);
+}
+
 notrace int __kprobes
 nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 {
@@ -321,6 +358,9 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	int touched = 0;
 	int cpu = smp_processor_id();
 	int rc = 0;
+
+	irq_show_regs_callback(cpu, regs);
+	__profile_tick(CPU_PROFILING, regs);
 
 	/* check for other users first */
 	if (notify_die(DIE_NMI, "nmi", regs, reason, 2, SIGINT)
@@ -358,9 +398,20 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 		 * wait a few IRQs (5 seconds) before doing the oops ...
 		 */
 		local_inc(&__get_cpu_var(alert_counter));
-		if (local_read(&__get_cpu_var(alert_counter)) == 5*nmi_hz)
+		if (local_read(&__get_cpu_var(alert_counter)) == 5*nmi_hz) {
+			int i;
+
+			for_each_online_cpu(i) {
+				if (i == cpu)
+					continue;
+				nmi_show_regs[i] = 1;
+				while (nmi_show_regs[i] == 1)
+					cpu_relax();
+			}
+
 			die_nmi("NMI Watchdog detected LOCKUP on CPU %d\n", regs,
 				panic_on_timeout);
+		}
 	} else {
 		__get_cpu_var(last_irq_sum) = sum;
 		local_set(&__get_cpu_var(alert_counter), 0);
@@ -476,6 +527,13 @@ void __trigger_all_cpu_backtrace(void)
 			break;
 		mdelay(1);
 	}
+}
+
+void smp_send_nmi_allbutself(void)
+{
+#ifdef CONFIG_SMP
+	send_IPI_allbutself(NMI_VECTOR);
+#endif
 }
 
 EXPORT_SYMBOL(nmi_active);
