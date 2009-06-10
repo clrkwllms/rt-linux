@@ -57,6 +57,7 @@ static int stat_interval;	/* Interval between stats, in seconds. */
 static int verbose;		/* Print more debug info. */
 static int test_no_idle_hz;	/* Test RCU's support for tickless idle CPUs. */
 static int shuffle_interval = 5; /* Interval between shuffles (in sec)*/
+static int preempt_torture;	/* Realtime task preempts torture readers. */
 static char *torture_type = "rcu"; /* What RCU implementation to torture. */
 
 module_param(nreaders, int, 0444);
@@ -71,6 +72,8 @@ module_param(test_no_idle_hz, bool, 0444);
 MODULE_PARM_DESC(test_no_idle_hz, "Test support for tickless idle CPUs");
 module_param(shuffle_interval, int, 0444);
 MODULE_PARM_DESC(shuffle_interval, "Number of seconds between shuffles");
+module_param(preempt_torture, bool, 0444);
+MODULE_PARM_DESC(preempt_torture, "Enable realtime preemption torture");
 module_param(torture_type, charp, 0444);
 MODULE_PARM_DESC(torture_type, "Type of RCU to torture (rcu, rcu_bh, srcu)");
 
@@ -191,6 +194,8 @@ struct rcu_torture_ops {
 	int (*completed)(void);
 	void (*deferredfree)(struct rcu_torture *p);
 	void (*sync)(void);
+	long (*preemptstart)(void);
+	void (*preemptend)(void);
 	int (*stats)(char *page);
 	char *name;
 };
@@ -255,16 +260,75 @@ static void rcu_torture_deferred_free(struct rcu_torture *p)
 	call_rcu(&p->rtort_rcu, rcu_torture_cb);
 }
 
+static struct task_struct *rcu_preeempt_task;
+static unsigned long rcu_torture_preempt_errors;
+
+static int rcu_torture_preempt(void *arg)
+{
+	int completedstart;
+	int err;
+	time_t gcstart;
+	struct sched_param sp;
+
+	sp.sched_priority = MAX_RT_PRIO - 1;
+	err = sched_setscheduler(current, SCHED_RR, &sp);
+	if (err != 0)
+		printk(KERN_ALERT "rcu_torture_preempt() priority err: %d\n",
+		       err);
+	current->flags |= PF_NOFREEZE;
+
+	do {
+		completedstart = rcu_torture_completed();
+		gcstart = xtime.tv_sec;
+		while ((xtime.tv_sec - gcstart < 10) &&
+		       (rcu_torture_completed() == completedstart))
+			cond_resched();
+		if (rcu_torture_completed() == completedstart)
+			rcu_torture_preempt_errors++;
+		schedule_timeout_interruptible(1);
+	} while (!kthread_should_stop());
+	return 0;
+}
+
+static long rcu_preempt_start(void)
+{
+	long retval = 0;
+
+	rcu_preeempt_task = kthread_run(rcu_torture_preempt, NULL,
+					"rcu_torture_preempt");
+	if (IS_ERR(rcu_preeempt_task)) {
+		VERBOSE_PRINTK_ERRSTRING("Failed to create preempter");
+		retval = PTR_ERR(rcu_preeempt_task);
+		rcu_preeempt_task = NULL;
+	}
+	return retval;
+}
+
+static void rcu_preempt_end(void)
+{
+	if (rcu_preeempt_task != NULL) {
+		VERBOSE_PRINTK_STRING("Stopping rcu_preempt task");
+		kthread_stop(rcu_preeempt_task);
+	}
+	rcu_preeempt_task = NULL;
+}
+
+static int rcu_preempt_stats(char *page)
+{
+	return sprintf(page,
+		       "Preemption stalls: %lu\n", rcu_torture_preempt_errors);
+}
+
 static struct rcu_torture_ops rcu_ops = {
-	.init = NULL,
-	.cleanup = NULL,
 	.readlock = rcu_torture_read_lock,
 	.readdelay = rcu_read_delay,
 	.readunlock = rcu_torture_read_unlock,
 	.completed = rcu_torture_completed,
 	.deferredfree = rcu_torture_deferred_free,
 	.sync = synchronize_rcu,
-	.stats = NULL,
+	.preemptstart = rcu_preempt_start,
+	.preemptend = rcu_preempt_end,
+	.stats = rcu_preempt_stats,
 	.name = "rcu"
 };
 
@@ -296,14 +360,12 @@ static void rcu_sync_torture_init(void)
 
 static struct rcu_torture_ops rcu_sync_ops = {
 	.init = rcu_sync_torture_init,
-	.cleanup = NULL,
 	.readlock = rcu_torture_read_lock,
 	.readdelay = rcu_read_delay,
 	.readunlock = rcu_torture_read_unlock,
 	.completed = rcu_torture_completed,
 	.deferredfree = rcu_sync_torture_deferred_free,
 	.sync = synchronize_rcu,
-	.stats = NULL,
 	.name = "rcu_sync"
 };
 
@@ -355,28 +417,23 @@ static void rcu_bh_torture_synchronize(void)
 }
 
 static struct rcu_torture_ops rcu_bh_ops = {
-	.init = NULL,
-	.cleanup = NULL,
 	.readlock = rcu_bh_torture_read_lock,
 	.readdelay = rcu_read_delay,  /* just reuse rcu's version. */
 	.readunlock = rcu_bh_torture_read_unlock,
 	.completed = rcu_bh_torture_completed,
 	.deferredfree = rcu_bh_torture_deferred_free,
 	.sync = rcu_bh_torture_synchronize,
-	.stats = NULL,
 	.name = "rcu_bh"
 };
 
 static struct rcu_torture_ops rcu_bh_sync_ops = {
 	.init = rcu_sync_torture_init,
-	.cleanup = NULL,
 	.readlock = rcu_bh_torture_read_lock,
 	.readdelay = rcu_read_delay,  /* just reuse rcu's version. */
 	.readunlock = rcu_bh_torture_read_unlock,
 	.completed = rcu_bh_torture_completed,
 	.deferredfree = rcu_sync_torture_deferred_free,
 	.sync = rcu_bh_torture_synchronize,
-	.stats = NULL,
 	.name = "rcu_bh_sync"
 };
 
@@ -488,14 +545,12 @@ static void sched_torture_synchronize(void)
 
 static struct rcu_torture_ops sched_ops = {
 	.init = rcu_sync_torture_init,
-	.cleanup = NULL,
 	.readlock = sched_torture_read_lock,
 	.readdelay = rcu_read_delay,  /* just reuse rcu's version. */
 	.readunlock = sched_torture_read_unlock,
 	.completed = sched_torture_completed,
 	.deferredfree = rcu_sync_torture_deferred_free,
 	.sync = sched_torture_synchronize,
-	.stats = NULL,
 	.name = "sched"
 };
 
@@ -787,9 +842,10 @@ rcu_torture_print_module_parms(char *tag)
 	printk(KERN_ALERT "%s" TORTURE_FLAG
 		"--- %s: nreaders=%d nfakewriters=%d "
 		"stat_interval=%d verbose=%d test_no_idle_hz=%d "
-		"shuffle_interval = %d\n",
+		"shuffle_interval=%d preempt_torture=%d\n",
 		torture_type, tag, nrealreaders, nfakewriters,
-		stat_interval, verbose, test_no_idle_hz, shuffle_interval);
+		stat_interval, verbose, test_no_idle_hz, shuffle_interval,
+		preempt_torture);
 }
 
 static void
@@ -842,6 +898,8 @@ rcu_torture_cleanup(void)
 		kthread_stop(stats_task);
 	}
 	stats_task = NULL;
+	if (preempt_torture && (cur_ops->preemptend != NULL))
+		cur_ops->preemptend();
 
 	/* Wait for all RCU callbacks to fire.  */
 	rcu_barrier();
@@ -983,6 +1041,11 @@ rcu_torture_init(void)
 			shuffler_task = NULL;
 			goto unwind;
 		}
+	}
+	if (preempt_torture && (cur_ops->preemptstart != NULL)) {
+		firsterr = cur_ops->preemptstart();
+		if (firsterr != 0)
+			goto unwind;
 	}
 	return 0;
 
