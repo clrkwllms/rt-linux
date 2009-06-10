@@ -258,6 +258,7 @@ static int check_tty_count(struct tty_struct *tty, const char *routine)
 		printk(KERN_WARNING "Warning: dev (%s) tty->count(%d) "
 				    "!= #fd's(%d) in %s\n",
 		       tty->name, tty->count, count, routine);
+		dump_stack();
 		return count;
 	}
 #endif

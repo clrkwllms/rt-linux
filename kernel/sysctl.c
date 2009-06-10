@@ -340,6 +340,54 @@ static struct ctl_table kern_table[] = {
 	},
 #endif
 	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "prof_pid",
+		.data		= &prof_pid,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#ifdef CONFIG_PREEMPT
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "kernel_preemption",
+		.data		= &kernel_preemption,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
+#ifdef CONFIG_PREEMPT_VOLUNTARY
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "voluntary_preemption",
+		.data		= &voluntary_preemption,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
+#if defined(CONFIG_PREEMPT_SOFTIRQS) && !defined(CONFIG_PREEMPT_RT)
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "softirq_preemption",
+		.data		= &softirq_preemption,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
+#if defined(CONFIG_PREEMPT_HARDIRQS) && !defined(CONFIG_PREEMPT_RT)
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "hardirq_preemption",
+		.data		= &hardirq_preemption,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
+	{
 		.ctl_name	= KERN_PANIC,
 		.procname	= "panic",
 		.data		= &panic_timeout,
@@ -347,6 +395,16 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+#ifdef CONFIG_GENERIC_HARDIRQS
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "debug_direct_keyboard",
+		.data		= &debug_direct_keyboard,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
 	{
 		.ctl_name	= KERN_CORE_USES_PID,
 		.procname	= "core_uses_pid",
