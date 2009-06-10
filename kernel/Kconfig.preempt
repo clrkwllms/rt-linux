@@ -160,6 +160,7 @@ endchoice
 config PREEMPT_RCU_BOOST
 	bool "Enable priority boosting of RCU read-side critical sections"
 	depends on PREEMPT_RCU
+	default y if PREEMPT_RT
 	help
 	  This option permits priority boosting of RCU read-side critical
 	  sections tat have been preempted and a RT process is waiting
