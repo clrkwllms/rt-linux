@@ -1250,7 +1250,7 @@ static int futex_wait(u32 __user *uaddr, struct rw_semaphore *fshared,
 			       "RT task %s:%d with priority %d"
 			       " using non PI futex\n",
 			       current->comm, current->pid,
-			       100 - current->prio);
+			       MAX_RT_PRIO - current->prio);
 		}
 	}
 	/*
