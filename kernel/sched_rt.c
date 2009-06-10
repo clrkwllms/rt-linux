@@ -12,6 +12,9 @@ static inline int rt_overloaded(struct rq *rq)
 
 static inline void rt_set_overload(struct rq *rq)
 {
+	if (!rq->online)
+		return;
+
 	cpu_set(rq->cpu, rq->rd->rto_mask);
 	/*
 	 * Make sure the mask is visible before we set
@@ -26,6 +29,9 @@ static inline void rt_set_overload(struct rq *rq)
 
 static inline void rt_clear_overload(struct rq *rq)
 {
+	if (!rq->online)
+		return;
+
 	/* the order here really doesn't matter */
 	atomic_dec(&rq->rd->rto_count);
 	cpu_clear(rq->cpu, rq->rd->rto_mask);
@@ -78,7 +84,10 @@ static inline void inc_rt_tasks(struct task_struct *p, struct rq *rq)
 #ifdef CONFIG_SMP
 	if (p->prio < rq->rt.highest_prio) {
 		rq->rt.highest_prio = p->prio;
-		cpupri_set(&rq->rd->cpupri, rq->cpu, p->prio);
+
+		if (rq->online)
+			cpupri_set(&rq->rd->cpupri, rq->cpu,
+				   p->prio);
 	}
 	if (p->nr_cpus_allowed > 1)
 		rq->rt.rt_nr_migratory++;
@@ -113,8 +122,11 @@ static inline void dec_rt_tasks(struct task_struct *p, struct rq *rq)
 		rq->rt.rt_nr_migratory--;
 	}
 
-	if (rq->rt.highest_prio != highest_prio)
-		cpupri_set(&rq->rd->cpupri, rq->cpu, rq->rt.highest_prio);
+	if (rq->rt.highest_prio != highest_prio) {
+		if (rq->online)
+			cpupri_set(&rq->rd->cpupri, rq->cpu,
+				   rq->rt.highest_prio);
+	}
 
 	update_rt_migration(rq);
 #endif /* CONFIG_SMP */
@@ -758,7 +770,7 @@ static void set_cpus_allowed_rt(struct task_struct *p, cpumask_t *new_mask)
 	p->nr_cpus_allowed = weight;
 }
 /* Assumes rq->lock is held */
-static void join_domain_rt(struct rq *rq)
+static void rq_online_rt(struct rq *rq)
 {
 	if (rq->rt.overloaded)
 		rt_set_overload(rq);
@@ -767,7 +779,7 @@ static void join_domain_rt(struct rq *rq)
 }
 
 /* Assumes rq->lock is held */
-static void leave_domain_rt(struct rq *rq)
+static void rq_offline_rt(struct rq *rq)
 {
 	if (rq->rt.overloaded)
 		rt_clear_overload(rq);
@@ -919,8 +931,8 @@ const struct sched_class rt_sched_class = {
 	.load_balance		= load_balance_rt,
 	.move_one_task		= move_one_task_rt,
 	.set_cpus_allowed       = set_cpus_allowed_rt,
-	.join_domain            = join_domain_rt,
-	.leave_domain           = leave_domain_rt,
+	.rq_online              = rq_online_rt,
+	.rq_offline             = rq_offline_rt,
 	.pre_schedule		= pre_schedule_rt,
 	.post_schedule		= post_schedule_rt,
 	.task_wake_up		= task_wake_up_rt,
