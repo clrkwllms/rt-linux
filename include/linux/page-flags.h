@@ -83,6 +83,8 @@
 #define PG_private		11	/* If pagecache, has fs-private data */
 
 #define PG_writeback		12	/* Page is under writeback */
+#define PG_nonewrefs		13	/* Block concurrent pagecache lookups
+					 * while testing refcount */
 #define PG_compound		14	/* Part of a compound page */
 #define PG_swapcache		15	/* Swap page: swp_entry_t in private */
 
@@ -260,6 +262,11 @@ static inline void __ClearPageTail(struct page *page)
 #define SetPageUncached(page)	set_bit(PG_uncached, &(page)->flags)
 #define ClearPageUncached(page)	clear_bit(PG_uncached, &(page)->flags)
 
+#define PageNoNewRefs(page)	test_bit(PG_nonewrefs, &(page)->flags)
+#define SetPageNoNewRefs(page)	set_bit(PG_nonewrefs, &(page)->flags)
+#define ClearPageNoNewRefs(page) clear_bit(PG_nonewrefs, &(page)->flags)
+#define __ClearPageNoNewRefs(page) __clear_bit(PG_nonewrefs, &(page)->flags)
+
 struct page;	/* forward declaration */
 
 extern void cancel_dirty_page(struct page *page, unsigned int account_size);
@@ -270,6 +277,27 @@ int test_set_page_writeback(struct page *page);
 static inline void set_page_writeback(struct page *page)
 {
 	test_set_page_writeback(page);
+}
+
+static inline void set_page_nonewrefs(struct page *page)
+{
+	preempt_disable();
+	SetPageNoNewRefs(page);
+	smp_wmb();
+}
+
+static inline void __clear_page_nonewrefs(struct page *page)
+{
+	smp_wmb();
+	__ClearPageNoNewRefs(page);
+	preempt_enable();
+}
+
+static inline void clear_page_nonewrefs(struct page *page)
+{
+	smp_wmb();
+	ClearPageNoNewRefs(page);
+	preempt_enable();
 }
 
 #endif	/* PAGE_FLAGS_H */

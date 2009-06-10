@@ -12,6 +12,8 @@
 #include <asm/uaccess.h>
 #include <linux/gfp.h>
 #include <linux/bitops.h>
+#include <linux/page-flags.h>
+#include <linux/hardirq.h> /* for in_interrupt() */
 
 /*
  * Bits in mapping->flags.  The lower __GFP_BITS_SHIFT bits are the page
@@ -61,6 +63,109 @@ static inline void mapping_set_gfp_mask(struct address_space *m, gfp_t mask)
 #define page_cache_get(page)		get_page(page)
 #define page_cache_release(page)	put_page(page)
 void release_pages(struct page **pages, int nr, int cold);
+
+/*
+ * speculatively take a reference to a page.
+ * If the page is free (_count == 0), then _count is untouched, and 0
+ * is returned. Otherwise, _count is incremented by 1 and 1 is returned.
+ *
+ * This function must be run in the same rcu_read_lock() section as has
+ * been used to lookup the page in the pagecache radix-tree: this allows
+ * allocators to use a synchronize_rcu() to stabilize _count.
+ *
+ * Unless an RCU grace period has passed, the count of all pages coming out
+ * of the allocator must be considered unstable. page_count may return higher
+ * than expected, and put_page must be able to do the right thing when the
+ * page has been finished with (because put_page is what is used to drop an
+ * invalid speculative reference).
+ *
+ * After incrementing the refcount, this function spins until PageNoNewRefs
+ * is clear, then a read memory barrier is issued.
+ *
+ * This forms the core of the lockless pagecache locking protocol, where
+ * the lookup-side (eg. find_get_page) has the following pattern:
+ * 1. find page in radix tree
+ * 2. conditionally increment refcount
+ * 3. wait for PageNoNewRefs
+ * 4. check the page is still in pagecache
+ *
+ * Remove-side (that cares about _count, eg. reclaim) has the following:
+ * A. SetPageNoNewRefs
+ * B. check refcount is correct
+ * C. remove page
+ * D. ClearPageNoNewRefs
+ *
+ * There are 2 critical interleavings that matter:
+ * - 2 runs before B: in this case, B sees elevated refcount and bails out
+ * - B runs before 2: in this case, 3 ensures 4 will not run until *after* C
+ *   (after D, even). In which case, 4 will notice C and lookup side can retry
+ *
+ * It is possible that between 1 and 2, the page is removed then the exact same
+ * page is inserted into the same position in pagecache. That's OK: the
+ * old find_get_page using tree_lock could equally have run before or after
+ * the write-side, depending on timing.
+ *
+ * Pagecache insertion isn't a big problem: either 1 will find the page or
+ * it will not. Likewise, the old find_get_page could run either before the
+ * insertion or afterwards, depending on timing.
+ */
+static inline int page_cache_get_speculative(struct page *page)
+{
+	VM_BUG_ON(in_interrupt());
+
+#ifndef CONFIG_SMP
+# ifdef CONFIG_PREEMPT
+	VM_BUG_ON(!in_atomic());
+# endif
+	/*
+	 * Preempt must be disabled here - we rely on rcu_read_lock doing
+	 * this for us.
+	 *
+	 * Pagecache won't be truncated from interrupt context, so if we have
+	 * found a page in the radix tree here, we have pinned its refcount by
+	 * disabling preempt, and hence no need for the "speculative get" that
+	 * SMP requires.
+	 */
+	VM_BUG_ON(page_count(page) == 0);
+	atomic_inc(&page->_count);
+
+#else
+	if (unlikely(!get_page_unless_zero(page)))
+		return 0; /* page has been freed */
+
+	/*
+	 * Note that get_page_unless_zero provides a memory barrier.
+	 * This is needed to ensure PageNoNewRefs is evaluated after the
+	 * page refcount has been raised. See below comment.
+	 */
+
+	while (unlikely(PageNoNewRefs(page)))
+		cpu_relax();
+
+	/*
+	 * smp_rmb is to ensure the load of page->flags (for PageNoNewRefs())
+	 * is performed before a future load used to ensure the page is
+	 * the correct on (usually: page->mapping and page->index).
+	 *
+	 * Those places that set PageNoNewRefs have the following pattern:
+	 * 	SetPageNoNewRefs(page)
+	 * 	wmb();
+	 * 	if (page_count(page) == X)
+	 * 		remove page from pagecache
+	 * 	wmb();
+	 * 	ClearPageNoNewRefs(page)
+	 *
+	 * If the load was out of order, page->mapping might be loaded before
+	 * the page is removed from pagecache but PageNoNewRefs evaluated
+	 * after the ClearPageNoNewRefs().
+	 */
+	smp_rmb();
+
+#endif
+	VM_BUG_ON(PageCompound(page) && (struct page *)page_private(page) != page);
+
+	return 1;
+}
 
 #ifdef CONFIG_NUMA
 extern struct page *__page_cache_alloc(gfp_t gfp);
