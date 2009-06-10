@@ -29,8 +29,8 @@ EXPORT_SYMBOL_GPL(nf_conntrack_chain);
 ATOMIC_NOTIFIER_HEAD(nf_ct_expect_chain);
 EXPORT_SYMBOL_GPL(nf_ct_expect_chain);
 
-DEFINE_PER_CPU(struct nf_conntrack_ecache, nf_conntrack_ecache);
-EXPORT_PER_CPU_SYMBOL_GPL(nf_conntrack_ecache);
+DEFINE_PER_CPU_LOCKED(struct nf_conntrack_ecache, nf_conntrack_ecache);
+EXPORT_PER_CPU_LOCKED_SYMBOL_GPL(nf_conntrack_ecache);
 
 /* deliver cached events and clear cache entry - must be called with locally
  * disabled softirqs */
@@ -52,22 +52,22 @@ __nf_ct_deliver_cached_events(struct nf_conntrack_ecache *ecache)
 void nf_ct_deliver_cached_events(const struct nf_conn *ct)
 {
 	struct nf_conntrack_ecache *ecache;
+	int cpu;
 
 	local_bh_disable();
-	ecache = &__get_cpu_var(nf_conntrack_ecache);
+	ecache = &get_cpu_var_locked(nf_conntrack_ecache, &cpu);
 	if (ecache->ct == ct)
 		__nf_ct_deliver_cached_events(ecache);
+	put_cpu_var_locked(nf_conntrack_ecache, cpu);
 	local_bh_enable();
 }
 EXPORT_SYMBOL_GPL(nf_ct_deliver_cached_events);
 
 /* Deliver cached events for old pending events, if current conntrack != old */
-void __nf_ct_event_cache_init(struct nf_conn *ct)
+void
+__nf_ct_event_cache_init(struct nf_conntrack_ecache *ecache, struct nf_conn *ct)
 {
-	struct nf_conntrack_ecache *ecache;
-
 	/* take care of delivering potentially old events */
-	ecache = &__get_cpu_var(nf_conntrack_ecache);
 	BUG_ON(ecache->ct == ct);
 	if (ecache->ct)
 		__nf_ct_deliver_cached_events(ecache);
@@ -85,7 +85,7 @@ void nf_ct_event_cache_flush(void)
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
-		ecache = &per_cpu(nf_conntrack_ecache, cpu);
+		ecache = &__get_cpu_var_locked(nf_conntrack_ecache, cpu);
 		if (ecache->ct)
 			nf_ct_put(ecache->ct);
 	}
