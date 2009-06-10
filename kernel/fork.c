@@ -1206,6 +1206,10 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->lock_count = 0;
 #endif
 
+#ifdef CONFIG_PREEMPT_RT
+	p->reader_lock_count = 0;
+#endif
+
 	if (pid != &init_struct_pid) {
 		retval = -ENOMEM;
 		pid = alloc_pid(task_active_pid_ns(p));

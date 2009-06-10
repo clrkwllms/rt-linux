@@ -1038,6 +1038,8 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 	struct rt_mutex *mutex = &rwm->mutex;
 	struct rt_mutex_waiter *waiter;
 	struct task_struct *mtxowner;
+	int reader_count, i;
+	int incr = 1;
 
 	assert_spin_locked(&mutex->wait_lock);
 
@@ -1047,6 +1049,16 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 	/* is the owner a writer? */
 	if (unlikely(rt_rwlock_writer(rwm)))
 		return 0;
+
+	/* check to see if we don't already own this lock */
+	for (i = current->reader_lock_count - 1; i >= 0; i--) {
+		if (current->owned_read_locks[i].lock == rwm) {
+			rt_rwlock_set_owner(rwm, RT_RW_READER, 0);
+			current->owned_read_locks[i].count++;
+			incr = 0;
+			goto taken;
+		}
+	}
 
 	/* A writer is not the owner, but is a writer waiting */
 	mtxowner = rt_mutex_owner(mutex);
@@ -1103,6 +1115,14 @@ static int try_to_take_rw_read(struct rw_mutex *rwm, int mtx)
 	/* RT_RW_READER forces slow paths */
 	rt_rwlock_set_owner(rwm, RT_RW_READER, 0);
  taken:
+	if (incr) {
+		reader_count = current->reader_lock_count++;
+		if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
+			current->owned_read_locks[reader_count].lock = rwm;
+			current->owned_read_locks[reader_count].count = 1;
+		} else
+			WARN_ON_ONCE(1);
+	}
 	rt_mutex_deadlock_account_lock(mutex, current);
 	atomic_inc(&rwm->count);
 	return 1;
@@ -1256,10 +1276,13 @@ rt_read_fastlock(struct rw_mutex *rwm,
 		 void fastcall (*slowfn)(struct rw_mutex *rwm, int mtx),
 		 int mtx)
 {
-retry:
+ retry:
 	if (likely(rt_rwlock_cmpxchg(rwm, NULL, current))) {
+		int reader_count;
+
 		rt_mutex_deadlock_account_lock(&rwm->mutex, current);
 		atomic_inc(&rwm->count);
+		smp_mb();
 		/*
 		 * It is possible that the owner was zeroed
 		 * before we incremented count. If owner is not
@@ -1269,6 +1292,13 @@ retry:
 			atomic_dec(&rwm->count);
 			goto retry;
 		}
+
+		reader_count = current->reader_lock_count++;
+		if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
+			current->owned_read_locks[reader_count].lock = rwm;
+			current->owned_read_locks[reader_count].count = 1;
+		} else
+			WARN_ON_ONCE(1);
 	} else
 		slowfn(rwm, mtx);
 }
@@ -1308,6 +1338,8 @@ rt_read_fasttrylock(struct rw_mutex *rwm,
 {
 retry:
 	if (likely(rt_rwlock_cmpxchg(rwm, NULL, current))) {
+		int reader_count;
+
 		rt_mutex_deadlock_account_lock(&rwm->mutex, current);
 		atomic_inc(&rwm->count);
 		/*
@@ -1319,6 +1351,13 @@ retry:
 			atomic_dec(&rwm->count);
 			goto retry;
 		}
+
+		reader_count = current->reader_lock_count++;
+		if (likely(reader_count < MAX_RWLOCK_DEPTH)) {
+			current->owned_read_locks[reader_count].lock = rwm;
+			current->owned_read_locks[reader_count].count = 1;
+		} else
+			WARN_ON_ONCE(1);
 		return 1;
 	} else
 		return slowfn(rwm, mtx);
@@ -1502,9 +1541,10 @@ static void fastcall noinline __sched
 rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 {
 	struct rt_mutex *mutex = &rwm->mutex;
+	struct rt_mutex_waiter *waiter;
 	unsigned long flags;
 	int savestate = !mtx;
-	struct rt_mutex_waiter *waiter;
+	int i;
 
 	spin_lock_irqsave(&mutex->wait_lock, flags);
 
@@ -1518,6 +1558,18 @@ rt_read_slowunlock(struct rw_mutex *rwm, int mtx)
 	 * worry that it changed.
 	 */
 	mark_rt_rwlock_check(rwm);
+
+	for (i = current->reader_lock_count - 1; i >= 0; i--) {
+		if (current->owned_read_locks[i].lock == rwm) {
+			current->owned_read_locks[i].count--;
+			if (!current->owned_read_locks[i].count) {
+				current->reader_lock_count--;
+				WARN_ON_ONCE(i != current->reader_lock_count);
+			}
+			break;
+		}
+	}
+	WARN_ON_ONCE(i < 0);
 
 	/*
 	 * If there are more readers, let the last one do any wakeups.
@@ -1580,9 +1632,15 @@ rt_read_fastunlock(struct rw_mutex *rwm,
 	WARN_ON(!atomic_read(&rwm->count));
 	WARN_ON(!rwm->owner);
 	atomic_dec(&rwm->count);
-	if (likely(rt_rwlock_cmpxchg(rwm, current, NULL)))
+	if (likely(rt_rwlock_cmpxchg(rwm, current, NULL))) {
+		int reader_count = --current->reader_lock_count;
 		rt_mutex_deadlock_account_unlock(current);
-	else
+		if (unlikely(reader_count < 0)) {
+			    reader_count = 0;
+			    WARN_ON_ONCE(1);
+		}
+		WARN_ON_ONCE(current->owned_read_locks[reader_count].lock != rwm);
+	} else
 		slowfn(rwm, mtx);
 }
 
