@@ -923,7 +923,7 @@ static int __cpuinit cpu_callback(struct notifier_block *nfb,
 		for (i = 0; i < MAX_SOFTIRQ; i++) {
 			p = kthread_create(ksoftirqd,
 					   &per_cpu(ksoftirqd, hotcpu)[i],
-					   "softirq-%s/%d", softirq_names[i],
+					   "sirq-%s/%d", softirq_names[i],
 					   hotcpu);
 			if (IS_ERR(p)) {
 				printk("ksoftirqd %d for %i failed\n", i,
