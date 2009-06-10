@@ -27,6 +27,7 @@ vmlinux*
 !vmlinux.lds.S
 System.map
 Module.symvers
+Module.markers
 !.gitignore
 
 #
