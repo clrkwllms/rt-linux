@@ -500,9 +500,9 @@ void free_irq(unsigned int irq, void *dev_id)
 			 * parallel with our fake
 			 */
 			if (action->flags & IRQF_SHARED) {
-				local_irq_save(flags);
+				local_irq_save_nort(flags);
 				action->handler(irq, dev_id);
-				local_irq_restore(flags);
+				local_irq_restore_nort(flags);
 			}
 #endif
 			kfree(action);
@@ -594,9 +594,9 @@ int request_irq(unsigned int irq, irq_handler_t handler,
 		 */
 		unsigned long flags;
 
-		local_irq_save(flags);
+		local_irq_save_nort(flags);
 		handler(irq, dev_id);
-		local_irq_restore(flags);
+		local_irq_restore_nort(flags);
 	}
 #endif
 
@@ -614,6 +614,11 @@ int hardirq_preemption = 1;
 
 EXPORT_SYMBOL(hardirq_preemption);
 
+/*
+ * Real-Time Preemption depends on hardirq threading:
+ */
+#ifndef CONFIG_PREEMPT_RT
+
 static int __init hardirq_preempt_setup (char *str)
 {
 	if (!strncmp(str, "off", 3))
@@ -628,6 +633,7 @@ static int __init hardirq_preempt_setup (char *str)
 
 __setup("hardirq-preempt=", hardirq_preempt_setup);
 
+#endif
 
 /*
  * threaded simple handler
@@ -787,12 +793,16 @@ static int do_irqd(void * __desc)
 	sys_sched_setscheduler(current->pid, SCHED_FIFO, &param);
 
 	while (!kthread_should_stop()) {
-		local_irq_disable();
+		local_irq_disable_nort();
 		set_current_state(TASK_INTERRUPTIBLE);
+#ifndef CONFIG_PREEMPT_RT
 		irq_enter();
+#endif
 		do_hardirq(desc);
+#ifndef CONFIG_PREEMPT_RT
 		irq_exit();
-		local_irq_enable();
+#endif
+		local_irq_enable_nort();
 		cond_resched();
 #ifdef CONFIG_SMP
 		/*

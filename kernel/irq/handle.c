@@ -54,12 +54,13 @@ struct irq_desc irq_desc[NR_IRQS] __cacheline_aligned_in_smp = {
 		.chip = &no_irq_chip,
 		.handle_irq = handle_bad_irq,
 		.depth = 1,
-		.lock = __SPIN_LOCK_UNLOCKED(irq_desc->lock),
+		.lock = RAW_SPIN_LOCK_UNLOCKED(irq_desc),
 #ifdef CONFIG_SMP
 		.affinity = CPU_MASK_ALL
 #endif
 	}
 };
+EXPORT_SYMBOL_GPL(irq_desc);
 
 /*
  * What should we do if we get a hw irq event on an illegal vector?
@@ -248,6 +249,13 @@ fastcall unsigned int __do_IRQ(unsigned int irq)
 		desc->chip->end(irq);
 		return 1;
 	}
+	/*
+	 * If the task is currently running in user mode, don't
+	 * detect soft lockups.  If CONFIG_DETECT_SOFTLOCKUP is not
+	 * configured, this should be optimized out.
+	 */
+	if (user_mode(get_irq_regs()))
+		touch_softlockup_watchdog();
 
 	spin_lock(&desc->lock);
 	if (desc->chip->ack)

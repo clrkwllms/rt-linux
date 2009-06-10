@@ -59,9 +59,8 @@ static int misrouted_irq(int irq)
 			}
 			action = action->next;
 		}
-		local_irq_disable();
 		/* Now clean up the flags */
-		spin_lock(&desc->lock);
+		spin_lock_irq(&desc->lock);
 		action = desc->action;
 
 		/*
