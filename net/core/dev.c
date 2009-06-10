@@ -2267,7 +2267,7 @@ out:
 
 softnet_break:
 	__get_cpu_var(netdev_rx_stat).time_squeeze++;
-	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
+	raise_softirq_irqoff(NET_RX_SOFTIRQ);
 	goto out;
 }
 
