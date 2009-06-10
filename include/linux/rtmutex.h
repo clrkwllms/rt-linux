@@ -31,7 +31,9 @@ struct rt_mutex {
 	int			save_state;
 	const char 		*name, *file;
 	int			line;
-	void			*magic;
+#endif
+#ifdef CONFIG_RTMUTEX_CHECK
+	unsigned long		magic;
 #endif
 };
 
@@ -62,10 +64,31 @@ struct hrtimer_sleeper;
 # define rt_mutex_debug_task_free(t)			do { } while (0)
 #endif
 
+#ifdef CONFIG_RTMUTEX_CHECK
+#define RT_MUTEX_CHECK_MAGIC  0x52544d58 /* RTMX */
+# define __RT_MUTEX_CHECK_INIT \
+	, .magic = RT_MUTEX_CHECK_MAGIC
+# define rt_mutex_magic_check(lock) \
+	WARN_ON_ONCE((lock)->magic != RT_MUTEX_CHECK_MAGIC);
+static inline void check_rt_mutex_init(struct rt_mutex *lock)
+{
+	lock->magic = RT_MUTEX_CHECK_MAGIC;
+}
+#else
+# define __RT_MUTEX_CHECK_INIT
+static inline void rt_mutex_magic_check(struct rt_mutex *lock)
+{
+}
+static inline void check_rt_mutex_init(struct rt_mutex *lock)
+{
+}
+#endif
+
 #define __RT_MUTEX_INITIALIZER(mutexname) \
 	{ .wait_lock = RAW_SPIN_LOCK_UNLOCKED(mutexname) \
 	, .wait_list = PLIST_HEAD_INIT(mutexname.wait_list, &mutexname.wait_lock) \
 	, .owner = NULL \
+	__RT_MUTEX_CHECK_INIT	\
 	__DEBUG_RT_MUTEX_INITIALIZER(mutexname)}
 
 #define DEFINE_RT_MUTEX(mutexname) \

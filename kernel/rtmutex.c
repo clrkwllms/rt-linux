@@ -950,6 +950,7 @@ rt_spin_lock_slowunlock(struct rt_mutex *lock)
 
 void __lockfunc rt_spin_lock(spinlock_t *lock)
 {
+	rt_spinlock_magic_check(lock);
 	spin_acquire(&lock->dep_map, 0, 0, _RET_IP_);
 	LOCK_CONTENDED_RT(lock, rt_mutex_trylock, __rt_spin_lock);
 }
@@ -965,6 +966,7 @@ EXPORT_SYMBOL(__rt_spin_lock);
 
 void __lockfunc rt_spin_lock_nested(spinlock_t *lock, int subclass)
 {
+	rt_spinlock_magic_check(lock);
 	spin_acquire(&lock->dep_map, subclass, 0, _RET_IP_);
 	LOCK_CONTENDED_RT(lock, rt_mutex_trylock, __rt_spin_lock);
 }
@@ -974,6 +976,7 @@ EXPORT_SYMBOL(rt_spin_lock_nested);
 
 void __lockfunc rt_spin_unlock(spinlock_t *lock)
 {
+	rt_spinlock_magic_check(lock);
 	/* NOTE: we always pass in '1' for nested, for simplicity */
 	spin_release(&lock->dep_map, 1, _RET_IP_);
 	rt_spin_lock_fastunlock(&lock->lock, rt_spin_lock_slowunlock);
@@ -1002,6 +1005,8 @@ int __lockfunc rt_spin_trylock(spinlock_t *lock)
 {
 	int ret = rt_mutex_trylock(&lock->lock);
 
+	rt_spinlock_magic_check(lock);
+
 	if (ret)
 		spin_acquire(&lock->dep_map, 0, 1, _RET_IP_);
 
@@ -1012,6 +1017,8 @@ EXPORT_SYMBOL(rt_spin_trylock);
 int __lockfunc rt_spin_trylock_irqsave(spinlock_t *lock, unsigned long *flags)
 {
 	int ret;
+
+	rt_spinlock_magic_check(lock);
 
 	*flags = 0;
 	ret = rt_mutex_trylock(&lock->lock);
@@ -1024,6 +1031,8 @@ EXPORT_SYMBOL(rt_spin_trylock_irqsave);
 
 int _atomic_dec_and_spin_lock(spinlock_t *lock, atomic_t *atomic)
 {
+	rt_spinlock_magic_check(lock);
+
 	/* Subtract 1 from counter unless that drops it to 0 (ie. it was 1) */
 	if (atomic_add_unless(atomic, -1, 1))
 		return 0;
@@ -1046,6 +1055,7 @@ __rt_spin_lock_init(spinlock_t *lock, char *name, struct lock_class_key *key)
 	lockdep_init_map(&lock->dep_map, name, key, 0);
 #endif
 	__rt_mutex_init(&lock->lock, name);
+	check_rt_spin_lock_init(lock);
 }
 EXPORT_SYMBOL(__rt_spin_lock_init);
 
@@ -1486,11 +1496,13 @@ rt_read_fastlock(struct rw_mutex *rwm,
 
 void fastcall rt_mutex_down_read(struct rw_mutex *rwm)
 {
+	rt_mutex_magic_check(&rwm->mutex);
 	rt_read_fastlock(rwm, rt_read_slowlock, 1);
 }
 
 void fastcall rt_rwlock_read_lock(struct rw_mutex *rwm)
 {
+	rt_rwlock_magic_check(&rwm->mutex);
 	rt_read_fastlock(rwm, rt_read_slowlock, 0);
 }
 
@@ -1650,11 +1662,13 @@ rt_write_fastlock(struct rw_mutex *rwm,
 
 void fastcall rt_mutex_down_write(struct rw_mutex *rwm)
 {
+	rt_mutex_magic_check(&rwm->mutex);
 	rt_write_fastlock(rwm, rt_write_slowlock, 1);
 }
 
 void fastcall rt_rwlock_write_lock(struct rw_mutex *rwm)
 {
+	rt_rwlock_magic_check(&rwm->mutex);
 	rt_write_fastlock(rwm, rt_write_slowlock, 0);
 }
 
@@ -1890,11 +1904,13 @@ rt_read_fastunlock(struct rw_mutex *rwm,
 
 void fastcall rt_mutex_up_read(struct rw_mutex *rwm)
 {
+	rt_mutex_magic_check(&rwm->mutex);
 	rt_read_fastunlock(rwm, rt_read_slowunlock, 1);
 }
 
 void fastcall rt_rwlock_read_unlock(struct rw_mutex *rwm)
 {
+	rt_rwlock_magic_check(&rwm->mutex);
 	rt_read_fastunlock(rwm, rt_read_slowunlock, 0);
 }
 
@@ -2031,11 +2047,13 @@ rt_write_fastunlock(struct rw_mutex *rwm,
 
 void fastcall rt_mutex_up_write(struct rw_mutex *rwm)
 {
+	rt_mutex_magic_check(&rwm->mutex);
 	rt_write_fastunlock(rwm, rt_write_slowunlock, 1);
 }
 
 void fastcall rt_rwlock_write_unlock(struct rw_mutex *rwm)
 {
+	rt_rwlock_magic_check(&rwm->mutex);
 	rt_write_fastunlock(rwm, rt_write_slowunlock, 0);
 }
 
@@ -2052,6 +2070,7 @@ rt_mutex_downgrade_write(struct rw_mutex *rwm)
 	unsigned long flags;
 	int reader_count;
 
+	rt_mutex_magic_check(&rwm->mutex);
 	spin_lock_irqsave(&mutex->wait_lock, flags);
 	init_rw_lists(rwm);
 
@@ -2523,6 +2542,7 @@ void __sched rt_mutex_lock(struct rt_mutex *lock)
 {
 	might_sleep();
 
+	rt_mutex_magic_check(lock);
 	rt_mutex_fastlock(lock, TASK_UNINTERRUPTIBLE, 0, rt_mutex_slowlock);
 }
 EXPORT_SYMBOL_GPL(rt_mutex_lock);
@@ -2543,6 +2563,7 @@ int __sched rt_mutex_lock_interruptible(struct rt_mutex *lock,
 {
 	might_sleep();
 
+	rt_mutex_magic_check(lock);
 	return rt_mutex_fastlock(lock, TASK_INTERRUPTIBLE,
 				 detect_deadlock, rt_mutex_slowlock);
 }
@@ -2569,6 +2590,7 @@ rt_mutex_timed_lock(struct rt_mutex *lock, struct hrtimer_sleeper *timeout,
 {
 	might_sleep();
 
+	rt_mutex_magic_check(lock);
 	return rt_mutex_timed_fastlock(lock, TASK_INTERRUPTIBLE, timeout,
 				       detect_deadlock, rt_mutex_slowlock);
 }
@@ -2594,6 +2616,7 @@ EXPORT_SYMBOL_GPL(rt_mutex_trylock);
  */
 void __sched rt_mutex_unlock(struct rt_mutex *lock)
 {
+	rt_mutex_magic_check(lock);
 	rt_mutex_fastunlock(lock, rt_mutex_slowunlock);
 }
 EXPORT_SYMBOL_GPL(rt_mutex_unlock);
@@ -2608,9 +2631,10 @@ EXPORT_SYMBOL_GPL(rt_mutex_unlock);
  */
 void rt_mutex_destroy(struct rt_mutex *lock)
 {
+	rt_mutex_magic_check(lock);
 	WARN_ON(rt_mutex_is_locked(lock));
-#ifdef CONFIG_DEBUG_RT_MUTEXES
-	lock->magic = NULL;
+#ifdef CONFIG_RTMUTEX_CHECK
+	lock->magic = 0;
 #endif
 }
 
@@ -2632,6 +2656,7 @@ void __rt_mutex_init(struct rt_mutex *lock, const char *name)
 	plist_head_init(&lock->wait_list, &lock->wait_lock);
 
 	debug_rt_mutex_init(lock, name);
+	check_rt_mutex_init(lock);
 }
 EXPORT_SYMBOL_GPL(__rt_mutex_init);
 
@@ -2665,6 +2690,7 @@ void rt_mutex_init_proxy_locked(struct rt_mutex *lock,
 void rt_mutex_proxy_unlock(struct rt_mutex *lock,
 			   struct task_struct *proxy_owner)
 {
+	rt_mutex_magic_check(lock);
 	debug_rt_mutex_proxy_unlock(lock);
 	rt_mutex_set_owner(lock, NULL, 0);
 	rt_mutex_deadlock_account_unlock(proxy_owner);
@@ -2684,6 +2710,7 @@ void rt_mutex_proxy_unlock(struct rt_mutex *lock,
  */
 struct task_struct *rt_mutex_next_owner(struct rt_mutex *lock)
 {
+	rt_mutex_magic_check(lock);
 	if (!rt_mutex_has_waiters(lock))
 		return NULL;
 

@@ -165,7 +165,10 @@ EXPORT_SYMBOL(_mutex_unlock);
  */
 int __lockfunc rt_write_trylock(rwlock_t *rwlock)
 {
-	int ret = rt_mutex_down_write_trylock(&rwlock->owners);
+	int ret;
+
+	rt_rwlock_magic_check(&rwlock->owners.mutex);
+	ret = rt_mutex_down_write_trylock(&rwlock->owners);
 
 	if (ret)
 		rwlock_acquire(&rwlock->dep_map, 0, 1, _RET_IP_);
@@ -176,6 +179,7 @@ EXPORT_SYMBOL(rt_write_trylock);
 
 int __lockfunc rt_write_trylock_irqsave(rwlock_t *rwlock, unsigned long *flags)
 {
+	rt_rwlock_magic_check(&rwlock->owners.mutex);
 	*flags = 0;
 	return rt_write_trylock(rwlock);
 }
@@ -185,6 +189,7 @@ int __lockfunc rt_read_trylock(rwlock_t *rwlock)
 {
 	int ret;
 
+	rt_rwlock_magic_check(&rwlock->owners.mutex);
 	ret = rt_mutex_down_read_trylock(&rwlock->owners);
 	if (ret)
 		rwlock_acquire_read(&rwlock->dep_map, 0, 1, _RET_IP_);
@@ -249,6 +254,7 @@ void __rt_rwlock_init(rwlock_t *rwlock, char *name, struct lock_class_key *key)
 	lockdep_init_map(&rwlock->dep_map, name, key, 0);
 #endif
 	rt_mutex_rwsem_init(&rwlock->owners, name);
+	check_rt_rwlock_init(&rwlock->owners.mutex);
 }
 EXPORT_SYMBOL(__rt_rwlock_init);
 
@@ -281,8 +287,10 @@ EXPORT_SYMBOL(rt_downgrade_write);
 
 int fastcall rt_down_write_trylock(struct rw_semaphore *rwsem)
 {
-	int ret = rt_mutex_down_write_trylock(&rwsem->owners);
+	int ret;
 
+	rt_mutex_magic_check(&rwsem->owners.mutex);
+	ret = rt_mutex_down_write_trylock(&rwsem->owners);
 	if (ret)
 		rwsem_acquire(&rwsem->dep_map, 0, 1, _RET_IP_);
 	return ret;
@@ -311,6 +319,7 @@ int fastcall rt_down_read_trylock(struct rw_semaphore *rwsem)
 {
 	int ret;
 
+	rt_mutex_magic_check(&rwsem->owners.mutex);
 	ret = rt_mutex_down_read_trylock(&rwsem->owners);
 	if (ret)
 		rwsem_acquire(&rwsem->dep_map, 0, 1, _RET_IP_);
@@ -403,6 +412,7 @@ int fastcall rt_down_trylock(struct semaphore *sem)
 	 * embedded mutex internally. It would be quite complex to remove
 	 * these transient failures so lets try it the simple way first:
 	 */
+	rt_mutex_magic_check(&sem->lock);
 	if (rt_mutex_trylock(&sem->lock)) {
 		__down_complete(sem);
 		return 0;
@@ -419,6 +429,7 @@ void fastcall rt_up(struct semaphore *sem)
 	 * Disable preemption to make sure a highprio trylock-er cannot
 	 * preempt us here and get into an infinite loop:
 	 */
+	rt_mutex_magic_check(&sem->lock);
 	preempt_disable();
 	count = atomic_inc_return(&sem->count);
 	/*

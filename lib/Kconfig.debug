@@ -192,6 +192,19 @@ config DEBUG_RT_MUTEXES
 	 When realtime preemption is enabled this includes spinlocks,
 	 rwlocks, mutexes and (rw)semaphores
 
+config RTMUTEX_CHECK
+	bool "RT Mutex integrity checker"
+	depends on PREEMPT_RT
+	default y
+	help
+	  When PREEMPT_RT is configured, most spinlocks and semaphores
+	  are converted into mutexes. There still exists true spin locks
+	  and old style semaphores. There are places in the kernel that
+	  passes the lock via pointer and typecasts it back. This
+	  can circumvent the compiler conversions. This option will add
+	  a magic number to all converted locks and check to make sure
+	  the lock is appropriate for the function being used.
+
 config DEBUG_PI_LIST
 	bool
 	default y

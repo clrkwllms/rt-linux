@@ -27,15 +27,47 @@ typedef struct {
 #endif
 } spinlock_t;
 
-#ifdef CONFIG_DEBUG_RT_MUTEXES
-# define __RT_SPIN_INITIALIZER(name)					\
-	{ .wait_lock = _RAW_SPIN_LOCK_UNLOCKED(name.wait_lock),		\
-	  .save_state = 1,						\
-	  .file = __FILE__,						\
-	  .line = __LINE__, }
+#ifdef CONFIG_RTMUTEX_CHECK
+#define RT_SPIN_CHECK_MAGIC  0x52545350 /* RTSP */
+# define __RT_SPIN_CHECK_INIT	, .magic = RT_SPIN_CHECK_MAGIC
+# define rt_spinlock_magic_check(mutex) \
+	WARN_ON_ONCE((mutex)->lock.magic != RT_SPIN_CHECK_MAGIC)
+
+# define rt_rwlock_magic_check(lock) \
+	WARN_ON_ONCE((lock)->magic != RT_SPIN_CHECK_MAGIC);
+static inline void check_rt_spin_lock_init(spinlock_t *lock)
+{
+	lock->lock.magic = RT_SPIN_CHECK_MAGIC;
+}
+static inline void check_rt_rwlock_init(struct rt_mutex *lock)
+{
+	lock->magic = RT_SPIN_CHECK_MAGIC;
+}
 #else
-# define __RT_SPIN_INITIALIZER(name)					\
-	{ .wait_lock = _RAW_SPIN_LOCK_UNLOCKED(name.wait_lock) }
+# define __RT_SPIN_CHECK_INIT
+static inline void rt_spinlock_magic_check(spinlock_t *lock)
+{ }
+static inline void rt_rwlock_magic_check(struct rt_mutex *lock)
+{ }
+static inline void check_rt_spin_lock_init(spinlock_t *lock)
+{ }
+static inline void check_rt_rwlock_init(struct rt_mutex *lock)
+{ }
+#endif
+
+#ifdef CONFIG_DEBUG_RT_MUTEXES
+# define __RT_SPIN_INITIALIZER(name)				\
+	{ .wait_lock = _RAW_SPIN_LOCK_UNLOCKED(name.wait_lock),	\
+	  .save_state = 1,					\
+	  .file = __FILE__,					\
+	  .line = __LINE__					\
+	  __RT_SPIN_CHECK_INIT }
+
+#else
+# define __RT_SPIN_INITIALIZER(name)				\
+	{							\
+	  .wait_lock = _RAW_SPIN_LOCK_UNLOCKED(name.wait_lock)	\
+	  __RT_SPIN_CHECK_INIT }
 #endif
 
 #define __SPIN_LOCK_UNLOCKED(name) (spinlock_t)				\
