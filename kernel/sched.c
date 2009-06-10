@@ -1545,9 +1545,6 @@ static int try_to_wake_up(struct task_struct *p, unsigned int state, int sync)
 	unsigned long flags;
 	long old_state;
 	struct rq *rq;
-#ifdef CONFIG_SMP
-	int new_cpu;
-#endif
 
 	rq = task_rq_lock(p, &flags);
 	old_state = p->state;
@@ -1565,9 +1562,9 @@ static int try_to_wake_up(struct task_struct *p, unsigned int state, int sync)
 	if (unlikely(task_running(rq, p)))
 		goto out_activate;
 
-	new_cpu = p->sched_class->select_task_rq(p, sync);
-	if (new_cpu != cpu) {
-		set_task_cpu(p, new_cpu);
+	cpu = p->sched_class->select_task_rq(p, sync);
+	if (cpu != orig_cpu) {
+		set_task_cpu(p, cpu);
 		task_rq_unlock(rq, &flags);
 		/* might preempt at this point */
 		rq = task_rq_lock(p, &flags);
@@ -1594,9 +1591,7 @@ static int try_to_wake_up(struct task_struct *p, unsigned int state, int sync)
 			}
 		}
 	}
-
 #endif
-
 
 out_activate:
 #endif /* CONFIG_SMP */
