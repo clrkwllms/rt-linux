@@ -10,10 +10,12 @@
 EXPORT_SYMBOL(mcount);
 #endif
 
-EXPORT_SYMBOL(__down_failed);
-EXPORT_SYMBOL(__down_failed_interruptible);
-EXPORT_SYMBOL(__down_failed_trylock);
-EXPORT_SYMBOL(__up_wakeup);
+#ifdef CONFIG_ASM_SEMAPHORES
+EXPORT_SYMBOL(__compat_down_failed);
+EXPORT_SYMBOL(__compat_down_failed_interruptible);
+EXPORT_SYMBOL(__compat_down_failed_trylock);
+EXPORT_SYMBOL(__compat_up_wakeup);
+#endif
 /* Networking helper routines. */
 EXPORT_SYMBOL(csum_partial_copy_generic);
 
@@ -28,7 +30,7 @@ EXPORT_SYMBOL(__put_user_8);
 
 EXPORT_SYMBOL(strstr);
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) && defined(CONFIG_ASM_SEMAPHORES)
 extern void FASTCALL( __write_lock_failed(rwlock_t *rw));
 extern void FASTCALL( __read_lock_failed(rwlock_t *rw));
 EXPORT_SYMBOL(__write_lock_failed);

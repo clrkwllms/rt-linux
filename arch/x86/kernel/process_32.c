@@ -113,7 +113,7 @@ void default_idle(void)
 		smp_mb();
 
 		local_irq_disable();
-		if (!need_resched())
+		if (!need_resched() && !need_resched_delayed())
 			safe_halt();	/* enables interrupts racelessly */
 		else
 			local_irq_enable();
@@ -178,7 +178,7 @@ void cpu_idle(void)
 	/* endless idle loop with no priority at all */
 	while (1) {
 		tick_nohz_stop_sched_tick();
-		while (!need_resched()) {
+		while (!need_resched() && !need_resched_delayed()) {
 			void (*idle)(void);
 
 			if (__get_cpu_var(cpu_idle_state))
@@ -201,7 +201,7 @@ void cpu_idle(void)
 			start_critical_timings();
 		}
 		tick_nohz_restart_sched_tick();
-		preempt_enable_no_resched();
+		__preempt_enable_no_resched();
 		schedule();
 		preempt_disable();
 	}
@@ -260,10 +260,10 @@ EXPORT_SYMBOL_GPL(cpu_idle_wait);
  */
 void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
 {
-	if (!need_resched()) {
+	if (!need_resched() && !need_resched_delayed()) {
 		__monitor((void *)&current_thread_info()->flags, 0, 0);
 		smp_mb();
-		if (!need_resched())
+		if (!need_resched() && !need_resched_delayed())
 			__mwait(eax, ecx);
 	}
 }

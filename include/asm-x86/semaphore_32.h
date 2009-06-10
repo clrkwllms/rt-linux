@@ -3,8 +3,6 @@
 
 #include <linux/linkage.h>
 
-#ifdef __KERNEL__
-
 /*
  * SMP- and interrupt-safe semaphores..
  *
@@ -41,29 +39,39 @@
 #include <linux/wait.h>
 #include <linux/rwsem.h>
 
-struct semaphore {
+/*
+ * On !PREEMPT_RT all semaphores are compat:
+ */
+#ifndef CONFIG_PREEMPT_RT
+# define compat_semaphore semaphore
+#endif
+
+struct compat_semaphore {
 	atomic_t count;
 	int sleepers;
 	wait_queue_head_t wait;
 };
 
 
-#define __SEMAPHORE_INITIALIZER(name, n)				\
+#define __COMPAT_SEMAPHORE_INITIALIZER(name, n)				\
 {									\
 	.count		= ATOMIC_INIT(n),				\
 	.sleepers	= 0,						\
 	.wait		= __WAIT_QUEUE_HEAD_INITIALIZER((name).wait)	\
 }
 
-#define __DECLARE_SEMAPHORE_GENERIC(name,count) \
-	struct semaphore name = __SEMAPHORE_INITIALIZER(name,count)
+#define __COMPAT_MUTEX_INITIALIZER(name) \
+	__COMPAT_SEMAPHORE_INITIALIZER(name,1)
 
-#define DECLARE_MUTEX(name) __DECLARE_SEMAPHORE_GENERIC(name,1)
+#define __COMPAT_DECLARE_SEMAPHORE_GENERIC(name,count) \
+	struct compat_semaphore name = __COMPAT_SEMAPHORE_INITIALIZER(name,count)
 
-static inline void sema_init (struct semaphore *sem, int val)
+#define COMPAT_DECLARE_MUTEX(name) __COMPAT_DECLARE_SEMAPHORE_GENERIC(name,1)
+
+static inline void compat_sema_init (struct compat_semaphore *sem, int val)
 {
 /*
- *	*sem = (struct semaphore)__SEMAPHORE_INITIALIZER((*sem),val);
+ *	*sem = (struct compat_semaphore)__SEMAPHORE_INITIALIZER((*sem),val);
  *
  * i'd rather use the more flexible initialization above, but sadly
  * GCC 2.7.2.3 emits a bogus warning. EGCS doesn't. Oh well.
@@ -73,27 +81,27 @@ static inline void sema_init (struct semaphore *sem, int val)
 	init_waitqueue_head(&sem->wait);
 }
 
-static inline void init_MUTEX (struct semaphore *sem)
+static inline void compat_init_MUTEX (struct compat_semaphore *sem)
 {
-	sema_init(sem, 1);
+	compat_sema_init(sem, 1);
 }
 
-static inline void init_MUTEX_LOCKED (struct semaphore *sem)
+static inline void compat_init_MUTEX_LOCKED (struct compat_semaphore *sem)
 {
-	sema_init(sem, 0);
+	compat_sema_init(sem, 0);
 }
 
-fastcall void __down_failed(void /* special register calling convention */);
-fastcall int  __down_failed_interruptible(void  /* params in registers */);
-fastcall int  __down_failed_trylock(void  /* params in registers */);
-fastcall void __up_wakeup(void /* special register calling convention */);
+fastcall void __compat_down_failed(void /* special register calling convention */);
+fastcall int  __compat_down_failed_interruptible(void  /* params in registers */);
+fastcall int  __compat_down_failed_trylock(void  /* params in registers */);
+fastcall void __compat_up_wakeup(void /* special register calling convention */);
 
 /*
  * This is ugly, but we want the default case to fall through.
  * "__down_failed" is a special asm handler that calls the C
  * routine that actually waits. See arch/i386/kernel/semaphore.c
  */
-static inline void down(struct semaphore * sem)
+static inline void compat_down(struct compat_semaphore * sem)
 {
 	might_sleep();
 	__asm__ __volatile__(
@@ -101,7 +109,7 @@ static inline void down(struct semaphore * sem)
 		LOCK_PREFIX "decl %0\n\t"     /* --sem->count */
 		"jns 2f\n"
 		"\tlea %0,%%eax\n\t"
-		"call __down_failed\n"
+		"call __compat_down_failed\n"
 		"2:"
 		:"+m" (sem->count)
 		:
@@ -112,7 +120,7 @@ static inline void down(struct semaphore * sem)
  * Interruptible try to acquire a semaphore.  If we obtained
  * it, return zero.  If we were interrupted, returns -EINTR
  */
-static inline int down_interruptible(struct semaphore * sem)
+static inline int compat_down_interruptible(struct compat_semaphore * sem)
 {
 	int result;
 
@@ -123,7 +131,7 @@ static inline int down_interruptible(struct semaphore * sem)
 		LOCK_PREFIX "decl %1\n\t"     /* --sem->count */
 		"jns 2f\n\t"
 		"lea %1,%%eax\n\t"
-		"call __down_failed_interruptible\n"
+		"call __compat_down_failed_interruptible\n"
 		"2:"
 		:"=&a" (result), "+m" (sem->count)
 		:
@@ -135,7 +143,7 @@ static inline int down_interruptible(struct semaphore * sem)
  * Non-blockingly attempt to down() a semaphore.
  * Returns zero if we acquired it
  */
-static inline int down_trylock(struct semaphore * sem)
+static inline int compat_down_trylock(struct compat_semaphore * sem)
 {
 	int result;
 
@@ -145,7 +153,7 @@ static inline int down_trylock(struct semaphore * sem)
 		LOCK_PREFIX "decl %1\n\t"     /* --sem->count */
 		"jns 2f\n\t"
 		"lea %1,%%eax\n\t"
-		"call __down_failed_trylock\n\t"
+		"call __compat_down_failed_trylock\n\t"
 		"2:\n"
 		:"=&a" (result), "+m" (sem->count)
 		:
@@ -157,19 +165,24 @@ static inline int down_trylock(struct semaphore * sem)
  * Note! This is subtle. We jump to wake people up only if
  * the semaphore was negative (== somebody was waiting on it).
  */
-static inline void up(struct semaphore * sem)
+static inline void compat_up(struct compat_semaphore * sem)
 {
 	__asm__ __volatile__(
 		"# atomic up operation\n\t"
 		LOCK_PREFIX "incl %0\n\t"     /* ++sem->count */
 		"jg 1f\n\t"
 		"lea %0,%%eax\n\t"
-		"call __up_wakeup\n"
+		"call __compat_up_wakeup\n"
 		"1:"
 		:"+m" (sem->count)
 		:
 		:"memory","ax");
 }
 
-#endif
+extern int FASTCALL(compat_sem_is_locked(struct compat_semaphore *sem));
+
+#define compat_sema_count(sem) atomic_read(&(sem)->count)
+
+#include <linux/semaphore.h>
+
 #endif

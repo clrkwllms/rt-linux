@@ -783,7 +783,7 @@ static int apm_do_idle(void)
 		 */
 		smp_mb();
 	}
-	if (!need_resched()) {
+	if (!need_resched() && !need_resched_delayed()) {
 		idled = 1;
 		ret = apm_bios_call_simple(APM_FUNC_IDLE, 0, 0, &eax);
 	}

@@ -44,15 +44,15 @@
 
 struct rwsem_waiter;
 
-extern struct rw_semaphore *FASTCALL(rwsem_down_read_failed(struct rw_semaphore *sem));
-extern struct rw_semaphore *FASTCALL(rwsem_down_write_failed(struct rw_semaphore *sem));
-extern struct rw_semaphore *FASTCALL(rwsem_wake(struct rw_semaphore *));
-extern struct rw_semaphore *FASTCALL(rwsem_downgrade_wake(struct rw_semaphore *sem));
+extern struct compat_rw_semaphore *FASTCALL(rwsem_down_read_failed(struct compat_rw_semaphore *sem));
+extern struct compat_rw_semaphore *FASTCALL(rwsem_down_write_failed(struct compat_rw_semaphore *sem));
+extern struct compat_rw_semaphore *FASTCALL(rwsem_wake(struct compat_rw_semaphore *));
+extern struct compat_rw_semaphore *FASTCALL(rwsem_downgrade_wake(struct compat_rw_semaphore *sem));
 
 /*
  * the semaphore definition
  */
-struct rw_semaphore {
+struct compat_rw_semaphore {
 	signed long		count;
 #define RWSEM_UNLOCKED_VALUE		0x00000000
 #define RWSEM_ACTIVE_BIAS		0x00000001
@@ -78,23 +78,23 @@ struct rw_semaphore {
 { RWSEM_UNLOCKED_VALUE, __SPIN_LOCK_UNLOCKED((name).wait_lock), \
   LIST_HEAD_INIT((name).wait_list) __RWSEM_DEP_MAP_INIT(name) }
 
-#define DECLARE_RWSEM(name) \
-	struct rw_semaphore name = __RWSEM_INITIALIZER(name)
+#define COMPAT_DECLARE_RWSEM(name) \
+	struct compat_rw_semaphore name = __RWSEM_INITIALIZER(name)
 
-extern void __init_rwsem(struct rw_semaphore *sem, const char *name,
+extern void __compat_init_rwsem(struct rw_semaphore *sem, const char *name,
 			 struct lock_class_key *key);
 
-#define init_rwsem(sem)						\
+#define compat_init_rwsem(sem)					\
 do {								\
 	static struct lock_class_key __key;			\
 								\
-	__init_rwsem((sem), #sem, &__key);			\
+	__compat_init_rwsem((sem), #sem, &__key);		\
 } while (0)
 
 /*
  * lock for reading
  */
-static inline void __down_read(struct rw_semaphore *sem)
+static inline void __down_read(struct compat_rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"# beginning down_read\n\t"
@@ -111,7 +111,7 @@ LOCK_PREFIX	"  incl      (%%eax)\n\t" /* adds 0x00000001, returns the old value 
 /*
  * trylock for reading -- returns 1 if successful, 0 if contention
  */
-static inline int __down_read_trylock(struct rw_semaphore *sem)
+static inline int __down_read_trylock(struct compat_rw_semaphore *sem)
 {
 	__s32 result, tmp;
 	__asm__ __volatile__(
@@ -134,7 +134,8 @@ LOCK_PREFIX	"  cmpxchgl  %2,%0\n\t"
 /*
  * lock for writing
  */
-static inline void __down_write_nested(struct rw_semaphore *sem, int subclass)
+static inline void
+__down_write_nested(struct compat_rw_semaphore *sem, int subclass)
 {
 	int tmp;
 
@@ -160,7 +161,7 @@ static inline void __down_write(struct rw_semaphore *sem)
 /*
  * trylock for writing -- returns 1 if successful, 0 if contention
  */
-static inline int __down_write_trylock(struct rw_semaphore *sem)
+static inline int __down_write_trylock(struct compat_rw_semaphore *sem)
 {
 	signed long ret = cmpxchg(&sem->count,
 				  RWSEM_UNLOCKED_VALUE, 
@@ -173,7 +174,7 @@ static inline int __down_write_trylock(struct rw_semaphore *sem)
 /*
  * unlock after reading
  */
-static inline void __up_read(struct rw_semaphore *sem)
+static inline void __up_read(struct compat_rw_semaphore *sem)
 {
 	__s32 tmp = -RWSEM_ACTIVE_READ_BIAS;
 	__asm__ __volatile__(
@@ -191,7 +192,7 @@ LOCK_PREFIX	"  xadd      %%edx,(%%eax)\n\t" /* subtracts 1, returns the old valu
 /*
  * unlock after writing
  */
-static inline void __up_write(struct rw_semaphore *sem)
+static inline void __up_write(struct compat_rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"# beginning __up_write\n\t"
@@ -209,7 +210,7 @@ LOCK_PREFIX	"  xaddl     %%edx,(%%eax)\n\t" /* tries to transition 0xffff0001 ->
 /*
  * downgrade write lock to read lock
  */
-static inline void __downgrade_write(struct rw_semaphore *sem)
+static inline void __downgrade_write(struct compat_rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"# beginning __downgrade_write\n\t"
@@ -226,7 +227,7 @@ LOCK_PREFIX	"  addl      %2,(%%eax)\n\t" /* transitions 0xZZZZ0001 -> 0xYYYY0001
 /*
  * implement atomic add functionality
  */
-static inline void rwsem_atomic_add(int delta, struct rw_semaphore *sem)
+static inline void rwsem_atomic_add(int delta, struct compat_rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 LOCK_PREFIX	"addl %1,%0"
@@ -237,7 +238,7 @@ LOCK_PREFIX	"addl %1,%0"
 /*
  * implement exchange and add functionality
  */
-static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
+static inline int rwsem_atomic_update(int delta, struct compat_rw_semaphore *sem)
 {
 	int tmp = delta;
 
@@ -249,7 +250,7 @@ LOCK_PREFIX	"xadd %0,%1"
 	return tmp+delta;
 }
 
-static inline int rwsem_is_locked(struct rw_semaphore *sem)
+static inline int compat_rwsem_is_locked(struct rw_semaphore *sem)
 {
 	return (sem->count != 0);
 }

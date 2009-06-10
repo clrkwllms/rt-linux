@@ -27,12 +27,12 @@
  * (the type definitions are in asm/spinlock_types.h)
  */
 
-static inline int __raw_spin_is_locked(raw_spinlock_t *x)
+static inline int __raw_spin_is_locked(__raw_spinlock_t *x)
 {
 	return *(volatile signed char *)(&(x)->slock) <= 0;
 }
 
-static inline void __raw_spin_lock(raw_spinlock_t *lock)
+static inline void __raw_spin_lock(__raw_spinlock_t *lock)
 {
 	asm volatile("\n1:\t"
 		     LOCK_PREFIX " ; decb %0\n\t"
@@ -55,7 +55,7 @@ static inline void __raw_spin_lock(raw_spinlock_t *lock)
  * irq-traced, but on CONFIG_TRACE_IRQFLAGS we never use this variant.
  */
 #ifndef CONFIG_PROVE_LOCKING
-static inline void __raw_spin_lock_flags(raw_spinlock_t *lock, unsigned long flags)
+static inline void __raw_spin_lock_flags(__raw_spinlock_t *lock, unsigned long flags)
 {
 	asm volatile(
 		"\n1:\t"
@@ -84,7 +84,7 @@ static inline void __raw_spin_lock_flags(raw_spinlock_t *lock, unsigned long fla
 }
 #endif
 
-static inline int __raw_spin_trylock(raw_spinlock_t *lock)
+static inline int __raw_spin_trylock(__raw_spinlock_t *lock)
 {
 	char oldval;
 	asm volatile(
@@ -103,14 +103,14 @@ static inline int __raw_spin_trylock(raw_spinlock_t *lock)
 
 #if !defined(CONFIG_X86_OOSTORE) && !defined(CONFIG_X86_PPRO_FENCE)
 
-static inline void __raw_spin_unlock(raw_spinlock_t *lock)
+static inline void __raw_spin_unlock(__raw_spinlock_t *lock)
 {
 	asm volatile("movb $1,%0" : "+m" (lock->slock) :: "memory");
 }
 
 #else
 
-static inline void __raw_spin_unlock(raw_spinlock_t *lock)
+static inline void __raw_spin_unlock(__raw_spinlock_t *lock)
 {
 	char oldval = 1;
 
@@ -121,7 +121,7 @@ static inline void __raw_spin_unlock(raw_spinlock_t *lock)
 
 #endif
 
-static inline void __raw_spin_unlock_wait(raw_spinlock_t *lock)
+static inline void __raw_spin_unlock_wait(__raw_spinlock_t *lock)
 {
 	while (__raw_spin_is_locked(lock))
 		cpu_relax();
@@ -152,7 +152,7 @@ static inline void __raw_spin_unlock_wait(raw_spinlock_t *lock)
  * read_can_lock - would read_trylock() succeed?
  * @lock: the rwlock in question.
  */
-static inline int __raw_read_can_lock(raw_rwlock_t *x)
+static inline int __raw_read_can_lock(__raw_rwlock_t *x)
 {
 	return (int)(x)->lock > 0;
 }
@@ -161,12 +161,12 @@ static inline int __raw_read_can_lock(raw_rwlock_t *x)
  * write_can_lock - would write_trylock() succeed?
  * @lock: the rwlock in question.
  */
-static inline int __raw_write_can_lock(raw_rwlock_t *x)
+static inline int __raw_write_can_lock(__raw_rwlock_t *x)
 {
 	return (x)->lock == RW_LOCK_BIAS;
 }
 
-static inline void __raw_read_lock(raw_rwlock_t *rw)
+static inline void __raw_read_lock(__raw_rwlock_t *rw)
 {
 	asm volatile(LOCK_PREFIX " subl $1,(%0)\n\t"
 		     "jns 1f\n"
@@ -175,7 +175,7 @@ static inline void __raw_read_lock(raw_rwlock_t *rw)
 		     ::"a" (rw) : "memory");
 }
 
-static inline void __raw_write_lock(raw_rwlock_t *rw)
+static inline void __raw_write_lock(__raw_rwlock_t *rw)
 {
 	asm volatile(LOCK_PREFIX " subl $" RW_LOCK_BIAS_STR ",(%0)\n\t"
 		     "jz 1f\n"
@@ -184,7 +184,7 @@ static inline void __raw_write_lock(raw_rwlock_t *rw)
 		     ::"a" (rw) : "memory");
 }
 
-static inline int __raw_read_trylock(raw_rwlock_t *lock)
+static inline int __raw_read_trylock(__raw_rwlock_t *lock)
 {
 	atomic_t *count = (atomic_t *)lock;
 	atomic_dec(count);
@@ -194,7 +194,7 @@ static inline int __raw_read_trylock(raw_rwlock_t *lock)
 	return 0;
 }
 
-static inline int __raw_write_trylock(raw_rwlock_t *lock)
+static inline int __raw_write_trylock(__raw_rwlock_t *lock)
 {
 	atomic_t *count = (atomic_t *)lock;
 	if (atomic_sub_and_test(RW_LOCK_BIAS, count))
@@ -203,19 +203,19 @@ static inline int __raw_write_trylock(raw_rwlock_t *lock)
 	return 0;
 }
 
-static inline void __raw_read_unlock(raw_rwlock_t *rw)
+static inline void __raw_read_unlock(__raw_rwlock_t *rw)
 {
 	asm volatile(LOCK_PREFIX "incl %0" :"+m" (rw->lock) : : "memory");
 }
 
-static inline void __raw_write_unlock(raw_rwlock_t *rw)
+static inline void __raw_write_unlock(__raw_rwlock_t *rw)
 {
 	asm volatile(LOCK_PREFIX "addl $" RW_LOCK_BIAS_STR ", %0"
 				 : "+m" (rw->lock) : : "memory");
 }
 
-#define _raw_spin_relax(lock)	cpu_relax()
-#define _raw_read_relax(lock)	cpu_relax()
-#define _raw_write_relax(lock)	cpu_relax()
+#define __raw_spin_relax(lock)	cpu_relax()
+#define __raw_read_relax(lock)	cpu_relax()
+#define __raw_write_relax(lock)	cpu_relax()
 
 #endif /* __ASM_SPINLOCK_H */
