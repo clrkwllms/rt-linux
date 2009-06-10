@@ -132,6 +132,11 @@ irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action)
 	irqreturn_t ret, retval = IRQ_NONE;
 	unsigned int status = 0;
 
+#ifdef __i386__
+	if (debug_direct_keyboard && irq == 1)
+		lockdep_off();
+#endif
+
 	handle_dynamic_tick(action);
 
 	/*
@@ -163,8 +168,29 @@ irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action)
 	}
 	local_irq_disable();
 
+#ifdef __i386__
+	if (debug_direct_keyboard && irq == 1)
+		lockdep_on();
+#endif
 	return retval;
 }
+
+/*
+ * Hack - used for development only.
+ */
+int __read_mostly debug_direct_keyboard = 0;
+
+int __init debug_direct_keyboard_setup(char *str)
+{
+	debug_direct_keyboard = 1;
+	printk(KERN_INFO "Switching IRQ 1 (keyboard) to to direct!\n");
+#ifdef CONFIG_PREEMPT_RT
+	printk(KERN_INFO "WARNING: kernel may easily crash this way!\n");
+#endif
+	return 1;
+}
+
+__setup("debug_direct_keyboard", debug_direct_keyboard_setup);
 
 int redirect_hardirq(struct irq_desc *desc)
 {
@@ -174,6 +200,11 @@ int redirect_hardirq(struct irq_desc *desc)
 	if (!hardirq_preemption || (desc->status & IRQ_NODELAY) ||
 							!desc->thread)
 		return 0;
+
+#ifdef __i386__
+	if (debug_direct_keyboard && (desc - irq_desc == 1))
+		return 0;
+#endif
 
 	BUG_ON(!irqs_disabled());
 	if (desc->thread && desc->thread->state != TASK_RUNNING)

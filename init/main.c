@@ -858,5 +858,7 @@ static int __init kernel_init(void * unused)
 	 * initmem segments and start the user-mode stuff..
 	 */
 	init_post();
+	WARN_ON(debug_direct_keyboard);
+
 	return 0;
 }
