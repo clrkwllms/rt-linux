@@ -279,25 +279,4 @@ static inline void set_page_writeback(struct page *page)
 	test_set_page_writeback(page);
 }
 
-static inline void set_page_nonewrefs(struct page *page)
-{
-	preempt_disable();
-	SetPageNoNewRefs(page);
-	smp_wmb();
-}
-
-static inline void __clear_page_nonewrefs(struct page *page)
-{
-	smp_wmb();
-	__ClearPageNoNewRefs(page);
-	preempt_enable();
-}
-
-static inline void clear_page_nonewrefs(struct page *page)
-{
-	smp_wmb();
-	ClearPageNoNewRefs(page);
-	preempt_enable();
-}
-
 #endif	/* PAGE_FLAGS_H */

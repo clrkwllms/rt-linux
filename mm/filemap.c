@@ -144,9 +144,11 @@ void remove_from_page_cache(struct page *page)
 
 	BUG_ON(!PageLocked(page));
 
-	spin_lock_irq(&mapping->tree_lock);
+	lock_page_ref_irq(page);
+	spin_lock(&mapping->tree_lock);
 	__remove_from_page_cache(page);
-	spin_unlock_irq(&mapping->tree_lock);
+	spin_unlock(&mapping->tree_lock);
+	unlock_page_ref_irq(page);
 }
 
 static int sync_page(void *word)
@@ -456,8 +458,8 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 	int error = radix_tree_preload(gfp_mask & ~__GFP_HIGHMEM);
 
 	if (error == 0) {
-		set_page_nonewrefs(page);
-		spin_lock_irq(&mapping->tree_lock);
+		lock_page_ref_irq(page);
+		spin_lock(&mapping->tree_lock);
 		error = radix_tree_insert(&mapping->page_tree, offset, page);
 		if (!error) {
 			page_cache_get(page);
@@ -467,8 +469,8 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 			mapping_nrpages_inc(mapping);
 			__inc_zone_page_state(page, NR_FILE_PAGES);
 		}
-		spin_unlock_irq(&mapping->tree_lock);
-		clear_page_nonewrefs(page);
+		spin_unlock(&mapping->tree_lock);
+		unlock_page_ref_irq(page);
 		radix_tree_preload_end();
 	}
 	return error;

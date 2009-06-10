@@ -385,8 +385,8 @@ int remove_mapping(struct address_space *mapping, struct page *page)
 	BUG_ON(!PageLocked(page));
 	BUG_ON(mapping != page_mapping(page));
 
-	set_page_nonewrefs(page);
-	spin_lock_irq(&mapping->tree_lock);
+	lock_page_ref_irq(page);
+	spin_lock(&mapping->tree_lock);
 	/*
 	 * The non racy check for a busy page.
 	 *
@@ -421,22 +421,22 @@ int remove_mapping(struct address_space *mapping, struct page *page)
 	if (PageSwapCache(page)) {
 		swp_entry_t swap = { .val = page_private(page) };
 		__delete_from_swap_cache(page);
-		spin_unlock_irq(&mapping->tree_lock);
+		spin_unlock(&mapping->tree_lock);
 		swap_free(swap);
 		goto free_it;
 	}
 
 	__remove_from_page_cache(page);
-	spin_unlock_irq(&mapping->tree_lock);
+	spin_unlock(&mapping->tree_lock);
 
 free_it:
-	__clear_page_nonewrefs(page);
+	unlock_page_ref_irq(page);
 	__put_page(page); /* The pagecache ref */
 	return 1;
 
 cannot_free:
-	spin_unlock_irq(&mapping->tree_lock);
-	clear_page_nonewrefs(page);
+	spin_unlock(&mapping->tree_lock);
+	unlock_page_ref_irq(page);
 	return 0;
 }
 

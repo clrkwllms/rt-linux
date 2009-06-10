@@ -303,16 +303,16 @@ static int migrate_page_move_mapping(struct address_space *mapping,
 		return 0;
 	}
 
-	set_page_nonewrefs(page);
-	spin_lock_irq(&mapping->tree_lock);
+	lock_page_ref_irq(page);
+	spin_lock(&mapping->tree_lock);
 
 	pslot = radix_tree_lookup_slot(&mapping->page_tree,
  					page_index(page));
 
 	if (page_count(page) != 2 + !!PagePrivate(page) ||
 			(struct page *)radix_tree_deref_slot(pslot) != page) {
-		spin_unlock_irq(&mapping->tree_lock);
-		clear_page_nonewrefs(page);
+		spin_unlock(&mapping->tree_lock);
+		unlock_page_ref_irq(page);
 		return -EAGAIN;
 	}
 
@@ -329,14 +329,7 @@ static int migrate_page_move_mapping(struct address_space *mapping,
 
 	radix_tree_replace_slot(pslot, newpage);
 	page->mapping = NULL;
-  	spin_unlock_irq(&mapping->tree_lock);
-	clear_page_nonewrefs(page);
-
-	/*
-	 * Drop cache reference from old page.
-	 * We know this isn't the last reference.
-	 */
-	__put_page(page);
+  	spin_unlock(&mapping->tree_lock);
 
 	/*
 	 * If moved to a different zone then also account
@@ -350,6 +343,14 @@ static int migrate_page_move_mapping(struct address_space *mapping,
 	 */
 	__dec_zone_page_state(page, NR_FILE_PAGES);
 	__inc_zone_page_state(newpage, NR_FILE_PAGES);
+
+	unlock_page_ref_irq(page);
+
+	/*
+	 * Drop cache reference from old page.
+	 * We know this isn't the last reference.
+	 */
+	__put_page(page);
 
 	return 0;
 }

@@ -14,6 +14,7 @@
 #include <linux/bitops.h>
 #include <linux/page-flags.h>
 #include <linux/hardirq.h> /* for in_interrupt() */
+#include <linux/bit_spinlock.h>
 
 /*
  * Bits in mapping->flags.  The lower __GFP_BITS_SHIFT bits are the page
@@ -63,6 +64,47 @@ static inline void mapping_set_gfp_mask(struct address_space *m, gfp_t mask)
 #define page_cache_get(page)		get_page(page)
 #define page_cache_release(page)	put_page(page)
 void release_pages(struct page **pages, int nr, int cold);
+
+static inline void lock_page_ref(struct page *page)
+{
+	bit_spin_lock(PG_nonewrefs, &page->flags);
+	smp_wmb();
+}
+
+static inline void unlock_page_ref(struct page *page)
+{
+	bit_spin_unlock(PG_nonewrefs, &page->flags);
+}
+
+static inline void wait_on_page_ref(struct page *page)
+{
+	while (unlikely(test_bit(PG_nonewrefs, &page->flags)))
+		cpu_relax();
+}
+
+#define lock_page_ref_irq(page)					\
+	do {							\
+		local_irq_disable();				\
+		lock_page_ref(page);				\
+	} while (0)
+
+#define unlock_page_ref_irq(page)				\
+	do {							\
+		unlock_page_ref(page);				\
+		local_irq_enable();				\
+	} while (0)
+
+#define lock_page_ref_irqsave(page, flags)			\
+	do {							\
+		local_irq_save(flags);				\
+		lock_page_ref(page);				\
+	} while (0)
+
+#define unlock_page_ref_irqrestore(page, flags)			\
+	do {							\
+		unlock_page_ref(page);				\
+		local_irq_restore(flags);			\
+	} while (0)
 
 /*
  * speculatively take a reference to a page.
@@ -139,8 +181,7 @@ static inline int page_cache_get_speculative(struct page *page)
 	 * page refcount has been raised. See below comment.
 	 */
 
-	while (unlikely(PageNoNewRefs(page)))
-		cpu_relax();
+	wait_on_page_ref(page);
 
 	/*
 	 * smp_rmb is to ensure the load of page->flags (for PageNoNewRefs())
