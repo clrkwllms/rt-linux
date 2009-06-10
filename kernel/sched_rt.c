@@ -707,7 +707,7 @@ static void post_schedule_rt(struct rq *rq)
 static void task_wake_up_rt(struct rq *rq, struct task_struct *p)
 {
 	if (!task_running(rq, p) &&
-	    (p->prio >= rq->rt.highest_prio) &&
+	    !test_tsk_need_resched(rq->curr) &&
 	    rq->rt.overloaded) {
 		push_rt_tasks(rq);
  		schedstat_inc(rq, rto_wakeup);
