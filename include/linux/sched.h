@@ -1070,6 +1070,8 @@ struct task_struct {
 	unsigned long long it_sched_expires;
 	struct list_head cpu_timers[3];
 
+	struct task_struct* posix_timer_list;
+
 /* process credentials */
 	uid_t uid,euid,suid,fsuid;
 	gid_t gid,egid,sgid,fsgid;
