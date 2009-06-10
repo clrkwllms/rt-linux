@@ -459,6 +459,7 @@ static void inline
 __tasklet_common_schedule(struct tasklet_struct *t, struct tasklet_head *head, unsigned int nr)
 {
 	if (tasklet_trylock(t)) {
+again:
 		/* We may have been preempted before tasklet_trylock
 		 * and __tasklet_action may have already run.
 		 * So double check the sched bit while the takslet
@@ -469,8 +470,21 @@ __tasklet_common_schedule(struct tasklet_struct *t, struct tasklet_head *head, u
 			t->next = head->list;
 			head->list = t;
 			raise_softirq_irqoff(nr);
+			tasklet_unlock(t);
+		} else {
+			/* This is subtle. If we hit the corner case above
+			 * It is possible that we get preempted right here,
+			 * and another task has successfully called
+			 * tasklet_schedule(), then this function, and
+			 * failed on the trylock. Thus we must be sure
+			 * before releasing the tasklet lock, that the
+			 * SCHED_BIT is clear. Otherwise the tasklet
+			 * may get its SCHED_BIT set, but not added to the
+			 * list
+			 */
+			if (!tasklet_tryunlock(t))
+				goto again;
 		}
-		tasklet_unlock(t);
 	}
 }
 
