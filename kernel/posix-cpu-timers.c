@@ -1296,6 +1296,12 @@ void __run_posix_cpu_timers(struct task_struct *tsk)
 	 * Double-check with locks held.
 	 */
 	read_lock(&tasklist_lock);
+	/* Make sure the task doesn't exit under us. */
+	if (unlikely(tsk->exit_state)) {
+		read_unlock(&tasklist_lock);
+		return;
+	}
+
 	if (likely(tsk->signal != NULL)) {
 		spin_lock(&tsk->sighand->siglock);
 
@@ -1424,7 +1430,7 @@ void run_posix_cpu_timers(struct task_struct *tsk)
 
 	if (UNEXPIRED(prof) && UNEXPIRED(virt) &&
 	    (tsk->it_sched_expires == 0 ||
-	     tsk->sum_exec_runtime < tsk->it_sched_expires))
+	     tsk->se.sum_exec_runtime < tsk->it_sched_expires))
 		return;
 
 #undef	UNEXPIRED
