@@ -435,6 +435,10 @@ config CC_OPTIMIZE_FOR_SIZE
 config SYSCTL
 	bool
 
+config RADIX_TREE_CONCURRENT
+	bool "Enable concurrent radix tree operations (EXPERIMENTAL)"
+	default y if SMP
+
 menuconfig EMBEDDED
 	bool "Configure standard kernel features (for small systems)"
 	help

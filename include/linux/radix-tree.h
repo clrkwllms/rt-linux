@@ -62,23 +62,65 @@ struct radix_tree_root {
 	unsigned int		height;
 	gfp_t			gfp_mask;
 	struct radix_tree_node	*rnode;
+	spinlock_t		lock;
 };
 
 #define RADIX_TREE_INIT(mask)	{					\
 	.height = 0,							\
 	.gfp_mask = (mask),						\
 	.rnode = NULL,							\
+	.lock = __SPIN_LOCK_UNLOCKED(radix_tree_root.lock),		\
 }
 
 #define RADIX_TREE(name, mask) \
 	struct radix_tree_root name = RADIX_TREE_INIT(mask)
 
-#define INIT_RADIX_TREE(root, mask)					\
-do {									\
-	(root)->height = 0;						\
-	(root)->gfp_mask = (mask);					\
-	(root)->rnode = NULL;						\
-} while (0)
+static inline void INIT_RADIX_TREE(struct radix_tree_root *root, gfp_t gfp_mask)
+{
+	root->height = 0;
+	root->gfp_mask = gfp_mask;
+	root->rnode = NULL;
+	spin_lock_init(&root->lock);
+}
+
+struct radix_tree_context {
+	struct radix_tree_root	*tree;
+	struct radix_tree_root	*root;
+#ifdef CONFIG_RADIX_TREE_CONCURRENT
+	spinlock_t		*locked;
+#endif
+};
+
+#ifdef CONFIG_RADIX_TREE_CONCURRENT
+#define RADIX_CONTEXT_ROOT(context)					\
+	((struct radix_tree_root *)(((unsigned long)context) + 1))
+
+#define __RADIX_TREE_CONTEXT_INIT(context, _tree)			\
+		.tree = RADIX_CONTEXT_ROOT(&context),			\
+		.locked = NULL,
+#else
+#define __RADIX_TREE_CONTEXT_INIT(context, _tree)			\
+		.tree = (_tree),
+#endif
+
+#define DEFINE_RADIX_TREE_CONTEXT(context, _tree) 			\
+	struct radix_tree_context context = { 				\
+		.root = (_tree), 					\
+		__RADIX_TREE_CONTEXT_INIT(context, _tree)		\
+       	}
+
+static inline void
+init_radix_tree_context(struct radix_tree_context *ctx,
+		struct radix_tree_root *root)
+{
+	ctx->root = root;
+#ifdef CONFIG_RADIX_TREE_CONCURRENT
+	ctx->tree = RADIX_CONTEXT_ROOT(ctx);
+	ctx->locked = NULL;
+#else
+	ctx->tree = root;
+#endif
+}
 
 /**
  * Radix-tree synchronization
@@ -153,6 +195,29 @@ static inline void radix_tree_replace_slot(void **pslot, void *item)
 {
 	BUG_ON(radix_tree_is_indirect_ptr(item));
 	rcu_assign_pointer(*pslot, item);
+}
+
+static inline void radix_tree_lock(struct radix_tree_context *context)
+{
+	struct radix_tree_root *root = context->root;
+	rcu_read_lock();
+	spin_lock(&root->lock);
+#ifdef CONFIG_RADIX_TREE_CONCURRENT
+	BUG_ON(context->locked);
+	context->locked = &root->lock;
+#endif
+}
+
+static inline void radix_tree_unlock(struct radix_tree_context *context)
+{
+#ifdef CONFIG_RADIX_TREE_CONCURRENT
+	BUG_ON(!context->locked);
+	spin_unlock(context->locked);
+	context->locked = NULL;
+#else
+	spin_unlock(&context->root->lock);
+#endif
+	rcu_read_unlock();
 }
 
 int radix_tree_insert(struct radix_tree_root *, unsigned long, void *);
