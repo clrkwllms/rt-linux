@@ -1,6 +1,13 @@
 #ifndef __ASM_MACH_TX49XX_CPU_FEATURE_OVERRIDES_H
 #define __ASM_MACH_TX49XX_CPU_FEATURE_OVERRIDES_H
 
+/* finish_arch_switch_empty is defined if we know finish_arch_switch() will
+ * be empty, based on the lack of features defined in this file.  This is
+ * needed because config preempt will barf in kernel/sched.c ifdef
+ * finish_arch_switch
+ */
+#define finish_arch_switch_empty
+
 #define cpu_has_llsc	1
 #define cpu_has_64bits	1
 #define cpu_has_inclusive_pcaches	0

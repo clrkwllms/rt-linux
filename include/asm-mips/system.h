@@ -70,6 +70,8 @@ do {									\
 	(last) = resume(prev, next, task_thread_info(next));		\
 } while (0)
 
+/* preempt kernel barfs in kernel/sched.c ifdef finish_arch_switch */
+#ifndef finish_arch_switch_empty
 #define finish_arch_switch(prev)					\
 do {									\
 	if (cpu_has_dsp)						\
@@ -77,6 +79,7 @@ do {									\
 	if (cpu_has_userlocal)						\
 		write_c0_userlocal(current_thread_info()->tp_value);	\
 } while (0)
+#endif
 
 static inline unsigned long __xchg_u32(volatile int * m, unsigned int val)
 {
