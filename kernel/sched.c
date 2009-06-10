@@ -5837,6 +5837,9 @@ static void rq_attach_root(struct rq *rq, struct root_domain *rd)
 			if (class->leave_domain)
 				class->leave_domain(rq);
 
+		cpu_clear(rq->cpu, old_rd->span);
+		cpu_clear(rq->cpu, old_rd->online);
+
 		if (atomic_dec_and_test(&old_rd->refcount))
 			kfree(old_rd);
 	}
