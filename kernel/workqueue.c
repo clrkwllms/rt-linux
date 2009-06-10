@@ -670,6 +670,7 @@ out:
 
 	return err;
 }
+EXPORT_SYMBOL(schedule_on_each_cpu);
 
 /**
  * schedule_on_each_cpu_wq - call a function on each online CPU on a per-CPU wq
