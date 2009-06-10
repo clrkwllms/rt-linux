@@ -307,10 +307,12 @@ static void async_completed(struct urb *urb)
         struct async *as = urb->context;
         struct dev_state *ps = as->ps;
 	struct siginfo sinfo;
+	unsigned long flags;
 
-        spin_lock(&ps->lock);
-        list_move_tail(&as->asynclist, &ps->async_completed);
-        spin_unlock(&ps->lock);
+	spin_lock_irqsave(&ps->lock, flags);
+	list_move_tail(&as->asynclist, &ps->async_completed);
+	spin_unlock_irqrestore(&ps->lock, flags);
+
 	as->status = urb->status;
 	if (as->signr) {
 		sinfo.si_signo = as->signr;
