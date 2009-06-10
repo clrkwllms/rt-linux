@@ -33,9 +33,63 @@
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
 
+/*
+ * On PREEMPT_RT we don't want to disable preemption for cpu variables.
+ * We grab a cpu and then use that cpu to lock the variables accordingly.
+ */
+#ifdef CONFIG_PREEMPT_RT
+static DEFINE_PER_CPU_LOCKED(struct pagevec, lru_add_pvecs) = { 0, };
+static DEFINE_PER_CPU_LOCKED(struct pagevec, lru_add_active_pvecs) = { 0, };
+static DEFINE_PER_CPU_LOCKED(struct pagevec, lru_rotate_pvecs) = { 0, };
+
+#define swap_get_cpu_var_irq_save(var, flags, cpu)	\
+	({						\
+		(void)flags;				\
+		&get_cpu_var_locked(var, &cpu);		\
+	})
+#define swap_put_cpu_var_irq_restore(var, flags, cpu)	\
+	put_cpu_var_locked(var, cpu)
+#define swap_get_cpu_var(var, cpu) \
+	&get_cpu_var_locked(var, &cpu)
+#define swap_put_cpu_var(var, cpu)		\
+	put_cpu_var_locked(var, cpu)
+#define swap_per_cpu_lock(var, cpu)				\
+	({							\
+		spin_lock(&__get_cpu_lock(var, cpu));		\
+		&__get_cpu_var_locked(var, cpu);	\
+	})
+#define swap_per_cpu_unlock(var, cpu)			\
+		spin_unlock(&__get_cpu_lock(var, cpu));
+#define swap_get_cpu() raw_smp_processor_id();
+#define swap_put_cpu()
+#else
 static DEFINE_PER_CPU(struct pagevec, lru_add_pvecs) = { 0, };
 static DEFINE_PER_CPU(struct pagevec, lru_add_active_pvecs) = { 0, };
 static DEFINE_PER_CPU(struct pagevec, lru_rotate_pvecs) = { 0, };
+
+#define swap_get_cpu_var_irq_save(var, flags, cpu)	\
+	({						\
+		(void)cpu;				\
+		local_irq_save(flags);			\
+		&__get_cpu_var(var);			\
+	})
+#define swap_put_cpu_var_irq_restore(var, flags, cpu)	\
+	local_irq_restore(flags)
+#define swap_get_cpu_var(var, cpu) \
+	({ (void)cpu; &get_cpu_var(var); })
+#define swap_put_cpu_var(var, cpu)		\
+	do {					\
+		(void)cpu;			\
+		put_cpu_var(var);		\
+	} while(0)
+#define swap_per_cpu_lock(var, cpu)		\
+	&per_cpu(lru_add_pvecs, cpu)
+#define swap_per_cpu_unlock(var, cpu)		\
+	do { } while(0)
+#define swap_get_cpu()  get_cpu()
+#define swap_put_cpu() put_cpu();
+
+#endif /* CONFIG_PREEMPT_RT */
 
 /*
  * This path almost never happens for VM activity - pages are normally
@@ -139,6 +193,7 @@ int rotate_reclaimable_page(struct page *page)
 {
 	struct pagevec *pvec;
 	unsigned long flags;
+	int cpu;
 
 	if (PageLocked(page))
 		return 1;
@@ -150,11 +205,10 @@ int rotate_reclaimable_page(struct page *page)
 		return 1;
 
 	page_cache_get(page);
-	local_irq_save(flags);
-	pvec = &__get_cpu_var(lru_rotate_pvecs);
+	pvec = swap_get_cpu_var_irq_save(lru_rotate_pvecs, flags, cpu);
 	if (!pagevec_add(pvec, page))
 		pagevec_move_tail(pvec);
-	local_irq_restore(flags);
+	swap_put_cpu_var_irq_restore(lru_rotate_pvecs, flags, cpu);
 
 	if (!test_clear_page_writeback(page))
 		BUG();
@@ -204,22 +258,24 @@ EXPORT_SYMBOL(mark_page_accessed);
  */
 void fastcall lru_cache_add(struct page *page)
 {
-	struct pagevec *pvec = &get_cpu_var(lru_add_pvecs);
+	int cpu;
+	struct pagevec *pvec = swap_get_cpu_var(lru_add_pvecs, cpu);
 
 	page_cache_get(page);
 	if (!pagevec_add(pvec, page))
 		__pagevec_lru_add(pvec);
-	put_cpu_var(lru_add_pvecs);
+	swap_put_cpu_var(lru_add_pvecs, cpu);
 }
 
 void fastcall lru_cache_add_active(struct page *page)
 {
-	struct pagevec *pvec = &get_cpu_var(lru_add_active_pvecs);
+	int cpu;
+	struct pagevec *pvec = swap_get_cpu_var(lru_add_active_pvecs, cpu);
 
 	page_cache_get(page);
 	if (!pagevec_add(pvec, page))
 		__pagevec_lru_add_active(pvec);
-	put_cpu_var(lru_add_active_pvecs);
+	swap_put_cpu_var(lru_add_active_pvecs, cpu);
 }
 
 /*
@@ -231,15 +287,17 @@ static void drain_cpu_pagevecs(int cpu)
 {
 	struct pagevec *pvec;
 
-	pvec = &per_cpu(lru_add_pvecs, cpu);
+	pvec = swap_per_cpu_lock(lru_add_pvecs, cpu);
 	if (pagevec_count(pvec))
 		__pagevec_lru_add(pvec);
+	swap_per_cpu_unlock(lru_add_pvecs, cpu);
 
-	pvec = &per_cpu(lru_add_active_pvecs, cpu);
+	pvec = swap_per_cpu_lock(lru_add_active_pvecs, cpu);
 	if (pagevec_count(pvec))
 		__pagevec_lru_add_active(pvec);
+	swap_per_cpu_unlock(lru_add_active_pvecs, cpu);
 
-	pvec = &per_cpu(lru_rotate_pvecs, cpu);
+	pvec = swap_per_cpu_lock(lru_rotate_pvecs, cpu);
 	if (pagevec_count(pvec)) {
 		unsigned long flags;
 
@@ -248,12 +306,15 @@ static void drain_cpu_pagevecs(int cpu)
 		pagevec_move_tail(pvec);
 		local_irq_restore(flags);
 	}
+	swap_per_cpu_unlock(lru_rotate_pvecs, cpu);
 }
 
 void lru_add_drain(void)
 {
-	drain_cpu_pagevecs(get_cpu());
-	put_cpu();
+	int cpu;
+	cpu = swap_get_cpu();
+	drain_cpu_pagevecs(cpu);
+	swap_put_cpu();
 }
 
 #ifdef CONFIG_NUMA
