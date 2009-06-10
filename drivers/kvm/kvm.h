@@ -325,6 +325,7 @@ struct kvm_vcpu {
 	u64 pdptrs[4]; /* pae */
 	u64 shadow_efer;
 	u64 apic_base;
+	bool migrate_apic_timer;
 	struct kvm_lapic *apic;    /* kernel irqchip context */
 #define VCPU_MP_STATE_RUNNABLE          0
 #define VCPU_MP_STATE_UNINITIALIZED     1
@@ -773,6 +774,11 @@ static inline void fpu_init(void)
 static inline u32 get_rdx_init_val(void)
 {
 	return 0x600; /* P6 family */
+}
+
+static inline void kvm_migrate_apic_timer(struct kvm_vcpu *vcpu)
+{
+	vcpu->migrate_apic_timer = true;
 }
 
 #define ASM_VMX_VMCLEAR_RAX       ".byte 0x66, 0x0f, 0xc7, 0x30"

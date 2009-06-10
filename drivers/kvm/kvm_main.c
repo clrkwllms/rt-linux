@@ -2003,6 +2003,11 @@ again:
 	if (unlikely(r))
 		goto out;
 
+	if (vcpu->migrate_apic_timer) {
+		vcpu->migrate_apic_timer = false;
+		__kvm_migrate_apic_timer(vcpu);
+	}
+
 	preempt_disable();
 
 	kvm_x86_ops->prepare_guest_switch(vcpu);

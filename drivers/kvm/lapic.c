@@ -1065,7 +1065,7 @@ void kvm_apic_post_state_restore(struct kvm_vcpu *vcpu)
 	start_apic_timer(apic);
 }
 
-void kvm_migrate_apic_timer(struct kvm_vcpu *vcpu)
+void __kvm_migrate_apic_timer(struct kvm_vcpu *vcpu)
 {
 	struct kvm_lapic *apic = vcpu->apic;
 	struct hrtimer *timer;
