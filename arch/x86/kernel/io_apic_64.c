@@ -1509,6 +1509,15 @@ static void ack_apic_level(unsigned int irq)
 			move_masked_irq(irq);
 		unmask_IO_APIC_irq(irq);
 	}
+#if (defined(CONFIG_GENERIC_PENDING_IRQ) || defined(CONFIG_IRQBALANCE)) && \
+	defined(CONFIG_PREEMPT_HARDIRQS)
+	/*
+	 * With threaded interrupts, we always have IRQ_INPROGRESS
+	 * when acking.
+	 */
+	else if (unlikely(irq_desc[irq].status & IRQ_MOVE_PENDING))
+		move_masked_irq(irq);
+#endif
 }
 
 static struct irq_chip ioapic_chip __read_mostly = {
