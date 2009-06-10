@@ -123,6 +123,12 @@ static inline void mark_rt_rwlock_check(struct rw_mutex *rwm)
 #endif /* CONFIG_PREEMPT_RT */
 #endif
 
+#ifdef CONFIG_PREEMPT_RT
+#define task_is_reader(task) ((task) == RT_RW_READER)
+#else
+#define task_is_reader(task) (0)
+#endif
+
 int pi_initialized;
 
 /*
@@ -315,7 +321,7 @@ static int rt_mutex_adjust_prio_chain(struct task_struct *task,
 	/*
 	 * Readers are special. We may need to boost more than one owner.
 	 */
-	if (task == RT_RW_READER) {
+	if (task_is_reader(task)) {
 		ret = rt_mutex_adjust_readers(orig_lock, orig_waiter,
 					      top_task, lock,
 					      recursion_depth);
@@ -376,7 +382,7 @@ static inline int try_to_steal_lock(struct rt_mutex *lock, int mode)
 	if (pendowner == current)
 		return 1;
 
-	WARN_ON(rt_mutex_owner(lock) == RT_RW_READER);
+	WARN_ON(task_is_reader(rt_mutex_owner(lock)));
 
 	spin_lock(&pendowner->pi_lock);
 	if (!lock_is_stealable(pendowner, mode)) {
@@ -506,7 +512,7 @@ static int task_blocks_on_rt_mutex(struct rt_mutex *lock,
 
 	if (waiter == rt_mutex_top_waiter(lock)) {
 		/* readers are handled differently */
-		if (owner == RT_RW_READER) {
+		if (task_is_reader(owner)) {
 			res = rt_mutex_adjust_readers(lock, waiter,
 						      current, lock, 0);
 			return res;
@@ -524,7 +530,7 @@ static int task_blocks_on_rt_mutex(struct rt_mutex *lock,
 	else if (debug_rt_mutex_detect_deadlock(waiter, detect_deadlock))
 		chain_walk = 1;
 
-	if (!chain_walk || owner == RT_RW_READER)
+	if (!chain_walk || task_is_reader(owner))
 		return 0;
 
 	/*
@@ -624,7 +630,7 @@ static void remove_waiter(struct rt_mutex *lock,
 	current->pi_blocked_on = NULL;
 	spin_unlock(&current->pi_lock);
 
-	if (first && owner != current && owner != RT_RW_READER) {
+	if (first && owner != current && !task_is_reader(owner)) {
 
 		spin_lock(&owner->pi_lock);
 
