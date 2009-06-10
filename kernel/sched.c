@@ -1765,10 +1765,20 @@ out_activate:
 
 out_running:
 	trace_kernel_sched_wakeup(rq, p);
+
+	/*
+	 * For a mutex wakeup we or TASK_RUNNING_MUTEX to the task
+	 * state to preserve the original state, so a real wakeup
+	 * still can see the (UN)INTERRUPTIBLE bits in the state check
+	 * above. We dont have to worry about the | TASK_RUNNING_MUTEX
+	 * here. The waiter is serialized by the mutex lock and nobody
+	 * else can fiddle with p->state as we hold rq lock.
+	 */
 	if (mutex)
-		p->state = TASK_RUNNING_MUTEX;
+		p->state |= TASK_RUNNING_MUTEX;
 	else
 		p->state = TASK_RUNNING;
+
 #ifdef CONFIG_SMP
 	if (p->sched_class->task_wake_up)
 		p->sched_class->task_wake_up(rq, p);
@@ -1782,38 +1792,34 @@ out:
 int fastcall wake_up_process(struct task_struct *p)
 {
 	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
-			      TASK_RUNNING_MUTEX | TASK_INTERRUPTIBLE |
-			      TASK_UNINTERRUPTIBLE, 0, 0);
+			      TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0, 0);
 }
 EXPORT_SYMBOL(wake_up_process);
 
 int fastcall wake_up_process_sync(struct task_struct * p)
 {
 	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
-			      TASK_RUNNING_MUTEX | TASK_INTERRUPTIBLE |
-			      TASK_UNINTERRUPTIBLE, 1, 0);
+			      TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 1, 0);
 }
 EXPORT_SYMBOL(wake_up_process_sync);
 
 int fastcall wake_up_process_mutex(struct task_struct * p)
 {
 	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
-			      TASK_RUNNING_MUTEX | TASK_INTERRUPTIBLE |
-			      TASK_UNINTERRUPTIBLE, 0, 1);
+			      TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0, 1);
 }
 EXPORT_SYMBOL(wake_up_process_mutex);
 
 int fastcall wake_up_process_mutex_sync(struct task_struct * p)
 {
 	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
-			      TASK_RUNNING_MUTEX | TASK_INTERRUPTIBLE |
-			      TASK_UNINTERRUPTIBLE, 1, 1);
+			      TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 1, 1);
 }
 EXPORT_SYMBOL(wake_up_process_mutex_sync);
 
 int fastcall wake_up_state(struct task_struct *p, unsigned int state)
 {
-	return try_to_wake_up(p, state | TASK_RUNNING_MUTEX, 0, 0);
+	return try_to_wake_up(p, state, 0, 0);
 }
 
 /*
@@ -3961,10 +3967,10 @@ asmlinkage void __sched __schedule(void)
 	clear_tsk_need_resched(prev);
 	clear_tsk_need_resched_delayed(prev);
 
-	if ((prev->state & ~TASK_RUNNING_MUTEX) &&
-			!(preempt_count() & PREEMPT_ACTIVE)) {
+	if (!(prev->state & TASK_RUNNING_MUTEX) && prev->state &&
+	    !(preempt_count() & PREEMPT_ACTIVE)) {
 		if (unlikely((prev->state & TASK_INTERRUPTIBLE) &&
-				unlikely(signal_pending(prev)))) {
+			     unlikely(signal_pending(prev)))) {
 			prev->state = TASK_RUNNING;
 		} else {
 			touch_softlockup_watchdog();
@@ -4184,8 +4190,7 @@ asmlinkage void __sched preempt_schedule_irq(void)
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync,
 			  void *key)
 {
-	return try_to_wake_up(curr->private, mode | TASK_RUNNING_MUTEX,
-			      sync, 0);
+	return try_to_wake_up(curr->private, mode, sync, 0);
 }
 EXPORT_SYMBOL(default_wake_function);
 
@@ -5421,8 +5426,9 @@ static void show_task(struct task_struct *p)
 	unsigned state;
 
 	state = p->state ? __ffs(p->state) + 1 : 0;
-	printk("%-13.13s %c [%p]", p->comm,
-		state < sizeof(stat_nam) - 1 ? stat_nam[state] : '?', p);
+	printk("%-13.13s %c (%03lx) [%p]", p->comm,
+	       state < sizeof(stat_nam) - 1 ? stat_nam[state] : '?',
+	       (unsigned long) p->state, p);
 #if BITS_PER_LONG == 32
 	if (0 && (state == TASK_RUNNING))
 		printk(KERN_CONT " running  ");
