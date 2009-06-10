@@ -47,8 +47,22 @@
 	thunk __up_wakeup,__up
 
 #ifdef CONFIG_TRACE_IRQFLAGS
-	thunk trace_hardirqs_on_thunk,trace_hardirqs_on
-	thunk trace_hardirqs_off_thunk,trace_hardirqs_off
+	/* put return address in rdi (arg1) */
+	.macro thunk_ra name,func
+	.globl \name
+\name:
+	CFI_STARTPROC
+	SAVE_ARGS
+	/* SAVE_ARGS pushs 9 elements */
+	/* the next element would be the rip */
+	movq 9*8(%rsp), %rdi
+	call \func
+	jmp  restore
+	CFI_ENDPROC
+	.endm
+
+	thunk_ra trace_hardirqs_on_thunk,trace_hardirqs_on_caller
+	thunk_ra trace_hardirqs_off_thunk,trace_hardirqs_off_caller
 #endif
 
 #ifdef CONFIG_DEBUG_LOCK_ALLOC

@@ -92,7 +92,7 @@ static inline void set_cyc2ns_scale(unsigned long cpu_khz)
 /*
  * Scheduler clock - returns current time in nanosec units.
  */
-unsigned long long native_sched_clock(void)
+unsigned long long notrace  native_sched_clock(void)
 {
 	unsigned long long this_offset;
 

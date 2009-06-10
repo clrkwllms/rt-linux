@@ -65,7 +65,8 @@ __setup("noreplace-paravirt", setup_noreplace_paravirt);
    get them easily into strings. */
 asm("\t.section .rodata, \"a\"\nintelnops: "
 	GENERIC_NOP1 GENERIC_NOP2 GENERIC_NOP3 GENERIC_NOP4 GENERIC_NOP5 GENERIC_NOP6
-	GENERIC_NOP7 GENERIC_NOP8);
+	GENERIC_NOP7 GENERIC_NOP8
+    "\t.previous");
 extern const unsigned char intelnops[];
 static const unsigned char *const intel_nops[ASM_NOP_MAX+1] = {
 	NULL,
@@ -83,7 +84,8 @@ static const unsigned char *const intel_nops[ASM_NOP_MAX+1] = {
 #ifdef K8_NOP1
 asm("\t.section .rodata, \"a\"\nk8nops: "
 	K8_NOP1 K8_NOP2 K8_NOP3 K8_NOP4 K8_NOP5 K8_NOP6
-	K8_NOP7 K8_NOP8);
+	K8_NOP7 K8_NOP8
+    "\t.previous");
 extern const unsigned char k8nops[];
 static const unsigned char *const k8_nops[ASM_NOP_MAX+1] = {
 	NULL,
@@ -101,7 +103,8 @@ static const unsigned char *const k8_nops[ASM_NOP_MAX+1] = {
 #ifdef K7_NOP1
 asm("\t.section .rodata, \"a\"\nk7nops: "
 	K7_NOP1 K7_NOP2 K7_NOP3 K7_NOP4 K7_NOP5 K7_NOP6
-	K7_NOP7 K7_NOP8);
+	K7_NOP7 K7_NOP8
+    "\t.previous");
 extern const unsigned char k7nops[];
 static const unsigned char *const k7_nops[ASM_NOP_MAX+1] = {
 	NULL,
@@ -119,7 +122,8 @@ static const unsigned char *const k7_nops[ASM_NOP_MAX+1] = {
 #ifdef P6_NOP1
 asm("\t.section .rodata, \"a\"\np6nops: "
 	P6_NOP1 P6_NOP2 P6_NOP3 P6_NOP4 P6_NOP5 P6_NOP6
-	P6_NOP7 P6_NOP8);
+	P6_NOP7 P6_NOP8
+    "\t.previous");
 extern const unsigned char p6nops[];
 static const unsigned char *const p6_nops[ASM_NOP_MAX+1] = {
 	NULL,
@@ -137,7 +141,7 @@ static const unsigned char *const p6_nops[ASM_NOP_MAX+1] = {
 #ifdef CONFIG_X86_64
 
 extern char __vsyscall_0;
-static inline const unsigned char*const * find_nop_table(void)
+const unsigned char *const *find_nop_table(void)
 {
 	return boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
 	       boot_cpu_data.x86 < 6 ? k8_nops : p6_nops;
@@ -156,7 +160,7 @@ static const struct nop {
 	{ -1, NULL }
 };
 
-static const unsigned char*const * find_nop_table(void)
+const unsigned char *const *find_nop_table(void)
 {
 	const unsigned char *const *noptable = intel_nops;
 	int i;
@@ -173,7 +177,7 @@ static const unsigned char*const * find_nop_table(void)
 #endif /* CONFIG_X86_64 */
 
 /* Use this to add nops to a buffer, then text_poke the whole buffer. */
-static void add_nops(void *insns, unsigned int len)
+void add_nops(void *insns, unsigned int len)
 {
 	const unsigned char *const *noptable = find_nop_table();
 
@@ -186,6 +190,7 @@ static void add_nops(void *insns, unsigned int len)
 		len -= noplen;
 	}
 }
+EXPORT_SYMBOL_GPL(add_nops);
 
 extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
 extern u8 *__smp_locks[], *__smp_locks_end[];

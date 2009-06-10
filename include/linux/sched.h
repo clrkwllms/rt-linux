@@ -220,6 +220,8 @@ extern void sched_init_smp(void);
 extern void init_idle(struct task_struct *idle, int cpu);
 extern void init_idle_bootup_task(struct task_struct *idle);
 
+extern int runqueue_is_locked(void);
+
 extern cpumask_t nohz_cpu_mask;
 #if defined(CONFIG_SMP) && defined(CONFIG_NO_HZ)
 extern int select_nohz_load_balancer(int cpu);
@@ -1944,6 +1946,18 @@ static inline void arch_pick_mmap_layout(struct mm_struct *mm)
 }
 #endif
 
+#ifdef CONFIG_TRACING
+extern void
+__trace_special(void *__tr, void *__data,
+		unsigned long arg1, unsigned long arg2, unsigned long arg3);
+#else
+static inline void
+__trace_special(void *__tr, void *__data,
+		unsigned long arg1, unsigned long arg2, unsigned long arg3)
+{
+}
+#endif
+
 extern long sched_setaffinity(pid_t pid, cpumask_t new_mask);
 extern long sched_getaffinity(pid_t pid, cpumask_t *mask);
 
@@ -2008,6 +2022,8 @@ static inline void migration_init(void)
 {
 }
 #endif
+
+#define TASK_STATE_TO_CHAR_STR "RSDTtZX"
 
 #endif /* __KERNEL__ */
 

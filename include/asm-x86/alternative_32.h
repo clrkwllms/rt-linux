@@ -151,4 +151,6 @@ apply_paravirt(struct paravirt_patch_site *start,
 
 extern void text_poke(void *addr, unsigned char *opcode, int len);
 
+const unsigned char *const *find_nop_table(void);
+
 #endif /* _I386_ALTERNATIVE_H */

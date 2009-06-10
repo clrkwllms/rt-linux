@@ -517,4 +517,6 @@ config FAULT_INJECTION_STACKTRACE_FILTER
 	help
 	  Provide stacktrace filter for fault-injection capabilities
 
+source kernel/trace/Kconfig
+
 source "samples/Kconfig"

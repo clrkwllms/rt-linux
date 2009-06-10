@@ -13,6 +13,14 @@ obj-y	:= process_64.o signal_64.o entry_64.o traps_64.o irq_64.o \
 		pci-dma_64.o pci-nommu_64.o alternative.o hpet.o tsc_64.o bugs_64.o \
 		i8253.o
 
+ifdef CONFIG_FTRACE
+# Do not profile debug utilities
+CFLAGS_REMOVE_tsc_64.o = -pg
+ifdef CONFIG_DYNAMIC_FTRACE
+CFLAGS_REMOVE_ftrace.o = -pg
+endif
+endif
+
 obj-$(CONFIG_STACKTRACE)	+= stacktrace.o
 obj-y				+= cpu/
 obj-y				+= acpi/
@@ -22,6 +30,7 @@ obj-$(CONFIG_X86_CPUID)		+= cpuid.o
 obj-$(CONFIG_SMP)		+= smp_64.o smpboot_64.o trampoline_64.o tsc_sync.o
 obj-y				+= apic_64.o  nmi_64.o
 obj-y				+= io_apic_64.o mpparse_64.o genapic_64.o genapic_flat_64.o
+obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o
 obj-$(CONFIG_KEXEC)		+= machine_kexec_64.o relocate_kernel_64.o crash.o
 obj-$(CONFIG_CRASH_DUMP)	+= crash_dump_64.o
 obj-$(CONFIG_PM)		+= suspend_64.o

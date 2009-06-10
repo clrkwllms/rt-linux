@@ -25,12 +25,12 @@ static inline void set_cyc2ns_scale(unsigned long khz)
 	cyc2ns_scale = (NSEC_PER_MSEC << NS_SCALE) / khz;
 }
 
-static unsigned long long cycles_2_ns(unsigned long long cyc)
+static unsigned long long notrace cycles_2_ns(unsigned long long cyc)
 {
 	return (cyc * cyc2ns_scale) >> NS_SCALE;
 }
 
-unsigned long long sched_clock(void)
+unsigned long long notrace sched_clock(void)
 {
 	unsigned long a = 0;
 

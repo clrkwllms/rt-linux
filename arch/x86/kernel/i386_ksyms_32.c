@@ -1,8 +1,14 @@
+#include <linux/ftrace.h>
 #include <linux/module.h>
 #include <asm/semaphore.h>
 #include <asm/checksum.h>
 #include <asm/desc.h>
 #include <asm/pgtable.h>
+
+#ifdef CONFIG_FTRACE
+/* mcount is defined in assembly */
+EXPORT_SYMBOL(mcount);
+#endif
 
 EXPORT_SYMBOL(__down_failed);
 EXPORT_SYMBOL(__down_failed_interruptible);

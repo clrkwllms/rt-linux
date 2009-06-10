@@ -600,7 +600,7 @@ void mark_rodata_ro(void)
 		start = (unsigned long)_etext;
 #endif
 
-#ifdef CONFIG_KPROBES
+#if defined(CONFIG_KPROBES) || defined(CONFIG_DYNAMIC_FTRACE)
 	start = (unsigned long)__start_rodata;
 #endif
 	

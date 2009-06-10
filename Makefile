@@ -520,6 +520,10 @@ KBUILD_CFLAGS	+= -g
 KBUILD_AFLAGS	+= -gdwarf-2
 endif
 
+ifdef CONFIG_FTRACE
+KBUILD_CFLAGS	+= -pg
+endif
+
 # Force gcc to behave correct even for buggy distributions
 KBUILD_CFLAGS         += $(call cc-option, -fno-stack-protector)
 

@@ -195,7 +195,10 @@ void cpu_idle(void)
 				play_dead();
 
 			__get_cpu_var(irq_stat).idle_timestamp = jiffies;
+			/* Don't trace irqs off for idle */
+			stop_critical_timings();
 			idle();
+			start_critical_timings();
 		}
 		tick_nohz_restart_sched_tick();
 		preempt_enable_no_resched();

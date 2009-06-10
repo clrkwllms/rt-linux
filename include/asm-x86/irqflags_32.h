@@ -157,25 +157,8 @@ static inline void trace_hardirqs_fixup(void)
  * C function, so save all the C-clobbered registers:
  */
 #ifdef CONFIG_TRACE_IRQFLAGS
-
-# define TRACE_IRQS_ON				\
-	pushl %eax;				\
-	pushl %ecx;				\
-	pushl %edx;				\
-	call trace_hardirqs_on;			\
-	popl %edx;				\
-	popl %ecx;				\
-	popl %eax;
-
-# define TRACE_IRQS_OFF				\
-	pushl %eax;				\
-	pushl %ecx;				\
-	pushl %edx;				\
-	call trace_hardirqs_off;		\
-	popl %edx;				\
-	popl %ecx;				\
-	popl %eax;
-
+#  define TRACE_IRQS_ON		call trace_hardirqs_on_thunk;
+#  define TRACE_IRQS_OFF	call trace_hardirqs_off_thunk;
 #else
 # define TRACE_IRQS_ON
 # define TRACE_IRQS_OFF

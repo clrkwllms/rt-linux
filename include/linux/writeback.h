@@ -103,6 +103,8 @@ extern int dirty_expire_interval;
 extern int block_dump;
 extern int laptop_mode;
 
+extern unsigned long determine_dirtyable_memory(void);
+
 extern int dirty_ratio_handler(struct ctl_table *table, int write,
 		struct file *filp, void __user *buffer, size_t *lenp,
 		loff_t *ppos);
