@@ -860,7 +860,7 @@ void __devinit rcu_online_cpu_rt(int cpu)
 
 #else /* #ifdef CONFIG_HOTPLUG_CPU */
 
-void rcu_offline_cpu(int cpu)
+void rcu_offline_cpu_rt(int cpu)
 {
 }
 
