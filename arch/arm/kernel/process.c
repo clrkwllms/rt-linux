@@ -136,7 +136,7 @@ static void default_idle(void)
 		cpu_relax();
 	else {
 		local_irq_disable();
-		if (!need_resched()) {
+		if (!need_resched() && !need_resched_delayed()) {
 			timer_dyn_reprogram();
 			arch_idle();
 		}
@@ -168,13 +168,15 @@ void cpu_idle(void)
 			idle = default_idle;
 		leds_event(led_idle_start);
 		tick_nohz_stop_sched_tick();
-		while (!need_resched())
+		while (!need_resched() && !need_resched_delayed())
 			idle();
 		leds_event(led_idle_end);
 		tick_nohz_restart_sched_tick();
-		preempt_enable_no_resched();
-		schedule();
+		local_irq_disable();
+		__preempt_enable_no_resched();
+		__schedule();
 		preempt_disable();
+		local_irq_enable();
 	}
 }
 

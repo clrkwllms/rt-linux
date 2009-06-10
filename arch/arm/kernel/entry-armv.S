@@ -204,7 +204,7 @@ __irq_svc:
 	irq_handler
 #ifdef CONFIG_PREEMPT
 	ldr	r0, [tsk, #TI_FLAGS]		@ get flags
-	tst	r0, #_TIF_NEED_RESCHED
+	tst	r0, #_TIF_NEED_RESCHED | _TIF_NEED_RESCHED_DELAYED
 	blne	svc_preempt
 preempt_return:
 	ldr	r0, [tsk, #TI_PREEMPT]		@ read preempt value
@@ -235,7 +235,7 @@ svc_preempt:
 	str	r7, [tsk, #TI_PREEMPT]		@ expects preempt_count == 0
 1:	bl	preempt_schedule_irq		@ irq en/disable is done inside
 	ldr	r0, [tsk, #TI_FLAGS]		@ get new tasks TI_FLAGS
-	tst	r0, #_TIF_NEED_RESCHED
+	tst	r0, #_TIF_NEED_RESCHED | _TIF_NEED_RESCHED_DELAYED
 	beq	preempt_return			@ go again
 	b	1b
 #endif

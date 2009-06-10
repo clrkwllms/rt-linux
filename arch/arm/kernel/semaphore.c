@@ -49,14 +49,16 @@
  *    we cannot lose wakeup events.
  */
 
-void __up(struct semaphore *sem)
+fastcall void __attribute_used__ __compat_up(struct compat_semaphore *sem)
 {
 	wake_up(&sem->wait);
 }
 
+EXPORT_SYMBOL(__compat_up);
+
 static DEFINE_SPINLOCK(semaphore_lock);
 
-void __sched __down(struct semaphore * sem)
+fastcall void __attribute_used__ __sched __compat_down(struct compat_semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -89,7 +91,9 @@ void __sched __down(struct semaphore * sem)
 	wake_up(&sem->wait);
 }
 
-int __sched __down_interruptible(struct semaphore * sem)
+EXPORT_SYMBOL(__compat_down);
+
+fastcall int __attribute_used__ __sched __compat_down_interruptible(struct compat_semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;
@@ -140,6 +144,8 @@ int __sched __down_interruptible(struct semaphore * sem)
 	return retval;
 }
 
+EXPORT_SYMBOL(__compat_down_interruptible);
+
 /*
  * Trylock failed - make sure we correct for
  * having decremented the count.
@@ -148,7 +154,7 @@ int __sched __down_interruptible(struct semaphore * sem)
  * single "cmpxchg" without failure cases,
  * but then it wouldn't work on a 386.
  */
-int __down_trylock(struct semaphore * sem)
+fastcall int __attribute_used__ __compat_down_trylock(struct compat_semaphore * sem)
 {
 	int sleepers;
 	unsigned long flags;
@@ -168,6 +174,15 @@ int __down_trylock(struct semaphore * sem)
 	return 1;
 }
 
+EXPORT_SYMBOL(__compat_down_trylock);
+
+fastcall int compat_sem_is_locked(struct compat_semaphore *sem)
+{
+	return (int) atomic_read(&sem->count) < 0;
+}
+
+EXPORT_SYMBOL(compat_sem_is_locked);
+
 /*
  * The semaphore operations have a special calling sequence that
  * allow us to do a simpler in-line version of them. These routines
@@ -185,7 +200,7 @@ asm("	.section .sched.text,\"ax\",%progbits	\n\
 __down_failed:					\n\
 	stmfd	sp!, {r0 - r4, lr}		\n\
 	mov	r0, ip				\n\
-	bl	__down				\n\
+	bl	__compat_down			\n\
 	ldmfd	sp!, {r0 - r4, pc}		\n\
 						\n\
 	.align	5				\n\
@@ -193,7 +208,7 @@ __down_failed:					\n\
 __down_interruptible_failed:			\n\
 	stmfd	sp!, {r0 - r4, lr}		\n\
 	mov	r0, ip				\n\
-	bl	__down_interruptible		\n\
+	bl	__compat_down_interruptible	\n\
 	mov	ip, r0				\n\
 	ldmfd	sp!, {r0 - r4, pc}		\n\
 						\n\
@@ -202,7 +217,7 @@ __down_interruptible_failed:			\n\
 __down_trylock_failed:				\n\
 	stmfd	sp!, {r0 - r4, lr}		\n\
 	mov	r0, ip				\n\
-	bl	__down_trylock			\n\
+	bl	__compat_down_trylock		\n\
 	mov	ip, r0				\n\
 	ldmfd	sp!, {r0 - r4, pc}		\n\
 						\n\
@@ -211,7 +226,7 @@ __down_trylock_failed:				\n\
 __up_wakeup:					\n\
 	stmfd	sp!, {r0 - r4, lr}		\n\
 	mov	r0, ip				\n\
-	bl	__up				\n\
+	bl	__compat_up			\n\
 	ldmfd	sp!, {r0 - r4, pc}		\n\
 	");
 
