@@ -114,6 +114,46 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 	: "cc");
 }
 
+/*
+ * Atomic compare and exchange.
+ */
+#define __HAVE_ARCH_CMPXCHG     1
+
+extern unsigned long wrong_size_cmpxchg(volatile void *ptr);
+
+static inline unsigned long __cmpxchg(volatile void *ptr,
+				unsigned long old,
+				unsigned long new, int size)
+{
+	volatile unsigned long *p = ptr;
+
+	if (size == 4) {
+		unsigned long oldval, res;
+
+		do {
+			__asm__ __volatile__("@ atomic_cmpxchg\n"
+			"ldrex  %1, [%2]\n"
+			"mov    %0, #0\n"
+			"teq    %1, %3\n"
+			"strexeq %0, %4, [%2]\n"
+			: "=&r" (res), "=&r" (oldval)
+			: "r" (p), "Ir" (old), "r" (new)
+			: "cc");
+		} while (res);
+
+		return oldval;
+	} else
+		return wrong_size_cmpxchg(ptr);
+}
+
+#define cmpxchg(ptr,o,n)						\
+({									\
+	__typeof__(*(ptr)) _o_ = (o);					\
+	__typeof__(*(ptr)) _n_ = (n);					\
+	(__typeof__(*(ptr))) __cmpxchg((ptr), (unsigned long)_o_,	\
+		 (unsigned long)_n_, sizeof(*(ptr)));			\
+})
+
 #else /* ARM_ARCH_6 */
 
 #include <asm/system.h>
