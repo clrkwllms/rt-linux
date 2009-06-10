@@ -400,13 +400,14 @@ void free_swap_and_cache(swp_entry_t entry)
 	p = swap_info_get(entry);
 	if (p) {
 		if (swap_entry_free(p, swp_offset(entry)) == 1) {
+			spin_unlock(&swap_lock);
 			page = find_get_page(&swapper_space, entry.val);
 			if (page && unlikely(TestSetPageLocked(page))) {
 				page_cache_release(page);
 				page = NULL;
 			}
-		}
-		spin_unlock(&swap_lock);
+		} else
+			spin_unlock(&swap_lock);
 	}
 	if (page) {
 		int one_user;
