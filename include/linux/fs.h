@@ -797,11 +797,7 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
 }
 
 struct file {
-	/*
-	 * fu_llist becomes invalid after file_free is called and queued via
-	 * fu_rcuhead for RCU freeing
-	 */
-	union {
+	struct {
 		struct lock_list_head	fu_llist;
 		struct rcu_head 	fu_rcuhead;
 	} f_u;
