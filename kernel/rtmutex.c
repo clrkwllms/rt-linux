@@ -2140,12 +2140,13 @@ static int rt_mutex_adjust_readers(struct rt_mutex *orig_lock,
 		int chain_walk = 0;
 
 		task = rls->task;
-		get_task_struct(task);
 
 		spin_lock(&task->pi_lock);
 		__rt_mutex_adjust_prio(task);
-		if (task->pi_blocked_on)
+		if (task->pi_blocked_on) {
 			chain_walk = 1;
+			get_task_struct(task);
+		}
 		spin_unlock(&task->pi_lock);
 
 		/*
