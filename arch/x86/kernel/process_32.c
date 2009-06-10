@@ -134,7 +134,9 @@ EXPORT_SYMBOL(default_idle);
  */
 static void poll_idle (void)
 {
-	cpu_relax();
+	do {
+		cpu_relax();
+	} while (!need_resched() && !need_resched_delayed());
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
