@@ -573,6 +573,11 @@ int runqueue_is_locked(void)
 	return ret;
 }
 
+int task_is_current(struct task_struct *task)
+{
+	return task_rq(task)->curr == task;
+}
+
 /*
  * Debugging: various feature bits
  */
