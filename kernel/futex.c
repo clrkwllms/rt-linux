@@ -61,6 +61,7 @@
 #include "rtmutex_common.h"
 
 int __read_mostly futex_cmpxchg_enabled;
+int __read_mostly futex_rt_pi_warning;
 
 #define FUTEX_HASHBITS (CONFIG_BASE_SMALL ? 4 : 8)
 
@@ -1243,6 +1244,15 @@ static int futex_wait(u32 __user *uaddr, struct rw_semaphore *fshared,
 
 	hb = queue_lock(&q, -1, NULL);
 
+	if (futex_rt_pi_warning && unlikely(rt_task(curr))) {
+		if (printk_ratelimit()) {
+			printk(KERN_WARNING
+			       "RT task %s:%d with priority %d"
+			       " using non PI futex\n",
+			       current->comm, current->pid,
+			       100 - current->prio);
+		}
+	}
 	/*
 	 * Access the page AFTER the futex is queued.
 	 * Order is important:

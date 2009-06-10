@@ -154,6 +154,7 @@ union futex_key {
 extern void exit_robust_list(struct task_struct *curr);
 extern void exit_pi_state_list(struct task_struct *curr);
 extern int futex_cmpxchg_enabled;
+extern int futex_rt_pi_warning;
 #else
 static inline void exit_robust_list(struct task_struct *curr)
 {
