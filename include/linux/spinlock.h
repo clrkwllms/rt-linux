@@ -501,7 +501,7 @@ do {									\
 
 #define spin_trylock_irq(lock)	\
 	__cond_lock(lock, PICK_SPIN_OP_RET(__spin_trylock_irq,		\
-		__spin_trylock_irq, lock))
+		_spin_trylock_irq, lock))
 
 #define spin_trylock_irqsave(lock, flags) \
 	__cond_lock(lock, PICK_SPIN_OP_RET(__spin_trylock_irqsave, 	\
