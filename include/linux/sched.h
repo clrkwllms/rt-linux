@@ -2033,17 +2033,8 @@ extern int __cond_resched_raw_spinlock(raw_spinlock_t *lock);
 extern int __cond_resched_spinlock(spinlock_t *spinlock);
 
 #define cond_resched_lock(lock) \
-({								\
-	int __ret;						\
-								\
-	if (TYPE_EQUAL((lock), raw_spinlock_t))	 		\
-		__ret = __cond_resched_raw_spinlock((raw_spinlock_t *)lock);\
-	else if (TYPE_EQUAL(lock, spinlock_t))			\
-		__ret = __cond_resched_spinlock((spinlock_t *)lock); \
-	else __ret = __bad_spinlock_type();			\
-								\
-	__ret;							\
-})
+	PICK_SPIN_OP_RET(__cond_resched_raw_spinlock, __cond_resched_spinlock,\
+		 lock)
 
 extern int cond_resched_softirq(void);
 extern int cond_resched_softirq_context(void);

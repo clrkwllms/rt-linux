@@ -857,7 +857,7 @@ int __lockfunc rt_spin_trylock_irqsave(spinlock_t *lock, unsigned long *flags)
 }
 EXPORT_SYMBOL(rt_spin_trylock_irqsave);
 
-int _atomic_dec_and_spin_lock(atomic_t *atomic, spinlock_t *lock)
+int _atomic_dec_and_spin_lock(spinlock_t *lock, atomic_t *atomic)
 {
 	/* Subtract 1 from counter unless that drops it to 0 (ie. it was 1) */
 	if (atomic_add_unless(atomic, -1, 1))
