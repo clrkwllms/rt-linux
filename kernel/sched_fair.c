@@ -185,6 +185,9 @@ static void __dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
 	if (cfs_rq->rb_leftmost == &se->run_node)
 		cfs_rq->rb_leftmost = rb_next(&se->run_node);
 
+	if (cfs_rq->rb_load_balance_curr == &se->run_node)
+		cfs_rq->rb_load_balance_curr = rb_next(&se->run_node);
+
 	rb_erase(&se->run_node, &cfs_rq->tasks_timeline);
 }
 

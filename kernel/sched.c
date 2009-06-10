@@ -2275,6 +2275,7 @@ static void update_cpu_load(struct rq *this_rq)
 
 #define LB_ALL_PINNED	0x01
 #define LB_COMPLETE	0x02
+#define LB_START	0x03
 
 /*
  * double_rq_lock - safely lock two runqueues
@@ -2477,7 +2478,11 @@ balance_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 	/*
 	 * Start the load-balancing iterator:
 	 */
-	p = iterator->start(iterator->arg);
+	if (*lb_flags & LB_START)
+		p = iterator->start(iterator->arg);
+	else
+		p = iterator->next(iterator->arg);
+
 	if (p)
 		pinned = 1;
 next:
@@ -2544,6 +2549,8 @@ static int move_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 	unsigned long total_load_moved = 0;
 	int this_best_prio = this_rq->curr->prio;
 
+	*lb_flags |= LB_START;
+
 	do {
 		unsigned long load_moved;
 
@@ -2555,9 +2562,11 @@ static int move_tasks(struct rq *this_rq, int this_cpu, struct rq *busiest,
 
 		total_load_moved += load_moved;
 
-		if (!load_moved || *lb_flags & LB_COMPLETE) {
+		if (*lb_flags & LB_COMPLETE) {
 			class = class->next;
+			*lb_flags |= LB_START;
 		} else if (sched_feat(LB_BREAK)) {
+			*lb_flags &= ~LB_START;
 			schedstat_inc(this_rq, lb_breaks);
 
 			double_rq_unlock(this_rq, busiest);
