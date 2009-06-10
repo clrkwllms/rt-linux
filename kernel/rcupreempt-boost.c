@@ -238,7 +238,7 @@ static void rcu_boost_task(struct task_struct *task)
 
 	if (task->rcu_prio < task->prio) {
 		rcu_trace_boost_task_boosted(RCU_BOOST_ME);
-		rt_mutex_setprio(task, task->rcu_prio);
+		task_setprio(task, task->rcu_prio);
 	}
 }
 
@@ -357,7 +357,7 @@ void __rcu_preempt_unboost(void)
 
 	spin_lock(&curr->pi_lock);
 	prio = rt_mutex_getprio(curr);
-	rt_mutex_setprio(curr, prio);
+	task_setprio(curr, prio);
 
 	curr->rcub_rbdp = NULL;
 
