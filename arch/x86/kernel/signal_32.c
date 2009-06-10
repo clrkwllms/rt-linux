@@ -536,13 +536,6 @@ handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 		}
 	}
 
-#ifdef CONFIG_PREEMPT_RT
-	/*
-	 * Fully-preemptible kernel does not need interrupts disabled:
-	 */
-	local_irq_enable();
-	preempt_check_resched();
-#endif
 	/*
 	 * If TF is set due to a debugger (PT_DTRACE), clear the TF flag so
 	 * that register information in the sigcontext is correct.
