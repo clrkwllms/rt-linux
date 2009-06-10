@@ -37,6 +37,8 @@
 
 #include <asm/uaccess.h>
 
+struct wq_full_barrier;
+
 /*
  * The per-CPU workqueue (if single thread, we always use the first
  * possible cpu).
@@ -53,6 +55,8 @@ struct cpu_workqueue_struct {
 	struct task_struct *thread;
 
 	int run_depth;		/* Detect run_workqueue() recursion depth */
+
+	struct wq_full_barrier *barrier;
 } ____cacheline_aligned;
 
 /*
@@ -129,10 +133,8 @@ struct cpu_workqueue_struct *get_wq_data(struct work_struct *work)
 }
 
 static void insert_work(struct cpu_workqueue_struct *cwq,
-				struct work_struct *work, int tail)
+		struct work_struct *work, int prio, int boost_prio)
 {
-	int prio = current->normal_prio;
-
 	set_wq_data(work, cwq);
 	/*
 	 * Ensure that we get the right work->data if we see the
@@ -142,8 +144,8 @@ static void insert_work(struct cpu_workqueue_struct *cwq,
 	plist_node_init(&work->entry, prio);
 	plist_add(&work->entry, &cwq->worklist);
 
-	if (prio < cwq->thread->prio)
-		task_setprio(cwq->thread, prio);
+	if (boost_prio < cwq->thread->prio)
+		task_setprio(cwq->thread, boost_prio);
 	wake_up(&cwq->more_work);
 }
 
@@ -154,7 +156,7 @@ static void __queue_work(struct cpu_workqueue_struct *cwq,
 	unsigned long flags;
 
 	spin_lock_irqsave(&cwq->lock, flags);
-	insert_work(cwq, work, 1);
+	insert_work(cwq, work, current->normal_prio, current->normal_prio);
 	spin_unlock_irqrestore(&cwq->lock, flags);
 }
 
@@ -261,8 +263,20 @@ static void leak_check(void *func)
 	dump_stack();
 }
 
+struct wq_full_barrier {
+	struct work_struct		work;
+	struct plist_head		worklist;
+	struct wq_full_barrier 		*prev_barrier;
+	int				prev_prio;
+	int				waiter_prio;
+	struct cpu_workqueue_struct 	*cwq;
+	struct completion		done;
+};
+
 static void run_workqueue(struct cpu_workqueue_struct *cwq)
 {
+	struct plist_head *worklist = &cwq->worklist;
+
 	spin_lock_irq(&cwq->lock);
 	cwq->run_depth++;
 	if (cwq->run_depth > 3) {
@@ -271,8 +285,11 @@ static void run_workqueue(struct cpu_workqueue_struct *cwq)
 			__FUNCTION__, cwq->run_depth);
 		dump_stack();
 	}
-	while (!plist_head_empty(&cwq->worklist)) {
-		struct work_struct *work = plist_first_entry(&cwq->worklist,
+
+again:
+	while (!plist_head_empty(worklist)) {
+		int prio;
+		struct work_struct *work = plist_first_entry(worklist,
 						struct work_struct, entry);
 		work_func_t f = work->func;
 #ifdef CONFIG_LOCKDEP
@@ -287,11 +304,19 @@ static void run_workqueue(struct cpu_workqueue_struct *cwq)
 		struct lockdep_map lockdep_map = work->lockdep_map;
 #endif
 
-		if (likely(cwq->thread->prio != work->entry.prio))
-			task_setprio(cwq->thread, work->entry.prio);
+		prio = work->entry.prio;
+		if (unlikely(worklist != &cwq->worklist)) {
+			prio = min(prio, cwq->barrier->prev_prio);
+			prio = min(prio, cwq->barrier->waiter_prio);
+			prio = min(prio, plist_first(&cwq->worklist)->prio);
+		}
+		prio = max(prio, 0);
+
+		if (likely(cwq->thread->prio != prio))
+			task_setprio(cwq->thread, prio);
 
 		cwq->current_work = work;
-		plist_del(&work->entry, &cwq->worklist);
+		plist_del(&work->entry, worklist);
 		plist_node_init(&work->entry, MAX_PRIO);
 		spin_unlock_irq(&cwq->lock);
 
@@ -307,7 +332,27 @@ static void run_workqueue(struct cpu_workqueue_struct *cwq)
 
 		spin_lock_irq(&cwq->lock);
 		cwq->current_work = NULL;
+
+		if (unlikely(cwq->barrier))
+			worklist = &cwq->barrier->worklist;
 	}
+
+	if (unlikely(worklist != &cwq->worklist)) {
+		struct wq_full_barrier *barrier = cwq->barrier;
+
+		BUG_ON(!barrier);
+		cwq->barrier = barrier->prev_barrier;
+		complete(&barrier->done);
+
+		if (unlikely(cwq->barrier))
+			worklist = &cwq->barrier->worklist;
+		else
+			worklist = &cwq->worklist;
+
+		if (!plist_head_empty(worklist))
+			goto again;
+	}
+
 	task_setprio(cwq->thread, current->normal_prio);
 	cwq->run_depth--;
 	spin_unlock_irq(&cwq->lock);
@@ -354,14 +399,47 @@ static void wq_barrier_func(struct work_struct *work)
 }
 
 static void insert_wq_barrier(struct cpu_workqueue_struct *cwq,
-					struct wq_barrier *barr, int tail)
+					struct wq_barrier *barr, int prio)
 {
 	INIT_WORK(&barr->work, wq_barrier_func);
 	__set_bit(WORK_STRUCT_PENDING, work_data_bits(&barr->work));
 
 	init_completion(&barr->done);
 
-	insert_work(cwq, &barr->work, tail);
+	insert_work(cwq, &barr->work, prio, current->prio);
+}
+
+static void wq_full_barrier_func(struct work_struct *work)
+{
+	struct wq_full_barrier *barrier =
+		container_of(work, struct wq_full_barrier, work);
+	struct cpu_workqueue_struct *cwq = barrier->cwq;
+	int prio = MAX_PRIO;
+
+	spin_lock_irq(&cwq->lock);
+	barrier->prev_barrier = cwq->barrier;
+	if (cwq->barrier) {
+		prio = min(prio, cwq->barrier->waiter_prio);
+		prio = min(prio, plist_first(&cwq->barrier->worklist)->prio);
+	}
+	barrier->prev_prio = prio;
+	cwq->barrier = barrier;
+	spin_unlock_irq(&cwq->lock);
+}
+
+static void insert_wq_full_barrier(struct cpu_workqueue_struct *cwq,
+		struct wq_full_barrier *barr)
+{
+	INIT_WORK(&barr->work, wq_full_barrier_func);
+	__set_bit(WORK_STRUCT_PENDING, work_data_bits(&barr->work));
+
+	plist_head_init(&barr->worklist, NULL);
+	plist_head_splice(&cwq->worklist, &barr->worklist);
+	barr->cwq = cwq;
+	init_completion(&barr->done);
+	barr->waiter_prio = current->prio;
+
+	insert_work(cwq, &barr->work, 0, current->prio);
 }
 
 static int flush_cpu_workqueue(struct cpu_workqueue_struct *cwq)
@@ -376,13 +454,13 @@ static int flush_cpu_workqueue(struct cpu_workqueue_struct *cwq)
 		run_workqueue(cwq);
 		active = 1;
 	} else {
-		struct wq_barrier barr;
+		struct wq_full_barrier barr;
 
 		active = 0;
 		spin_lock_irq(&cwq->lock);
 		if (!plist_head_empty(&cwq->worklist) ||
 			cwq->current_work != NULL) {
-			insert_wq_barrier(cwq, &barr, 1);
+			insert_wq_full_barrier(cwq, &barr);
 			active = 1;
 		}
 		spin_unlock_irq(&cwq->lock);
@@ -468,7 +546,7 @@ static void wait_on_cpu_work(struct cpu_workqueue_struct *cwq,
 
 	spin_lock_irq(&cwq->lock);
 	if (unlikely(cwq->current_work == work)) {
-		insert_wq_barrier(cwq, &barr, 0);
+		insert_wq_barrier(cwq, &barr, -1);
 		running = 1;
 	}
 	spin_unlock_irq(&cwq->lock);
@@ -782,6 +860,7 @@ init_cpu_workqueue(struct workqueue_struct *wq, int cpu)
 	spin_lock_init(&cwq->lock);
 	plist_head_init(&cwq->worklist, NULL);
 	init_waitqueue_head(&cwq->more_work);
+	cwq->barrier = NULL;
 
 	return cwq;
 }
