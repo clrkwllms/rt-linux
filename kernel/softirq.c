@@ -411,12 +411,12 @@ void do_softirq_from_hardirq(void)
 {
 	unsigned long p_flags;
 
-	if (!local_softirq_pending())
-		return;
 	/*
 	 * 'immediate' softirq execution, from hardirq context:
 	 */
 	local_irq_disable();
+	if (!local_softirq_pending())
+		goto out;
 	__local_bh_disable((unsigned long)__builtin_return_address(0));
 #ifndef CONFIG_PREEMPT_SOFTIRQS
 	trace_softirq_enter();
@@ -436,6 +436,7 @@ void do_softirq_from_hardirq(void)
 	current->flags &= ~PF_SOFTIRQ;
 
 	_local_bh_enable();
+out:
 	local_irq_enable();
 }
 

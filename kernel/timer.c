@@ -1035,7 +1035,7 @@ static inline void update_times(void)
  */
 static void run_timer_softirq(struct softirq_action *h)
 {
-	tvec_base_t *base = __get_cpu_var(tvec_bases);
+	tvec_base_t *base = per_cpu(tvec_bases, raw_smp_processor_id());
 
 	update_times();
 	hrtimer_run_queues();

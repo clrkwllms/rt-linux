@@ -380,9 +380,9 @@ static inline int hrtimer_is_hres_enabled(void)
 /*
  * Is the high resolution mode active ?
  */
-static inline int hrtimer_hres_active(void)
+static inline int hrtimer_hres_active(struct hrtimer_cpu_base *cpu_base)
 {
-	return __get_cpu_var(hrtimer_bases).hres_active;
+	return cpu_base->hres_active;
 }
 
 /*
@@ -470,11 +470,12 @@ static int hrtimer_reprogram(struct hrtimer *timer,
  */
 static void retrigger_next_event(void *arg)
 {
-	struct hrtimer_cpu_base *base;
+	struct hrtimer_cpu_base *base = &__get_cpu_var(hrtimer_bases);
+
 	struct timespec realtime_offset;
 	unsigned long seq;
 
-	if (!hrtimer_hres_active())
+	if (!hrtimer_hres_active(base))
 		return;
 
 	do {
@@ -483,8 +484,6 @@ static void retrigger_next_event(void *arg)
 					-wall_to_monotonic.tv_sec,
 					-wall_to_monotonic.tv_nsec);
 	} while (read_seqretry(&xtime_lock, seq));
-
-	base = &__get_cpu_var(hrtimer_bases);
 
 	/* Adjust CLOCK_REALTIME offset */
 	spin_lock(&base->lock);
@@ -606,10 +605,8 @@ static inline int hrtimer_enqueue_reprogram(struct hrtimer *timer,
 /*
  * Switch to high resolution mode
  */
-static int hrtimer_switch_to_hres(void)
+static int hrtimer_switch_to_hres(struct hrtimer_cpu_base *base)
 {
-	int cpu = smp_processor_id();
-	struct hrtimer_cpu_base *base = &per_cpu(hrtimer_bases, cpu);
 	unsigned long flags;
 
 	if (base->hres_active)
@@ -620,7 +617,7 @@ static int hrtimer_switch_to_hres(void)
 	if (tick_init_highres()) {
 		local_irq_restore(flags);
 		printk(KERN_WARNING "Could not switch to high resolution "
-				    "mode on CPU %d\n", cpu);
+		       "mode on CPU %d\n", raw_smp_processor_id());
 		return 0;
 	}
 	base->hres_active = 1;
@@ -642,9 +639,15 @@ static inline void hrtimer_raise_softirq(void)
 
 #else
 
-static inline int hrtimer_hres_active(void) { return 0; }
+static inline int hrtimer_hres_active(struct hrtimer_cpu_base *base)
+{
+	return 0;
+}
 static inline int hrtimer_is_hres_enabled(void) { return 0; }
-static inline int hrtimer_switch_to_hres(void) { return 0; }
+static inline int hrtimer_switch_to_hres(struct hrtimer_cpu_base *base)
+{
+	return 0;
+}
 static inline void hrtimer_force_reprogram(struct hrtimer_cpu_base *base) { }
 static inline int hrtimer_enqueue_reprogram(struct hrtimer *timer,
 					    struct hrtimer_clock_base *base)
@@ -836,7 +839,7 @@ static void __remove_hrtimer(struct hrtimer *timer,
 		if (base->first == &timer->node) {
 			base->first = rb_next(&timer->node);
 			/* Reprogram the clock event device. if enabled */
-			if (reprogram && hrtimer_hres_active())
+			if (reprogram && hrtimer_hres_active(base->cpu_base))
 				hrtimer_force_reprogram(base->cpu_base);
 		}
 		rb_erase(&timer->node, &base->active);
@@ -1027,7 +1030,7 @@ ktime_t hrtimer_get_next_event(void)
 
 	spin_lock_irqsave(&cpu_base->lock, flags);
 
-	if (!hrtimer_hres_active()) {
+	if (!hrtimer_hres_active(cpu_base)) {
 		for (i = 0; i < HRTIMER_MAX_CLOCK_BASES; i++, base++) {
 			struct hrtimer *timer;
 
@@ -1335,10 +1338,11 @@ static inline void run_hrtimer_queue(struct hrtimer_cpu_base *cpu_base,
  */
 void hrtimer_run_queues(void)
 {
-	struct hrtimer_cpu_base *cpu_base = &__get_cpu_var(hrtimer_bases);
+	struct hrtimer_cpu_base *cpu_base;
 	int i;
 
-	if (hrtimer_hres_active())
+	cpu_base = &per_cpu(hrtimer_bases, raw_smp_processor_id());
+	if (hrtimer_hres_active(cpu_base))
 		return;
 
 	/*
@@ -1350,7 +1354,7 @@ void hrtimer_run_queues(void)
 	 * deadlock vs. xtime_lock.
 	 */
 	if (tick_check_oneshot_change(!hrtimer_is_hres_enabled()))
-		if (hrtimer_switch_to_hres())
+		if (hrtimer_switch_to_hres(cpu_base))
 			return;
 
 	hrtimer_get_softirq_time(cpu_base);
