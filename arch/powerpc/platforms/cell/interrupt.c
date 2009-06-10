@@ -90,7 +90,6 @@ static struct irq_chip iic_chip = {
 	.typename = " CELL-IIC ",
 	.mask = iic_mask,
 	.unmask = iic_unmask,
-	.ack = iic_eoi,
 	.eoi = iic_eoi,
 };
 
