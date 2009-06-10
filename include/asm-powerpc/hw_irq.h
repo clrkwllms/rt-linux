@@ -120,7 +120,7 @@ static inline void raw_local_irq_save_ptr(unsigned long *flags)
 #define hard_irq_enable()	local_irq_enable()
 #define hard_irq_disable()	local_irq_disable()
 
-#include <linux/trace_irqflags.h>
+#include <linux/irqflags.h>
 
 #endif /* CONFIG_PPC64 */
 
