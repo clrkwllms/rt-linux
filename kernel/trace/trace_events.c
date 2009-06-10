@@ -291,6 +291,40 @@ event_hrtimer_callback(void *probe_data, void *call_data,
 }
 
 static void
+event_program_event_callback(void *probe_data, void *call_data,
+			     const char *format, va_list *args)
+{
+	struct trace_array *tr = probe_data;
+	struct trace_array_cpu *data;
+	unsigned long flags;
+	ktime_t *expires;
+	int64_t *delta;
+	long disable;
+	int cpu;
+
+	if (!tracer_enabled)
+		return;
+
+	getarg(expires, *args);
+	getarg(delta, *args);
+
+	/* interrupts should be off, we are in an interrupt */
+	cpu = smp_processor_id();
+	data = tr->data[cpu];
+
+	disable = atomic_inc_return(&data->disabled);
+	if (disable != 1)
+		goto out;
+
+	local_save_flags(flags);
+	tracing_event_program_event(tr, data, flags, CALLER_ADDR1, expires, delta);
+
+ out:
+	atomic_dec(&data->disabled);
+}
+
+
+static void
 event_task_activate_callback(void *probe_data, void *call_data,
 			     const char *format, va_list *args)
 {
@@ -511,8 +545,16 @@ static void event_tracer_register(struct trace_array *tr)
 	if (ret)
 		goto out9;
 
+	ret = event_register_marker("ftrace_event_timer", "%p %p",
+				    event_program_event_callback, tr);
+	if (ret)
+		goto out10;
+
 	return;
 
+ out10:
+	marker_probe_unregister("kernel_sched_schedule",
+				event_ctx_callback, tr);
  out9:
 	marker_probe_unregister("kernel_sched_wakeup_new",
 				event_wakeup_callback, tr);
@@ -544,6 +586,8 @@ static void event_tracer_register(struct trace_array *tr)
 
 static void event_tracer_unregister(struct trace_array *tr)
 {
+	marker_probe_unregister("ftrace_event_timer",
+				event_program_event_callback, tr);
 	marker_probe_unregister("kernel_sched_schedule",
 				event_ctx_callback, tr);
 	marker_probe_unregister("kernel_sched_wakeup_new",

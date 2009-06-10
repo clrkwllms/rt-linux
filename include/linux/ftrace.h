@@ -176,6 +176,12 @@ static inline void ftrace_event_task_deactivate(struct task_struct *p, int cpu)
 {
 	trace_mark(ftrace_event_task_deactivate, "%p %d", p, cpu);
 }
+
+static inline void ftrace_event_program_event(ktime_t *expires, int64_t *delta)
+{
+	trace_mark(ftrace_event_timer, "%p %p", expires, delta);
+}
+
 #else
 # define ftrace_event_irq(irq, user, ip)	do { } while (0)
 # define ftrace_event_fault(ip, error, addr)	do { } while (0)
@@ -184,6 +190,7 @@ static inline void ftrace_event_task_deactivate(struct task_struct *p, int cpu)
 # define ftrace_event_timestamp(now)		do { } while (0)
 # define ftrace_event_task_activate(p, cpu)	do { } while (0)
 # define ftrace_event_task_deactivate(p, cpu)	do { } while (0)
+# define ftrace_event_program_event(p, d)	do { } while (0)
 #endif /* CONFIG_TRACE_EVENTS */
 
 #endif /* _LINUX_FTRACE_H */
