@@ -59,6 +59,7 @@ struct rcu_synchronize {
 	struct completion completion;
 };
 
+DEFINE_PER_CPU(int, rcu_data_passed_quiesc);
 static DEFINE_PER_CPU(struct rcu_head, rcu_barrier_head) = {NULL};
 static atomic_t rcu_barrier_cpu_count;
 static DEFINE_MUTEX(rcu_barrier_mutex);
@@ -94,6 +95,22 @@ void synchronize_rcu(void)
 	wait_for_completion(&rcu.completion);
 }
 EXPORT_SYMBOL_GPL(synchronize_rcu);
+
+#ifdef CONFIG_PREEMPT_RCU
+
+/*
+ * Map synchronize_sched() to the classic RCU implementation.
+ */
+void __synchronize_sched(void)
+{
+	struct rcu_synchronize rcu;
+
+	init_completion(&rcu.completion);
+	call_rcu_classic(&rcu.head, wakeme_after_rcu);
+	wait_for_completion(&rcu.completion);
+}
+EXPORT_SYMBOL_GPL(__synchronize_sched);
+#endif /* #ifdef CONFIG_PREEMPT_RCU */
 
 static void rcu_barrier_callback(struct rcu_head *notused)
 {
@@ -138,8 +155,3 @@ void rcu_barrier(void)
 	mutex_unlock(&rcu_barrier_mutex);
 }
 EXPORT_SYMBOL_GPL(rcu_barrier);
-
-void __init rcu_init(void)
-{
-	__rcu_init();
-}

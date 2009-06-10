@@ -61,7 +61,6 @@ struct rcu_data {
 	spinlock_t	lock;		/* Protect rcu_data fields. */
 	long		completed;	/* Number of last completed batch. */
 	int		waitlistcount;
-	struct tasklet_struct rcu_tasklet;
 	struct rcu_head *nextlist;
 	struct rcu_head **nexttail;
 	struct rcu_head *waitlist[GP_STAGES];
@@ -550,7 +549,7 @@ static void rcu_check_mb(int cpu)
 	}
 }
 
-void rcu_check_callbacks(int cpu, int user)
+void rcu_check_callbacks_rt(int cpu, int user)
 {
 	unsigned long oldirq;
 	struct rcu_data *rdp = RCU_DATA_CPU(cpu);
@@ -561,19 +560,14 @@ void rcu_check_callbacks(int cpu, int user)
 	spin_lock_irqsave(&rdp->lock, oldirq);
 	RCU_TRACE_RDP(rcupreempt_trace_check_callbacks, rdp);
 	__rcu_advance_callbacks(rdp);
-	if (rdp->donelist == NULL) {
-		spin_unlock_irqrestore(&rdp->lock, oldirq);
-	} else {
-		spin_unlock_irqrestore(&rdp->lock, oldirq);
-		raise_softirq(RCU_SOFTIRQ);
-	}
+	spin_unlock_irqrestore(&rdp->lock, oldirq);
 }
 
 /*
  * Needed by dynticks, to make sure all RCU processing has finished
- * when we go idle:
+ * when we go idle.  (Currently unused, needed?)
  */
-void rcu_advance_callbacks(int cpu, int user)
+void rcu_advance_callbacks_rt(int cpu, int user)
 {
 	unsigned long oldirq;
 	struct rcu_data *rdp = RCU_DATA_CPU(cpu);
@@ -589,7 +583,7 @@ void rcu_advance_callbacks(int cpu, int user)
 	spin_unlock_irqrestore(&rdp->lock, oldirq);
 }
 
-static void rcu_process_callbacks(struct softirq_action *unused)
+void rcu_process_callbacks_rt(struct softirq_action *unused)
 {
 	unsigned long flags;
 	struct rcu_head *next, *list;
@@ -613,8 +607,8 @@ static void rcu_process_callbacks(struct softirq_action *unused)
 	}
 }
 
-void fastcall call_rcu(struct rcu_head *head,
-				void (*func)(struct rcu_head *rcu))
+void fastcall call_rcu_preempt(struct rcu_head *head,
+			       void (*func)(struct rcu_head *rcu))
 {
 	unsigned long oldirq;
 	struct rcu_data *rdp;
@@ -631,28 +625,7 @@ void fastcall call_rcu(struct rcu_head *head,
 	spin_unlock(&rdp->lock);
 	local_irq_restore(oldirq);
 }
-EXPORT_SYMBOL_GPL(call_rcu);
-
-/*
- * Wait until all currently running preempt_disable() code segments
- * (including hardware-irq-disable segments) complete.  Note that
- * in -rt this does -not- necessarily result in all currently executing
- * interrupt -handlers- having completed.
- */
-void __synchronize_sched(void)
-{
-	cpumask_t oldmask;
-	int cpu;
-
-	if (sched_getaffinity(0, &oldmask) < 0)
-		oldmask = cpu_possible_map;
-	for_each_online_cpu(cpu) {
-		sched_setaffinity(0, cpumask_of_cpu(cpu));
-		schedule();
-	}
-	sched_setaffinity(0, oldmask);
-}
-EXPORT_SYMBOL_GPL(__synchronize_sched);
+EXPORT_SYMBOL_GPL(call_rcu_preempt);
 
 /*
  * Check to see if any future RCU-related work will need to be done
@@ -663,7 +636,7 @@ EXPORT_SYMBOL_GPL(__synchronize_sched);
  * This function is part of the RCU implementation; it is -not-
  * an exported member of the RCU API.
  */
-int rcu_needs_cpu(int cpu)
+int rcu_needs_cpu_rt(int cpu)
 {
 	struct rcu_data *rdp = RCU_DATA_CPU(cpu);
 
@@ -672,7 +645,7 @@ int rcu_needs_cpu(int cpu)
 		rdp->nextlist != NULL);
 }
 
-int rcu_pending(int cpu)
+int rcu_pending_rt(int cpu)
 {
 	struct rcu_data *rdp = RCU_DATA_CPU(cpu);
 
@@ -699,7 +672,7 @@ int rcu_pending(int cpu)
 	return 0;
 }
 
-void __init __rcu_init(void)
+void __init rcu_init_rt(void)
 {
 	int cpu;
 	int i;
@@ -719,7 +692,6 @@ void __init __rcu_init(void)
 		rdp->donelist = NULL;
 		rdp->donetail = &rdp->donelist;
 	}
-	open_softirq(RCU_SOFTIRQ, rcu_process_callbacks, NULL);
 }
 
 /*

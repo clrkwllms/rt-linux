@@ -42,25 +42,26 @@
 #include <linux/cpumask.h>
 #include <linux/seqlock.h>
 
-#define rcu_qsctr_inc(cpu)
-#define rcu_bh_qsctr_inc(cpu)
 #define call_rcu_bh(head, rcu) call_rcu(head, rcu)
-
-extern void __rcu_read_lock(void);
-extern void __rcu_read_unlock(void);
-extern int rcu_pending(int cpu);
-extern int rcu_needs_cpu(int cpu);
-
+#define rcu_bh_qsctr_inc(cpu)	do { } while (0)
 #define __rcu_read_lock_bh()	{ rcu_read_lock(); local_bh_disable(); }
 #define __rcu_read_unlock_bh()	{ local_bh_enable(); rcu_read_unlock(); }
-
 #define __rcu_read_lock_nesting()	(current->rcu_read_lock_nesting)
 
+extern void FASTCALL(call_rcu_classic(struct rcu_head *head,
+		     void (*func)(struct rcu_head *head)));
+extern void FASTCALL(call_rcu_preempt(struct rcu_head *head,
+		     void (*func)(struct rcu_head *head)));
+extern void __rcu_read_lock(void);
+extern void __rcu_read_unlock(void);
 extern void __synchronize_sched(void);
-
-extern void __rcu_init(void);
-extern void rcu_check_callbacks(int cpu, int user);
-extern void rcu_restart_cpu(int cpu);
+extern void rcu_advance_callbacks_rt(int cpu, int user);
+extern void rcu_check_callbacks_rt(int cpu, int user);
+extern void rcu_init_rt(void);
+extern int  rcu_needs_cpu_rt(int cpu);
+extern int  rcu_pending_rt(int cpu);
+struct softirq_action;
+extern void rcu_process_callbacks_rt(struct softirq_action *unused);
 
 #ifdef CONFIG_RCU_TRACE
 struct rcupreempt_trace;

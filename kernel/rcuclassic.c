@@ -45,9 +45,52 @@
 #include <linux/moduleparam.h>
 #include <linux/percpu.h>
 #include <linux/notifier.h>
-/* #include <linux/rcupdate.h> @@@ */
 #include <linux/cpu.h>
 #include <linux/mutex.h>
+
+
+/* Global control variables for rcupdate callback mechanism. */
+struct rcu_ctrlblk {
+	long	cur;		/* Current batch number.                      */
+	long	completed;	/* Number of the last completed batch         */
+	int	next_pending;	/* Is the next batch already waiting?         */
+
+	int	signaled;
+
+	spinlock_t	lock	____cacheline_internodealigned_in_smp;
+	cpumask_t	cpumask; /* CPUs that need to switch in order    */
+				 /* for current batch to proceed.        */
+} ____cacheline_internodealigned_in_smp;
+
+/* Is batch a before batch b ? */
+static inline int rcu_batch_before(long a, long b)
+{
+	return (a - b) < 0;
+}
+
+/*
+ * Per-CPU data for Read-Copy UPdate.
+ * nxtlist - new callbacks are added here
+ * curlist - current batch for which quiescent cycle started if any
+ */
+struct rcu_data {
+	/* 1) quiescent state handling : */
+	long		quiescbatch;     /* Batch # for grace period */
+	int		*passed_quiesc;	 /* User-mode/idle loop etc. */
+	int		qs_pending;	 /* core waits for quiesc state */
+
+	/* 2) batch handling */
+	long  	       	batch;           /* Batch # for current RCU batch */
+	struct rcu_head *nxtlist;
+	struct rcu_head **nxttail;
+	long            qlen; 	 	 /* # of queued callbacks */
+	struct rcu_head *curlist;
+	struct rcu_head **curtail;
+	struct rcu_head *donelist;
+	struct rcu_head **donetail;
+	long		blimit;		 /* Upper limit on a processed batch */
+	int cpu;
+};
 
 /* Definition for rcupdate control block. */
 static struct rcu_ctrlblk rcu_ctrlblk = {
@@ -63,11 +106,11 @@ static struct rcu_ctrlblk rcu_bh_ctrlblk = {
 	.cpumask = CPU_MASK_NONE,
 };
 
-DEFINE_PER_CPU(struct rcu_data, rcu_data) = { 0L };
-DEFINE_PER_CPU(struct rcu_data, rcu_bh_data) = { 0L };
+static DEFINE_PER_CPU(struct rcu_data, rcu_data) = { 0L };
+static DEFINE_PER_CPU(struct rcu_data, rcu_bh_data) = { 0L };
+DEFINE_PER_CPU(int, rcu_data_bh_passed_quiesc);
 
 /* Fake initialization required by compiler */
-static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
 static int blimit = 10;
 static int qhimark = 10000;
 static int qlowmark = 100;
@@ -110,8 +153,8 @@ static inline void force_quiescent_state(struct rcu_data *rdp,
  * sections are delimited by rcu_read_lock() and rcu_read_unlock(),
  * and may be nested.
  */
-void fastcall call_rcu(struct rcu_head *head,
-				void (*func)(struct rcu_head *rcu))
+void fastcall call_rcu_classic(struct rcu_head *head,
+			       void (*func)(struct rcu_head *rcu))
 {
 	unsigned long flags;
 	struct rcu_data *rdp;
@@ -128,7 +171,9 @@ void fastcall call_rcu(struct rcu_head *head,
 	}
 	local_irq_restore(flags);
 }
-EXPORT_SYMBOL_GPL(call_rcu);
+EXPORT_SYMBOL_GPL(call_rcu_classic);
+
+#ifdef CONFIG_CLASSIC_RCU
 
 /**
  * call_rcu_bh - Queue an RCU for invocation after a quicker grace period.
@@ -166,7 +211,9 @@ void fastcall call_rcu_bh(struct rcu_head *head,
 
 	local_irq_restore(flags);
 }
+#ifdef CONFIG_CLASSIC_RCU
 EXPORT_SYMBOL_GPL(call_rcu_bh);
+#endif /* #ifdef CONFIG_CLASSIC_RCU */
 
 /*
  * Return the number of RCU batches processed thus far.  Useful
@@ -176,7 +223,9 @@ long rcu_batches_completed(void)
 {
 	return rcu_ctrlblk.completed;
 }
+#ifdef CONFIG_CLASSIC_RCU
 EXPORT_SYMBOL_GPL(rcu_batches_completed);
+#endif /* #ifdef CONFIG_CLASSIC_RCU */
 
 /*
  * Return the number of RCU batches processed thus far.  Useful
@@ -186,7 +235,11 @@ long rcu_batches_completed_bh(void)
 {
 	return rcu_bh_ctrlblk.completed;
 }
+#ifdef CONFIG_CLASSIC_RCU
 EXPORT_SYMBOL_GPL(rcu_batches_completed_bh);
+#endif /* #ifdef CONFIG_CLASSIC_RCU */
+
+#endif /* #ifdef CONFIG_CLASSIC_RCU */
 
 /*
  * Invoke the completed RCU callbacks. They are expected to be in
@@ -217,7 +270,7 @@ static void rcu_do_batch(struct rcu_data *rdp)
 	if (!rdp->donelist)
 		rdp->donetail = &rdp->donelist;
 	else
-		tasklet_schedule(&per_cpu(rcu_tasklet, rdp->cpu));
+		raise_softirq(RCU_SOFTIRQ);
 }
 
 /*
@@ -294,7 +347,7 @@ static void rcu_check_quiescent_state(struct rcu_ctrlblk *rcp,
 	if (rdp->quiescbatch != rcp->cur) {
 		/* start new grace period: */
 		rdp->qs_pending = 1;
-		rdp->passed_quiesc = 0;
+		*rdp->passed_quiesc = 0;
 		rdp->quiescbatch = rcp->cur;
 		return;
 	}
@@ -310,7 +363,7 @@ static void rcu_check_quiescent_state(struct rcu_ctrlblk *rcp,
 	 * Was there a quiescent state since the beginning of the grace
 	 * period? If no, then exit and wait for the next call.
 	 */
-	if (!rdp->passed_quiesc)
+	if (!*rdp->passed_quiesc)
 		return;
 	rdp->qs_pending = 0;
 
@@ -369,7 +422,6 @@ static void rcu_offline_cpu(int cpu)
 					&per_cpu(rcu_bh_data, cpu));
 	put_cpu_var(rcu_data);
 	put_cpu_var(rcu_bh_data);
-	tasklet_kill_immediate(&per_cpu(rcu_tasklet, cpu), cpu);
 }
 
 #else
@@ -381,7 +433,7 @@ static void rcu_offline_cpu(int cpu)
 #endif
 
 /*
- * This does the RCU processing work from tasklet context.
+ * This does the RCU processing work from softirq context.
  */
 static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 					struct rcu_data *rdp)
@@ -426,10 +478,11 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 		rcu_do_batch(rdp);
 }
 
-static void rcu_process_callbacks(unsigned long unused)
+static void rcu_process_callbacks(struct softirq_action *unused)
 {
 	__rcu_process_callbacks(&rcu_ctrlblk, &__get_cpu_var(rcu_data));
 	__rcu_process_callbacks(&rcu_bh_ctrlblk, &__get_cpu_var(rcu_bh_data));
+	rcu_process_callbacks_rt(unused);
 }
 
 static int __rcu_pending(struct rcu_ctrlblk *rcp, struct rcu_data *rdp)
@@ -464,7 +517,8 @@ static int __rcu_pending(struct rcu_ctrlblk *rcp, struct rcu_data *rdp)
 int rcu_pending(int cpu)
 {
 	return __rcu_pending(&rcu_ctrlblk, &per_cpu(rcu_data, cpu)) ||
-		__rcu_pending(&rcu_bh_ctrlblk, &per_cpu(rcu_bh_data, cpu));
+	       __rcu_pending(&rcu_bh_ctrlblk, &per_cpu(rcu_bh_data, cpu)) ||
+	       rcu_pending_rt(cpu);
 }
 
 /*
@@ -478,7 +532,8 @@ int rcu_needs_cpu(int cpu)
 	struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
 	struct rcu_data *rdp_bh = &per_cpu(rcu_bh_data, cpu);
 
-	return (!!rdp->curlist || !!rdp_bh->curlist || rcu_pending(cpu));
+	return (!!rdp->curlist || !!rdp_bh->curlist || rcu_pending(cpu) ||
+		rcu_needs_cpu_rt(cpu));
 }
 
 void rcu_check_callbacks(int cpu, int user)
@@ -490,7 +545,8 @@ void rcu_check_callbacks(int cpu, int user)
 		rcu_bh_qsctr_inc(cpu);
 	} else if (!in_softirq())
 		rcu_bh_qsctr_inc(cpu);
-	tasklet_schedule(&per_cpu(rcu_tasklet, cpu));
+	rcu_check_callbacks_rt(cpu, user);
+	raise_softirq(RCU_SOFTIRQ);
 }
 
 static void rcu_init_percpu_data(int cpu, struct rcu_ctrlblk *rcp,
@@ -512,8 +568,9 @@ static void __cpuinit rcu_online_cpu(int cpu)
 	struct rcu_data *bh_rdp = &per_cpu(rcu_bh_data, cpu);
 
 	rcu_init_percpu_data(cpu, &rcu_ctrlblk, rdp);
+	rdp->passed_quiesc = &per_cpu(rcu_data_passed_quiesc, cpu);
 	rcu_init_percpu_data(cpu, &rcu_bh_ctrlblk, bh_rdp);
-	tasklet_init(&per_cpu(rcu_tasklet, cpu), rcu_process_callbacks, 0UL);
+	bh_rdp->passed_quiesc = &per_cpu(rcu_data_bh_passed_quiesc, cpu);
 }
 
 static int __cpuinit rcu_cpu_notify(struct notifier_block *self,
@@ -545,12 +602,14 @@ static struct notifier_block __cpuinitdata rcu_nb = {
  * Note that rcu_qsctr and friends are implicitly
  * initialized due to the choice of ``0'' for RCU_CTR_INVALID.
  */
-void __init __rcu_init(void)
+void __init rcu_init(void)
 {
 	rcu_cpu_notify(&rcu_nb, CPU_UP_PREPARE,
 			(void *)(long)smp_processor_id());
 	/* Register notifier for non-boot CPUs */
 	register_cpu_notifier(&rcu_nb);
+	rcu_init_rt();
+	open_softirq(RCU_SOFTIRQ, rcu_process_callbacks, NULL);
 }
 
 module_param(blimit, int, 0);

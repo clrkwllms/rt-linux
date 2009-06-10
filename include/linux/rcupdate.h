@@ -220,8 +220,11 @@ extern struct lockdep_map rcu_lock_map;
  * delimited by rcu_read_lock() and rcu_read_unlock(),
  * and may be nested.
  */
-extern void FASTCALL(call_rcu(struct rcu_head *head,
-			      void (*func)(struct rcu_head *head)));
+#ifdef CONFIG_CLASSIC_RCU
+#define call_rcu(head, func) call_rcu_classic(head, func)
+#else /* #ifdef CONFIG_CLASSIC_RCU */
+#define call_rcu(head, func) call_rcu_preempt(head, func)
+#endif /* #else #ifdef CONFIG_CLASSIC_RCU */
 
 /**
  * call_rcu_bh - Queue an RCU for invocation after a quicker grace period.
@@ -249,9 +252,28 @@ extern long rcu_batches_completed(void);
 extern long rcu_batches_completed_bh(void);
 
 /* Internal to kernel */
-extern void rcu_init(void);
 extern void rcu_check_callbacks(int cpu, int user);
-extern int rcu_needs_cpu(int cpu);
+extern long rcu_batches_completed(void);
+extern long rcu_batches_completed_bh(void);
+extern void rcu_check_callbacks(int cpu, int user);
+extern void rcu_init(void);
+extern int  rcu_needs_cpu(int cpu);
+extern int  rcu_pending(int cpu);
+struct softirq_action;
+extern void rcu_restart_cpu(int cpu);
+
+DECLARE_PER_CPU(int, rcu_data_passed_quiesc);
+
+/*
+ * Increment the quiescent state counter.
+ * The counter is a bit degenerated: We do not need to know
+ * how many quiescent states passed, just if there was at least
+ * one since the start of the grace period. Thus just a flag.
+ */
+static inline void rcu_qsctr_inc(int cpu)
+{
+	per_cpu(rcu_data_passed_quiesc, cpu) = 1;
+}
 
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUPDATE_H */
