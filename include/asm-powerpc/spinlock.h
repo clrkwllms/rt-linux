@@ -179,7 +179,7 @@ extern void __raw_spin_unlock_wait(__raw_spinlock_t *lock);
  * This returns the old value in the lock + 1,
  * so we got a read lock if the return value is > 0.
  */
-static long __inline__ __read_trylock(__raw_rwlock_t *rw)
+static long __inline__ ___raw_read_trylock(__raw_rwlock_t *rw)
 {
 	long tmp;
 
@@ -203,7 +203,7 @@ static long __inline__ __read_trylock(__raw_rwlock_t *rw)
  * This returns the old value in the lock,
  * so we got the write lock if the return value is 0.
  */
-static __inline__ long __write_trylock(__raw_rwlock_t *rw)
+static __inline__ long ___raw_write_trylock(__raw_rwlock_t *rw)
 {
 	long tmp, token;
 
@@ -226,7 +226,7 @@ static __inline__ long __write_trylock(__raw_rwlock_t *rw)
 static void __inline__ __raw_read_lock(__raw_rwlock_t *rw)
 {
 	while (1) {
-		if (likely(__read_trylock(rw) > 0))
+		if (likely(___raw_read_trylock(rw) > 0))
 			break;
 		do {
 			HMT_low();
@@ -240,7 +240,7 @@ static void __inline__ __raw_read_lock(__raw_rwlock_t *rw)
 static void __inline__ __raw_write_lock(__raw_rwlock_t *rw)
 {
 	while (1) {
-		if (likely(__write_trylock(rw) == 0))
+		if (likely(___raw_write_trylock(rw) == 0))
 			break;
 		do {
 			HMT_low();
@@ -253,12 +253,12 @@ static void __inline__ __raw_write_lock(__raw_rwlock_t *rw)
 
 static int __inline__ __raw_read_trylock(__raw_rwlock_t *rw)
 {
-	return __read_trylock(rw) > 0;
+	return ___raw_read_trylock(rw) > 0;
 }
 
 static int __inline__ __raw_write_trylock(__raw_rwlock_t *rw)
 {
-	return __write_trylock(rw) == 0;
+	return ___raw_write_trylock(rw) == 0;
 }
 
 static void __inline__ __raw_read_unlock(__raw_rwlock_t *rw)
