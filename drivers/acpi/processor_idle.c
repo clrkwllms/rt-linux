@@ -209,7 +209,7 @@ static void acpi_safe_halt(void)
 	 * test NEED_RESCHED:
 	 */
 	smp_mb();
-	if (!need_resched() || !need_resched_delayed())
+	if (!need_resched() && !need_resched_delayed())
 		safe_halt();
 	current_thread_info()->status |= TS_POLLING;
 }
@@ -382,7 +382,7 @@ static void acpi_processor_idle(void)
 	 * Check whether we truly need to go idle, or should
 	 * reschedule:
 	 */
-	if (unlikely(need_resched())) {
+	if (need_resched() || need_resched_delayed()) {
 		local_irq_enable();
 		return;
 	}
@@ -472,7 +472,7 @@ static void acpi_processor_idle(void)
 		 * test NEED_RESCHED:
 		 */
 		smp_mb();
-		if (need_resched()) {
+		if (need_resched() || need_resched_delayed()) {
 			current_thread_info()->status |= TS_POLLING;
 			local_irq_enable();
 			return;
@@ -1377,6 +1377,19 @@ static int acpi_idle_enter_c1(struct cpuidle_device *dev,
 
 	if (unlikely(!pr))
 		return 0;
+
+	local_irq_disable();
+
+	/* Do not access any ACPI IO ports in suspend path */
+	if (acpi_idle_suspend) {
+		acpi_safe_halt();
+		return 0;
+	}
+
+	if (need_resched() || need_resched_delayed()) {
+		local_irq_enable();
+		return 0;
+	}
 
 	if (pr->flags.bm_check)
 		acpi_idle_update_bm_rld(pr, cx);
