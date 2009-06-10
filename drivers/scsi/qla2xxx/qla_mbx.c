@@ -11,7 +11,7 @@
 static void
 qla2x00_mbx_sem_timeout(unsigned long data)
 {
-	struct semaphore	*sem_ptr = (struct semaphore *)data;
+	struct compat_semaphore	*sem_ptr = (struct compat_semaphore *)data;
 
 	DEBUG11(printk("qla2x00_sem_timeout: entered.\n"));
 
