@@ -214,6 +214,14 @@ static unsigned long pkmap_insert(struct page *page)
 	return vaddr;
 }
 
+/*
+ * Flush all unused kmap mappings in order to remove stray mappings.
+ */
+void kmap_flush_unused(void)
+{
+	WARN_ON_ONCE(1);
+}
+
 fastcall void *kmap_high(struct page *page)
 {
 	unsigned long vaddr;
