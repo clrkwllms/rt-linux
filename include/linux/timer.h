@@ -146,10 +146,12 @@ static inline void add_timer(struct timer_list *timer)
 	__mod_timer(timer, timer->expires);
 }
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT_SOFTIRQS)
+  extern int timer_pending_sync(struct timer_list *timer);
   extern int try_to_del_timer_sync(struct timer_list *timer);
   extern int del_timer_sync(struct timer_list *timer);
 #else
+# define timer_pending_sync(t)		timer_pending(t)
 # define try_to_del_timer_sync(t)	del_timer(t)
 # define del_timer_sync(t)		del_timer(t)
 #endif
