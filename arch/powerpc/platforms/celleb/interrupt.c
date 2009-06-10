@@ -29,6 +29,10 @@
 #include "interrupt.h"
 #include "beat_wrapper.h"
 
+#ifdef CONFIG_PREEMPT_HARDIRQS
+extern int hardirq_preemption;
+#endif /* CONFIG_PREEMPT_HARDIRQS */
+
 #define	MAX_IRQS	NR_IRQS
 static DEFINE_SPINLOCK(beatic_irq_mask_lock);
 static uint64_t	beatic_irq_mask_enable[(MAX_IRQS+255)/64];
@@ -71,12 +75,35 @@ static void beatic_mask_irq(unsigned int irq_plug)
 	spin_unlock_irqrestore(&beatic_irq_mask_lock, flags);
 }
 
+static void __beatic_eoi_irq(unsigned int irq_plug)
+{
+	s64 err;
+
+	if ((err = beat_downcount_of_interrupt(irq_plug)) != 0) {
+		if ((err & 0xFFFFFFFF) != 0xFFFFFFF5) /* -11: wrong state */
+			panic("Failed to downcount IRQ! Error = %16lx", err);
+
+		printk(KERN_ERR "IRQ over-downcounted, plug %d\n", irq_plug);
+	}
+}
+
 static void beatic_unmask_irq(unsigned int irq_plug)
 {
 	unsigned long flags;
 
+#ifdef CONFIG_PREEMPT_HARDIRQS
+	if (hardirq_preemption)
+		__beatic_eoi_irq(irq_plug);
+#endif /* CONFIG_PREEMPT_HARDIRQS */
+
 	spin_lock_irqsave(&beatic_irq_mask_lock, flags);
 	beatic_irq_mask_enable[irq_plug/64] |= 1UL << (63 - (irq_plug%64));
+
+#ifdef CONFIG_PREEMPT_HARDIRQS
+	if (hardirq_preemption)
+		beatic_irq_mask_ack[irq_plug/64] |= 1UL << (63 - (irq_plug%64));
+#endif /* CONFIG_PREEMPT_HARDIRQS */
+
 	beatic_update_irq_mask(irq_plug);
 	spin_unlock_irqrestore(&beatic_irq_mask_lock, flags);
 }
@@ -93,15 +120,15 @@ static void beatic_ack_irq(unsigned int irq_plug)
 
 static void beatic_end_irq(unsigned int irq_plug)
 {
-	s64 err;
 	unsigned long flags;
 
-	if ((err = beat_downcount_of_interrupt(irq_plug)) != 0) {
-		if ((err & 0xFFFFFFFF) != 0xFFFFFFF5) /* -11: wrong state */
-			panic("Failed to downcount IRQ! Error = %16lx", err);
+#ifdef CONFIG_PREEMPT_HARDIRQS
+	if (hardirq_preemption)
+		return;
+#endif /* CONFIG_PREEMPT_HARDIRQS */
 
-		printk(KERN_ERR "IRQ over-downcounted, plug %d\n", irq_plug);
-	}
+	__beatic_eoi_irq(irq_plug);
+
 	spin_lock_irqsave(&beatic_irq_mask_lock, flags);
 	beatic_irq_mask_ack[irq_plug/64] |= 1UL << (63 - (irq_plug%64));
 	beatic_update_irq_mask(irq_plug);
