@@ -302,9 +302,9 @@ static void drain_cpu_pagevecs(int cpu)
 		unsigned long flags;
 
 		/* No harm done if a racing interrupt already did this */
-		local_irq_save(flags);
+		local_irq_save_nort(flags);
 		pagevec_move_tail(pvec);
-		local_irq_restore(flags);
+		local_irq_restore_nort(flags);
 	}
 	swap_per_cpu_unlock(lru_rotate_pvecs, cpu);
 }
