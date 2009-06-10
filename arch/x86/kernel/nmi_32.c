@@ -392,7 +392,7 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 
 		spin_lock(&lock);
 		printk("NMI backtrace for cpu %d\n", cpu);
-		dump_stack();
+		show_regs(regs);
 		spin_unlock(&lock);
 		cpu_clear(cpu, backtrace_mask);
 	}
