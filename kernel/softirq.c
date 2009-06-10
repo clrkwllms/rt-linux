@@ -459,10 +459,17 @@ static void inline
 __tasklet_common_schedule(struct tasklet_struct *t, struct tasklet_head *head, unsigned int nr)
 {
 	if (tasklet_trylock(t)) {
-		WARN_ON(t->next != NULL);
-		t->next = head->list;
-		head->list = t;
-		raise_softirq_irqoff(nr);
+		/* We may have been preempted before tasklet_trylock
+		 * and __tasklet_action may have already run.
+		 * So double check the sched bit while the takslet
+		 * is locked before adding it to the list.
+		 */
+		if (test_bit(TASKLET_STATE_SCHED, &t->state)) {
+			WARN_ON(t->next != NULL);
+			t->next = head->list;
+			head->list = t;
+			raise_softirq_irqoff(nr);
+		}
 		tasklet_unlock(t);
 	}
 }
