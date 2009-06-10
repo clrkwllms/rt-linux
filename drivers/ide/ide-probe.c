@@ -128,7 +128,7 @@ static inline void do_identify (ide_drive_t *drive, u8 cmd)
 	hwif->ata_input_data(drive, id, SECTOR_WORDS);
 
 	drive->id_read = 1;
-	local_irq_enable();
+	local_irq_enable_nort();
 	ide_fix_driveid(id);
 
 #if defined (CONFIG_SCSI_EATA_PIO) || defined (CONFIG_SCSI_EATA)
@@ -311,14 +311,14 @@ static int actual_try_to_identify (ide_drive_t *drive, u8 cmd)
 		unsigned long flags;
 
 		/* local CPU only; some systems need this */
-		local_irq_save(flags);
+		local_irq_save_nort(flags);
 		/* drive returned ID */
 		do_identify(drive, cmd);
 		/* drive responded with ID */
 		rc = 0;
 		/* clear drive IRQ */
 		(void) hwif->INB(IDE_STATUS_REG);
-		local_irq_restore(flags);
+		local_irq_restore_nort(flags);
 	} else {
 		/* drive refused ID */
 		rc = 2;
@@ -801,7 +801,7 @@ static void probe_hwif(ide_hwif_t *hwif)
 		} while ((stat & BUSY_STAT) && time_after(timeout, jiffies));
 
 	}
-	local_irq_restore(flags);
+	local_irq_restore_nort(flags);
 	/*
 	 * Use cached IRQ number. It might be (and is...) changed by probe
 	 * code above

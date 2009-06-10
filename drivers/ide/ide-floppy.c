@@ -1668,9 +1668,9 @@ static int idefloppy_get_format_progress(ide_drive_t *drive, int __user *arg)
 		atapi_status_t status;
 		unsigned long flags;
 
-		local_irq_save(flags);
+		local_irq_save_nort(flags);
 		status.all = HWIF(drive)->INB(IDE_STATUS_REG);
-		local_irq_restore(flags);
+		local_irq_restore_nort(flags);
 
 		progress_indication = !status.b.dsc ? 0 : 0x10000;
 	}

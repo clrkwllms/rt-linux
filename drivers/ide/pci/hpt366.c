@@ -1430,7 +1430,7 @@ static void __devinit init_dma_hpt366(ide_hwif_t *hwif, unsigned long dmabase)
 
 	dma_old = inb(dmabase + 2);
 
-	local_irq_save(flags);
+	local_irq_save_nort(flags);
 
 	dma_new = dma_old;
 	pci_read_config_byte(dev, hwif->channel ? 0x4b : 0x43, &masterdma);
@@ -1441,7 +1441,7 @@ static void __devinit init_dma_hpt366(ide_hwif_t *hwif, unsigned long dmabase)
 	if (dma_new != dma_old)
 		outb(dma_new, dmabase + 2);
 
-	local_irq_restore(flags);
+	local_irq_restore_nort(flags);
 
 	ide_setup_dma(hwif, dmabase, 8);
 }

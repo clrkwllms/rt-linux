@@ -447,15 +447,16 @@ int ide_set_xfer_rate(ide_drive_t *drive, u8 rate)
 
 static void ide_dump_opcode(ide_drive_t *drive)
 {
+	unsigned long flags;
 	struct request *rq;
 	u8 opcode = 0;
 	int found = 0;
 
-	spin_lock(&ide_lock);
+	spin_lock_irqsave(&ide_lock, flags);
 	rq = NULL;
 	if (HWGROUP(drive))
 		rq = HWGROUP(drive)->rq;
-	spin_unlock(&ide_lock);
+	spin_unlock_irqrestore(&ide_lock, flags);
 	if (!rq)
 		return;
 	if (rq->cmd_type == REQ_TYPE_ATA_CMD ||
@@ -484,10 +485,8 @@ static void ide_dump_opcode(ide_drive_t *drive)
 static u8 ide_dump_ata_status(ide_drive_t *drive, const char *msg, u8 stat)
 {
 	ide_hwif_t *hwif = HWIF(drive);
-	unsigned long flags;
 	u8 err = 0;
 
-	local_irq_save(flags);
 	printk("%s: %s: status=0x%02x { ", drive->name, msg, stat);
 	if (stat & BUSY_STAT)
 		printk("Busy ");
@@ -548,7 +547,7 @@ static u8 ide_dump_ata_status(ide_drive_t *drive, const char *msg, u8 stat)
 		printk("\n");
 	}
 	ide_dump_opcode(drive);
-	local_irq_restore(flags);
+
 	return err;
 }
 
@@ -563,14 +562,11 @@ static u8 ide_dump_ata_status(ide_drive_t *drive, const char *msg, u8 stat)
 
 static u8 ide_dump_atapi_status(ide_drive_t *drive, const char *msg, u8 stat)
 {
-	unsigned long flags;
-
 	atapi_status_t status;
 	atapi_error_t error;
 
 	status.all = stat;
 	error.all = 0;
-	local_irq_save(flags);
 	printk("%s: %s: status=0x%02x { ", drive->name, msg, stat);
 	if (status.b.bsy)
 		printk("Busy ");
@@ -596,7 +592,7 @@ static u8 ide_dump_atapi_status(ide_drive_t *drive, const char *msg, u8 stat)
 		printk("}\n");
 	}
 	ide_dump_opcode(drive);
-	local_irq_restore(flags);
+
 	return error.all;
 }
 
