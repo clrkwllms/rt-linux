@@ -133,7 +133,7 @@ static void restart_machine(void)
 {
 	stopmachine_set_state(STOPMACHINE_EXIT);
 	local_irq_enable();
-	preempt_enable_no_resched();
+	__preempt_enable_no_resched();
 }
 
 struct stop_machine_data
