@@ -221,7 +221,10 @@ struct net_local {
 	int should_relinquish;
 	spinlock_t lock;
 	atomic_t kill_timer;
-	struct semaphore killed_timer_sem;
+	/*
+	 * PREEMPT_RT: this isnt a mutex, it should be struct completion.
+	 */
+	struct compat_semaphore killed_timer_sem;
 };
 
 static inline void enable_parport_interrupts (struct net_device *dev)

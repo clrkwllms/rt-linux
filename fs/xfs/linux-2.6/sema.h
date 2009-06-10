@@ -27,7 +27,7 @@
  * sema_t structure just maps to struct semaphore in Linux kernel.
  */
 
-typedef struct semaphore sema_t;
+typedef struct compat_semaphore sema_t;
 
 #define initnsema(sp, val, name)	sema_init(sp, val)
 #define psema(sp, b)			down(sp)
@@ -36,7 +36,12 @@ typedef struct semaphore sema_t;
 
 static inline int issemalocked(sema_t *sp)
 {
-	return down_trylock(sp) || (up(sp), 0);
+	int rv;
+
+	if ((rv = down_trylock(sp)))
+		return (rv);
+	up(sp);
+	return (0);
 }
 
 /*

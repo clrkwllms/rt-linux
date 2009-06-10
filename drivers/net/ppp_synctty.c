@@ -70,7 +70,7 @@ struct syncppp {
 	struct tasklet_struct tsk;
 
 	atomic_t	refcnt;
-	struct semaphore dead_sem;
+	struct compat_semaphore dead_sem;
 	struct ppp_channel chan;	/* interface to generic ppp layer */
 };
 

@@ -123,7 +123,7 @@ struct sixpack {
 	struct timer_list	tx_t;
 	struct timer_list	resync_t;
 	atomic_t		refcnt;
-	struct semaphore	dead_sem;
+	struct compat_semaphore	dead_sem;
 	spinlock_t		lock;
 };
 

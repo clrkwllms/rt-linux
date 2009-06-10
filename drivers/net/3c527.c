@@ -182,7 +182,7 @@ struct mc32_local
 
 	u16 rx_ring_tail;       /* index to rx de-queue end */
 
-	struct semaphore cmd_mutex;    /* Serialises issuing of execute commands */
+	struct compat_semaphore cmd_mutex;    /* Serialises issuing of execute commands */
         struct completion execution_cmd; /* Card has completed an execute command */
 	struct completion xceiver_cmd;   /* Card has completed a tx or rx command */
 };
