@@ -73,7 +73,7 @@ acpi_status acpi_hw_clear_acpi_status(void)
 			  ACPI_BITMASK_ALL_FIXED_STATUS,
 			  (u16) acpi_gbl_FADT.xpm1a_event_block.address));
 
-	lock_flags = acpi_os_acquire_lock(acpi_gbl_hardware_lock);
+	spin_lock_irqsave(acpi_gbl_hardware_lock, lock_flags);
 
 	status = acpi_hw_register_write(ACPI_REGISTER_PM1_STATUS,
 					ACPI_BITMASK_ALL_FIXED_STATUS);
@@ -97,7 +97,7 @@ acpi_status acpi_hw_clear_acpi_status(void)
 	status = acpi_ev_walk_gpe_list(acpi_hw_clear_gpe_block);
 
       unlock_and_exit:
-	acpi_os_release_lock(acpi_gbl_hardware_lock, lock_flags);
+	spin_unlock_irqrestore(acpi_gbl_hardware_lock, lock_flags);
 	return_ACPI_STATUS(status);
 }
 
@@ -300,9 +300,9 @@ acpi_status acpi_get_register(u32 register_id, u32 * return_value)
 {
 	acpi_status status;
 	acpi_cpu_flags flags;
-	flags = acpi_os_acquire_lock(acpi_gbl_hardware_lock);
+	spin_lock_irqsave(acpi_gbl_hardware_lock, flags);
 	status = acpi_get_register_unlocked(register_id, return_value);
-	acpi_os_release_lock(acpi_gbl_hardware_lock, flags);
+	spin_unlock_irqrestore(acpi_gbl_hardware_lock, flags);
 	return status;
 }
 
@@ -339,7 +339,7 @@ acpi_status acpi_set_register(u32 register_id, u32 value)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	lock_flags = acpi_os_acquire_lock(acpi_gbl_hardware_lock);
+	spin_lock_irqsave(acpi_gbl_hardware_lock, lock_flags);
 
 	/* Always do a register read first so we can insert the new bits  */
 
@@ -443,7 +443,7 @@ acpi_status acpi_set_register(u32 register_id, u32 value)
 
       unlock_and_exit:
 
-	acpi_os_release_lock(acpi_gbl_hardware_lock, lock_flags);
+	spin_unlock_irqrestore(acpi_gbl_hardware_lock, lock_flags);
 
 	/* Normalize the value that was read */
 
