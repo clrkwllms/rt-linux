@@ -350,10 +350,10 @@ void nmi_show_all_regs(void)
 
 static DEFINE_RAW_SPINLOCK(nmi_print_lock);
 
-notrace void irq_show_regs_callback(int cpu, struct pt_regs *regs)
+notrace int irq_show_regs_callback(int cpu, struct pt_regs *regs)
 {
 	if (!nmi_show_regs[cpu])
-		return;
+		return 0;
 
 	nmi_show_regs[cpu] = 0;
 	spin_lock(&nmi_print_lock);
@@ -362,6 +362,7 @@ notrace void irq_show_regs_callback(int cpu, struct pt_regs *regs)
 		per_cpu(irq_stat, cpu).apic_timer_irqs);
 	show_regs(regs);
 	spin_unlock(&nmi_print_lock);
+	return 1;
 }
 
 notrace __kprobes int
@@ -376,8 +377,9 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	unsigned int sum;
 	int touched = 0;
 	int cpu = smp_processor_id();
-	int rc=0;
+	int rc;
 
+	rc = irq_show_regs_callback(cpu, regs);
 	__profile_tick(CPU_PROFILING, regs);
 
 	/* check for other users first */
@@ -403,8 +405,6 @@ nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	 */
 	sum = per_cpu(irq_stat, cpu).apic_timer_irqs +
 		per_cpu(irq_stat, cpu).irq0_irqs;
-
-	irq_show_regs_callback(cpu, regs);
 
 	/* if the apic timer isn't firing, this cpu isn't doing much */
 	/* if the none of the timers isn't firing, this cpu isn't doing much */
