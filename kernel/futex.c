@@ -284,6 +284,31 @@ void put_futex_key(int fshared, union futex_key *key)
 	drop_futex_key_refs(key);
 }
 
+/*
+ * get_user_writeable - get user page and verify RW access
+ * @uaddr:	pointer to faulting user space address
+ *
+ * We cannot write to the user space address and get_user just faults
+ * the page in, but does not tell us whether the mapping is writeable.
+ *
+ * We can not rely on access_ok() for private futexes as it is just a
+ * range check and we can neither rely on get_user_pages() as there
+ * might be a mprotect(PROT_READ) for that mapping after
+ * get_user_pages() and before the fault in the atomic write access.
+ */
+static int get_user_writeable(u32 __user *uaddr)
+{
+	unsigned long addr = (unsigned long)uaddr;
+	struct page *page;
+	int ret;
+
+	ret = get_user_pages_fast(addr, 1, 1, &page);
+	if (!ret)
+		put_page(page);
+
+	return ret;
+}
+
 /**
  * futex_top_waiter() - Return the highest priority waiter on a futex
  * @hb:     the hash bucket the futex_q's reside in
@@ -896,7 +921,6 @@ retry:
 retry_private:
 	op_ret = futex_atomic_op_inuser(op, uaddr2);
 	if (unlikely(op_ret < 0)) {
-		u32 dummy;
 
 		double_unlock_hb(hb1, hb2);
 
@@ -914,7 +938,7 @@ retry_private:
 			goto out_put_keys;
 		}
 
-		ret = get_user(dummy, uaddr2);
+		ret = get_user_writeable(uaddr2);
 		if (ret)
 			goto out_put_keys;
 
@@ -1204,7 +1228,7 @@ retry_private:
 			double_unlock_hb(hb1, hb2);
 			put_futex_key(fshared, &key2);
 			put_futex_key(fshared, &key1);
-			ret = get_user(curval2, uaddr2);
+			ret = get_user_writeable(uaddr2);
 			if (!ret)
 				goto retry;
 			goto out;
@@ -1482,7 +1506,7 @@ retry:
 handle_fault:
 	spin_unlock(q->lock_ptr);
 
-	ret = get_user(uval, uaddr);
+	ret = get_user_writeable(uaddr);
 
 	spin_lock(q->lock_ptr);
 
@@ -1807,7 +1831,6 @@ static int futex_lock_pi(u32 __user *uaddr, int fshared,
 {
 	struct hrtimer_sleeper timeout, *to = NULL;
 	struct futex_hash_bucket *hb;
-	u32 uval;
 	struct futex_q q;
 	int res, ret;
 
@@ -1909,16 +1932,9 @@ out:
 	return ret != -EINTR ? ret : -ERESTARTNOINTR;
 
 uaddr_faulted:
-	/*
-	 * We have to r/w  *(int __user *)uaddr, and we have to modify it
-	 * atomically.  Therefore, if we continue to fault after get_user()
-	 * below, we need to handle the fault ourselves, while still holding
-	 * the mmap_sem.  This can occur if the uaddr is under contention as
-	 * we have to drop the mmap_sem in order to call get_user().
-	 */
 	queue_unlock(&q, hb);
 
-	ret = get_user(uval, uaddr);
+	ret = get_user_writeable(uaddr);
 	if (ret)
 		goto out_put_key;
 
@@ -2013,17 +2029,10 @@ out:
 	return ret;
 
 pi_faulted:
-	/*
-	 * We have to r/w  *(int __user *)uaddr, and we have to modify it
-	 * atomically.  Therefore, if we continue to fault after get_user()
-	 * below, we need to handle the fault ourselves, while still holding
-	 * the mmap_sem.  This can occur if the uaddr is under contention as
-	 * we have to drop the mmap_sem in order to call get_user().
-	 */
 	spin_unlock(&hb->lock);
 	put_futex_key(fshared, &key);
 
-	ret = get_user(uval, uaddr);
+	ret = get_user_writeable(uaddr);
 	if (!ret)
 		goto retry;
 
