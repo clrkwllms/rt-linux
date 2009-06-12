@@ -38,7 +38,7 @@ struct mutex {
 	struct mutex mutexname = __MUTEX_INITIALIZER(mutexname)
 
 extern void
-_mutex_init(struct mutex *lock, char *name, struct lock_class_key *key);
+__mutex_init(struct mutex *lock, char *name, struct lock_class_key *key);
 
 extern void __lockfunc _mutex_lock(struct mutex *lock);
 extern int __lockfunc _mutex_lock_interruptible(struct mutex *lock);
@@ -75,7 +75,7 @@ extern void __lockfunc _mutex_unlock(struct mutex *lock);
 do {							\
 	static struct lock_class_key __key;		\
 							\
-	_mutex_init((mutex), #mutex, &__key);		\
+	__mutex_init((mutex), #mutex, &__key);		\
 } while (0)
 
 #else /* PREEMPT_RT */
