@@ -239,7 +239,7 @@ unsigned int arpt_do_table(struct sk_buff *skb,
 
 	read_lock_bh(&table->lock);
 	private = table->private;
-	table_base = (void *)private->entries[smp_processor_id()];
+	table_base = (void *)private->entries[raw_smp_processor_id()];
 	e = get_entry(table_base, private->hook_entry[hook]);
 	back = get_entry(table_base, private->underflow[hook]);
 
@@ -1159,7 +1159,7 @@ static int do_add_counters(struct net *net, void __user *user, unsigned int len,
 
 	i = 0;
 	/* Choose the copy that is on our node */
-	loc_cpu_entry = private->entries[smp_processor_id()];
+	loc_cpu_entry = private->entries[raw_smp_processor_id()];
 	ARPT_ENTRY_ITERATE(loc_cpu_entry,
 			   private->size,
 			   add_counter_to_entry,
