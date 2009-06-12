@@ -188,6 +188,7 @@ extern struct cred init_cred;
 	.cpu_timers	= INIT_CPU_TIMERS(tsk.cpu_timers),		\
 	.fs_excl	= ATOMIC_INIT(0),				\
 	.timer_slack_ns = 50000, /* 50 usec default slack */		\
+	.posix_timer_list = NULL,					\
 	.pi_lock	= RAW_SPIN_LOCK_UNLOCKED(tsk.pi_lock),		\
 	.pids = {							\
 		[PIDTYPE_PID]  = INIT_PID_LINK(PIDTYPE_PID),		\
