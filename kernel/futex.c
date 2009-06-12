@@ -979,7 +979,7 @@ void requeue_futex(struct futex_q *q, struct futex_hash_bucket *hb1,
 		plist_del(&q->list, &hb1->chain);
 		plist_add(&q->list, &hb2->chain);
 		q->lock_ptr = &hb2->lock;
-#ifdef CONFIG_DEBUG_PI_LIST
+#if defined(CONFIG_DEBUG_PI_LIST) && !defined(CONFIG_PREEMPT_RT)
 		q->list.plist.lock = &hb2->lock;
 #endif
 	}
@@ -1317,7 +1317,7 @@ static inline void queue_me(struct futex_q *q, struct futex_hash_bucket *hb)
 	prio = min(current->normal_prio, MAX_RT_PRIO);
 
 	plist_node_init(&q->list, prio);
-#ifdef CONFIG_DEBUG_PI_LIST
+#if defined(CONFIG_DEBUG_PI_LIST) && !defined(CONFIG_PREEMPT_RT)
 	q->list.plist.lock = &hb->lock;
 #endif
 	plist_add(&q->list, &hb->chain);
@@ -1614,6 +1614,10 @@ static void futex_wait_queue_me(struct futex_hash_bucket *hb, struct futex_q *q,
 	 * q.lock_ptr != 0 is not safe, because of ordering against wakeup.
 	 */
 	if (likely(!plist_node_empty(&q->list))) {
+		unsigned long nosched_flag = current->flags & PF_NOSCHED;
+
+		current->flags &= ~PF_NOSCHED;
+
 		/*
 		 * If the timer has already expired, current will already be
 		 * flagged for rescheduling. Only call schedule if there
@@ -1621,6 +1625,8 @@ static void futex_wait_queue_me(struct futex_hash_bucket *hb, struct futex_q *q,
 		 */
 		if (!timeout || timeout->task)
 			schedule();
+
+		current->flags |= nosched_flag;
 	}
 	__set_current_state(TASK_RUNNING);
 }
