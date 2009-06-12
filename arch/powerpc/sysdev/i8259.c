@@ -23,7 +23,7 @@ static unsigned char cached_8259[2] = { 0xff, 0xff };
 #define cached_A1 (cached_8259[0])
 #define cached_21 (cached_8259[1])
 
-static DEFINE_SPINLOCK(i8259_lock);
+static DEFINE_RAW_SPINLOCK(i8259_lock);
 
 static struct irq_host *i8259_host;
 

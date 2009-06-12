@@ -42,7 +42,7 @@ static void __devinit smp_chrp_setup_cpu(int cpu_nr)
 	mpic_setup_this_cpu();
 }
 
-static DEFINE_SPINLOCK(timebase_lock);
+static DEFINE_RAW_SPINLOCK(timebase_lock);
 static unsigned int timebase_upper = 0, timebase_lower = 0;
 
 void __devinit smp_chrp_give_timebase(void)
