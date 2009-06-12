@@ -49,6 +49,7 @@
 #include <linux/delayacct.h>
 #include <linux/unistd.h>
 #include <linux/rmap.h>
+#include <linux/irq.h>
 #include <linux/mempolicy.h>
 #include <linux/key.h>
 #include <linux/buffer_head.h>
@@ -583,8 +584,10 @@ asmlinkage void __init start_kernel(void)
 	 * fragile until we cpu_idle() for the first time.
 	 */
 	preempt_disable();
+
 	build_all_zonelists();
 	page_alloc_init();
+	early_init_hardirqs();
 	printk(KERN_NOTICE "Kernel command line: %s\n", boot_command_line);
 	parse_early_param();
 	parse_args("Booting kernel", static_command_line, __start___param,
@@ -863,6 +866,8 @@ static int __init kernel_init(void * unused)
 	cad_pid = task_pid(current);
 
 	smp_prepare_cpus(setup_max_cpus);
+
+	init_hardirqs();
 
 	do_pre_smp_initcalls();
 	start_boot_trace();

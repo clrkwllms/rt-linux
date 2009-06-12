@@ -98,6 +98,12 @@ extern int softirq_preemption;
 # define softirq_preemption 0
 #endif
 
+#ifdef CONFIG_PREEMPT_HARDIRQS
+extern int hardirq_preemption;
+#else
+# define hardirq_preemption 0
+#endif
+
 struct mem_cgroup;
 struct exec_domain;
 struct futex_pi_state;
@@ -1632,6 +1638,7 @@ extern cputime_t task_gtime(struct task_struct *p);
 #define PF_EXITING	0x00000004	/* getting shut down */
 #define PF_EXITPIDONE	0x00000008	/* pi exit done on shut down */
 #define PF_VCPU		0x00000010	/* I'm a virtual CPU */
+#define PF_HARDIRQ	0x08000020	/* hardirq context */
 #define PF_FORKNOEXEC	0x00000040	/* forked but didn't exec */
 #define PF_SUPERPRIV	0x00000100	/* used super-user privileges */
 #define PF_DUMPCORE	0x00000200	/* dumped core */
@@ -2240,6 +2247,7 @@ static inline int cond_resched_bkl(void)
 	return _cond_resched();
 }
 extern int cond_resched_softirq_context(void);
+extern int cond_resched_hardirq_context(void);
 
 /*
  * Does a critical section need to be broken due to another
@@ -2275,6 +2283,13 @@ static inline void thread_group_cputime_free(struct signal_struct *sig)
 static inline int softirq_need_resched(void)
 {
 	if (softirq_preemption && (current->flags & PF_SOFTIRQ))
+		return need_resched();
+	return 0;
+}
+
+static inline int hardirq_need_resched(void)
+{
+	if (hardirq_preemption && (current->flags & PF_HARDIRQ))
 		return need_resched();
 	return 0;
 }
