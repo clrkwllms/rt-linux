@@ -979,7 +979,7 @@ static int transfer_objects(struct array_cache *to,
 #ifndef CONFIG_NUMA
 
 #define drain_alien_cache(cachep, alien) do { } while (0)
-#define reap_alien(cachep, l3, this_cpu) do { } while (0)
+#define reap_alien(cachep, l3, this_cpu) 0
 
 static inline struct array_cache **alloc_alien_cache(int node, int limit)
 {
@@ -1077,7 +1077,7 @@ static void __drain_alien_cache(struct kmem_cache *cachep,
 /*
  * Called from cache_reap() to regularly drain alien caches round robin.
  */
-static void
+static int
 reap_alien(struct kmem_cache *cachep, struct kmem_list3 *l3, int *this_cpu)
 {
 	int node = per_cpu(reap_node, *this_cpu);
@@ -1088,8 +1088,10 @@ reap_alien(struct kmem_cache *cachep, struct kmem_list3 *l3, int *this_cpu)
 		if (ac && ac->avail && spin_trylock_irq(&ac->lock)) {
 			__drain_alien_cache(cachep, ac, node, this_cpu);
 			spin_unlock_irq(&ac->lock);
+			return 1;
 		}
 	}
+	return 0;
 }
 
 static void drain_alien_cache(struct kmem_cache *cachep,
@@ -2445,7 +2447,7 @@ static void check_spinlock_acquired_node(struct kmem_cache *cachep, int node)
 #define check_spinlock_acquired_node(x, y) do { } while(0)
 #endif
 
-static void drain_array(struct kmem_cache *cachep, struct kmem_list3 *l3,
+static int drain_array(struct kmem_cache *cachep, struct kmem_list3 *l3,
 			struct array_cache *ac,
 			int force, int node);
 
@@ -4082,14 +4084,15 @@ static int enable_cpucache(struct kmem_cache *cachep)
  * Drain an array if it contains any elements taking the l3 lock only if
  * necessary. Note that the l3 listlock also protects the array_cache
  * if drain_array() is used on the shared array.
+ * returns non-zero if some work is done
  */
-void drain_array(struct kmem_cache *cachep, struct kmem_list3 *l3,
+int drain_array(struct kmem_cache *cachep, struct kmem_list3 *l3,
 		 struct array_cache *ac, int force, int node)
 {
 	int tofree, this_cpu;
 
 	if (!ac || !ac->avail)
-		return;
+		return 0;
 	if (ac->touched && !force) {
 		ac->touched = 0;
 	} else {
@@ -4105,6 +4108,7 @@ void drain_array(struct kmem_cache *cachep, struct kmem_list3 *l3,
 		}
 		slab_spin_unlock_irq(&l3->list_lock, this_cpu);
 	}
+	return 1;
 }
 
 /**
@@ -4142,10 +4146,10 @@ static void cache_reap(struct work_struct *w)
 		 */
 		l3 = searchp->nodelists[node];
 
-		reap_alien(searchp, l3, &this_cpu);
+		work_done += reap_alien(searchp, l3, &this_cpu);
 
-		drain_array(searchp, l3, cpu_cache_get(searchp, this_cpu),
-			    0, node);
+		work_done += drain_array(searchp, l3,
+			    cpu_cache_get(searchp, this_cpu), 0, node);
 
 		/*
 		 * These are racy checks but it does not matter
@@ -4156,7 +4160,7 @@ static void cache_reap(struct work_struct *w)
 
 		l3->next_reap = jiffies + REAPTIMEOUT_LIST3;
 
-		drain_array(searchp, l3, l3->shared, 0, node);
+		work_done += drain_array(searchp, l3, l3->shared, 0, node);
 
 		if (l3->free_touched)
 			l3->free_touched = 0;
@@ -4175,7 +4179,8 @@ next:
 	next_reap_node();
 out:
 	/* Set up the next iteration */
-	schedule_delayed_work(work, round_jiffies_relative(REAPTIMEOUT_CPUC));
+	schedule_delayed_work(work,
+		round_jiffies_relative((1+!work_done) * REAPTIMEOUT_CPUC));
 }
 
 #ifdef CONFIG_SLABINFO
