@@ -80,7 +80,7 @@ struct microcode_amd {
 #define UCODE_CONTAINER_HEADER_SIZE	12
 
 /* serialize access to the physical write */
-static DEFINE_SPINLOCK(microcode_update_lock);
+static DEFINE_RAW_SPINLOCK(microcode_update_lock);
 
 static struct equiv_cpu_entry *equiv_cpu_table;
 
