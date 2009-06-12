@@ -12,8 +12,13 @@ void coda_destroy_inodecache(void);
 int coda_init_inodecache(void);
 int coda_fsync(struct file *coda_file, struct dentry *coda_dentry,
 	       int datasync);
+#ifdef CONFIG_SYSCTL
 void coda_sysctl_init(void);
 void coda_sysctl_clean(void);
+#else
+static inline void coda_sysctl_init(void) { }
+static inline void coda_sysctl_clean(void) { }
+#endif
 
 #endif  /*  _CODA_INT_  */
 

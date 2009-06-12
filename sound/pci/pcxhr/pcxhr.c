@@ -224,7 +224,7 @@ static int pcxhr_pll_freq_register(unsigned int freq, unsigned int* pllreg,
 static int pcxhr_get_clock_reg(struct pcxhr_mgr *mgr, unsigned int rate,
 			       unsigned int *reg, unsigned int *freq)
 {
-	unsigned int val, realfreq, pllreg;
+	unsigned int val, realfreq, uninitialized_var(pllreg);
 	struct pcxhr_rmh rmh;
 	int err;
 
@@ -298,7 +298,9 @@ static int pcxhr_sub_set_clock(struct pcxhr_mgr *mgr,
 			       unsigned int rate,
 			       int *changed)
 {
-	unsigned int val, realfreq, speed;
+	unsigned int uninitialized_var(val),
+		     uninitialized_var(realfreq),
+		     speed;
 	struct pcxhr_rmh rmh;
 	int err;
 
@@ -681,7 +683,7 @@ static void pcxhr_trigger_tasklet(unsigned long arg)
 {
 	unsigned long flags;
 	int i, j, err;
-	struct pcxhr_pipe *pipe;
+	struct pcxhr_pipe *uninitialized_var(pipe);
 	struct snd_pcxhr *chip;
 	struct pcxhr_mgr *mgr = (struct pcxhr_mgr*)(arg);
 	int capture_mask = 0;

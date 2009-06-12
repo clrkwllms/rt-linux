@@ -194,7 +194,7 @@ static int __devinit snd_vx222_probe(struct pci_dev *pci,
 	static int dev;
 	struct snd_card *card;
 	struct snd_vx_hardware *hw;
-	struct snd_vx222 *vx;
+	struct snd_vx222 *uninitialized_var(vx);
 	int err;
 
 	if (dev >= SNDRV_CARDS)

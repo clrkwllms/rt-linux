@@ -295,8 +295,10 @@ static char hop_pattern_length[] = { 1,
 	JAPAN_TEST_HOP_MOD
 };
 
+#ifdef CONFIG_PROC_FS
 static char rcsid[] =
     "Raylink/WebGear wireless LAN - Corey <Thomas corey@world.std.com>";
+#endif
 
 static const struct net_device_ops ray_netdev_ops = {
 	.ndo_init 		= ray_dev_init,

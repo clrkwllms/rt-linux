@@ -8985,7 +8985,7 @@ AscSendScsiQueue(ASC_DVC_VAR *asc_dvc, ASC_SCSI_Q *scsiq, uchar n_q_required)
 {
 	PortAddr iop_base;
 	uchar free_q_head;
-	uchar next_qp;
+	uchar uninitialized_var(next_qp);
 	uchar tid_no;
 	uchar target_ix;
 	int sta;
@@ -9414,7 +9414,7 @@ static int asc_execute_scsi_cmnd(struct scsi_cmnd *scp)
 		err_code = asc_dvc->err_code;
 	} else {
 		ADV_DVC_VAR *adv_dvc = &boardp->dvc_var.adv_dvc_var;
-		ADV_SCSI_REQ_Q *adv_scsiqp;
+		ADV_SCSI_REQ_Q *uninitialized_var(adv_scsiqp);
 
 		switch (adv_build_req(boardp, scp, &adv_scsiqp)) {
 		case ASC_NOERROR:
@@ -12346,7 +12346,9 @@ static int __devinit advansys_board_found(struct Scsi_Host *shost,
 #endif
  err_free_proc:
 	kfree(boardp->prtbuf);
+#ifdef CONFIG_PROC_FS
  err_unmap:
+#endif
 	if (boardp->ioremap_addr)
 		iounmap(boardp->ioremap_addr);
  err_shost:

@@ -168,7 +168,7 @@ befs_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 	befs_off_t offset;
 	int ret;
 	int utfnamelen;
-	char *utfname;
+	char *uninitialized_var(utfname);
 	const char *name = dentry->d_name.name;
 
 	befs_debug(sb, "---> befs_lookup() "
@@ -221,8 +221,8 @@ befs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	size_t keysize;
 	unsigned char d_type;
 	char keybuf[BEFS_NAME_LEN + 1];
-	char *nlsname;
-	int nlsnamelen;
+	char *uninitialized_var(nlsname);
+	int uninitialized_var(nlsnamelen);
 	const char *dirname = filp->f_path.dentry->d_name.name;
 
 	befs_debug(sb, "---> befs_readdir() "
