@@ -12,10 +12,73 @@
 
 #include <linux/list.h>
 #include <linux/spinlock_types.h>
+#include <linux/rt_lock.h>
 #include <linux/linkage.h>
 #include <linux/lockdep.h>
 
 #include <asm/atomic.h>
+
+#ifdef CONFIG_PREEMPT_RT
+
+#include <linux/rtmutex.h>
+
+struct mutex {
+	struct rt_mutex		lock;
+#ifdef CONFIG_DEBUG_LOCK_ALLOC
+	struct lockdep_map	dep_map;
+#endif
+};
+
+#define __MUTEX_INITIALIZER(mutexname)					\
+	{								\
+		.lock = __RT_MUTEX_INITIALIZER(mutexname.lock)		\
+	}
+
+#define DEFINE_MUTEX(mutexname)						\
+	struct mutex mutexname = __MUTEX_INITIALIZER(mutexname)
+
+extern void
+_mutex_init(struct mutex *lock, char *name, struct lock_class_key *key);
+
+extern void __lockfunc _mutex_lock(struct mutex *lock);
+extern int __lockfunc _mutex_lock_interruptible(struct mutex *lock);
+extern int __lockfunc _mutex_lock_killable(struct mutex *lock);
+extern void __lockfunc _mutex_lock_nested(struct mutex *lock, int subclass);
+extern int __lockfunc _mutex_lock_interruptible_nested(struct mutex *lock, int subclass);
+extern int __lockfunc _mutex_lock_killable_nested(struct mutex *lock, int subclass);
+extern int __lockfunc _mutex_trylock(struct mutex *lock);
+extern void __lockfunc _mutex_unlock(struct mutex *lock);
+
+#define mutex_is_locked(l)		rt_mutex_is_locked(&(l)->lock)
+#define mutex_lock(l)			_mutex_lock(l)
+#define mutex_lock_interruptible(l)	_mutex_lock_interruptible(l)
+#define mutex_lock_killable(l)		_mutex_lock_killable(l)
+#define mutex_trylock(l)		_mutex_trylock(l)
+#define mutex_unlock(l)			_mutex_unlock(l)
+#define mutex_destroy(l)		rt_mutex_destroy(&(l)->lock)
+
+#ifdef CONFIG_DEBUG_LOCK_ALLOC
+# define mutex_lock_nested(l, s)	_mutex_lock_nested(l, s)
+# define mutex_lock_interruptible_nested(l, s) \
+					_mutex_lock_interruptible_nested(l, s)
+# define mutex_lock_killable_nested(l, s) \
+					_mutex_lock_killable_nested(l, s)
+#else
+# define mutex_lock_nested(l, s)	_mutex_lock(l)
+# define mutex_lock_interruptible_nested(l, s) \
+					_mutex_lock_interruptible(l)
+# define mutex_lock_killable_nested(l, s) \
+					_mutex_lock_killable(l)
+#endif
+
+# define mutex_init(mutex)				\
+do {							\
+	static struct lock_class_key __key;		\
+							\
+	_mutex_init((mutex), #mutex, &__key);		\
+} while (0)
+
+#else /* PREEMPT_RT */
 
 /*
  * Simple, straightforward mutexes with strict semantics:
@@ -173,5 +236,7 @@ static inline int atomic_dec_and_mutex_lock(atomic_t *cnt, struct mutex *lock)
 	/* we hit 0, and we hold the lock */
 	return 1;
 }
+
+#endif /* !PREEMPT_RT */
 
 #endif

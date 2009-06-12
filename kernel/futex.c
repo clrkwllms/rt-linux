@@ -2589,7 +2589,11 @@ static int __init futex_init(void)
 		futex_cmpxchg_enabled = 1;
 
 	for (i = 0; i < ARRAY_SIZE(futex_queues); i++) {
+#ifdef CONFIG_PREEMPT_RT
+		plist_head_init(&futex_queues[i].chain, NULL);
+#else
 		plist_head_init(&futex_queues[i].chain, &futex_queues[i].lock);
+#endif
 		spin_lock_init(&futex_queues[i].lock);
 	}
 

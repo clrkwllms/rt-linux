@@ -13,8 +13,8 @@
 #include <linux/delay.h>
 #include <linux/module.h>
 
-void __spin_lock_init(spinlock_t *lock, const char *name,
-		      struct lock_class_key *key)
+void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
+			  struct lock_class_key *key)
 {
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	/*
@@ -23,16 +23,16 @@ void __spin_lock_init(spinlock_t *lock, const char *name,
 	debug_check_no_locks_freed((void *)lock, sizeof(*lock));
 	lockdep_init_map(&lock->dep_map, name, key, 0);
 #endif
-	lock->raw_lock = (raw_spinlock_t)__RAW_SPIN_LOCK_UNLOCKED;
+	lock->raw_lock = (__raw_spinlock_t)__RAW_SPIN_LOCK_UNLOCKED;
 	lock->magic = SPINLOCK_MAGIC;
 	lock->owner = SPINLOCK_OWNER_INIT;
 	lock->owner_cpu = -1;
 }
 
-EXPORT_SYMBOL(__spin_lock_init);
+EXPORT_SYMBOL(__raw_spin_lock_init);
 
-void __rwlock_init(rwlock_t *lock, const char *name,
-		   struct lock_class_key *key)
+void __raw_rwlock_init(raw_rwlock_t *lock, const char *name,
+		       struct lock_class_key *key)
 {
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	/*
@@ -41,15 +41,15 @@ void __rwlock_init(rwlock_t *lock, const char *name,
 	debug_check_no_locks_freed((void *)lock, sizeof(*lock));
 	lockdep_init_map(&lock->dep_map, name, key, 0);
 #endif
-	lock->raw_lock = (raw_rwlock_t) __RAW_RW_LOCK_UNLOCKED;
+	lock->raw_lock = (__raw_rwlock_t) __RAW_RW_LOCK_UNLOCKED;
 	lock->magic = RWLOCK_MAGIC;
 	lock->owner = SPINLOCK_OWNER_INIT;
 	lock->owner_cpu = -1;
 }
 
-EXPORT_SYMBOL(__rwlock_init);
+EXPORT_SYMBOL(__raw_rwlock_init);
 
-static void spin_bug(spinlock_t *lock, const char *msg)
+static void spin_bug(raw_spinlock_t *lock, const char *msg)
 {
 	struct task_struct *owner = NULL;
 
@@ -73,7 +73,7 @@ static void spin_bug(spinlock_t *lock, const char *msg)
 #define SPIN_BUG_ON(cond, lock, msg) if (unlikely(cond)) spin_bug(lock, msg)
 
 static inline void
-debug_spin_lock_before(spinlock_t *lock)
+debug_spin_lock_before(raw_spinlock_t *lock)
 {
 	SPIN_BUG_ON(lock->magic != SPINLOCK_MAGIC, lock, "bad magic");
 	SPIN_BUG_ON(lock->owner == current, lock, "recursion");
@@ -81,13 +81,13 @@ debug_spin_lock_before(spinlock_t *lock)
 							lock, "cpu recursion");
 }
 
-static inline void debug_spin_lock_after(spinlock_t *lock)
+static inline void debug_spin_lock_after(raw_spinlock_t *lock)
 {
 	lock->owner_cpu = raw_smp_processor_id();
 	lock->owner = current;
 }
 
-static inline void debug_spin_unlock(spinlock_t *lock)
+static inline void debug_spin_unlock(raw_spinlock_t *lock)
 {
 	SPIN_BUG_ON(lock->magic != SPINLOCK_MAGIC, lock, "bad magic");
 	SPIN_BUG_ON(!spin_is_locked(lock), lock, "already unlocked");
@@ -98,7 +98,7 @@ static inline void debug_spin_unlock(spinlock_t *lock)
 	lock->owner_cpu = -1;
 }
 
-static void __spin_lock_debug(spinlock_t *lock)
+static void __spin_lock_debug(raw_spinlock_t *lock)
 {
 	u64 i;
 	u64 loops = loops_per_jiffy * HZ;
@@ -125,7 +125,7 @@ static void __spin_lock_debug(spinlock_t *lock)
 	}
 }
 
-void _raw_spin_lock(spinlock_t *lock)
+void __lockfunc _raw_spin_lock(raw_spinlock_t *lock)
 {
 	debug_spin_lock_before(lock);
 	if (unlikely(!__raw_spin_trylock(&lock->raw_lock)))
@@ -133,7 +133,7 @@ void _raw_spin_lock(spinlock_t *lock)
 	debug_spin_lock_after(lock);
 }
 
-int _raw_spin_trylock(spinlock_t *lock)
+int __lockfunc _raw_spin_trylock(raw_spinlock_t *lock)
 {
 	int ret = __raw_spin_trylock(&lock->raw_lock);
 
@@ -148,13 +148,13 @@ int _raw_spin_trylock(spinlock_t *lock)
 	return ret;
 }
 
-void _raw_spin_unlock(spinlock_t *lock)
+void __lockfunc _raw_spin_unlock(raw_spinlock_t *lock)
 {
 	debug_spin_unlock(lock);
 	__raw_spin_unlock(&lock->raw_lock);
 }
 
-static void rwlock_bug(rwlock_t *lock, const char *msg)
+static void rwlock_bug(raw_rwlock_t *lock, const char *msg)
 {
 	if (!debug_locks_off())
 		return;
@@ -167,8 +167,8 @@ static void rwlock_bug(rwlock_t *lock, const char *msg)
 
 #define RWLOCK_BUG_ON(cond, lock, msg) if (unlikely(cond)) rwlock_bug(lock, msg)
 
-#if 0		/* __write_lock_debug() can lock up - maybe this can too? */
-static void __read_lock_debug(rwlock_t *lock)
+#if 1		/* __write_lock_debug() can lock up - maybe this can too? */
+static void __raw_read_lock_debug(raw_rwlock_t *lock)
 {
 	u64 i;
 	u64 loops = loops_per_jiffy * HZ;
@@ -193,13 +193,13 @@ static void __read_lock_debug(rwlock_t *lock)
 }
 #endif
 
-void _raw_read_lock(rwlock_t *lock)
+void __lockfunc _raw_read_lock(raw_rwlock_t *lock)
 {
 	RWLOCK_BUG_ON(lock->magic != RWLOCK_MAGIC, lock, "bad magic");
-	__raw_read_lock(&lock->raw_lock);
+	__raw_read_lock_debug(lock);
 }
 
-int _raw_read_trylock(rwlock_t *lock)
+int __lockfunc _raw_read_trylock(raw_rwlock_t *lock)
 {
 	int ret = __raw_read_trylock(&lock->raw_lock);
 
@@ -212,13 +212,13 @@ int _raw_read_trylock(rwlock_t *lock)
 	return ret;
 }
 
-void _raw_read_unlock(rwlock_t *lock)
+void __lockfunc _raw_read_unlock(raw_rwlock_t *lock)
 {
 	RWLOCK_BUG_ON(lock->magic != RWLOCK_MAGIC, lock, "bad magic");
 	__raw_read_unlock(&lock->raw_lock);
 }
 
-static inline void debug_write_lock_before(rwlock_t *lock)
+static inline void debug_write_lock_before(raw_rwlock_t *lock)
 {
 	RWLOCK_BUG_ON(lock->magic != RWLOCK_MAGIC, lock, "bad magic");
 	RWLOCK_BUG_ON(lock->owner == current, lock, "recursion");
@@ -226,13 +226,13 @@ static inline void debug_write_lock_before(rwlock_t *lock)
 							lock, "cpu recursion");
 }
 
-static inline void debug_write_lock_after(rwlock_t *lock)
+static inline void debug_write_lock_after(raw_rwlock_t *lock)
 {
 	lock->owner_cpu = raw_smp_processor_id();
 	lock->owner = current;
 }
 
-static inline void debug_write_unlock(rwlock_t *lock)
+static inline void debug_write_unlock(raw_rwlock_t *lock)
 {
 	RWLOCK_BUG_ON(lock->magic != RWLOCK_MAGIC, lock, "bad magic");
 	RWLOCK_BUG_ON(lock->owner != current, lock, "wrong owner");
@@ -242,8 +242,8 @@ static inline void debug_write_unlock(rwlock_t *lock)
 	lock->owner_cpu = -1;
 }
 
-#if 0		/* This can cause lockups */
-static void __write_lock_debug(rwlock_t *lock)
+#if 1		/* This can cause lockups */
+static void __raw_write_lock_debug(raw_rwlock_t *lock)
 {
 	u64 i;
 	u64 loops = loops_per_jiffy * HZ;
@@ -268,14 +268,14 @@ static void __write_lock_debug(rwlock_t *lock)
 }
 #endif
 
-void _raw_write_lock(rwlock_t *lock)
+void __lockfunc _raw_write_lock(raw_rwlock_t *lock)
 {
 	debug_write_lock_before(lock);
-	__raw_write_lock(&lock->raw_lock);
+	__raw_write_lock_debug(lock);
 	debug_write_lock_after(lock);
 }
 
-int _raw_write_trylock(rwlock_t *lock)
+int __lockfunc _raw_write_trylock(raw_rwlock_t *lock)
 {
 	int ret = __raw_write_trylock(&lock->raw_lock);
 
@@ -290,7 +290,7 @@ int _raw_write_trylock(rwlock_t *lock)
 	return ret;
 }
 
-void _raw_write_unlock(rwlock_t *lock)
+void __lockfunc _raw_write_unlock(raw_rwlock_t *lock)
 {
 	debug_write_unlock(lock);
 	__raw_write_unlock(&lock->raw_lock);
