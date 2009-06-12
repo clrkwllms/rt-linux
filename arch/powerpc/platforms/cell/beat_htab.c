@@ -40,7 +40,7 @@
 #define DBG_LOW(fmt...) do { } while (0)
 #endif
 
-static DEFINE_SPINLOCK(beat_htab_lock);
+static DEFINE_RAW_SPINLOCK(beat_htab_lock);
 
 static inline unsigned int beat_read_mask(unsigned hpte_group)
 {
