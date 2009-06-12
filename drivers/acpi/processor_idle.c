@@ -956,7 +956,7 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
 }
 
 static int c3_cpu_count;
-static DEFINE_SPINLOCK(c3_lock);
+static DEFINE_RAW_SPINLOCK(c3_lock);
 
 /**
  * acpi_idle_enter_bm - enters C3 with proper BM handling
