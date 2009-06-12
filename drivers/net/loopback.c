@@ -82,7 +82,7 @@ static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 	lb_stats->packets++;
 	put_cpu();
 
-	netif_rx(skb);
+	netif_rx_ni(skb);
 
 	return 0;
 }
