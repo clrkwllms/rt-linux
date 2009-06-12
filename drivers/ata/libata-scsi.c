@@ -3247,7 +3247,7 @@ void ata_scsi_scan_host(struct ata_port *ap, int sync)
 	int tries = 5;
 	struct ata_device *last_failed_dev = NULL;
 	struct ata_link *link;
-	struct ata_device *dev;
+	struct ata_device *uninitialized_var(dev);
 
 	if (ap->flags & ATA_FLAG_DISABLED)
 		return;

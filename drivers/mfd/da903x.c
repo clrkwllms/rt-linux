@@ -75,6 +75,7 @@ static inline int __da903x_read(struct i2c_client *client,
 {
 	int ret;
 
+	*val = 0;
 	ret = i2c_smbus_read_byte_data(client, reg);
 	if (ret < 0) {
 		dev_err(&client->dev, "failed reading at 0x%02x\n", reg);

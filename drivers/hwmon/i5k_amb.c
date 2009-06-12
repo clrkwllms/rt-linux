@@ -480,7 +480,7 @@ static unsigned long i5k_channel_pci_id(struct i5k_amb_data *data,
 	case PCI_DEVICE_ID_INTEL_5400_ERR:
 		return PCI_DEVICE_ID_INTEL_5400_FBD0 + channel;
 	default:
-		BUG();
+		panic("i5k_channel_pci_id: unknown chipset!");
 	}
 }
 

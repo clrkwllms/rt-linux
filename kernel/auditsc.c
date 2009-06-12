@@ -741,6 +741,7 @@ void audit_filter_inodes(struct task_struct *tsk, struct audit_context *ctx)
 	rcu_read_unlock();
 }
 
+#ifdef CONFIG_AUDIT_TREE
 static void audit_set_auditable(struct audit_context *ctx)
 {
 	if (!ctx->prio) {
@@ -748,6 +749,7 @@ static void audit_set_auditable(struct audit_context *ctx)
 		ctx->current_state = AUDIT_RECORD_CONTEXT;
 	}
 }
+#endif
 
 static inline struct audit_context *audit_get_context(struct task_struct *tsk,
 						      int return_valid,

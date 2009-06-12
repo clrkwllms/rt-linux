@@ -1774,7 +1774,7 @@ static struct pci_device_id fdomain_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ }
 };
-MODULE_DEVICE_TABLE(pci, fdomain_pci_tbl);
+MODULE_STATIC_DEVICE_TABLE(pci, fdomain_pci_tbl);
 #endif
 #define driver_template fdomain_driver_template
 #include "scsi_module.c"

@@ -263,6 +263,7 @@ EXPORT_SYMBOL_GPL(unregister_timer_hook);
  *
  * -- wli
  */
+#ifdef CONFIG_PROC_FS
 static void __profile_flip_buffers(void *unused)
 {
 	int cpu = smp_processor_id();
@@ -306,57 +307,6 @@ static void profile_discard_flip_buffers(void)
 		memset(hits, 0, NR_PROFILE_HIT*sizeof(struct profile_hit));
 	}
 	mutex_unlock(&profile_flip_mutex);
-}
-
-void profile_hits(int type, void *__pc, unsigned int nr_hits)
-{
-	unsigned long primary, secondary, flags, pc = (unsigned long)__pc;
-	int i, j, cpu;
-	struct profile_hit *hits;
-
-	if (prof_on != type || !prof_buffer)
-		return;
-	pc = min((pc - (unsigned long)_stext) >> prof_shift, prof_len - 1);
-	i = primary = (pc & (NR_PROFILE_GRP - 1)) << PROFILE_GRPSHIFT;
-	secondary = (~(pc << 1) & (NR_PROFILE_GRP - 1)) << PROFILE_GRPSHIFT;
-	cpu = get_cpu();
-	hits = per_cpu(cpu_profile_hits, cpu)[per_cpu(cpu_profile_flip, cpu)];
-	if (!hits) {
-		put_cpu();
-		return;
-	}
-	/*
-	 * We buffer the global profiler buffer into a per-CPU
-	 * queue and thus reduce the number of global (and possibly
-	 * NUMA-alien) accesses. The write-queue is self-coalescing:
-	 */
-	local_irq_save(flags);
-	do {
-		for (j = 0; j < PROFILE_GRPSZ; ++j) {
-			if (hits[i + j].pc == pc) {
-				hits[i + j].hits += nr_hits;
-				goto out;
-			} else if (!hits[i + j].hits) {
-				hits[i + j].pc = pc;
-				hits[i + j].hits = nr_hits;
-				goto out;
-			}
-		}
-		i = (i + secondary) & (NR_PROFILE_HIT - 1);
-	} while (i != primary);
-
-	/*
-	 * Add the current hit(s) and flush the write-queue out
-	 * to the global buffer:
-	 */
-	atomic_add(nr_hits, &prof_buffer[pc]);
-	for (i = 0; i < NR_PROFILE_HIT; ++i) {
-		atomic_add(hits[i].hits, &prof_buffer[hits[i].pc]);
-		hits[i].pc = hits[i].hits = 0;
-	}
-out:
-	local_irq_restore(flags);
-	put_cpu();
 }
 
 static int __cpuinit profile_cpu_callback(struct notifier_block *info,
@@ -417,6 +367,60 @@ out_free:
 	}
 	return NOTIFY_OK;
 }
+#endif /* CONFIG_PROC_FS */
+
+void profile_hits(int type, void *__pc, unsigned int nr_hits)
+{
+	unsigned long primary, secondary, flags, pc = (unsigned long)__pc;
+	int i, j, cpu;
+	struct profile_hit *hits;
+
+	if (prof_on != type || !prof_buffer)
+		return;
+	pc = min((pc - (unsigned long)_stext) >> prof_shift, prof_len - 1);
+	i = primary = (pc & (NR_PROFILE_GRP - 1)) << PROFILE_GRPSHIFT;
+	secondary = (~(pc << 1) & (NR_PROFILE_GRP - 1)) << PROFILE_GRPSHIFT;
+	cpu = get_cpu();
+	hits = per_cpu(cpu_profile_hits, cpu)[per_cpu(cpu_profile_flip, cpu)];
+	if (!hits) {
+		put_cpu();
+		return;
+	}
+	/*
+	 * We buffer the global profiler buffer into a per-CPU
+	 * queue and thus reduce the number of global (and possibly
+	 * NUMA-alien) accesses. The write-queue is self-coalescing:
+	 */
+	local_irq_save(flags);
+	do {
+		for (j = 0; j < PROFILE_GRPSZ; ++j) {
+			if (hits[i + j].pc == pc) {
+				hits[i + j].hits += nr_hits;
+				goto out;
+			} else if (!hits[i + j].hits) {
+				hits[i + j].pc = pc;
+				hits[i + j].hits = nr_hits;
+				goto out;
+			}
+		}
+		i = (i + secondary) & (NR_PROFILE_HIT - 1);
+	} while (i != primary);
+
+	/*
+	 * Add the current hit(s) and flush the write-queue out
+	 * to the global buffer:
+	 */
+	atomic_add(nr_hits, &prof_buffer[pc]);
+	for (i = 0; i < NR_PROFILE_HIT; ++i) {
+		atomic_add(hits[i].hits, &prof_buffer[hits[i].pc]);
+		hits[i].pc = hits[i].hits = 0;
+	}
+out:
+	local_irq_restore(flags);
+	put_cpu();
+}
+
+
 #else /* !CONFIG_SMP */
 #define profile_flip_buffers()		do { } while (0)
 #define profile_discard_flip_buffers()	do { } while (0)
@@ -610,7 +614,7 @@ out_cleanup:
 #define create_hash_tables()			({ 0; })
 #endif
 
-int __ref create_proc_profile(void) /* false positive from hotcpu_notifier */
+int create_proc_profile(void)
 {
 	struct proc_dir_entry *entry;
 

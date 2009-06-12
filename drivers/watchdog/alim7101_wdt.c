@@ -427,7 +427,7 @@ static struct pci_device_id alim7101_pci_tbl[] __devinitdata = {
 	{ }
 };
 
-MODULE_DEVICE_TABLE(pci, alim7101_pci_tbl);
+MODULE_STATIC_DEVICE_TABLE(pci, alim7101_pci_tbl);
 
 MODULE_AUTHOR("Steve Hill");
 MODULE_DESCRIPTION("ALi M7101 PMU Computer Watchdog Timer driver");

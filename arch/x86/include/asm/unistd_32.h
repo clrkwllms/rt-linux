@@ -338,6 +338,10 @@
 #define __NR_dup3		330
 #define __NR_pipe2		331
 #define __NR_inotify_init1	332
+#define __NR_preadv		333
+#define __NR_pwritev		334
+#define __NR_rt_tgsigqueueinfo	335
+#define __NR_perf_counter_open	336
 
 #ifdef __KERNEL__
 

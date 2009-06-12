@@ -111,7 +111,7 @@ bail:
 long ocfs2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct inode *inode = filp->f_path.dentry->d_inode;
-	unsigned int flags;
+	unsigned int uninitialized_var(flags);
 	int new_clusters;
 	int status;
 	struct ocfs2_space_resv sr;
