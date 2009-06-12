@@ -711,7 +711,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev, struct packe
 		hdrlen = sizeof(*h.h2);
 		break;
 	default:
-		BUG();
+		panic("AF_PACKET: bad tp->version");
 	}
 
 	sll = h.raw + TPACKET_ALIGN(hdrlen);

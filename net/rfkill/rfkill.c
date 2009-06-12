@@ -387,6 +387,7 @@ static const char *rfkill_get_type_str(enum rfkill_type type)
 		return "wwan";
 	default:
 		BUG();
+		return NULL;
 	}
 }
 
