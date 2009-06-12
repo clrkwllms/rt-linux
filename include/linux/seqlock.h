@@ -30,6 +30,7 @@
  * Priority inheritance and live-lock avoidance by Gregory Haskins
  */
 
+#include <linux/pickop.h>
 #include <linux/spinlock.h>
 #include <linux/preempt.h>
 
@@ -69,11 +70,25 @@ typedef __raw_seqlock_t raw_seqlock_t;
 #define SEQLOCK_UNLOCKED \
 		 __SEQLOCK_UNLOCKED(old_style_seqlock_init)
 
-#define raw_seqlock_init(x) \
-	do { *(x) = (raw_seqlock_t) __RAW_SEQLOCK_UNLOCKED(x); spin_lock_init(&(x)->lock); } while (0)
+static inline void __raw_seqlock_init(raw_seqlock_t *seqlock)
+{
+	*seqlock = (raw_seqlock_t) __RAW_SEQLOCK_UNLOCKED(x);
+	spin_lock_init(&seqlock->lock);
+}
 
-#define seqlock_init(x) \
-		do { *(x) = (seqlock_t) __SEQLOCK_UNLOCKED(x); rwlock_init(&(x)->lock); } while (0)
+#ifdef CONFIG_PREEMPT_RT
+static inline void __seqlock_init(seqlock_t *seqlock)
+{
+	*seqlock = (seqlock_t) __SEQLOCK_UNLOCKED(seqlock);
+	rwlock_init(&seqlock->lock);
+}
+#else
+extern void __seqlock_init(seqlock_t *seqlock);
+#endif
+
+#define seqlock_init(seq)						\
+	PICK_FUNCTION(raw_seqlock_t *, seqlock_t *,			\
+			  __raw_seqlock_init, __seqlock_init, seq);
 
 #define DEFINE_SEQLOCK(x) \
 		seqlock_t x = __SEQLOCK_UNLOCKED(x)
