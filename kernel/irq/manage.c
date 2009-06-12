@@ -836,7 +836,7 @@ __setup("hardirq-preempt=", hardirq_preempt_setup);
 static void thread_simple_irq(irq_desc_t *desc)
 {
 	struct irqaction *action = desc->action;
-	unsigned int irq = desc - irq_desc;
+	unsigned int irq = desc->irq;
 	irqreturn_t action_ret;
 
 	do {
@@ -858,7 +858,7 @@ static void thread_simple_irq(irq_desc_t *desc)
  */
 static void thread_level_irq(irq_desc_t *desc)
 {
-	unsigned int irq = desc - irq_desc;
+	unsigned int irq = desc->irq;
 
 	thread_simple_irq(desc);
 	if (!(desc->status & IRQ_DISABLED) && desc->chip->unmask)
@@ -870,7 +870,7 @@ static void thread_level_irq(irq_desc_t *desc)
  */
 static void thread_fasteoi_irq(irq_desc_t *desc)
 {
-	unsigned int irq = desc - irq_desc;
+	unsigned int irq = desc->irq;
 
 	thread_simple_irq(desc);
 	if (!(desc->status & IRQ_DISABLED) && desc->chip->unmask)
@@ -882,7 +882,7 @@ static void thread_fasteoi_irq(irq_desc_t *desc)
  */
 static void thread_edge_irq(irq_desc_t *desc)
 {
-	unsigned int irq = desc - irq_desc;
+	unsigned int irq = desc->irq;
 
 	do {
 		struct irqaction *action = desc->action;
@@ -920,7 +920,7 @@ static void thread_edge_irq(irq_desc_t *desc)
  */
 static void thread_do_irq(irq_desc_t *desc)
 {
-	unsigned int irq = desc - irq_desc;
+	unsigned int irq = desc->irq;
 
 	do {
 		struct irqaction *action = desc->action;
@@ -1040,16 +1040,21 @@ static int start_irq_thread(int irq, struct irq_desc *desc)
 	return 0;
 }
 
+/*
+ * Start hardirq threads for all IRQs that are registered already.
+ *
+ * New ones will be started at the time of IRQ setup from now on.
+ */
 void __init init_hardirqs(void)
 {
-	int i;
+	struct irq_desc *desc;
+	int irq;
+
 	ok_to_create_irq_threads = 1;
 
-	for (i = 0; i < NR_IRQS; i++) {
-		irq_desc_t *desc = irq_desc + i;
-
+	for_each_irq_desc(irq, desc) {
 		if (desc->action && !(desc->status & IRQ_NODELAY))
-			start_irq_thread(i, desc);
+			start_irq_thread(irq, desc);
 	}
 }
 
