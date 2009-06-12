@@ -156,7 +156,6 @@ struct irq_2_iommu;
  * @irqs_unhandled:	stats field for spurious unhandled interrupts
  * @thread:		Thread pointer for threaded preemptible irq handling
  * @wait_for_handler:	Waitqueue to wait for a running preemptible handler
- * @cycles:		Timestamp for stats and debugging
  * @lock:		locking for SMP
  * @affinity:		IRQ affinity on SMP
  * @cpu:		cpu index useful for balancing
@@ -184,10 +183,10 @@ struct irq_desc {
 	unsigned int		irq_count;	/* For detecting broken IRQs */
 	unsigned long		last_unhandled;	/* Aging timer for unhandled count */
 	unsigned int		irqs_unhandled;
- 	struct task_struct	*thread;
- 	wait_queue_head_t	wait_for_handler;
- 	cycles_t		timestamp;
-	spinlock_t		lock;
+	struct task_struct	*thread;
+	wait_queue_head_t	wait_for_handler;
+	cycles_t		timestamp;
+	raw_spinlock_t		lock;
 #ifdef CONFIG_SMP
 	cpumask_var_t		affinity;
 	unsigned int		cpu;
@@ -421,7 +420,6 @@ extern int set_irq_msi(unsigned int irq, struct msi_desc *entry);
 
 /* Early initialization of irqs */
 extern void early_init_hardirqs(void);
-extern cycles_t irq_timestamp(unsigned int irq);
 
 #if defined(CONFIG_PREEMPT_HARDIRQS)
 extern void init_hardirqs(void);
