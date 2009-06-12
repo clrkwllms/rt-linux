@@ -63,6 +63,7 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/idr.h>
+#include <linux/kmemcheck.h>
 #include <linux/ftrace.h>
 #include <linux/async.h>
 #include <linux/kmemtrace.h>
@@ -800,6 +801,9 @@ static void __init do_basic_setup(void)
 static void __init do_pre_smp_initcalls(void)
 {
 	initcall_t *call;
+
+	/* kmemcheck must initialize before all early initcalls: */
+	kmemcheck_init();
 
 	for (call = __initcall_start; call < __early_initcall_end; call++)
 		do_one_initcall(*call);

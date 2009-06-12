@@ -46,6 +46,7 @@
 #endif
 
 #include <asm/stacktrace.h>
+#include <asm/kmemcheck.h>
 #include <asm/processor.h>
 #include <asm/debugreg.h>
 #include <asm/atomic.h>
@@ -533,6 +534,10 @@ dotraplinkage void __kprobes do_debug(struct pt_regs *regs, long error_code)
 	int si_code;
 
 	get_debugreg(condition, 6);
+
+	/* Catch kmemcheck conditions first of all! */
+	if (condition & DR_STEP && kmemcheck_trap(regs))
+		return;
 
 	/*
 	 * The processor cleared BTF, so don't mark that we need it set.

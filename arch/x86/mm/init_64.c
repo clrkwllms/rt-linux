@@ -97,20 +97,26 @@ __setup("noexec32=", nonx32_setup);
 
 /*
  * NOTE: This function is marked __ref because it calls __init function
- * (alloc_bootmem_pages). It's safe to do it ONLY when after_bootmem == 0.
+ * (alloc_bootmem_pages). It's safe to do it ONLY when DURING_BOOTMEM.
  */
 static __ref void *spp_getpage(void)
 {
-	void *ptr;
+	void *ptr = NULL;
 
-	if (after_bootmem)
-		ptr = (void *) get_zeroed_page(GFP_ATOMIC);
-	else
+	switch (bootmem_state) {
+	case AFTER_BOOTMEM:
+		ptr = (void *) get_zeroed_page(GFP_ATOMIC | __GFP_NOTRACK);
+		break;
+	case DURING_BOOTMEM:
 		ptr = alloc_bootmem_pages(PAGE_SIZE);
+		break;
+	default:
+		panic("calling spp_getpage before bootmem\n");
+	}
 
 	if (!ptr || ((unsigned long)ptr & ~PAGE_MASK)) {
 		panic("set_pte_phys: cannot allocate page data %s\n",
-			after_bootmem ? "after bootmem" : "");
+			bootmem_state == AFTER_BOOTMEM ? "after bootmem" : "");
 	}
 
 	pr_debug("spp_getpage %p\n", ptr);
@@ -277,16 +283,17 @@ void __init cleanup_highmap(void)
 
 static __ref void *alloc_low_page(unsigned long *phys)
 {
-	unsigned long pfn = e820_table_end++;
+	unsigned long pfn;
 	void *adr;
 
-	if (after_bootmem) {
-		adr = (void *)get_zeroed_page(GFP_ATOMIC);
+	if (bootmem_state == AFTER_BOOTMEM) {
+		adr = (void *)get_zeroed_page(GFP_ATOMIC | __GFP_NOTRACK);
 		*phys = __pa(adr);
 
 		return adr;
 	}
 
+	pfn = e820_table_end++;
 	if (pfn >= e820_table_top)
 		panic("alloc_low_page: ran out of memory");
 
@@ -298,7 +305,7 @@ static __ref void *alloc_low_page(unsigned long *phys)
 
 static __ref void unmap_low_page(void *adr)
 {
-	if (after_bootmem)
+	if (bootmem_state == AFTER_BOOTMEM)
 		return;
 
 	early_iounmap(adr, PAGE_SIZE);
@@ -317,7 +324,7 @@ phys_pte_init(pte_t *pte_page, unsigned long addr, unsigned long end,
 	for(i = pte_index(addr); i < PTRS_PER_PTE; i++, addr += PAGE_SIZE, pte++) {
 
 		if (addr >= end) {
-			if (!after_bootmem) {
+			if (bootmem_state != AFTER_BOOTMEM) {
 				for(; i < PTRS_PER_PTE; i++, pte++)
 					set_pte(pte, __pte(0));
 			}
@@ -373,7 +380,7 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long address, unsigned long end,
 		pgprot_t new_prot = prot;
 
 		if (address >= end) {
-			if (!after_bootmem) {
+			if (bootmem_state != AFTER_BOOTMEM) {
 				for (; i < PTRS_PER_PMD; i++, pmd++)
 					set_pmd(pmd, __pmd(0));
 			}
@@ -459,7 +466,7 @@ phys_pud_init(pud_t *pud_page, unsigned long addr, unsigned long end,
 		if (addr >= end)
 			break;
 
-		if (!after_bootmem &&
+		if (bootmem_state != AFTER_BOOTMEM &&
 				!e820_any_mapped(addr, addr+PUD_SIZE, 0)) {
 			set_pud(pud, __pud(0));
 			continue;
@@ -650,8 +657,6 @@ void __init mem_init(void)
 
 	/* clear_bss() already clear the empty_zero_page */
 
-	reservedpages = 0;
-
 	/* this will put all low memory onto the freelists */
 #ifdef CONFIG_NUMA
 	totalram_pages = numa_free_all_bootmem();
@@ -659,9 +664,9 @@ void __init mem_init(void)
 	totalram_pages = free_all_bootmem();
 #endif
 
+	bootmem_state = AFTER_BOOTMEM;
 	absent_pages = absent_pages_in_range(0, max_pfn);
 	reservedpages = max_pfn - totalram_pages - absent_pages;
-	after_bootmem = 1;
 
 	codesize =  (unsigned long) &_etext - (unsigned long) &_text;
 	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;

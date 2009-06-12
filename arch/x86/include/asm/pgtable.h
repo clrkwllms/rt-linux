@@ -478,6 +478,11 @@ static inline int pgd_none(pgd_t pgd)
 }
 #endif	/* PAGETABLE_LEVELS > 3 */
 
+static inline int pte_hidden(pte_t pte)
+{
+	return pte_flags(pte) & _PAGE_HIDDEN;
+}
+
 #endif	/* __ASSEMBLY__ */
 
 /*

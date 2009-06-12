@@ -19,7 +19,7 @@ unsigned long __initdata e820_table_start;
 unsigned long __meminitdata e820_table_end;
 unsigned long __meminitdata e820_table_top;
 
-int after_bootmem;
+enum bootmem_state bootmem_state = BEFORE_BOOTMEM;
 
 int direct_gbpages
 #ifdef CONFIG_DIRECT_GBPAGES
@@ -210,10 +210,10 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 
 	printk(KERN_INFO "init_memory_mapping: %016lx-%016lx\n", start, end);
 
-	if (!after_bootmem)
+	if (bootmem_state == BEFORE_BOOTMEM)
 		init_gbpages();
 
-#ifdef CONFIG_DEBUG_PAGEALLOC
+#if defined(CONFIG_DEBUG_PAGEALLOC) || defined(CONFIG_KMEMCHECK)
 	/*
 	 * For CONFIG_DEBUG_PAGEALLOC, identity mapping will use small pages.
 	 * This will simplify cpa(), which otherwise needs to support splitting
@@ -346,7 +346,7 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 	 * memory mapped. Unfortunately this is done currently before the
 	 * nodes are discovered.
 	 */
-	if (!after_bootmem)
+	if (bootmem_state == BEFORE_BOOTMEM)
 		find_early_table_space(end, use_pse, use_gbpages);
 
 #ifdef CONFIG_X86_32
@@ -367,7 +367,7 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 #endif
 
 #ifdef CONFIG_X86_64
-	if (!after_bootmem && !start) {
+	if (bootmem_state == BEFORE_BOOTMEM && !start) {
 		pud_t *pud;
 		pmd_t *pmd;
 
@@ -387,11 +387,12 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 #endif
 	__flush_tlb_all();
 
-	if (!after_bootmem && e820_table_end > e820_table_start)
+	if (bootmem_state == BEFORE_BOOTMEM &&
+	    e820_table_end > e820_table_start)
 		reserve_early(e820_table_start << PAGE_SHIFT,
 				 e820_table_end << PAGE_SHIFT, "PGTABLE");
 
-	if (!after_bootmem)
+	if (bootmem_state == BEFORE_BOOTMEM)
 		early_memtest(start, end);
 
 	return ret >> PAGE_SHIFT;

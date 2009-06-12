@@ -914,6 +914,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	initmem_init(0, max_pfn);
+	bootmem_state = DURING_BOOTMEM;
 
 #ifdef CONFIG_ACPI_SLEEP
 	/*
