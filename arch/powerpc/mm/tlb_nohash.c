@@ -85,7 +85,7 @@ EXPORT_SYMBOL(local_flush_tlb_page);
  */
 #ifdef CONFIG_SMP
 
-static DEFINE_SPINLOCK(tlbivax_lock);
+static DEFINE_RAW_SPINLOCK(tlbivax_lock);
 
 struct tlb_flush_param {
 	unsigned long addr;
@@ -190,7 +190,9 @@ void flush_tlb_kernel_range(unsigned long start, unsigned long end)
 	_tlbil_pid(0);
 	preempt_enable();
 #else
+	preempt_disable();
 	_tlbil_pid(0);
+	preempt_enable();
 #endif
 }
 EXPORT_SYMBOL(flush_tlb_kernel_range);
