@@ -970,7 +970,7 @@ static int do_irqd(void * __desc)
 	struct irq_desc *desc = __desc;
 
 #ifdef CONFIG_SMP
-	set_cpus_allowed(current, desc->affinity);
+	set_cpus_allowed_ptr(current, desc->affinity);
 #endif
 	current->flags |= PF_NOFREEZE | PF_HARDIRQ;
 
@@ -993,8 +993,8 @@ static int do_irqd(void * __desc)
 		/*
 		 * Did IRQ affinities change?
 		 */
-		if (!cpus_equal(current->cpus_allowed, desc->affinity))
-			set_cpus_allowed(current, desc->affinity);
+		if (!cpumask_equal(&current->cpus_allowed, desc->affinity))
+			set_cpus_allowed_ptr(current, desc->affinity);
 #endif
 		schedule();
 	}
