@@ -897,5 +897,7 @@ static int __init kernel_init(void * unused)
 	 */
 
 	init_post();
+	WARN_ON(debug_direct_keyboard);
+
 	return 0;
 }
