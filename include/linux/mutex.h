@@ -214,6 +214,8 @@ extern int __must_check mutex_lock_killable(struct mutex *lock);
 extern int mutex_trylock(struct mutex *lock);
 extern void mutex_unlock(struct mutex *lock);
 
+#endif /* !PREEMPT_RT */
+
 /**
  * atomic_dec_and_mutex_lock - return holding mutex if we dec to 0
  * @cnt: the atomic which we are to dec
@@ -236,7 +238,5 @@ static inline int atomic_dec_and_mutex_lock(atomic_t *cnt, struct mutex *lock)
 	/* we hit 0, and we hold the lock */
 	return 1;
 }
-
-#endif /* !PREEMPT_RT */
 
 #endif
