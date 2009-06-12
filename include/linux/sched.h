@@ -2572,7 +2572,7 @@ static inline void mm_init_owner(struct mm_struct *mm, struct task_struct *p)
 }
 #endif /* CONFIG_MM_OWNER */
 
-#define TASK_STATE_TO_CHAR_STR "RSDTtZX"
+#define TASK_STATE_TO_CHAR_STR "RMSDTtZX"
 
 #ifdef CONFIG_SMP
 static inline int task_is_current(struct task_struct *task)
