@@ -782,7 +782,6 @@ rt_spin_lock_slowlock(struct rt_mutex *lock)
 	struct rt_mutex_waiter waiter;
 	unsigned long saved_state, flags;
 	struct task_struct *orig_owner;
-	int missed = 0;
 
 	debug_rt_mutex_init_waiter(&waiter);
 	waiter.task = NULL;
@@ -803,20 +802,15 @@ rt_spin_lock_slowlock(struct rt_mutex *lock)
 	 * about original state TASK_INTERRUPTIBLE as well, as we
 	 * could miss a wakeup_interruptible()
 	 */
-	saved_state = current->state;
+	saved_state = rt_set_current_blocked_state(current->state);
 
 	for (;;) {
 		unsigned long saved_flags;
 		int saved_lock_depth = current->lock_depth;
 
 		/* Try to acquire the lock */
-		if (do_try_to_take_rt_mutex(lock, STEAL_LATERAL)) {
-			/* If we never blocked break out now */
-			if (!missed)
-				goto unlock;
+		if (do_try_to_take_rt_mutex(lock, STEAL_LATERAL))
 			break;
-		}
-		missed = 1;
 
 		/*
 		 * waiter.task is NULL the first time we come here and
@@ -847,12 +841,6 @@ rt_spin_lock_slowlock(struct rt_mutex *lock)
 		if (adaptive_wait(&waiter, orig_owner)) {
 			put_task_struct(orig_owner);
 
-			saved_state = rt_set_current_blocked_state(saved_state);
-			/*
-			 * The xchg() in update_current() is an implicit
-			 * barrier which we rely upon to ensure current->state
-			 * is visible before we test waiter.task.
-			 */
 			if (waiter.task)
 				schedule_rt_mutex(lock);
 		} else
@@ -861,6 +849,7 @@ rt_spin_lock_slowlock(struct rt_mutex *lock)
 		spin_lock_irqsave(&lock->wait_lock, flags);
 		current->flags |= saved_flags;
 		current->lock_depth = saved_lock_depth;
+		saved_state = rt_set_current_blocked_state(saved_state);
 	}
 
 	rt_restore_current_state(saved_state);
@@ -879,7 +868,6 @@ rt_spin_lock_slowlock(struct rt_mutex *lock)
 	 */
 	fixup_rt_mutex_waiters(lock);
 
- unlock:
 	spin_unlock_irqrestore(&lock->wait_lock, flags);
 
 	debug_rt_mutex_free_waiter(&waiter);
