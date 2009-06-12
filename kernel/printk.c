@@ -91,7 +91,7 @@ static int console_locked, console_suspended;
  * It is also used in interesting ways to provide interlocking in
  * release_console_sem().
  */
-static DEFINE_SPINLOCK(logbuf_lock);
+static DEFINE_RAW_SPINLOCK(logbuf_lock);
 
 #define LOG_BUF_MASK (log_buf_len-1)
 #define LOG_BUF(idx) (log_buf[(idx) & LOG_BUF_MASK])
@@ -395,7 +395,7 @@ static void __call_console_drivers(unsigned start, unsigned end)
 
 	for (con = console_drivers; con; con = con->next) {
 		if ((con->flags & CON_ENABLED) && con->write &&
-				(cpu_online(smp_processor_id()) ||
+				(cpu_online(raw_smp_processor_id()) ||
 				(con->flags & CON_ANYTIME)))
 			con->write(con, &LOG_BUF(start), end - start);
 	}
@@ -511,6 +511,7 @@ static void zap_locks(void)
 	spin_lock_init(&logbuf_lock);
 	/* And make sure that we print immediately */
 	init_MUTEX(&console_sem);
+	zap_rt_locks();
 }
 
 #if defined(CONFIG_PRINTK_TIME)
@@ -592,7 +593,8 @@ static inline int can_use_console(unsigned int cpu)
  * interrupts disabled. It should return with 'lockbuf_lock'
  * released but interrupts still disabled.
  */
-static int acquire_console_semaphore_for_printk(unsigned int cpu)
+static int acquire_console_semaphore_for_printk(unsigned int cpu,
+						unsigned long flags)
 {
 	int retval = 0;
 
@@ -613,6 +615,8 @@ static int acquire_console_semaphore_for_printk(unsigned int cpu)
 	}
 	printk_cpu = UINT_MAX;
 	spin_unlock(&logbuf_lock);
+	lockdep_on();
+	local_irq_restore(flags);
 	return retval;
 }
 static const char recursion_bug_msg [] =
@@ -634,7 +638,7 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	preempt_disable();
 	/* This stops the holder of console_sem just where we want him */
 	raw_local_irq_save(flags);
-	this_cpu = smp_processor_id();
+	this_cpu = raw_smp_processor_id();
 
 	/*
 	 * Ouch, printk recursed into itself!
@@ -649,7 +653,8 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 		 */
 		if (!oops_in_progress) {
 			recursion_bug = 1;
-			goto out_restore_irqs;
+			raw_local_irq_restore(flags);
+			goto out;
 		}
 		zap_locks();
 	}
@@ -657,6 +662,7 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	lockdep_off();
 	spin_lock(&logbuf_lock);
 	printk_cpu = this_cpu;
+	preempt_enable();
 
 	if (recursion_bug) {
 		recursion_bug = 0;
@@ -726,14 +732,10 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	 * will release 'logbuf_lock' regardless of whether it
 	 * actually gets the semaphore or not.
 	 */
-	if (acquire_console_semaphore_for_printk(this_cpu))
+	if (acquire_console_semaphore_for_printk(this_cpu, flags))
 		release_console_sem();
 
-	lockdep_on();
-out_restore_irqs:
-	raw_local_irq_restore(flags);
-
-	preempt_enable();
+out:
 	return printed_len;
 }
 EXPORT_SYMBOL(printk);
@@ -996,15 +998,35 @@ void release_console_sem(void)
 		_con_start = con_start;
 		_log_end = log_end;
 		con_start = log_end;		/* Flush */
+		/*
+		 * on PREEMPT_RT, call console drivers with
+		 * interrupts enabled (if printk was called
+		 * with interrupts disabled):
+		 */
+#ifdef CONFIG_PREEMPT_RT
+		spin_unlock_irqrestore(&logbuf_lock, flags);
+#else
 		spin_unlock(&logbuf_lock);
 		stop_critical_timings();	/* don't trace print latency */
+#endif
 		call_console_drivers(_con_start, _log_end);
 		start_critical_timings();
+#ifndef CONFIG_PREEMPT_RT
 		local_irq_restore(flags);
+#endif
 	}
 	console_locked = 0;
-	up(&console_sem);
 	spin_unlock_irqrestore(&logbuf_lock, flags);
+	up(&console_sem);
+	/*
+	 * On PREEMPT_RT kernels __wake_up may sleep, so wake syslogd
+	 * up only if we are in a preemptible section. We normally dont
+	 * printk from non-preemptible sections so this is for the emergency
+	 * case only.
+	 */
+#ifdef CONFIG_PREEMPT_RT
+	if (!in_atomic() && !irqs_disabled())
+#endif
 	if (wake_klogd)
 		wake_up_klogd();
 }
@@ -1279,6 +1301,23 @@ int printk_ratelimit(void)
 	return __ratelimit(&printk_ratelimit_state);
 }
 EXPORT_SYMBOL(printk_ratelimit);
+
+static DEFINE_RAW_SPINLOCK(warn_lock);
+
+void __WARN_ON(const char *func, const char *file, const int line)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&warn_lock, flags);
+	printk("%s/%d[CPU#%d]: BUG in %s at %s:%d\n",
+		current->comm, current->pid, raw_smp_processor_id(),
+		func, file, line);
+	dump_stack();
+	spin_unlock_irqrestore(&warn_lock, flags);
+}
+
+EXPORT_SYMBOL(__WARN_ON);
+
 
 /**
  * printk_timed_ratelimit - caller-controlled printk ratelimiting
