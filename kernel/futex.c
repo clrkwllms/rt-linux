@@ -1003,8 +1003,12 @@ void requeue_futex(struct futex_q *q, struct futex_hash_bucket *hb1,
 		plist_del(&q->list, &hb1->chain);
 		plist_add(&q->list, &hb2->chain);
 		q->lock_ptr = &hb2->lock;
-#if defined(CONFIG_DEBUG_PI_LIST) && !defined(CONFIG_PREEMPT_RT)
+#ifdef CONFIG_DEBUG_PI_LIST
+# ifdef CONFIG_PREEMPT_RT
+		q->list.plist.lock = NULL;
+# else
 		q->list.plist.lock = &hb2->lock;
+# endif
 #endif
 	}
 	get_futex_key_refs(key2);
@@ -1341,8 +1345,12 @@ static inline void queue_me(struct futex_q *q, struct futex_hash_bucket *hb)
 	prio = min(current->normal_prio, MAX_RT_PRIO);
 
 	plist_node_init(&q->list, prio);
-#if defined(CONFIG_DEBUG_PI_LIST) && !defined(CONFIG_PREEMPT_RT)
+#ifdef CONFIG_DEBUG_PI_LIST
+#ifdef CONFIG_PREEMPT_RT
+	q->list.plist.lock = NULL;
+#else
 	q->list.plist.lock = &hb->lock;
+#endif
 #endif
 	plist_add(&q->list, &hb->chain);
 	q->task = current;
