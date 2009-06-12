@@ -65,8 +65,8 @@ SECTIONS
 	} :data
 
 
+  . = ALIGN(PAGE_SIZE);
   .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - LOAD_OFFSET) {
-	. = ALIGN(PAGE_SIZE);
 	. = ALIGN(CONFIG_X86_L1_CACHE_BYTES);
 	*(.data.cacheline_aligned)
   }
