@@ -839,8 +839,10 @@ static int change_page_attr_set_clr(unsigned long *addr, int numpages,
 		}
 	}
 
+#if 0
 	/* Must avoid aliasing mappings in the highmem code */
 	kmap_flush_unused();
+#endif
 
 	vm_unmap_aliases();
 
