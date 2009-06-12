@@ -838,7 +838,7 @@ static int  __init get_MP_intsrc_index(struct mpc_intsrc *m)
 
 static struct mpc_intsrc __initdata *m_spare[SPARE_SLOT_NUM];
 
-static void check_irq_src(struct mpc_intsrc *m, int *nr_m_spare)
+static void __init check_irq_src(struct mpc_intsrc *m, int *nr_m_spare)
 {
 	int i;
 
