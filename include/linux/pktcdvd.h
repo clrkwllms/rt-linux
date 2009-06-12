@@ -112,6 +112,7 @@ struct pkt_ctrl_command {
 #include <linux/completion.h>
 #include <linux/cdrom.h>
 #include <linux/kobject.h>
+#include <linux/mempool.h>
 #include <linux/sysfs.h>
 #include <linux/mempool.h>
 
