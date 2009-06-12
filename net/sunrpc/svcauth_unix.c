@@ -682,7 +682,7 @@ svcauth_unix_set_client(struct svc_rqst *rqstp)
 		sin6 = svc_addr_in6(rqstp);
 		break;
 	default:
-		BUG();
+		panic("svcauth_unix_set_client: bad address family!");
 	}
 
 	rqstp->rq_client = NULL;
@@ -862,4 +862,5 @@ struct auth_ops svcauth_unix = {
 	.domain_release	= svcauth_unix_domain_release,
 	.set_client	= svcauth_unix_set_client,
 };
+
 

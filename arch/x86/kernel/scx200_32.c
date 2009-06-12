@@ -78,8 +78,10 @@ static int __devinit scx200_probe(struct pci_dev *pdev, const struct pci_device_
 		if (scx200_cb_probe(SCx200_CB_BASE_FIXED)) {
 			scx200_cb_base = SCx200_CB_BASE_FIXED;
 		} else {
-			pci_read_config_dword(pdev, SCx200_CBA_SCRATCH, &base);
-			if (scx200_cb_probe(base)) {
+			int err;
+
+			err = pci_read_config_dword(pdev, SCx200_CBA_SCRATCH, &base);
+			if (!err && scx200_cb_probe(base)) {
 				scx200_cb_base = base;
 			} else {
 				printk(KERN_WARNING NAME ": Configuration Block not found\n");

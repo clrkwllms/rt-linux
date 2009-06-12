@@ -466,7 +466,7 @@ static int get_filter(void __user *arg, struct sock_filter **p)
 	*p = code;
 	return uprog.len;
 }
-#endif /* CONFIG_IPPP_FILTER */
+#endif
 
 /*
  * ippp device ioctl

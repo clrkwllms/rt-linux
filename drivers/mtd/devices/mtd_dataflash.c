@@ -679,7 +679,7 @@ add_dataflash_otp(struct spi_device *spi, char *name,
 	dev_set_drvdata(&spi->dev, priv);
 
 	if (mtd_has_partitions()) {
-		struct mtd_partition	*parts;
+		struct mtd_partition	*uninitialized_var(parts);
 		int			nr_parts = 0;
 
 #ifdef CONFIG_MTD_CMDLINE_PARTS

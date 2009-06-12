@@ -848,6 +848,8 @@ static ssize_t show_pwm_auto_temp(struct device *dev,
 	}
 	/* shouldn't ever get here */
 	BUG();
+
+	return 0;
 }
 
 static ssize_t set_pwm_auto_temp(struct device *dev,

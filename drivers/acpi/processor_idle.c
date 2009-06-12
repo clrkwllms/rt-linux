@@ -824,8 +824,11 @@ static int acpi_idle_bm_check(void)
  */
 static inline void acpi_idle_do_entry(struct acpi_processor_cx *cx)
 {
+	u64 perf_flags;
+
 	/* Don't trace irqs off for idle */
 	stop_critical_timings();
+	perf_flags = hw_perf_save_disable();
 	if (cx->entry_method == ACPI_CSTATE_FFH) {
 		/* Call into architectural FFH based C-state */
 		acpi_processor_ffh_cstate_enter(cx);
@@ -840,6 +843,7 @@ static inline void acpi_idle_do_entry(struct acpi_processor_cx *cx)
 		   gets asserted in time to freeze execution properly. */
 		unused = inl(acpi_gbl_FADT.xpm_timer_block.address);
 	}
+	hw_perf_restore(perf_flags);
 	start_critical_timings();
 }
 

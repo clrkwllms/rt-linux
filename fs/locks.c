@@ -1567,7 +1567,7 @@ EXPORT_SYMBOL(flock_lock_file_wait);
 SYSCALL_DEFINE2(flock, unsigned int, fd, unsigned int, cmd)
 {
 	struct file *filp;
-	struct file_lock *lock;
+	struct file_lock *uninitialized_var(lock);
 	int can_sleep, unlock;
 	int error;
 

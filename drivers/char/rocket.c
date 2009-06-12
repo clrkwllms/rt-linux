@@ -150,12 +150,14 @@ static Word_t aiop_intr_bits[AIOP_CTL_SIZE] = {
 	AIOP_INTR_BIT_3
 };
 
+#ifdef CONFIG_PCI
 static Word_t upci_aiop_intr_bits[AIOP_CTL_SIZE] = {
 	UPCI_AIOP_INTR_BIT_0,
 	UPCI_AIOP_INTR_BIT_1,
 	UPCI_AIOP_INTR_BIT_2,
 	UPCI_AIOP_INTR_BIT_3
 };
+#endif
 
 static Byte_t RData[RDATASIZE] = {
 	0x00, 0x09, 0xf6, 0x82,
@@ -227,7 +229,6 @@ static unsigned long nextLineNumber;
 static int __init init_ISA(int i);
 static void rp_wait_until_sent(struct tty_struct *tty, int timeout);
 static void rp_flush_buffer(struct tty_struct *tty);
-static void rmSpeakerReset(CONTROLLER_T * CtlP, unsigned long model);
 static unsigned char GetLineNumber(int ctrl, int aiop, int ch);
 static unsigned char SetLineNumber(int ctrl, int aiop, int ch);
 static void rp_start(struct tty_struct *tty);
@@ -241,11 +242,14 @@ static void sDisInterrupts(CHANNEL_T * ChP, Word_t Flags);
 static void sModemReset(CONTROLLER_T * CtlP, int chan, int on);
 static void sPCIModemReset(CONTROLLER_T * CtlP, int chan, int on);
 static int sWriteTxPrioByte(CHANNEL_T * ChP, Byte_t Data);
+#ifdef CONFIG_PCI
+static void rmSpeakerReset(CONTROLLER_T * CtlP, unsigned long model);
 static int sPCIInitController(CONTROLLER_T * CtlP, int CtlNum,
 			      ByteIO_t * AiopIOList, int AiopIOListSize,
 			      WordIO_t ConfigIO, int IRQNum, Byte_t Frequency,
 			      int PeriodicOnly, int altChanRingIndicator,
 			      int UPCIRingInd);
+#endif
 static int sInitController(CONTROLLER_T * CtlP, int CtlNum, ByteIO_t MudbacIO,
 			   ByteIO_t * AiopIOList, int AiopIOListSize,
 			   int IRQNum, Byte_t Frequency, int PeriodicOnly);
@@ -1751,7 +1755,7 @@ static struct pci_device_id __devinitdata rocket_pci_ids[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_RP, PCI_ANY_ID) },
 	{ }
 };
-MODULE_DEVICE_TABLE(pci, rocket_pci_ids);
+MODULE_STATIC_DEVICE_TABLE(pci, rocket_pci_ids);
 
 /*
  *  Called when a PCI card is found.  Retrieves and stores model information,
@@ -2533,6 +2537,7 @@ static int sInitController(CONTROLLER_T * CtlP, int CtlNum, ByteIO_t MudbacIO,
 		return (CtlP->NumAiop);
 }
 
+#ifdef CONFIG_PCI
 /***************************************************************************
 Function: sPCIInitController
 Purpose:  Initialization of controller global registers and controller
@@ -2652,6 +2657,7 @@ static int sPCIInitController(CONTROLLER_T * CtlP, int CtlNum,
 	else
 		return (CtlP->NumAiop);
 }
+#endif /* CONFIG_PCI */
 
 /***************************************************************************
 Function: sReadAiopID
@@ -3142,6 +3148,7 @@ static void sPCIModemReset(CONTROLLER_T * CtlP, int chan, int on)
 	sOutB(addr + chan, 0);	/* apply or remove reset */
 }
 
+#ifdef CONFIG_PCI
 /*  Resets the speaker controller on RocketModem II and III devices */
 static void rmSpeakerReset(CONTROLLER_T * CtlP, unsigned long model)
 {
@@ -3160,6 +3167,7 @@ static void rmSpeakerReset(CONTROLLER_T * CtlP, unsigned long model)
 		sOutB(addr, 0);
 	}
 }
+#endif /* CONFIG_PCI */
 
 /*  Returns the line number given the controller (board), aiop and channel number */
 static unsigned char GetLineNumber(int ctrl, int aiop, int ch)

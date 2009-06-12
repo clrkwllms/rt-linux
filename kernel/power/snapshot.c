@@ -486,8 +486,8 @@ static int memory_bm_find_bit(struct memory_bitmap *bm, unsigned long pfn,
 
 static void memory_bm_set_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
-	void *addr;
-	unsigned int bit;
+	unsigned int bit = 0;
+	void *addr = NULL;
 	int error;
 
 	error = memory_bm_find_bit(bm, pfn, &addr, &bit);
@@ -520,8 +520,8 @@ static void memory_bm_clear_bit(struct memory_bitmap *bm, unsigned long pfn)
 
 static int memory_bm_test_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
-	void *addr;
-	unsigned int bit;
+	unsigned int bit = 0;
+	void *addr = NULL;
 	int error;
 
 	error = memory_bm_find_bit(bm, pfn, &addr, &bit);

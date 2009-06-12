@@ -103,10 +103,9 @@ extern void warn_slowpath(const char *file, const int line,
 #endif
 
 #ifndef WARN
-#define WARN(condition, format...) ({					\
-	int __ret_warn_on = !!(condition);				\
-	unlikely(__ret_warn_on);					\
-})
+static inline int __attribute__ ((format(printf, 2, 3)))
+__WARN(int condition, const char *fmt, ...) { return condition; }
+#define WARN(condition, format...) __WARN(!!(condition), format)
 #endif
 
 #endif
