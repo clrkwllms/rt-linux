@@ -33,6 +33,7 @@
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/pagemap.h>
+#include <linux/perf_counter.h>
 #include <linux/highmem.h>
 #include <linux/spinlock.h>
 #include <linux/key.h>
@@ -105,39 +106,27 @@ static inline void put_binfmt(struct linux_binfmt * fmt)
 SYSCALL_DEFINE1(uselib, const char __user *, library)
 {
 	struct file *file;
-	struct nameidata nd;
 	char *tmp = getname(library);
 	int error = PTR_ERR(tmp);
 
-	if (!IS_ERR(tmp)) {
-		error = path_lookup_open(AT_FDCWD, tmp,
-					 LOOKUP_FOLLOW, &nd,
-					 FMODE_READ|FMODE_EXEC);
-		putname(tmp);
-	}
-	if (error)
+	if (IS_ERR(tmp))
 		goto out;
 
-	error = -EINVAL;
-	if (!S_ISREG(nd.path.dentry->d_inode->i_mode))
-		goto exit;
-
-	error = -EACCES;
-	if (nd.path.mnt->mnt_flags & MNT_NOEXEC)
-		goto exit;
-
-	error = inode_permission(nd.path.dentry->d_inode,
-				 MAY_READ | MAY_EXEC | MAY_OPEN);
-	if (error)
-		goto exit;
-	error = ima_path_check(&nd.path, MAY_READ | MAY_EXEC | MAY_OPEN);
-	if (error)
-		goto exit;
-
-	file = nameidata_to_filp(&nd, O_RDONLY|O_LARGEFILE);
+	file = do_filp_open(AT_FDCWD, tmp,
+				O_LARGEFILE | O_RDONLY | FMODE_EXEC, 0,
+				MAY_READ | MAY_EXEC | MAY_OPEN);
+	putname(tmp);
 	error = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto out;
+
+	error = -EINVAL;
+	if (!S_ISREG(file->f_path.dentry->d_inode->i_mode))
+		goto exit;
+
+	error = -EACCES;
+	if (file->f_path.mnt->mnt_flags & MNT_NOEXEC)
+		goto exit;
 
 	fsnotify_open(file->f_path.dentry);
 
@@ -160,13 +149,10 @@ SYSCALL_DEFINE1(uselib, const char __user *, library)
 		}
 		read_unlock(&binfmt_lock);
 	}
+exit:
 	fput(file);
 out:
   	return error;
-exit:
-	release_open_intent(&nd);
-	path_put(&nd.path);
-	goto out;
 }
 
 #ifdef CONFIG_MMU
@@ -661,47 +647,33 @@ EXPORT_SYMBOL(setup_arg_pages);
 
 struct file *open_exec(const char *name)
 {
-	struct nameidata nd;
 	struct file *file;
 	int err;
 
-	err = path_lookup_open(AT_FDCWD, name, LOOKUP_FOLLOW, &nd,
-				FMODE_READ|FMODE_EXEC);
-	if (err)
+	file = do_filp_open(AT_FDCWD, name,
+				O_LARGEFILE | O_RDONLY | FMODE_EXEC, 0,
+				MAY_EXEC | MAY_OPEN);
+	if (IS_ERR(file))
 		goto out;
 
 	err = -EACCES;
-	if (!S_ISREG(nd.path.dentry->d_inode->i_mode))
-		goto out_path_put;
+	if (!S_ISREG(file->f_path.dentry->d_inode->i_mode))
+		goto exit;
 
-	if (nd.path.mnt->mnt_flags & MNT_NOEXEC)
-		goto out_path_put;
-
-	err = inode_permission(nd.path.dentry->d_inode, MAY_EXEC | MAY_OPEN);
-	if (err)
-		goto out_path_put;
-	err = ima_path_check(&nd.path, MAY_EXEC | MAY_OPEN);
-	if (err)
-		goto out_path_put;
-
-	file = nameidata_to_filp(&nd, O_RDONLY|O_LARGEFILE);
-	if (IS_ERR(file))
-		return file;
+	if (file->f_path.mnt->mnt_flags & MNT_NOEXEC)
+		goto exit;
 
 	fsnotify_open(file->f_path.dentry);
 
 	err = deny_write_access(file);
-	if (err) {
-		fput(file);
-		goto out;
-	}
+	if (err)
+		goto exit;
 
+out:
 	return file;
 
- out_path_put:
-	release_open_intent(&nd);
-	path_put(&nd.path);
- out:
+exit:
+	fput(file);
 	return ERR_PTR(err);
 }
 EXPORT_SYMBOL(open_exec);
@@ -951,6 +923,7 @@ void set_task_comm(struct task_struct *tsk, char *buf)
 	task_lock(tsk);
 	strlcpy(tsk->comm, buf, sizeof(tsk->comm));
 	task_unlock(tsk);
+	perf_counter_comm(tsk);
 }
 
 int flush_old_exec(struct linux_binprm * bprm)
@@ -1019,6 +992,13 @@ int flush_old_exec(struct linux_binprm * bprm)
 
 	current->personality &= ~bprm->per_clear;
 
+	/*
+	 * Flush performance counters when crossing a
+	 * security domain:
+	 */
+	if (!get_dumpable(current->mm))
+		perf_counter_exit_task(current);
+
 	/* An exec changes our domain. We are no longer part of the thread
 	   group */
 
@@ -1045,7 +1025,7 @@ void install_exec_creds(struct linux_binprm *bprm)
 	commit_creds(bprm->cred);
 	bprm->cred = NULL;
 
-	/* cred_exec_mutex must be held at least to this point to prevent
+	/* cred_guard_mutex must be held at least to this point to prevent
 	 * ptrace_attach() from altering our determination of the task's
 	 * credentials; any time after this it may be unlocked */
 
@@ -1055,7 +1035,7 @@ EXPORT_SYMBOL(install_exec_creds);
 
 /*
  * determine how safe it is to execute the proposed program
- * - the caller must hold current->cred_exec_mutex to protect against
+ * - the caller must hold current->cred_guard_mutex to protect against
  *   PTRACE_ATTACH
  */
 int check_unsafe_exec(struct linux_binprm *bprm)
@@ -1297,7 +1277,7 @@ int do_execve(char * filename,
 	if (!bprm)
 		goto out_files;
 
-	retval = mutex_lock_interruptible(&current->cred_exec_mutex);
+	retval = mutex_lock_interruptible(&current->cred_guard_mutex);
 	if (retval < 0)
 		goto out_free;
 	current->in_execve = 1;
@@ -1360,7 +1340,7 @@ int do_execve(char * filename,
 	/* execve succeeded */
 	current->fs->in_exec = 0;
 	current->in_execve = 0;
-	mutex_unlock(&current->cred_exec_mutex);
+	mutex_unlock(&current->cred_guard_mutex);
 	acct_update_integrals(current);
 	free_bprm(bprm);
 	if (displaced)
@@ -1383,7 +1363,7 @@ out_unmark:
 
 out_unlock:
 	current->in_execve = 0;
-	mutex_unlock(&current->cred_exec_mutex);
+	mutex_unlock(&current->cred_guard_mutex);
 
 out_free:
 	free_bprm(bprm);

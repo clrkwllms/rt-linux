@@ -524,8 +524,8 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 			int val, seconds, remain, result;
 			struct timespec ts, utc;
 			utc = CURRENT_TIME;
-			ts = cnvrtDosUnixTm(le16_to_cpu(rsp->SrvTime.Date),
-						le16_to_cpu(rsp->SrvTime.Time));
+			ts = cnvrtDosUnixTm(rsp->SrvTime.Date,
+					    rsp->SrvTime.Time, 0);
 			cFYI(1, ("SrvTime %d sec since 1970 (utc: %d) diff: %d",
 				(int)ts.tv_sec, (int)utc.tv_sec,
 				(int)(utc.tv_sec - ts.tv_sec)));
@@ -2427,8 +2427,7 @@ querySymLinkRetry:
 	params = 2 /* level */  + 4 /* rsrvd */  + name_len /* incl null */ ;
 	pSMB->TotalDataCount = 0;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
-	/* BB find exact max data count below from sess structure BB */
-	pSMB->MaxDataCount = cpu_to_le16(4000);
+	pSMB->MaxDataCount = cpu_to_le16(CIFSMaxBufSize);
 	pSMB->MaxSetupCount = 0;
 	pSMB->Reserved = 0;
 	pSMB->Flags = 0;
@@ -2475,7 +2474,7 @@ querySymLinkRetry:
 			/* BB FIXME investigate remapping reserved chars here */
 			*symlinkinfo = cifs_strndup_from_ucs(data_start, count,
 						    is_unicode, nls_codepage);
-			if (!symlinkinfo)
+			if (!*symlinkinfo)
 				rc = -ENOMEM;
 		}
 	}
@@ -3976,9 +3975,8 @@ parse_DFS_referrals(TRANSACTION2_GET_DFS_REFER_RSP *pSMBr,
 		max_len = data_end - temp;
 		node->path_name = cifs_strndup_from_ucs(temp, max_len,
 						      is_unicode, nls_codepage);
-		if (IS_ERR(node->path_name)) {
-			rc = PTR_ERR(node->path_name);
-			node->path_name = NULL;
+		if (!node->path_name) {
+			rc = -ENOMEM;
 			goto parse_DFS_referrals_exit;
 		}
 
@@ -3987,11 +3985,8 @@ parse_DFS_referrals(TRANSACTION2_GET_DFS_REFER_RSP *pSMBr,
 		max_len = data_end - temp;
 		node->node_name = cifs_strndup_from_ucs(temp, max_len,
 						      is_unicode, nls_codepage);
-		if (IS_ERR(node->node_name)) {
-			rc = PTR_ERR(node->node_name);
-			node->node_name = NULL;
-			goto parse_DFS_referrals_exit;
-		}
+		if (!node->node_name)
+			rc = -ENOMEM;
 	}
 
 parse_DFS_referrals_exit:

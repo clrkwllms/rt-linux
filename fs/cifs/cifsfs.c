@@ -35,6 +35,7 @@
 #include <linux/delay.h>
 #include <linux/kthread.h>
 #include <linux/freezer.h>
+#include <linux/smp_lock.h>
 #include "cifsfs.h"
 #include "cifspdu.h"
 #define DECLARE_GLOBALS_HERE
@@ -145,7 +146,7 @@ cifs_read_super(struct super_block *sb, void *data,
 #endif
 	sb->s_blocksize = CIFS_MAX_MSGSIZE;
 	sb->s_blocksize_bits = 14;	/* default 2**14 = CIFS_MAX_MSGSIZE */
-	inode = cifs_iget(sb, ROOT_I);
+	inode = cifs_root_iget(sb, ROOT_I);
 
 	if (IS_ERR(inode)) {
 		rc = PTR_ERR(inode);
@@ -203,6 +204,9 @@ cifs_put_super(struct super_block *sb)
 		cFYI(1, ("Empty cifs superblock info passed to unmount"));
 		return;
 	}
+
+	lock_kernel();
+
 	rc = cifs_umount(sb, cifs_sb);
 	if (rc)
 		cERROR(1, ("cifs_umount failed with return code %d", rc));
@@ -215,7 +219,8 @@ cifs_put_super(struct super_block *sb)
 
 	unload_nls(cifs_sb->local_nls);
 	kfree(cifs_sb);
-	return;
+
+	unlock_kernel();
 }
 
 static int
@@ -530,6 +535,7 @@ static void cifs_umount_begin(struct super_block *sb)
 	if (tcon == NULL)
 		return;
 
+	lock_kernel();
 	read_lock(&cifs_tcp_ses_lock);
 	if (tcon->tc_count == 1)
 		tcon->tidStatus = CifsExiting;
@@ -548,6 +554,7 @@ static void cifs_umount_begin(struct super_block *sb)
 	}
 /* BB FIXME - finish add checks for tidStatus BB */
 
+	unlock_kernel();
 	return;
 }
 
@@ -599,8 +606,7 @@ cifs_get_sb(struct file_system_type *fs_type,
 
 	rc = cifs_read_super(sb, data, dev_name, flags & MS_SILENT ? 1 : 0);
 	if (rc) {
-		up_write(&sb->s_umount);
-		deactivate_super(sb);
+		deactivate_locked_super(sb);
 		return rc;
 	}
 	sb->s_flags |= MS_ACTIVE;

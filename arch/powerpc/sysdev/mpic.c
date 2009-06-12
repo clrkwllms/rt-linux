@@ -807,7 +807,7 @@ static void mpic_end_ipi(unsigned int irq)
 
 #endif /* CONFIG_SMP */
 
-void mpic_set_affinity(unsigned int irq, const struct cpumask *cpumask)
+int mpic_set_affinity(unsigned int irq, const struct cpumask *cpumask)
 {
 	struct mpic *mpic = mpic_from_irq(irq);
 	unsigned int src = mpic_irq_to_hw(irq);
@@ -824,6 +824,8 @@ void mpic_set_affinity(unsigned int irq, const struct cpumask *cpumask)
 		mpic_irq_write(src, MPIC_INFO(IRQ_DESTINATION),
 			       mpic_physmask(cpus_addr(tmp)[0]));
 	}
+
+	return 0;
 }
 
 static unsigned int mpic_type_to_vecpri(struct mpic *mpic, unsigned int type)
@@ -1057,13 +1059,6 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	memset(mpic, 0, sizeof(struct mpic));
 	mpic->name = name;
 
-	mpic->irqhost = irq_alloc_host(node, IRQ_HOST_MAP_LINEAR,
-				       isu_size, &mpic_host_ops,
-				       flags & MPIC_LARGE_VECTORS ? 2048 : 256);
-	if (mpic->irqhost == NULL)
-		return NULL;
-
-	mpic->irqhost->host_data = mpic;
 	mpic->hc_irq = mpic_irq_chip;
 	mpic->hc_irq.typename = name;
 	if (flags & MPIC_PRIMARY)
@@ -1212,6 +1207,15 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	}
 	mpic->isu_shift = 1 + __ilog2(mpic->isu_size - 1);
 	mpic->isu_mask = (1 << mpic->isu_shift) - 1;
+
+	mpic->irqhost = irq_alloc_host(node, IRQ_HOST_MAP_LINEAR,
+				       isu_size ? isu_size : mpic->num_sources,
+				       &mpic_host_ops,
+				       flags & MPIC_LARGE_VECTORS ? 2048 : 256);
+	if (mpic->irqhost == NULL)
+		return NULL;
+
+	mpic->irqhost->host_data = mpic;
 
 	/* Display version */
 	switch (greg_feature & MPIC_GREG_FEATURE_VERSION_MASK) {

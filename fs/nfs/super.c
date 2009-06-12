@@ -683,9 +683,12 @@ static int nfs_show_stats(struct seq_file *m, struct vfsmount *mnt)
  */
 static void nfs_umount_begin(struct super_block *sb)
 {
-	struct nfs_server *server = NFS_SB(sb);
+	struct nfs_server *server;
 	struct rpc_clnt *rpc;
 
+	lock_kernel();
+
+	server = NFS_SB(sb);
 	/* -EIO all pending I/O */
 	rpc = server->client_acl;
 	if (!IS_ERR(rpc))
@@ -693,6 +696,8 @@ static void nfs_umount_begin(struct super_block *sb)
 	rpc = server->client;
 	if (!IS_ERR(rpc))
 		rpc_killall_tasks(rpc);
+
+	unlock_kernel();
 }
 
 /*
@@ -1808,6 +1813,7 @@ nfs_remount(struct super_block *sb, int *flags, char *raw_data)
 	if (data == NULL)
 		return -ENOMEM;
 
+	lock_kernel();
 	/* fill out struct with values from existing mount */
 	data->flags = nfss->flags;
 	data->rsize = nfss->rsize;
@@ -1832,6 +1838,7 @@ nfs_remount(struct super_block *sb, int *flags, char *raw_data)
 	error = nfs_compare_remount_data(nfss, data);
 out:
 	kfree(data);
+	unlock_kernel();
 	return error;
 }
 
@@ -2106,8 +2113,7 @@ out_err_nosb:
 error_splat_root:
 	dput(mntroot);
 error_splat_super:
-	up_write(&s->s_umount);
-	deactivate_super(s);
+	deactivate_locked_super(s);
 	goto out;
 }
 
@@ -2203,8 +2209,7 @@ out_err_noserver:
 	return error;
 
 error_splat_super:
-	up_write(&s->s_umount);
-	deactivate_super(s);
+	deactivate_locked_super(s);
 	dprintk("<-- nfs_xdev_get_sb() = %d [splat]\n", error);
 	return error;
 }
@@ -2464,8 +2469,7 @@ out_free:
 error_splat_root:
 	dput(mntroot);
 error_splat_super:
-	up_write(&s->s_umount);
-	deactivate_super(s);
+	deactivate_locked_super(s);
 	goto out;
 }
 
@@ -2559,8 +2563,7 @@ out_err_noserver:
 	return error;
 
 error_splat_super:
-	up_write(&s->s_umount);
-	deactivate_super(s);
+	deactivate_locked_super(s);
 	dprintk("<-- nfs4_xdev_get_sb() = %d [splat]\n", error);
 	return error;
 }
@@ -2644,8 +2647,7 @@ out_err_noserver:
 	return error;
 
 error_splat_super:
-	up_write(&s->s_umount);
-	deactivate_super(s);
+	deactivate_locked_super(s);
 	dprintk("<-- nfs4_referral_get_sb() = %d [splat]\n", error);
 	return error;
 }

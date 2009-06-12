@@ -62,9 +62,11 @@
 # define SLAB_DEBUG_OBJECTS	0x00000000UL
 #endif
 
+#define SLAB_NOLEAKTRACE	0x00800000UL	/* Avoid kmemleak tracing */
+
 /* Don't track use of uninitialized memory */
 #ifdef CONFIG_KMEMCHECK
-# define SLAB_NOTRACK		0x00800000UL
+# define SLAB_NOTRACK		0x01000000UL
 #else
 # define SLAB_NOTRACK		0x00000000UL
 #endif

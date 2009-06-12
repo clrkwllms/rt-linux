@@ -18,6 +18,7 @@ enum { MAX_NESTED_LINKS = 8 };
 struct nameidata {
 	struct path	path;
 	struct qstr	last;
+	struct path	root;
 	unsigned int	flags;
 	int		last_type;
 	unsigned	depth;
@@ -69,7 +70,6 @@ extern int path_lookup(const char *, unsigned, struct nameidata *);
 extern int vfs_path_lookup(struct dentry *, struct vfsmount *,
 			   const char *, unsigned int, struct nameidata *);
 
-extern int path_lookup_open(int dfd, const char *name, unsigned lookup_flags, struct nameidata *, int open_flags);
 extern struct file *lookup_instantiate_filp(struct nameidata *nd, struct dentry *dentry,
 		int (*open)(struct inode *, struct file *));
 extern struct file *nameidata_to_filp(struct nameidata *nd, int flags);
@@ -78,8 +78,8 @@ extern void release_open_intent(struct nameidata *);
 extern struct dentry *lookup_one_len(const char *, struct dentry *, int);
 extern struct dentry *lookup_one_noperm(const char *, struct dentry *);
 
-extern int follow_down(struct vfsmount **, struct dentry **);
-extern int follow_up(struct vfsmount **, struct dentry **);
+extern int follow_down(struct path *);
+extern int follow_up(struct path *);
 
 extern struct dentry *lock_rename(struct dentry *, struct dentry *);
 extern void unlock_rename(struct dentry *, struct dentry *);
