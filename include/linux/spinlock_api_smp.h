@@ -19,7 +19,7 @@ int in_lock_functions(unsigned long addr);
 
 #define assert_spin_locked(x)	BUG_ON(!spin_is_locked(x))
 
-void __lockfunc _spin_lock_nest_lock(spinlock_t *lock, struct lockdep_map *map)
+void __lockfunc __spin_lock_nest_lock(raw_spinlock_t *lock, struct lockdep_map *map)
 							__acquires(lock);
 #define ACQUIRE_SPIN		__acquires(lock)
 #define ACQUIRE_RW		__acquires(lock)
