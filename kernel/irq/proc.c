@@ -7,6 +7,8 @@
  */
 
 #include <linux/irq.h>
+#include <asm/uaccess.h>
+#include <linux/profile.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/interrupt.h>
@@ -116,6 +118,9 @@ static ssize_t default_affinity_write(struct file *file,
 		goto out;
 	}
 
+	/* create /proc/irq/prof_cpu_mask */
+	create_prof_cpu_mask(root_irq_dir);
+
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
 	 * way to make the system unusable accidentally :-) At least
@@ -160,45 +165,6 @@ static int irq_spurious_read(char *page, char **start, off_t off,
 			jiffies_to_msecs(desc->last_unhandled));
 }
 
-#define MAX_NAMELEN 128
-
-static int name_unique(unsigned int irq, struct irqaction *new_action)
-{
-	struct irq_desc *desc = irq_to_desc(irq);
-	struct irqaction *action;
-	unsigned long flags;
-	int ret = 1;
-
-	spin_lock_irqsave(&desc->lock, flags);
-	for (action = desc->action ; action; action = action->next) {
-		if ((action != new_action) && action->name &&
-				!strcmp(new_action->name, action->name)) {
-			ret = 0;
-			break;
-		}
-	}
-	spin_unlock_irqrestore(&desc->lock, flags);
-	return ret;
-}
-
-void register_handler_proc(unsigned int irq, struct irqaction *action)
-{
-	char name [MAX_NAMELEN];
-	struct irq_desc *desc = irq_to_desc(irq);
-
-	if (!desc->dir || action->dir || !action->name ||
-					!name_unique(irq, action))
-		return;
-
-	memset(name, 0, MAX_NAMELEN);
-	snprintf(name, MAX_NAMELEN, "%s", action->name);
-
-	/* create /proc/irq/1234/handler/ */
-	action->dir = proc_mkdir(name, desc->dir);
-}
-
-#undef MAX_NAMELEN
-
 #define MAX_NAMELEN 10
 
 void register_irq_proc(unsigned int irq, struct irq_desc *desc)
@@ -232,6 +198,8 @@ void register_irq_proc(unsigned int irq, struct irq_desc *desc)
 
 void unregister_handler_proc(unsigned int irq, struct irqaction *action)
 {
+	if (action->threaded)
+		remove_proc_entry(action->threaded->name, action->dir);
 	if (action->dir) {
 		struct irq_desc *desc = irq_to_desc(irq);
 
@@ -246,6 +214,91 @@ static void register_default_affinity_proc(void)
 		    &default_affinity_proc_fops);
 #endif
 }
+
+#ifndef CONFIG_PREEMPT_RT
+
+static int threaded_read_proc(char *page, char **start, off_t off,
+			      int count, int *eof, void *data)
+{
+	return sprintf(page, "%c\n",
+		((struct irqaction *)data)->flags & IRQF_NODELAY ? '0' : '1');
+}
+
+static int threaded_write_proc(struct file *file, const char __user *buffer,
+			       unsigned long count, void *data)
+{
+	int c;
+	struct irqaction *action = data;
+	irq_desc_t *desc = irq_to_desc(action->irq);
+
+	if (get_user(c, buffer))
+		return -EFAULT;
+	if (c != '0' && c != '1')
+		return -EINVAL;
+
+	spin_lock_irq(&desc->lock);
+
+	if (c == '0')
+		action->flags |= IRQF_NODELAY;
+	if (c == '1')
+		action->flags &= ~IRQF_NODELAY;
+	recalculate_desc_flags(desc);
+
+	spin_unlock_irq(&desc->lock);
+
+	return 1;
+}
+
+#endif
+
+#define MAX_NAMELEN 128
+
+static int name_unique(unsigned int irq, struct irqaction *new_action)
+{
+	struct irq_desc *desc = irq_to_desc(irq);
+	struct irqaction *action;
+
+	for (action = desc->action ; action; action = action->next)
+		if ((action != new_action) && action->name &&
+				!strcmp(new_action->name, action->name))
+			return 0;
+	return 1;
+}
+
+void register_handler_proc(unsigned int irq, struct irqaction *action)
+{
+	char name [MAX_NAMELEN];
+	struct irq_desc *desc = irq_to_desc(irq);
+
+	if (!desc->dir || action->dir || !action->name ||
+					!name_unique(irq, action))
+		return;
+
+	memset(name, 0, MAX_NAMELEN);
+	snprintf(name, MAX_NAMELEN, "%s", action->name);
+
+	/* create /proc/irq/1234/handler/ */
+	action->dir = proc_mkdir(name, desc->dir);
+
+	if (!action->dir)
+		return;
+#ifndef CONFIG_PREEMPT_RT
+	{
+		struct proc_dir_entry *entry;
+		/* create /proc/irq/1234/handler/threaded */
+		entry = create_proc_entry("threaded", 0600, action->dir);
+		if (!entry)
+			return;
+		entry->nlink = 1;
+		entry->data = (void *)action;
+		entry->read_proc = threaded_read_proc;
+		entry->write_proc = threaded_write_proc;
+		action->threaded = entry;
+	}
+#endif
+}
+
+#undef MAX_NAMELEN
 
 void init_irq_proc(void)
 {
