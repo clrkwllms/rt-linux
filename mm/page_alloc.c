@@ -564,18 +564,16 @@ static inline int free_pages_check(struct page *page)
  * And clear the zone's pages_scanned counter, to hold off the "all pages are
  * pinned" detection logic.
  */
-static void free_pages_bulk(struct zone *zone, int count,
-					struct list_head *list, int order)
+static void
+free_pages_bulk(struct zone *zone, struct list_head *list, int order)
 {
 	spin_lock(&zone->lock);
 	zone_clear_flag(zone, ZONE_ALL_UNRECLAIMABLE);
 	zone->pages_scanned = 0;
-	while (count--) {
-		struct page *page;
 
-		VM_BUG_ON(list_empty(list));
-		page = list_entry(list->prev, struct page, lru);
-		/* have to delete it as __free_one_page list manipulates */
+	while (!list_empty(list)) {
+		struct page *page = list_first_entry(list, struct page, lru);
+
 		list_del(&page->lru);
 		__free_one_page(page, zone, order);
 		cond_resched_lock(&zone->lock);
@@ -935,6 +933,16 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 	return i;
 }
 
+static void
+isolate_pcp_pages(int count, struct list_head *src, struct list_head *dst)
+{
+	while (count--) {
+		struct page *page = list_last_entry(src, struct page, lru);
+		list_move(&page->lru, dst);
+	}
+}
+
+
 #ifdef CONFIG_NUMA
 /*
  * Called from the vmstat counter updater to drain pagesets of this
@@ -946,6 +954,7 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
  */
 void drain_zone_pages(struct zone *zone, struct per_cpu_pages *pcp)
 {
+	LIST_HEAD(free_list);
 	unsigned long flags;
 	int to_drain;
 	int this_cpu;
@@ -955,9 +964,11 @@ void drain_zone_pages(struct zone *zone, struct per_cpu_pages *pcp)
 		to_drain = pcp->batch;
 	else
 		to_drain = pcp->count;
-	free_pages_bulk(zone, to_drain, &pcp->list, 0);
+	isolate_pcp_pages(to_drain, &pcp->list, &free_list);
 	pcp->count -= to_drain;
 	unlock_cpu_pcp(flags, this_cpu);
+
+	free_pages_bulk(zone, &free_list, 0);
 }
 #endif
 
@@ -976,6 +987,7 @@ static void drain_pages(unsigned int cpu)
 	for_each_zone(zone) {
 		struct per_cpu_pageset *pset;
 		struct per_cpu_pages *pcp;
+		LIST_HEAD(free_list);
 
 		if (!populated_zone(zone))
 			continue;
@@ -987,9 +999,10 @@ static void drain_pages(unsigned int cpu)
 		}
 		pcp = &pset->pcp;
 		lock_cpu_pcp(&flags, &cpu);
-		free_pages_bulk(zone, pcp->count, &pcp->list, 0);
+		isolate_pcp_pages(pcp->count, &pcp->list, &free_list);
 		pcp->count = 0;
 		unlock_cpu_pcp(flags, cpu);
+		free_pages_bulk(zone, &free_list, 0);
 	}
 }
 
@@ -1122,10 +1135,15 @@ static void free_hot_cold_page(struct page *page, int cold)
 	set_page_private(page, get_pageblock_migratetype(page));
 	pcp->count++;
 	if (pcp->count >= pcp->high) {
-		free_pages_bulk(zone, pcp->batch, &pcp->list, 0);
+		LIST_HEAD(free_list);
+
+		isolate_pcp_pages(pcp->batch, &pcp->list, &free_list);
 		pcp->count -= pcp->batch;
-	}
-	put_zone_pcp(zone, flags, this_cpu);
+		put_zone_pcp(zone, flags, this_cpu);
+
+		free_pages_bulk(zone, &free_list, 0);
+	} else
+		put_zone_pcp(zone, flags, this_cpu);
 }
 
 void free_hot_page(struct page *page)
