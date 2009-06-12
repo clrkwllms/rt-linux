@@ -257,7 +257,7 @@ static inline int rwsem_atomic_update(int delta, struct compat_rw_semaphore *sem
 	return tmp + delta;
 }
 
-static inline int rwsem_is_locked(struct compat_rw_semaphore *sem)
+static inline int compat_rwsem_is_locked(struct compat_rw_semaphore *sem)
 {
 	return (sem->count != 0);
 }
