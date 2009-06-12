@@ -936,7 +936,7 @@ static int cifs_filldir(char *pfindEntry, struct file *file, filldir_t filldir,
 	__u64  inum;
 	struct cifs_sb_info *cifs_sb;
 	struct inode *tmp_inode;
-	struct dentry *tmp_dentry;
+	struct dentry *uninitialized_var(tmp_dentry);
 
 	/* get filename and len into qstring */
 	/* get dentry */
@@ -1020,7 +1020,7 @@ int cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	struct cifsFileInfo *cifsFile = NULL;
-	char *current_entry;
+	char *uninitialized_var(current_entry);
 	int num_to_fill = 0;
 	char *tmp_buf = NULL;
 	char *end_of_smb;

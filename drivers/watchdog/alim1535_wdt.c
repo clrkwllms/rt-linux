@@ -306,7 +306,7 @@ static struct pci_device_id ali_pci_tbl[] = {
 	{ PCI_VENDOR_ID_AL, 0x1535, PCI_ANY_ID, PCI_ANY_ID,},
 	{ 0, },
 };
-MODULE_DEVICE_TABLE(pci, ali_pci_tbl);
+MODULE_STATIC_DEVICE_TABLE(pci, ali_pci_tbl);
 
 /*
  *	ali_find_watchdog	-	find a 1535 and 7101

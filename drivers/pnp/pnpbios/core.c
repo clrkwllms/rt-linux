@@ -572,6 +572,8 @@ static int __init pnpbios_init(void)
 
 fs_initcall(pnpbios_init);
 
+#ifdef CONFIG_HOTPLUG
+
 static int __init pnpbios_thread_init(void)
 {
 #if defined(CONFIG_PPC)
@@ -580,19 +582,21 @@ static int __init pnpbios_thread_init(void)
 #endif
 	if (pnpbios_disabled)
 		return 0;
-#ifdef CONFIG_HOTPLUG
 	{
 		struct task_struct *task;
+
 		init_completion(&unload_sem);
 		task = kthread_run(pnp_dock_thread, NULL, "kpnpbiosd");
 		if (IS_ERR(task))
 			return PTR_ERR(task);
 	}
-#endif
+
 	return 0;
 }
 
 /* Start the kernel thread later: */
 module_init(pnpbios_thread_init);
+
+#endif
 
 EXPORT_SYMBOL(pnpbios_protocol);

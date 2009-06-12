@@ -896,7 +896,7 @@ long keyctl_instantiate_key(key_serial_t id,
 {
 	const struct cred *cred = current_cred();
 	struct request_key_auth *rka;
-	struct key *instkey, *dest_keyring;
+	struct key *instkey, *uninitialized_var(dest_keyring);
 	void *payload;
 	long ret;
 	bool vm = false;
@@ -974,7 +974,7 @@ long keyctl_negate_key(key_serial_t id, unsigned timeout, key_serial_t ringid)
 {
 	const struct cred *cred = current_cred();
 	struct request_key_auth *rka;
-	struct key *instkey, *dest_keyring;
+	struct key *instkey, *uninitialized_var(dest_keyring);
 	long ret;
 
 	kenter("%d,%u,%d", id, timeout, ringid);

@@ -452,7 +452,7 @@ static struct pci_device_id whcrc_id_table[] = {
 	{ PCI_DEVICE_CLASS(PCI_CLASS_WIRELESS_WHCI, ~0) },
 	{ /* empty last entry */ }
 };
-MODULE_DEVICE_TABLE(pci, whcrc_id_table);
+MODULE_STATIC_DEVICE_TABLE(pci, whcrc_id_table);
 
 static struct umc_driver whcrc_driver = {
 	.name       = "whc-rc",

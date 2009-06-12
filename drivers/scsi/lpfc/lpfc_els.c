@@ -3968,7 +3968,8 @@ lpfc_els_rcv_rscn(struct lpfc_vport *vport, struct lpfc_iocbq *cmdiocb,
 	struct lpfc_dmabuf *pcmd;
 	uint32_t *lp, *datap;
 	IOCB_t *icmd;
-	uint32_t payload_len, length, nportid, *cmd;
+	uint32_t payload_len, uninitialized_var(length), nportid,
+		 *uninitialized_var(cmd);
 	int rscn_cnt;
 	int rscn_id = 0, hba_id = 0;
 	int i;
