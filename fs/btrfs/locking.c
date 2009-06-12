@@ -93,6 +93,7 @@ static int btrfs_spin_on_block(struct extent_buffer *eb)
  */
 int btrfs_try_spin_lock(struct extent_buffer *eb)
 {
+#ifndef CONFIG_PREEMPT_RT
 	int i;
 
 	spin_nested(eb);
@@ -110,6 +111,7 @@ int btrfs_try_spin_lock(struct extent_buffer *eb)
 			return 1;
 		spin_unlock(&eb->lock);
 	}
+#endif
 	return 0;
 }
 
