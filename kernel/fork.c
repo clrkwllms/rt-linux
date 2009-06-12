@@ -1813,6 +1813,19 @@ void  __mmdrop_delayed(struct mm_struct *mm)
 	put_cpu_var(delayed_drop_list);
 }
 
+static void takeover_delayed_drop(int hotcpu)
+{
+	struct list_head *head = &per_cpu(delayed_drop_list, hotcpu);
+
+	while (!list_empty(head)) {
+		struct mm_struct *mm = list_entry(head->next,
+				struct mm_struct, delayed_drop);
+
+		list_del(&mm->delayed_drop);
+		__mmdrop_delayed(mm);
+	}
+}
+
 static int desched_thread(void * __bind_cpu)
 {
 	set_user_nice(current, -10);
@@ -1873,6 +1886,7 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 		p = per_cpu(desched_task, hotcpu);
 		per_cpu(desched_task, hotcpu) = NULL;
 		kthread_stop(p);
+		takeover_delayed_drop(hotcpu);
 		takeover_tasklets(hotcpu);
 		break;
 #endif /* CONFIG_HOTPLUG_CPU */
