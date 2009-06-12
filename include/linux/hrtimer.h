@@ -30,8 +30,11 @@ struct hrtimer_cpu_base;
  * Mode arguments of xxx_hrtimer functions:
  */
 enum hrtimer_mode {
-	HRTIMER_MODE_ABS,	/* Time value is absolute */
-	HRTIMER_MODE_REL,	/* Time value is relative to now */
+	HRTIMER_MODE_ABS = 0x0,		/* Time value is absolute */
+	HRTIMER_MODE_REL = 0x1,		/* Time value is relative to now */
+	HRTIMER_MODE_PINNED = 0x02,	/* Timer is bound to CPU */
+	HRTIMER_MODE_ABS_PINNED = 0x02,
+	HRTIMER_MODE_REL_PINNED = 0x03,
 };
 
 /*
@@ -305,7 +308,7 @@ static inline int hrtimer_is_hres_active(struct hrtimer *timer)
 
 extern ktime_t ktime_get(void);
 extern ktime_t ktime_get_real(void);
-
+extern int hrtimer_hres_active(void);
 
 DECLARE_PER_CPU(struct tick_device, tick_cpu_device);
 
