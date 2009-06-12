@@ -21,7 +21,7 @@
 #include <linux/rwsem.h>
 
 typedef struct {
-	struct rw_semaphore	mr_lock;
+	struct compat_rw_semaphore	mr_lock;
 #ifdef DEBUG
 	int			mr_writer;
 #endif
