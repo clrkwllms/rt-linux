@@ -90,9 +90,9 @@ static struct dn_dev_parms dn_dev_list[] =  {
 	.t3 =		10,
 	.name =		"ethernet",
 	.ctl_name =	NET_DECNET_CONF_ETHER,
-	.up =		dn_eth_up,
-	.down = 	dn_eth_down,
-	.timer3 =	dn_send_brd_hello,
+	.dn_up =		dn_eth_up,
+	.dn_down = 	dn_eth_down,
+	.dn_timer3 =	dn_send_brd_hello,
 },
 {
 	.type =		ARPHRD_IPGRE, /* DECnet tunneled over GRE in IP */
@@ -102,7 +102,7 @@ static struct dn_dev_parms dn_dev_list[] =  {
 	.t3 =		10,
 	.name =		"ipgre",
 	.ctl_name =	NET_DECNET_CONF_GRE,
-	.timer3 =	dn_send_brd_hello,
+	.dn_timer3 =	dn_send_brd_hello,
 },
 #if 0
 {
@@ -113,7 +113,7 @@ static struct dn_dev_parms dn_dev_list[] =  {
 	.t3 =		120,
 	.name =		"x25",
 	.ctl_name =	NET_DECNET_CONF_X25,
-	.timer3 =	dn_send_ptp_hello,
+	.dn_timer3 =	dn_send_ptp_hello,
 },
 #endif
 #if 0
@@ -125,7 +125,7 @@ static struct dn_dev_parms dn_dev_list[] =  {
 	.t3 =		10,
 	.name =		"ppp",
 	.ctl_name =	NET_DECNET_CONF_PPP,
-	.timer3 =	dn_send_brd_hello,
+	.dn_timer3 =	dn_send_brd_hello,
 },
 #endif
 {
@@ -136,7 +136,7 @@ static struct dn_dev_parms dn_dev_list[] =  {
 	.t3 =		120,
 	.name =		"ddcmp",
 	.ctl_name =	NET_DECNET_CONF_DDCMP,
-	.timer3 =	dn_send_ptp_hello,
+	.dn_timer3 =	dn_send_ptp_hello,
 },
 {
 	.type =		ARPHRD_LOOPBACK, /* Loopback interface - always last */
@@ -146,7 +146,7 @@ static struct dn_dev_parms dn_dev_list[] =  {
 	.t3 =		10,
 	.name =		"loopback",
 	.ctl_name =	NET_DECNET_CONF_LOOPBACK,
-	.timer3 =	dn_send_brd_hello,
+	.dn_timer3 =	dn_send_brd_hello,
 }
 };
 
@@ -305,11 +305,11 @@ static int dn_forwarding_proc(ctl_table *table, int write,
 		 */
 		tmp = dn_db->parms.forwarding;
 		dn_db->parms.forwarding = old;
-		if (dn_db->parms.down)
-			dn_db->parms.down(dev);
+		if (dn_db->parms.dn_down)
+			dn_db->parms.dn_down(dev);
 		dn_db->parms.forwarding = tmp;
-		if (dn_db->parms.up)
-			dn_db->parms.up(dev);
+		if (dn_db->parms.dn_up)
+			dn_db->parms.dn_up(dev);
 	}
 
 	return err;
@@ -343,11 +343,11 @@ static int dn_forwarding_sysctl(ctl_table *table,
 		if (value > 2)
 			return -EINVAL;
 
-		if (dn_db->parms.down)
-			dn_db->parms.down(dev);
+		if (dn_db->parms.dn_down)
+			dn_db->parms.dn_down(dev);
 		dn_db->parms.forwarding = value;
-		if (dn_db->parms.up)
-			dn_db->parms.up(dev);
+		if (dn_db->parms.dn_up)
+			dn_db->parms.dn_up(dev);
 	}
 
 	return 0;
@@ -1078,10 +1078,10 @@ static void dn_dev_timer_func(unsigned long arg)
 	struct dn_ifaddr *ifa;
 
 	if (dn_db->t3 <= dn_db->parms.t2) {
-		if (dn_db->parms.timer3) {
+		if (dn_db->parms.dn_timer3) {
 			for(ifa = dn_db->ifa_list; ifa; ifa = ifa->ifa_next) {
 				if (!(ifa->ifa_flags & IFA_F_SECONDARY))
-					dn_db->parms.timer3(dev, ifa);
+					dn_db->parms.dn_timer3(dev, ifa);
 			}
 		}
 		dn_db->t3 = dn_db->parms.t3;
@@ -1140,8 +1140,8 @@ static struct dn_dev *dn_dev_create(struct net_device *dev, int *err)
 		return NULL;
 	}
 
-	if (dn_db->parms.up) {
-		if (dn_db->parms.up(dev) < 0) {
+	if (dn_db->parms.dn_up) {
+		if (dn_db->parms.dn_up(dev) < 0) {
 			neigh_parms_release(&dn_neigh_table, dn_db->neigh_parms);
 			dev->dn_ptr = NULL;
 			kfree(dn_db);
@@ -1235,8 +1235,8 @@ static void dn_dev_delete(struct net_device *dev)
 	dn_dev_check_default(dev);
 	neigh_ifdown(&dn_neigh_table, dev);
 
-	if (dn_db->parms.down)
-		dn_db->parms.down(dev);
+	if (dn_db->parms.dn_down)
+		dn_db->parms.dn_down(dev);
 
 	dev->dn_ptr = NULL;
 
