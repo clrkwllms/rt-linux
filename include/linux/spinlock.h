@@ -531,7 +531,7 @@ static inline void bit_spin_lock(int bitnum, unsigned long *addr)
 	 * attempt to acquire the lock bit.
 	 */
 #if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK) || defined(CONFIG_PREEMPT)
-	while (test_and_set_bit(bitnum, addr))
+	while (unlikely(test_and_set_bit_lock(bitnum, addr)))
 		while (test_bit(bitnum, addr))
 			cpu_relax();
 #endif
@@ -544,7 +544,7 @@ static inline void bit_spin_lock(int bitnum, unsigned long *addr)
 static inline int bit_spin_trylock(int bitnum, unsigned long *addr)
 {
 #if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK) || defined(CONFIG_PREEMPT)
-	if (test_and_set_bit(bitnum, addr))
+	if (unlikely(test_and_set_bit_lock(bitnum, addr)))
 		return 0;
 #endif
 	__acquire(bitlock);
@@ -552,14 +552,29 @@ static inline int bit_spin_trylock(int bitnum, unsigned long *addr)
 }
 
 /*
- *  bit-based spin_unlock()
+ *  bit-based spin_unlock():
  */
 static inline void bit_spin_unlock(int bitnum, unsigned long *addr)
 {
 #if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK) || defined(CONFIG_PREEMPT)
+# ifdef CONFIG_DEBUG_SPINLOCK
 	BUG_ON(!test_bit(bitnum, addr));
-	smp_mb__before_clear_bit();
-	clear_bit(bitnum, addr);
+# endif
+	clear_bit_unlock(bitnum, addr);
+#endif
+	__release(bitlock);
+}
+
+/*
+ *  bit-based spin_unlock() - non-atomic version:
+ */
+static inline void __bit_spin_unlock(int bitnum, unsigned long *addr)
+{
+#if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK) || defined(CONFIG_PREEMPT)
+# ifdef CONFIG_DEBUG_SPINLOCK
+	BUG_ON(!test_bit(bitnum, addr));
+# endif
+	__clear_bit_unlock(bitnum, addr);
 #endif
 	__release(bitlock);
 }
