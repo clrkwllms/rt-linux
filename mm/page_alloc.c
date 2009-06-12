@@ -567,7 +567,9 @@ static inline int free_pages_check(struct page *page)
 static void
 free_pages_bulk(struct zone *zone, struct list_head *list, int order)
 {
-	spin_lock(&zone->lock);
+	unsigned long flags;
+
+	spin_lock_irqsave(&zone->lock, flags);
 	zone_clear_flag(zone, ZONE_ALL_UNRECLAIMABLE);
 	zone->pages_scanned = 0;
 
@@ -576,18 +578,23 @@ free_pages_bulk(struct zone *zone, struct list_head *list, int order)
 
 		list_del(&page->lru);
 		__free_one_page(page, zone, order);
+#ifdef CONFIG_PREEMPT_RT
 		cond_resched_lock(&zone->lock);
+#endif
 	}
-	spin_unlock(&zone->lock);
+	spin_unlock_irqrestore(&zone->lock, flags);
 }
 
 static void free_one_page(struct zone *zone, struct page *page, int order)
 {
-	spin_lock(&zone->lock);
+	unsigned long flags;
+
+	spin_lock_irqsave(&zone->lock, flags);
+
 	zone_clear_flag(zone, ZONE_ALL_UNRECLAIMABLE);
 	zone->pages_scanned = 0;
 	__free_one_page(page, zone, order);
-	spin_unlock(&zone->lock);
+	spin_unlock_irqrestore(&zone->lock, flags);
 }
 
 static void __free_pages_ok(struct page *page, unsigned int order)
@@ -612,8 +619,8 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 
 	lock_cpu_pcp(&flags, &this_cpu);
 	count_vm_events(PGFREE, 1 << order);
-	free_one_page(page_zone(page), page, order);
 	unlock_cpu_pcp(flags, this_cpu);
+	free_one_page(page_zone(page), page, order);
 }
 
 /*
@@ -967,7 +974,6 @@ void drain_zone_pages(struct zone *zone, struct per_cpu_pages *pcp)
 	isolate_pcp_pages(to_drain, &pcp->list, &free_list);
 	pcp->count -= to_drain;
 	unlock_cpu_pcp(flags, this_cpu);
-
 	free_pages_bulk(zone, &free_list, 0);
 }
 #endif
@@ -1140,7 +1146,6 @@ static void free_hot_cold_page(struct page *page, int cold)
 		isolate_pcp_pages(pcp->batch, &pcp->list, &free_list);
 		pcp->count -= pcp->batch;
 		put_zone_pcp(zone, flags, this_cpu);
-
 		free_pages_bulk(zone, &free_list, 0);
 	} else
 		put_zone_pcp(zone, flags, this_cpu);
