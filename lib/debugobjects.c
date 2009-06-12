@@ -25,14 +25,14 @@
 
 struct debug_bucket {
 	struct hlist_head	list;
-	spinlock_t		lock;
+	raw_spinlock_t		lock;
 };
 
 static struct debug_bucket	obj_hash[ODEBUG_HASH_SIZE];
 
 static struct debug_obj		obj_static_pool[ODEBUG_POOL_SIZE] __initdata;
 
-static DEFINE_SPINLOCK(pool_lock);
+static DEFINE_RAW_SPINLOCK(pool_lock);
 
 static HLIST_HEAD(obj_pool);
 
