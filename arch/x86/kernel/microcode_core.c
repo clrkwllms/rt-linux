@@ -391,9 +391,16 @@ static int mc_sysdev_add(struct sys_device *sys_dev)
 		return err;
 
 	err = microcode_init_cpu(cpu);
+#if 0
+	/*
+	 * While it looks correct, it's broken as we remove the sysfs
+	 * entry in sysdev_remove below again. The error handling in
+	 * this file is completely wreckaged and we have multiple
+	 * hotplug handling via notifier and sysdev as well.  Sigh.
+	 */
 	if (err)
 		sysfs_remove_group(&sys_dev->kobj, &mc_attr_group);
-
+#endif
 	return err;
 }
 
