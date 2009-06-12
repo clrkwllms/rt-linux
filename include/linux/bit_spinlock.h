@@ -1,6 +1,8 @@
 #ifndef __LINUX_BIT_SPINLOCK_H
 #define __LINUX_BIT_SPINLOCK_H
 
+#if 0
+
 /*
  *  bit-based spin_lock()
  *
@@ -90,6 +92,8 @@ static inline int bit_spin_is_locked(int bitnum, unsigned long *addr)
 	return 1;
 #endif
 }
+
+#endif
 
 #endif /* __LINUX_BIT_SPINLOCK_H */
 

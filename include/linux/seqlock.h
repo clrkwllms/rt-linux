@@ -32,46 +32,80 @@
 typedef struct {
 	unsigned sequence;
 	spinlock_t lock;
-} seqlock_t;
+} __seqlock_t;
+
+typedef struct {
+	unsigned sequence;
+	raw_spinlock_t lock;
+} __raw_seqlock_t;
+
+#define seqlock_need_resched(seq) lock_need_resched(&(seq)->lock)
+
+#ifdef CONFIG_PREEMPT_RT
+typedef __seqlock_t seqlock_t;
+#else
+typedef __raw_seqlock_t seqlock_t;
+#endif
+
+typedef __raw_seqlock_t raw_seqlock_t;
 
 /*
  * These macros triggered gcc-3.x compile-time problems.  We think these are
  * OK now.  Be cautious.
  */
-#define __SEQLOCK_UNLOCKED(lockname) \
-		 { 0, __SPIN_LOCK_UNLOCKED(lockname) }
+#define __RAW_SEQLOCK_UNLOCKED(lockname) \
+		{ 0, RAW_SPIN_LOCK_UNLOCKED(lockname) }
+
+#ifdef CONFIG_PREEMPT_RT
+# define __SEQLOCK_UNLOCKED(lockname) { 0, __SPIN_LOCK_UNLOCKED(lockname) }
+#else
+# define __SEQLOCK_UNLOCKED(lockname) __RAW_SEQLOCK_UNLOCKED(lockname)
+#endif
 
 #define SEQLOCK_UNLOCKED \
 		 __SEQLOCK_UNLOCKED(old_style_seqlock_init)
 
-#define seqlock_init(x)					\
-	do {						\
-		(x)->sequence = 0;			\
-		spin_lock_init(&(x)->lock);		\
-	} while (0)
+#define raw_seqlock_init(x) \
+	do { *(x) = (raw_seqlock_t) __RAW_SEQLOCK_UNLOCKED(x); spin_lock_init(&(x)->lock); } while (0)
+
+#define seqlock_init(x) \
+		do { *(x) = (seqlock_t) __SEQLOCK_UNLOCKED(x); spin_lock_init(&(x)->lock); } while (0)
 
 #define DEFINE_SEQLOCK(x) \
 		seqlock_t x = __SEQLOCK_UNLOCKED(x)
+
+#define DEFINE_RAW_SEQLOCK(name) \
+	raw_seqlock_t name __cacheline_aligned_in_smp = \
+					__RAW_SEQLOCK_UNLOCKED(name)
+
 
 /* Lock out other writers and update the count.
  * Acts like a normal spin_lock/unlock.
  * Don't need preempt_disable() because that is in the spin_lock already.
  */
-static inline void write_seqlock(seqlock_t *sl)
+static inline void __write_seqlock(seqlock_t *sl)
 {
 	spin_lock(&sl->lock);
 	++sl->sequence;
 	smp_wmb();
 }
 
-static inline void write_sequnlock(seqlock_t *sl)
+static __always_inline unsigned long __write_seqlock_irqsave(seqlock_t *sl)
+{
+	__write_seqlock(sl);
+	return 0;
+}
+
+static inline void __write_sequnlock(seqlock_t *sl)
 {
 	smp_wmb();
 	sl->sequence++;
 	spin_unlock(&sl->lock);
 }
 
-static inline int write_tryseqlock(seqlock_t *sl)
+#define __write_sequnlock_irqrestore(sl, flags)	__write_sequnlock(sl)
+
+static inline int __write_tryseqlock(seqlock_t *sl)
 {
 	int ret = spin_trylock(&sl->lock);
 
@@ -83,7 +117,7 @@ static inline int write_tryseqlock(seqlock_t *sl)
 }
 
 /* Start of read calculation -- fetch last complete writer token */
-static __always_inline unsigned read_seqbegin(const seqlock_t *sl)
+static __always_inline unsigned __read_seqbegin(const seqlock_t *sl)
 {
 	unsigned ret;
 
@@ -103,13 +137,195 @@ repeat:
  *
  * If sequence value changed then writer changed data while in section.
  */
-static __always_inline int read_seqretry(const seqlock_t *sl, unsigned start)
+static inline int __read_seqretry(seqlock_t *sl, unsigned iv)
+{
+	int ret;
+
+	smp_rmb();
+	ret = (iv & 1) | (sl->sequence ^ iv);
+	/*
+	 * If invalid then serialize with the writer, to make sure we
+	 * are not livelocking it:
+	 */
+	if (unlikely(ret)) {
+		unsigned long flags;
+		spin_lock_irqsave(&sl->lock, flags);
+		spin_unlock_irqrestore(&sl->lock, flags);
+	}
+	return ret;
+}
+
+static __always_inline void __write_seqlock_raw(raw_seqlock_t *sl)
+{
+	spin_lock(&sl->lock);
+	++sl->sequence;
+	smp_wmb();
+}
+
+static __always_inline unsigned long
+__write_seqlock_irqsave_raw(raw_seqlock_t *sl)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	__write_seqlock_raw(sl);
+	return flags;
+}
+
+static __always_inline void __write_seqlock_irq_raw(raw_seqlock_t *sl)
+{
+	local_irq_disable();
+	__write_seqlock_raw(sl);
+}
+
+static __always_inline void __write_seqlock_bh_raw(raw_seqlock_t *sl)
+{
+	local_bh_disable();
+	__write_seqlock_raw(sl);
+}
+
+static __always_inline void __write_sequnlock_raw(raw_seqlock_t *sl)
+{
+	smp_wmb();
+	sl->sequence++;
+	spin_unlock(&sl->lock);
+}
+
+static __always_inline void
+__write_sequnlock_irqrestore_raw(raw_seqlock_t *sl, unsigned long flags)
+{
+	__write_sequnlock_raw(sl);
+	local_irq_restore(flags);
+	preempt_check_resched();
+}
+
+static __always_inline void __write_sequnlock_irq_raw(raw_seqlock_t *sl)
+{
+	__write_sequnlock_raw(sl);
+	local_irq_enable();
+	preempt_check_resched();
+}
+
+static __always_inline void __write_sequnlock_bh_raw(raw_seqlock_t *sl)
+{
+	__write_sequnlock_raw(sl);
+	local_bh_enable();
+}
+
+static __always_inline int __write_tryseqlock_raw(raw_seqlock_t *sl)
+{
+	int ret = spin_trylock(&sl->lock);
+
+	if (ret) {
+		++sl->sequence;
+		smp_wmb();
+	}
+	return ret;
+}
+
+static __always_inline unsigned __read_seqbegin_raw(const raw_seqlock_t *sl)
+{
+	unsigned ret = sl->sequence;
+	smp_rmb();
+	return ret;
+}
+
+static __always_inline int __read_seqretry_raw(const raw_seqlock_t *sl, unsigned start)
 {
 	smp_rmb();
 
 	return (sl->sequence != start);
 }
 
+extern int __bad_seqlock_type(void);
+
+/*
+ * PICK_SEQ_OP() is a small redirector to allow less typing of the lock
+ * types raw_seqlock_t, seqlock_t, at the front of the PICK_FUNCTION
+ * macro.
+ */
+#define PICK_SEQ_OP(...) 	\
+	PICK_FUNCTION(raw_seqlock_t *, seqlock_t *, ##__VA_ARGS__)
+#define PICK_SEQ_OP_RET(...) \
+	PICK_FUNCTION_RET(raw_seqlock_t *, seqlock_t *, ##__VA_ARGS__)
+
+#define write_seqlock(sl) PICK_SEQ_OP(__write_seqlock_raw, __write_seqlock, sl)
+
+#define write_sequnlock(sl)	\
+	PICK_SEQ_OP(__write_sequnlock_raw, __write_sequnlock, sl)
+
+#define write_tryseqlock(sl)	\
+	PICK_SEQ_OP_RET(__write_tryseqlock_raw, __write_tryseqlock, sl)
+
+#define read_seqbegin(sl) 	\
+	PICK_SEQ_OP_RET(__read_seqbegin_raw, __read_seqbegin, sl)
+
+#define read_seqretry(sl, iv)	\
+	PICK_SEQ_OP_RET(__read_seqretry_raw, __read_seqretry, sl, iv)
+
+#define write_seqlock_irqsave(lock, flags)			\
+do {								\
+	flags = PICK_SEQ_OP_RET(__write_seqlock_irqsave_raw,	\
+		__write_seqlock_irqsave, lock);			\
+} while (0)
+
+#define write_seqlock_irq(lock)	\
+	PICK_SEQ_OP(__write_seqlock_irq_raw, __write_seqlock, lock)
+
+#define write_seqlock_bh(lock)	\
+	PICK_SEQ_OP(__write_seqlock_bh_raw, __write_seqlock, lock)
+
+#define write_sequnlock_irqrestore(lock, flags)		\
+	PICK_SEQ_OP(__write_sequnlock_irqrestore_raw,	\
+		__write_sequnlock_irqrestore, lock, flags)
+
+#define write_sequnlock_bh(lock)	\
+	PICK_SEQ_OP(__write_sequnlock_bh_raw, __write_sequnlock, lock)
+
+#define write_sequnlock_irq(lock)	\
+	PICK_SEQ_OP(__write_sequnlock_irq_raw, __write_sequnlock, lock)
+
+static __always_inline
+unsigned long __read_seqbegin_irqsave_raw(raw_seqlock_t *sl)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	__read_seqbegin_raw(sl);
+	return flags;
+}
+
+static __always_inline unsigned long __read_seqbegin_irqsave(seqlock_t *sl)
+{
+	__read_seqbegin(sl);
+	return 0;
+}
+
+#define read_seqbegin_irqsave(lock, flags)			\
+do {								\
+	flags = PICK_SEQ_OP_RET(__read_seqbegin_irqsave_raw,	\
+		__read_seqbegin_irqsave, lock);			\
+} while (0)
+
+static __always_inline int
+__read_seqretry_irqrestore(seqlock_t *sl, unsigned iv, unsigned long flags)
+{
+	return __read_seqretry(sl, iv);
+}
+
+static __always_inline int
+__read_seqretry_irqrestore_raw(raw_seqlock_t *sl, unsigned iv,
+			       unsigned long flags)
+{
+	int ret = read_seqretry(sl, iv);
+	local_irq_restore(flags);
+	preempt_check_resched();
+	return ret;
+}
+
+#define read_seqretry_irqrestore(lock, iv, flags)			\
+	PICK_SEQ_OP_RET(__read_seqretry_irqrestore_raw, 		\
+		__read_seqretry_irqrestore, lock, iv, flags)
 
 /*
  * Version using sequence counter only.
@@ -166,32 +382,4 @@ static inline void write_seqcount_end(seqcount_t *s)
 	smp_wmb();
 	s->sequence++;
 }
-
-/*
- * Possible sw/hw IRQ protected versions of the interfaces.
- */
-#define write_seqlock_irqsave(lock, flags)				\
-	do { local_irq_save(flags); write_seqlock(lock); } while (0)
-#define write_seqlock_irq(lock)						\
-	do { local_irq_disable();   write_seqlock(lock); } while (0)
-#define write_seqlock_bh(lock)						\
-        do { local_bh_disable();    write_seqlock(lock); } while (0)
-
-#define write_sequnlock_irqrestore(lock, flags)				\
-	do { write_sequnlock(lock); local_irq_restore(flags); } while(0)
-#define write_sequnlock_irq(lock)					\
-	do { write_sequnlock(lock); local_irq_enable(); } while(0)
-#define write_sequnlock_bh(lock)					\
-	do { write_sequnlock(lock); local_bh_enable(); } while(0)
-
-#define read_seqbegin_irqsave(lock, flags)				\
-	({ local_irq_save(flags);   read_seqbegin(lock); })
-
-#define read_seqretry_irqrestore(lock, iv, flags)			\
-	({								\
-		int ret = read_seqretry(lock, iv);			\
-		local_irq_restore(flags);				\
-		ret;							\
-	})
-
 #endif /* __LINUX_SEQLOCK_H */
