@@ -2393,7 +2393,10 @@ static inline void thread_group_cputime_free(struct signal_struct *sig)
 #ifdef CONFIG_PREEMPT_RT
 static inline int __spin_needbreak(spinlock_t *lock)
 {
-	return lock->break_lock;
+	struct task_struct *tsk = current;
+
+	/* break if we are priority boosted */
+	return tsk->prio < tsk->normal_prio;
 }
 #else
 static inline int __spin_needbreak(spinlock_t *lock)
