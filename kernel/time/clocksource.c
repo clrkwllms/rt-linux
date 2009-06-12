@@ -51,7 +51,7 @@ static struct clocksource *curr_clocksource = &clocksource_jiffies;
 static struct clocksource *next_clocksource;
 static struct clocksource *clocksource_override;
 static LIST_HEAD(clocksource_list);
-static DEFINE_SPINLOCK(clocksource_lock);
+static DEFINE_RAW_SPINLOCK(clocksource_lock);
 static char override_name[32];
 static int finished_booting;
 
