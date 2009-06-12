@@ -693,7 +693,7 @@ retry:
  * The hash bucket lock must be held when this is called.
  * Afterwards, the futex_q must not be accessed.
  */
-static void wake_futex(struct futex_q *q)
+static void wake_futex(struct task_struct **wake_list, struct futex_q *q)
 {
 	struct task_struct *p = q->task;
 
@@ -716,8 +716,51 @@ static void wake_futex(struct futex_q *q)
 	smp_wmb();
 	q->lock_ptr = NULL;
 
-	wake_up_state(p, TASK_NORMAL);
-	put_task_struct(p);
+	/*
+	 * Atomically grab the task, if ->futex_wakeup is !0 already it means
+	 * its already queued (either by us or someone else) and will get the
+	 * wakeup due to that.
+	 *
+	 * This cmpxchg() implies a full barrier, which pairs with the write
+	 * barrier implied by the wakeup in wake_futex_list().
+	 */
+	if (cmpxchg(&p->futex_wakeup, 0, p) != 0) {
+		/*
+		 * It was already queued, drop the extra ref and we're done.
+		 */
+		put_task_struct(p);
+		return;
+	}
+
+	/*
+	 * Put the task on our wakeup list by atomically switching it with
+	 * the list head. (XXX its a local list, no possible concurrency,
+	 * this could be written without cmpxchg).
+	 */
+	do {
+		p->futex_wakeup = *wake_list;
+	} while (cmpxchg(wake_list, p->futex_wakeup, p) != p->futex_wakeup);
+}
+
+/*
+ * For each task on the list, deliver the pending wakeup and release the
+ * task reference obtained in wake_futex().
+ */
+static void wake_futex_list(struct task_struct *head)
+{
+	while (head != &init_task) {
+		struct task_struct *next = head->futex_wakeup;
+
+		head->futex_wakeup = NULL;
+		/*
+		 * wake_up_state() implies a wmb() to pair with the queueing
+		 * in wake_futex() so as to not miss wakeups.
+		 */
+		wake_up_state(head, TASK_NORMAL);
+		put_task_struct(head);
+
+		head = next;
+	}
 }
 
 static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_q *this)
@@ -831,6 +874,7 @@ static int futex_wake(u32 __user *uaddr, int fshared, int nr_wake, u32 bitset)
 	struct futex_q *this, *next;
 	struct plist_head *head;
 	union futex_key key = FUTEX_KEY_INIT;
+	struct task_struct *wake_list = &init_task;
 	int ret;
 
 	if (!bitset)
@@ -855,7 +899,7 @@ static int futex_wake(u32 __user *uaddr, int fshared, int nr_wake, u32 bitset)
 			if (!(this->bitset & bitset))
 				continue;
 
-			wake_futex(this);
+			wake_futex(&wake_list, this);
 			if (++ret >= nr_wake)
 				break;
 		}
@@ -863,6 +907,8 @@ static int futex_wake(u32 __user *uaddr, int fshared, int nr_wake, u32 bitset)
 
 	spin_unlock(&hb->lock);
 	put_futex_key(fshared, &key);
+
+	wake_futex_list(wake_list);
 out:
 	return ret;
 }
@@ -879,6 +925,7 @@ futex_wake_op(u32 __user *uaddr1, int fshared, u32 __user *uaddr2,
 	struct futex_hash_bucket *hb1, *hb2;
 	struct plist_head *head;
 	struct futex_q *this, *next;
+	struct task_struct *wake_list = &init_task;
 	int ret, op_ret;
 
 retry:
@@ -930,7 +977,7 @@ retry_private:
 
 	plist_for_each_entry_safe(this, next, head, list) {
 		if (match_futex (&this->key, &key1)) {
-			wake_futex(this);
+			wake_futex(&wake_list, this);
 			if (++ret >= nr_wake)
 				break;
 		}
@@ -942,7 +989,7 @@ retry_private:
 		op_ret = 0;
 		plist_for_each_entry_safe(this, next, head, list) {
 			if (match_futex (&this->key, &key2)) {
-				wake_futex(this);
+				wake_futex(&wake_list, this);
 				if (++op_ret >= nr_wake2)
 					break;
 			}
@@ -955,6 +1002,8 @@ out_put_keys:
 	put_futex_key(fshared, &key2);
 out_put_key1:
 	put_futex_key(fshared, &key1);
+
+	wake_futex_list(wake_list);
 out:
 	return ret;
 }
@@ -1104,6 +1153,7 @@ static int futex_requeue(u32 __user *uaddr1, int fshared, u32 __user *uaddr2,
 	struct futex_hash_bucket *hb1, *hb2;
 	struct plist_head *head1;
 	struct futex_q *this, *next;
+	struct task_struct *wake_list = &init_task;
 	u32 curval2;
 
 	if (requeue_pi) {
@@ -1241,7 +1291,7 @@ retry_private:
 		 * woken by futex_unlock_pi().
 		 */
 		if (++task_count <= nr_wake && !requeue_pi) {
-			wake_futex(this);
+			wake_futex(&wake_list, this);
 			continue;
 		}
 
@@ -1287,6 +1337,8 @@ out_put_keys:
 	put_futex_key(fshared, &key2);
 out_put_key1:
 	put_futex_key(fshared, &key1);
+
+	wake_futex_list(wake_list);
 out:
 	if (pi_state != NULL)
 		free_pi_state(pi_state);
