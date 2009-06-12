@@ -1645,9 +1645,24 @@ static int psmouse_get_maxproto(char *buffer, struct kernel_param *kp)
 	return sprintf(buffer, "%s\n", psmouse_protocol_by_type(type)->name);
 }
 
+static int __read_mostly nopsmouse;
+
+static int __init nopsmouse_setup(char *str)
+{
+        nopsmouse = 1;
+        printk(KERN_INFO "debug: not setting up psmouse.\n");
+
+        return 1;
+}
+
+__setup("nopsmouse", nopsmouse_setup);
+
 static int __init psmouse_init(void)
 {
 	int err;
+
+	if (nopsmouse)
+		return 0;
 
 	kpsmoused_wq = create_singlethread_workqueue("kpsmoused");
 	if (!kpsmoused_wq) {
