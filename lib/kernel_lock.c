@@ -39,7 +39,7 @@ static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(kernel_flag);
 int __lockfunc __reacquire_kernel_lock(void)
 {
 	while (!_raw_spin_trylock(&kernel_flag)) {
-		if (need_resched())
+		if (test_thread_flag(TIF_NEED_RESCHED))
 			return -EAGAIN;
 		cpu_relax();
 	}
