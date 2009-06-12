@@ -92,6 +92,12 @@ struct sched_param {
 
 #include <asm/processor.h>
 
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+extern int softirq_preemption;
+#else
+# define softirq_preemption 0
+#endif
+
 struct mem_cgroup;
 struct exec_domain;
 struct futex_pi_state;
@@ -1645,6 +1651,7 @@ extern cputime_t task_gtime(struct task_struct *p);
 #define PF_SPREAD_PAGE	0x01000000	/* Spread page cache over cpuset */
 #define PF_SPREAD_SLAB	0x02000000	/* Spread some slab caches over cpuset */
 #define PF_THREAD_BOUND	0x04000000	/* Thread bound to specific cpu */
+#define PF_SOFTIRQ	0x08000000	/* softirq context */
 #define PF_MEMPOLICY	0x10000000	/* Non-default NUMA mempolicy */
 #define PF_MUTEX_TESTER	0x20000000	/* Thread belongs to the rt mutex tester */
 #define PF_FREEZER_SKIP	0x40000000	/* Freezer should not count it as freezeable */
@@ -2232,6 +2239,7 @@ static inline int cond_resched_bkl(void)
 {
 	return _cond_resched();
 }
+extern int cond_resched_softirq_context(void);
 
 /*
  * Does a critical section need to be broken due to another
@@ -2262,6 +2270,13 @@ static inline void thread_group_cputime_init(struct signal_struct *sig)
 
 static inline void thread_group_cputime_free(struct signal_struct *sig)
 {
+}
+
+static inline int softirq_need_resched(void)
+{
+	if (softirq_preemption && (current->flags & PF_SOFTIRQ))
+		return need_resched();
+	return 0;
 }
 
 /*
