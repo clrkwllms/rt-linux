@@ -27,7 +27,7 @@ static LIST_HEAD(clockevents_released);
 static RAW_NOTIFIER_HEAD(clockevents_chain);
 
 /* Protection for the above */
-static DEFINE_SPINLOCK(clockevents_lock);
+static DEFINE_RAW_SPINLOCK(clockevents_lock);
 
 /**
  * clockevents_delta2ns - Convert a latch value (device ticks) to nanoseconds
