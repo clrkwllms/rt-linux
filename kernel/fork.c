@@ -1062,6 +1062,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	clear_tsk_thread_flag(p, TIF_SIGPENDING);
 	init_sigpending(&p->pending);
+	p->sigqueue_cache = NULL;
 
 	p->utime = cputime_zero;
 	p->stime = cputime_zero;
