@@ -940,6 +940,9 @@ static void dotest(void (*testcase_fn)(void), int expected, int lockclass_mask)
 {
 	unsigned long saved_preempt_count = preempt_count();
 	int expected_failure = 0;
+#if defined(CONFIG_DEBUG_PREEMPT) && defined(CONFIG_DEBUG_RT_MUTEXES)
+        int saved_lock_count = current->lock_count;
+#endif
 
 	WARN_ON(irqs_disabled());
 
@@ -989,6 +992,9 @@ static void dotest(void (*testcase_fn)(void), int expected, int lockclass_mask)
 #endif
 
 	reset_locks();
+#if defined(CONFIG_DEBUG_PREEMPT) && defined(CONFIG_DEBUG_RT_MUTEXES)
+        current->lock_count = saved_lock_count;
+#endif
 }
 
 static inline void print_testname(const char *testname)
