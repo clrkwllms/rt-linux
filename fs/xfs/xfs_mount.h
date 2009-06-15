@@ -275,7 +275,7 @@ typedef struct xfs_mount {
 	uint			m_bm_maxlevels[2]; /* XFS_BM_MAXLEVELS */
 	uint			m_in_maxlevels;	/* XFS_IN_MAXLEVELS */
 	struct xfs_perag	*m_perag;	/* per-ag accounting info */
-	struct rw_semaphore	m_peraglock;	/* lock for m_perag (pointer) */
+	struct compat_rw_semaphore m_peraglock;	/* lock for m_perag (pointer) */
 	struct mutex		m_growlock;	/* growfs mutex */
 	int			m_fixedfsid[2];	/* unchanged for life of FS */
 	uint			m_dmevmask;	/* DMI events for this FS */
