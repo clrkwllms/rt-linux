@@ -6707,7 +6707,7 @@ EXPORT_SYMBOL(__cond_resched_spinlock);
  */
 int __sched cond_resched_softirq(void)
 {
-#ifndef CONFIG_PREEMPT_RT
+#ifndef CONFIG_PREEMPT_SOFTIRQS
 	WARN_ON_ONCE(!in_softirq());
 	if (!in_softirq())
 		return 0;
