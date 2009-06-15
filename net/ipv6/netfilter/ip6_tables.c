@@ -376,7 +376,7 @@ ip6t_do_table(struct sk_buff *skb,
 	read_lock_bh(&table->lock);
 	IP_NF_ASSERT(table->valid_hooks & (1 << hook));
 	private = table->private;
-	table_base = (void *)private->entries[smp_processor_id()];
+	table_base = (void *)private->entries[raw_smp_processor_id()];
 	e = get_entry(table_base, private->hook_entry[hook]);
 
 	/* For return from builtin chain */

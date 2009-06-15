@@ -76,9 +76,9 @@ struct dn_dev_parms {
 	int priority;             /* Priority to be a router            */
 	char *name;               /* Name for sysctl                    */
 	int ctl_name;             /* Index for sysctl                   */
-	int  (*up)(struct net_device *);
-	void (*down)(struct net_device *);
-	void (*timer3)(struct net_device *, struct dn_ifaddr *ifa);
+	int  (*dn_up)(struct net_device *);
+	void (*dn_down)(struct net_device *);
+	void (*dn_timer3)(struct net_device *, struct dn_ifaddr *ifa);
 	void *sysctl;
 };
 
