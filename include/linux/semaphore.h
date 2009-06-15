@@ -38,6 +38,8 @@ static inline void compat_sema_init(struct compat_semaphore *sem, int val)
 {
 	static struct lock_class_key __key;
 	*sem = (struct compat_semaphore) __COMPAT_SEMAPHORE_INITIALIZER(*sem, val);
+
+	spin_lock_init(&sem->lock);
 	lockdep_init_map(&sem->lock.dep_map, "semaphore->lock", &__key, 0);
 }
 
