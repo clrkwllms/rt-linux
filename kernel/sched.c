@@ -140,6 +140,7 @@ DEFINE_TRACE(sched_wakeup);
 DEFINE_TRACE(sched_wakeup_new);
 DEFINE_TRACE(sched_switch);
 DEFINE_TRACE(sched_migrate_task);
+DEFINE_TRACE(sched_task_setprio);
 
 #ifdef CONFIG_SMP
 
@@ -5972,7 +5973,7 @@ void task_setprio(struct task_struct *p, int prio)
 
 	p->prio = prio;
 
-//	trace_special_pid(p->pid, __PRIO(oldprio), PRIO(p));
+	trace_sched_task_setprio(rq, p, oldprio);
 
 	if (running)
 		p->sched_class->set_curr_task(rq);
@@ -5981,7 +5982,6 @@ void task_setprio(struct task_struct *p, int prio)
 
 		check_class_changed(rq, p, prev_class, oldprio, running);
 	}
-//	trace_special(prev_resched, _need_resched(), 0);
 
 out_unlock:
 	task_rq_unlock(rq, &flags);
