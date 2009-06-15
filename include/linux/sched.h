@@ -1728,9 +1728,9 @@ extern cputime_t task_gtime(struct task_struct *p);
 #define PF_EXITING	0x00000004	/* getting shut down */
 #define PF_EXITPIDONE	0x00000008	/* pi exit done on shut down */
 #define PF_VCPU		0x00000010	/* I'm a virtual CPU */
-#define PF_HARDIRQ	0x08000020	/* hardirq context */
 #define PF_NOSCHED	0x00000020	/* Userspace does not expect scheduling */
 #define PF_FORKNOEXEC	0x00000040	/* forked but didn't exec */
+#define PF_HARDIRQ	0x00000080	/* hardirq context */
 #define PF_SUPERPRIV	0x00000100	/* used super-user privileges */
 #define PF_DUMPCORE	0x00000200	/* dumped core */
 #define PF_SIGNALED	0x00000400	/* killed by a signal */
