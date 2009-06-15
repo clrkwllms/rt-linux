@@ -92,8 +92,11 @@ static inline void __write_seqlock(seqlock_t *sl)
 
 static __always_inline unsigned long __write_seqlock_irqsave(seqlock_t *sl)
 {
+	unsigned long flags;
+
+	local_save_flags(flags);
 	__write_seqlock(sl);
-	return 0;
+	return flags;
 }
 
 static inline void __write_sequnlock(seqlock_t *sl)
@@ -286,26 +289,27 @@ do {								\
 	PICK_SEQ_OP(__write_sequnlock_irq_raw, __write_sequnlock, lock)
 
 static __always_inline
-unsigned long __read_seqbegin_irqsave_raw(raw_seqlock_t *sl)
+unsigned long __seq_irqsave_raw(raw_seqlock_t *sl)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
-	__read_seqbegin_raw(sl);
 	return flags;
 }
 
-static __always_inline unsigned long __read_seqbegin_irqsave(seqlock_t *sl)
+static __always_inline unsigned long __seq_irqsave(seqlock_t *sl)
 {
-	__read_seqbegin(sl);
-	return 0;
+	unsigned long flags;
+
+	local_save_flags(flags);
+	return flags;
 }
 
-#define read_seqbegin_irqsave(lock, flags)			\
-do {								\
-	flags = PICK_SEQ_OP_RET(__read_seqbegin_irqsave_raw,	\
-		__read_seqbegin_irqsave, lock);			\
-} while (0)
+#define read_seqbegin_irqsave(lock, flags)				\
+({									\
+	flags = PICK_SEQ_OP_RET(__seq_irqsave_raw, __seq_irqsave, lock);\
+	read_seqbegin(lock);						\
+})
 
 static __always_inline int
 __read_seqretry_irqrestore(seqlock_t *sl, unsigned iv, unsigned long flags)
