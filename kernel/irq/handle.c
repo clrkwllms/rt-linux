@@ -237,7 +237,7 @@ struct irq_desc irq_desc[NR_IRQS] __cacheline_aligned_in_smp = {
 		.chip = &no_irq_chip,
 		.handle_irq = handle_bad_irq,
 		.depth = 1,
-		.lock = __SPIN_LOCK_UNLOCKED(irq_desc->lock),
+		.lock = RAW_SPIN_LOCK_UNLOCKED(irq_desc->lock),
 	}
 };
 
