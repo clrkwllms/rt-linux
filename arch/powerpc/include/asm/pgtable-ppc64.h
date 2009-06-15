@@ -285,8 +285,15 @@ static inline unsigned long pte_update(struct mm_struct *mm,
 	: "r" (ptep), "r" (clr), "m" (*ptep), "i" (_PAGE_BUSY)
 	: "cc" );
 
-	if (old & _PAGE_HASHPTE)
+	if (old & _PAGE_HASHPTE) {
+#ifdef CONFIG_PREEMPT_RT
+		preempt_disable();
+#endif
 		hpte_need_flush(mm, addr, ptep, old, huge);
+#ifdef CONFIG_PREEMPT_RT
+		preempt_enable();
+#endif
+	}
 	return old;
 }
 
