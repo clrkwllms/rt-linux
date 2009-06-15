@@ -180,13 +180,13 @@ struct mnt_writer {
 	unsigned long count;
 	struct vfsmount *mnt;
 } ____cacheline_aligned_in_smp;
-static DEFINE_PER_CPU(struct mnt_writer, mnt_writers);
+static DEFINE_PER_CPU_LOCKED(struct mnt_writer, mnt_writers);
 
 static int __init init_mnt_writers(void)
 {
 	int cpu;
 	for_each_possible_cpu(cpu) {
-		struct mnt_writer *writer = &per_cpu(mnt_writers, cpu);
+		struct mnt_writer *writer = &per_cpu_var_locked(mnt_writers, cpu);
 		spin_lock_init(&writer->lock);
 		lockdep_set_class(&writer->lock, &writer->lock_class);
 		writer->count = 0;
@@ -201,7 +201,7 @@ static void unlock_mnt_writers(void)
 	struct mnt_writer *cpu_writer;
 
 	for_each_possible_cpu(cpu) {
-		cpu_writer = &per_cpu(mnt_writers, cpu);
+		cpu_writer = &per_cpu_var_locked(mnt_writers, cpu);
 		spin_unlock(&cpu_writer->lock);
 	}
 }
@@ -253,8 +253,8 @@ int mnt_want_write(struct vfsmount *mnt)
 {
 	int ret = 0;
 	struct mnt_writer *cpu_writer;
-
-	cpu_writer = &get_cpu_var(mnt_writers);
+	int cpu = 0;
+	cpu_writer = &get_cpu_var_locked(mnt_writers, &cpu);
 	spin_lock(&cpu_writer->lock);
 	if (__mnt_is_readonly(mnt)) {
 		ret = -EROFS;
@@ -264,7 +264,7 @@ int mnt_want_write(struct vfsmount *mnt)
 	cpu_writer->count++;
 out:
 	spin_unlock(&cpu_writer->lock);
-	put_cpu_var(mnt_writers);
+	put_cpu_var_locked(mnt_writers, cpu);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(mnt_want_write);
@@ -275,7 +275,7 @@ static void lock_mnt_writers(void)
 	struct mnt_writer *cpu_writer;
 
 	for_each_possible_cpu(cpu) {
-		cpu_writer = &per_cpu(mnt_writers, cpu);
+		cpu_writer = &per_cpu_var_locked(mnt_writers, cpu);
 		spin_lock(&cpu_writer->lock);
 		__clear_mnt_count(cpu_writer);
 		cpu_writer->mnt = NULL;
@@ -333,8 +333,8 @@ void mnt_drop_write(struct vfsmount *mnt)
 {
 	int must_check_underflow = 0;
 	struct mnt_writer *cpu_writer;
-
-	cpu_writer = &get_cpu_var(mnt_writers);
+	int cpu = 0;
+	cpu_writer = &get_cpu_var_locked(mnt_writers, &cpu);
 	spin_lock(&cpu_writer->lock);
 
 	use_cpu_writer_for_mount(cpu_writer, mnt);
@@ -361,7 +361,7 @@ void mnt_drop_write(struct vfsmount *mnt)
 	 * __mnt_writers can underflow.  Without it,
 	 * we could theoretically wrap __mnt_writers.
 	 */
-	put_cpu_var(mnt_writers);
+	put_cpu_var_locked(mnt_writers, cpu);
 }
 EXPORT_SYMBOL_GPL(mnt_drop_write);
 
@@ -613,7 +613,8 @@ static inline void __mntput(struct vfsmount *mnt)
 	 * can come in.
 	 */
 	for_each_possible_cpu(cpu) {
-		struct mnt_writer *cpu_writer = &per_cpu(mnt_writers, cpu);
+		struct mnt_writer *cpu_writer = &per_cpu_var_locked(mnt_writers, cpu);
+
 		spin_lock(&cpu_writer->lock);
 		if (cpu_writer->mnt != mnt) {
 			spin_unlock(&cpu_writer->lock);
