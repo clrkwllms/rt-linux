@@ -342,25 +342,6 @@ void  rt_up_read(struct rw_semaphore *rwsem)
 }
 EXPORT_SYMBOL(rt_up_read);
 
-#ifdef CONFIG_DEBUG_LOCK_ALLOC
-void  rt_up_read_non_owner(struct rw_semaphore *rwsem)
-{
-	unsigned long flags;
-	/*
-	 * Read locks within the self-held write lock succeed.
-	 */
-	spin_lock_irqsave(&rwsem->lock.wait_lock, flags);
-	if (rt_mutex_real_owner(&rwsem->lock) == current && rwsem->read_depth) {
-		spin_unlock_irqrestore(&rwsem->lock.wait_lock, flags);
-		rwsem->read_depth--;
-		return;
-	}
-	spin_unlock_irqrestore(&rwsem->lock.wait_lock, flags);
-	rt_mutex_unlock(&rwsem->lock);
-}
-EXPORT_SYMBOL(rt_up_read_non_owner);
-#endif
-
 /*
  * downgrade a write lock into a read lock
  * - just wake up any readers at the front of the queue
@@ -450,32 +431,6 @@ void  rt_down_read_nested(struct rw_semaphore *rwsem, int subclass)
 	__rt_down_read(rwsem, subclass);
 }
 EXPORT_SYMBOL(rt_down_read_nested);
-
-
-#ifdef CONFIG_DEBUG_LOCK_ALLOC
-
-/*
- * Same as rt_down_read() but no lockdep calls:
- */
-void  rt_down_read_non_owner(struct rw_semaphore *rwsem)
-{
-	unsigned long flags;
-	/*
-	 * Read locks within the write lock succeed.
-	 */
-	spin_lock_irqsave(&rwsem->lock.wait_lock, flags);
-
-	if (rt_mutex_real_owner(&rwsem->lock) == current) {
-		spin_unlock_irqrestore(&rwsem->lock.wait_lock, flags);
-		rwsem->read_depth++;
-		return;
-	}
-	spin_unlock_irqrestore(&rwsem->lock.wait_lock, flags);
-	rt_mutex_lock(&rwsem->lock);
-}
-EXPORT_SYMBOL(rt_down_read_non_owner);
-
-#endif
 
 void  __rt_rwsem_init(struct rw_semaphore *rwsem, char *name,
 			      struct lock_class_key *key)
