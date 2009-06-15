@@ -49,6 +49,7 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#include <linux/delay.h>
 
 #define BUF_SIZE_DEFAULT	262144UL		/* 8K*(sizeof(entry)) */
 #define BUF_FLAGS		(RB_FL_OVERWRITE)	/* no block on full */
