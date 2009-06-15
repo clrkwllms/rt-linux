@@ -10,6 +10,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/kmemcheck.h>
 
 #define C2PORT_NAME_LEN			32
 
@@ -20,8 +21,10 @@
 /* Main struct */
 struct c2port_ops;
 struct c2port_device {
-	unsigned int access:1;
-	unsigned int flash_access:1;
+	kmemcheck_define_bitfield(flags, {
+		unsigned int access:1;
+		unsigned int flash_access:1;
+	});
 
 	int id;
 	char name[C2PORT_NAME_LEN];

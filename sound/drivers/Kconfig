@@ -33,7 +33,7 @@ if SND_DRIVERS
 
 config SND_PCSP
 	tristate "PC-Speaker support (READ HELP!)"
-	depends on PCSPKR_PLATFORM && X86_PC && HIGH_RES_TIMERS
+	depends on PCSPKR_PLATFORM && X86 && HIGH_RES_TIMERS
 	depends on INPUT
 	depends on EXPERIMENTAL
 	select SND_PCM
@@ -91,6 +91,8 @@ config SND_VIRMIDI
 
 config SND_MTPAV
 	tristate "MOTU MidiTimePiece AV multiport MIDI"
+	# sometimes crashes
+	depends on 0
 	select SND_RAWMIDI
 	help
 	  To use a MOTU MidiTimePiece AV multiport MIDI adapter

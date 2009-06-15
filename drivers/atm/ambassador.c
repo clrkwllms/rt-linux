@@ -2097,7 +2097,7 @@ static int __devinit amb_init (amb_dev * dev)
 {
   loader_block lb;
   
-  u32 version;
+  u32 version = -1;
   
   if (amb_reset (dev, 1)) {
     PRINTK (KERN_ERR, "card reset failed!");

@@ -13,6 +13,8 @@ comment "Enable MMC support to see WiMAX SDIO drivers"
 config WIMAX_I2400M_USB
 	tristate "Intel Wireless WiMAX Connection 2400 over USB (including 5x50)"
 	depends on WIMAX && USB
+	# build failure: config-Thu_Jan__8_10_51_13_CET_2009.bad
+	depends on 0
 	select WIMAX_I2400M
 	help
 	  Select if you have a device based on the Intel WiMAX

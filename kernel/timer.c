@@ -491,14 +491,18 @@ static inline void debug_timer_free(struct timer_list *timer)
 	debug_object_free(timer, &timer_debug_descr);
 }
 
-static void __init_timer(struct timer_list *timer);
+static void __init_timer(struct timer_list *timer,
+			 const char *name,
+			 struct lock_class_key *key);
 
-void init_timer_on_stack(struct timer_list *timer)
+void init_timer_on_stack_key(struct timer_list *timer,
+			     const char *name,
+			     struct lock_class_key *key)
 {
 	debug_object_init_on_stack(timer, &timer_debug_descr);
-	__init_timer(timer);
+	__init_timer(timer, name, key);
 }
-EXPORT_SYMBOL_GPL(init_timer_on_stack);
+EXPORT_SYMBOL_GPL(init_timer_on_stack_key);
 
 void destroy_timer_on_stack(struct timer_list *timer)
 {
@@ -512,7 +516,9 @@ static inline void debug_timer_activate(struct timer_list *timer) { }
 static inline void debug_timer_deactivate(struct timer_list *timer) { }
 #endif
 
-static void __init_timer(struct timer_list *timer)
+static void __init_timer(struct timer_list *timer,
+			 const char *name,
+			 struct lock_class_key *key)
 {
 	timer->entry.next = NULL;
 	timer->base = __raw_get_cpu_var(tvec_bases);
@@ -521,6 +527,7 @@ static void __init_timer(struct timer_list *timer)
 	timer->start_pid = -1;
 	memset(timer->start_comm, 0, TASK_COMM_LEN);
 #endif
+	lockdep_init_map(&timer->lockdep_map, name, key, 0);
 }
 
 /**
@@ -530,19 +537,23 @@ static void __init_timer(struct timer_list *timer)
  * init_timer() must be done to a timer prior calling *any* of the
  * other timer functions.
  */
-void init_timer(struct timer_list *timer)
+void init_timer_key(struct timer_list *timer,
+		    const char *name,
+		    struct lock_class_key *key)
 {
 	debug_timer_init(timer);
-	__init_timer(timer);
+	__init_timer(timer, name, key);
 }
-EXPORT_SYMBOL(init_timer);
+EXPORT_SYMBOL(init_timer_key);
 
-void init_timer_deferrable(struct timer_list *timer)
+void init_timer_deferrable_key(struct timer_list *timer,
+			       const char *name,
+			       struct lock_class_key *key)
 {
-	init_timer(timer);
+	init_timer_key(timer, name, key);
 	timer_set_deferrable(timer);
 }
-EXPORT_SYMBOL(init_timer_deferrable);
+EXPORT_SYMBOL(init_timer_deferrable_key);
 
 static inline void detach_timer(struct timer_list *timer,
 				int clear_pending)
@@ -589,11 +600,14 @@ static struct tvec_base *lock_timer_base(struct timer_list *timer,
 	}
 }
 
-int __mod_timer(struct timer_list *timer, unsigned long expires)
+static inline int
+__mod_timer(struct timer_list *timer, unsigned long expires, bool pending_only)
 {
 	struct tvec_base *base, *new_base;
 	unsigned long flags;
-	int ret = 0;
+	int ret;
+
+	ret = 0;
 
 	timer_stats_timer_set_start_info(timer);
 	BUG_ON(!timer->function);
@@ -603,6 +617,9 @@ int __mod_timer(struct timer_list *timer, unsigned long expires)
 	if (timer_pending(timer)) {
 		detach_timer(timer, 0);
 		ret = 1;
+	} else {
+		if (pending_only)
+			goto out_unlock;
 	}
 
 	debug_timer_activate(timer);
@@ -629,12 +646,83 @@ int __mod_timer(struct timer_list *timer, unsigned long expires)
 
 	timer->expires = expires;
 	internal_add_timer(base, timer);
+
+out_unlock:
 	spin_unlock_irqrestore(&base->lock, flags);
 
 	return ret;
 }
 
-EXPORT_SYMBOL(__mod_timer);
+/**
+ * mod_timer_pending - modify a pending timer's timeout
+ * @timer: the pending timer to be modified
+ * @expires: new timeout in jiffies
+ *
+ * mod_timer_pending() is the same for pending timers as mod_timer(),
+ * but will not re-activate and modify already deleted timers.
+ *
+ * It is useful for unserialized use of timers.
+ */
+int mod_timer_pending(struct timer_list *timer, unsigned long expires)
+{
+	return __mod_timer(timer, expires, true);
+}
+EXPORT_SYMBOL(mod_timer_pending);
+
+/**
+ * mod_timer - modify a timer's timeout
+ * @timer: the timer to be modified
+ * @expires: new timeout in jiffies
+ *
+ * mod_timer() is a more efficient way to update the expire field of an
+ * active timer (if the timer is inactive it will be activated)
+ *
+ * mod_timer(timer, expires) is equivalent to:
+ *
+ *     del_timer(timer); timer->expires = expires; add_timer(timer);
+ *
+ * Note that if there are multiple unserialized concurrent users of the
+ * same timer, then mod_timer() is the only safe way to modify the timeout,
+ * since add_timer() cannot modify an already running timer.
+ *
+ * The function returns whether it has modified a pending timer or not.
+ * (ie. mod_timer() of an inactive timer returns 0, mod_timer() of an
+ * active timer returns 1.)
+ */
+int mod_timer(struct timer_list *timer, unsigned long expires)
+{
+	/*
+	 * This is a common optimization triggered by the
+	 * networking code - if the timer is re-modified
+	 * to be the same thing then just return:
+	 */
+	if (timer->expires == expires && timer_pending(timer))
+		return 1;
+
+	return __mod_timer(timer, expires, false);
+}
+EXPORT_SYMBOL(mod_timer);
+
+/**
+ * add_timer - start a timer
+ * @timer: the timer to be added
+ *
+ * The kernel will do a ->function(->data) callback from the
+ * timer interrupt at the ->expires point in the future. The
+ * current time is 'jiffies'.
+ *
+ * The timer's ->expires, ->function (and if the handler uses it, ->data)
+ * fields must be set prior calling this function.
+ *
+ * Timers with an ->expires field in the past will be executed in the next
+ * timer tick.
+ */
+void add_timer(struct timer_list *timer)
+{
+	BUG_ON(timer_pending(timer));
+	mod_timer(timer, timer->expires);
+}
+EXPORT_SYMBOL(add_timer);
 
 /**
  * add_timer_on - start a timer on a particular CPU
@@ -667,44 +755,6 @@ void add_timer_on(struct timer_list *timer, int cpu)
 }
 
 /**
- * mod_timer - modify a timer's timeout
- * @timer: the timer to be modified
- * @expires: new timeout in jiffies
- *
- * mod_timer() is a more efficient way to update the expire field of an
- * active timer (if the timer is inactive it will be activated)
- *
- * mod_timer(timer, expires) is equivalent to:
- *
- *     del_timer(timer); timer->expires = expires; add_timer(timer);
- *
- * Note that if there are multiple unserialized concurrent users of the
- * same timer, then mod_timer() is the only safe way to modify the timeout,
- * since add_timer() cannot modify an already running timer.
- *
- * The function returns whether it has modified a pending timer or not.
- * (ie. mod_timer() of an inactive timer returns 0, mod_timer() of an
- * active timer returns 1.)
- */
-int mod_timer(struct timer_list *timer, unsigned long expires)
-{
-	BUG_ON(!timer->function);
-
-	timer_stats_timer_set_start_info(timer);
-	/*
-	 * This is a common optimization triggered by the
-	 * networking code - if the timer is re-modified
-	 * to be the same thing then just return:
-	 */
-	if (timer->expires == expires && timer_pending(timer))
-		return 1;
-
-	return __mod_timer(timer, expires);
-}
-
-EXPORT_SYMBOL(mod_timer);
-
-/**
  * del_timer - deactive a timer.
  * @timer: the timer to be deactivated
  *
@@ -733,7 +783,6 @@ int del_timer(struct timer_list *timer)
 
 	return ret;
 }
-
 EXPORT_SYMBOL(del_timer);
 
 #ifdef CONFIG_SMP
@@ -767,7 +816,6 @@ out:
 
 	return ret;
 }
-
 EXPORT_SYMBOL(try_to_del_timer_sync);
 
 /**
@@ -789,6 +837,15 @@ EXPORT_SYMBOL(try_to_del_timer_sync);
  */
 int del_timer_sync(struct timer_list *timer)
 {
+#ifdef CONFIG_LOCKDEP
+	unsigned long flags;
+
+	local_irq_save(flags);
+	lock_map_acquire(&timer->lockdep_map);
+	lock_map_release(&timer->lockdep_map);
+	local_irq_restore(flags);
+#endif
+
 	for (;;) {
 		int ret = try_to_del_timer_sync(timer);
 		if (ret >= 0)
@@ -796,7 +853,6 @@ int del_timer_sync(struct timer_list *timer)
 		cpu_relax();
 	}
 }
-
 EXPORT_SYMBOL(del_timer_sync);
 #endif
 
@@ -861,10 +917,36 @@ static inline void __run_timers(struct tvec_base *base)
 
 			set_running_timer(base, timer);
 			detach_timer(timer, 1);
+
 			spin_unlock_irq(&base->lock);
 			{
 				int preempt_count = preempt_count();
+
+#ifdef CONFIG_LOCKDEP
+				/*
+				 * It is permissible to free the timer from
+				 * inside the function that is called from
+				 * it, this we need to take into account for
+				 * lockdep too. To avoid bogus "held lock
+				 * freed" warnings as well as problems when
+				 * looking into timer->lockdep_map, make a
+				 * copy and use that here.
+				 */
+				struct lockdep_map lockdep_map =
+					timer->lockdep_map;
+#endif
+				/*
+				 * Couple the lock chain with the lock chain at
+				 * del_timer_sync() by acquiring the lock_map
+				 * around the fn() call here and in
+				 * del_timer_sync().
+				 */
+				lock_map_acquire(&lockdep_map);
+
 				fn(data);
+
+				lock_map_release(&lockdep_map);
+
 				if (preempt_count != preempt_count()) {
 					printk(KERN_ERR "huh, entered %p "
 					       "with preempt_count %08x, exited"
@@ -1038,47 +1120,6 @@ void update_process_times(int user_tick)
 }
 
 /*
- * Nr of active tasks - counted in fixed-point numbers
- */
-static unsigned long count_active_tasks(void)
-{
-	return nr_active() * FIXED_1;
-}
-
-/*
- * Hmm.. Changed this, as the GNU make sources (load.c) seems to
- * imply that avenrun[] is the standard name for this kind of thing.
- * Nothing else seems to be standardized: the fractional size etc
- * all seem to differ on different machines.
- *
- * Requires xtime_lock to access.
- */
-unsigned long avenrun[3];
-
-EXPORT_SYMBOL(avenrun);
-
-/*
- * calc_load - given tick count, update the avenrun load estimates.
- * This is called while holding a write_lock on xtime_lock.
- */
-static inline void calc_load(unsigned long ticks)
-{
-	unsigned long active_tasks; /* fixed-point */
-	static int count = LOAD_FREQ;
-
-	count -= ticks;
-	if (unlikely(count < 0)) {
-		active_tasks = count_active_tasks();
-		do {
-			CALC_LOAD(avenrun[0], EXP_1, active_tasks);
-			CALC_LOAD(avenrun[1], EXP_5, active_tasks);
-			CALC_LOAD(avenrun[2], EXP_15, active_tasks);
-			count += LOAD_FREQ;
-		} while (count < 0);
-	}
-}
-
-/*
  * This function runs timers and the timer-tq in bottom half context.
  */
 static void run_timer_softirq(struct softirq_action *h)
@@ -1102,16 +1143,6 @@ void run_local_timers(void)
 }
 
 /*
- * Called by the timer interrupt. xtime_lock must already be taken
- * by the timer IRQ!
- */
-static inline void update_times(unsigned long ticks)
-{
-	update_wall_time();
-	calc_load(ticks);
-}
-
-/*
  * The 64-bit jiffies value is not atomic - you MUST NOT read it
  * without sampling the sequence number in xtime_lock.
  * jiffies is defined in the linker script...
@@ -1120,7 +1151,8 @@ static inline void update_times(unsigned long ticks)
 void do_timer(unsigned long ticks)
 {
 	jiffies_64 += ticks;
-	update_times(ticks);
+	update_wall_time();
+	calc_global_load();
 }
 
 #ifdef __ARCH_WANT_SYS_ALARM
@@ -1268,7 +1300,7 @@ signed long __sched schedule_timeout(signed long timeout)
 	expire = timeout + jiffies;
 
 	setup_timer_on_stack(&timer, process_timeout, (unsigned long)current);
-	__mod_timer(&timer, expire);
+	__mod_timer(&timer, expire, false);
 	schedule();
 	del_singleshot_timer_sync(&timer);
 
@@ -1321,37 +1353,17 @@ int do_sysinfo(struct sysinfo *info)
 {
 	unsigned long mem_total, sav_total;
 	unsigned int mem_unit, bitcount;
-	unsigned long seq;
+	struct timespec tp;
 
 	memset(info, 0, sizeof(struct sysinfo));
 
-	do {
-		struct timespec tp;
-		seq = read_seqbegin(&xtime_lock);
+	ktime_get_ts(&tp);
+	monotonic_to_bootbased(&tp);
+	info->uptime = tp.tv_sec + (tp.tv_nsec ? 1 : 0);
 
-		/*
-		 * This is annoying.  The below is the same thing
-		 * posix_get_clock_monotonic() does, but it wants to
-		 * take the lock which we want to cover the loads stuff
-		 * too.
-		 */
+	get_avenrun(info->loads, 0, SI_LOAD_SHIFT - FSHIFT);
 
-		getnstimeofday(&tp);
-		tp.tv_sec += wall_to_monotonic.tv_sec;
-		tp.tv_nsec += wall_to_monotonic.tv_nsec;
-		monotonic_to_bootbased(&tp);
-		if (tp.tv_nsec - NSEC_PER_SEC >= 0) {
-			tp.tv_nsec = tp.tv_nsec - NSEC_PER_SEC;
-			tp.tv_sec++;
-		}
-		info->uptime = tp.tv_sec + (tp.tv_nsec ? 1 : 0);
-
-		info->loads[0] = avenrun[0] << (SI_LOAD_SHIFT - FSHIFT);
-		info->loads[1] = avenrun[1] << (SI_LOAD_SHIFT - FSHIFT);
-		info->loads[2] = avenrun[2] << (SI_LOAD_SHIFT - FSHIFT);
-
-		info->procs = nr_threads;
-	} while (read_seqretry(&xtime_lock, seq));
+	info->procs = nr_threads;
 
 	si_meminfo(info);
 	si_swapinfo(info);

@@ -51,10 +51,6 @@ void coda_vattr_to_iattr(struct inode *, struct coda_vattr *);
 void coda_iattr_to_vattr(struct iattr *, struct coda_vattr *);
 unsigned short coda_flags_to_cflags(unsigned short);
 
-/* sysctl.h */
-void coda_sysctl_init(void);
-void coda_sysctl_clean(void);
-
 #define CODA_ALLOC(ptr, cast, size) do { \
     if (size < PAGE_SIZE) \
         ptr = kmalloc((unsigned long) size, GFP_KERNEL); \

@@ -1,7 +1,7 @@
 /*
  * Stack trace management functions
  *
- *  Copyright (C) 2006 Red Hat, Inc., Ingo Molnar <mingo@redhat.com>
+ *  Copyright (C) 2006-2009 Red Hat, Inc., Ingo Molnar <mingo@redhat.com>
  */
 #include <linux/sched.h>
 #include <linux/stacktrace.h>
@@ -76,6 +76,13 @@ void save_stack_trace(struct stack_trace *trace)
 		trace->entries[trace->nr_entries++] = ULONG_MAX;
 }
 EXPORT_SYMBOL_GPL(save_stack_trace);
+
+void save_stack_trace_bp(struct stack_trace *trace, unsigned long bp)
+{
+	dump_trace(current, NULL, NULL, bp, &save_stack_ops, trace);
+	if (trace->nr_entries < trace->max_entries)
+		trace->entries[trace->nr_entries++] = ULONG_MAX;
+}
 
 void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
 {

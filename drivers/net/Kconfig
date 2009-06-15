@@ -776,6 +776,8 @@ config NET_VENDOR_SMC
 config WD80x3
 	tristate "WD80*3 support"
 	depends on NET_VENDOR_SMC && ISA
+	# broken build
+	depends on 0
 	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
@@ -1162,6 +1164,8 @@ config EEXPRESS_PRO
 config HPLAN_PLUS
 	tristate "HP PCLAN+ (27247B and 27252A) support"
 	depends on NET_ISA
+	# broken build with config-Mon_Jul_21_20_21_08_CEST_2008.bad
+	depends on 0
 	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
@@ -2559,6 +2563,8 @@ config MYRI10GE_DCA
 
 config NETXEN_NIC
 	tristate "NetXen Multi port (1/10) Gigabit Ethernet NIC"
+	# build breakage
+	depends on 0
 	depends on PCI
 	help
 	  This enables the support for NetXen's Gigabit Ethernet card.
