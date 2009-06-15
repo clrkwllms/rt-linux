@@ -268,8 +268,9 @@ static void sg_complete(struct urb *urb)
 {
 	struct usb_sg_request *io = urb->context;
 	int status = urb->status;
+	unsigned long flags;
 
-	spin_lock(&io->lock);
+	spin_lock_irqsave (&io->lock, flags);
 
 	/* In 2.5 we require hcds' endpoint queues not to progress after fault
 	 * reports, until the completion callback (this!) returns.  That lets
@@ -303,7 +304,7 @@ static void sg_complete(struct urb *urb)
 		 * unlink pending urbs so they won't rx/tx bad data.
 		 * careful: unlink can sometimes be synchronous...
 		 */
-		spin_unlock(&io->lock);
+		spin_unlock_irqrestore (&io->lock, flags);
 		for (i = 0, found = 0; i < io->entries; i++) {
 			if (!io->urbs [i] || !io->urbs [i]->dev)
 				continue;
@@ -318,7 +319,7 @@ static void sg_complete(struct urb *urb)
 			} else if (urb == io->urbs [i])
 				found = 1;
 		}
-		spin_lock(&io->lock);
+		spin_lock_irqsave (&io->lock, flags);
 	}
 	urb->dev = NULL;
 
@@ -328,7 +329,7 @@ static void sg_complete(struct urb *urb)
 	if (!io->count)
 		complete(&io->complete);
 
-	spin_unlock(&io->lock);
+	spin_unlock_irqrestore (&io->lock, flags);
 }
 
 
@@ -595,7 +596,7 @@ void usb_sg_cancel(struct usb_sg_request *io)
 		int i;
 
 		io->status = -ECONNRESET;
-		spin_unlock(&io->lock);
+		spin_unlock_irqrestore(&io->lock, flags);
 		for (i = 0; i < io->entries; i++) {
 			int retval;
 
@@ -606,7 +607,7 @@ void usb_sg_cancel(struct usb_sg_request *io)
 				dev_warn(&io->dev->dev, "%s, unlink --> %d\n",
 					__func__, retval);
 		}
-		spin_lock(&io->lock);
+		spin_lock_irqsave(&io->lock, flags);
 	}
 	spin_unlock_irqrestore(&io->lock, flags);
 }
