@@ -5519,12 +5519,6 @@ void complete_all(struct completion *x)
 }
 EXPORT_SYMBOL(complete_all);
 
-unsigned int  completion_done(struct completion *x)
-{
-	return x->done;
-}
-EXPORT_SYMBOL(completion_done);
-
 static inline long __sched
 do_wait_for_common(struct completion *x, long timeout, int state)
 {
