@@ -145,7 +145,7 @@ static inline int __read_seqretry(seqlock_t *sl, unsigned iv)
 	int ret;
 
 	smp_rmb();
-	ret = (iv & 1) | (sl->sequence ^ iv);
+	ret = (sl->sequence != iv);
 	/*
 	 * If invalid then serialize with the writer, to make sure we
 	 * are not livelocking it:
@@ -228,8 +228,16 @@ static __always_inline int __write_tryseqlock_raw(raw_seqlock_t *sl)
 
 static __always_inline unsigned __read_seqbegin_raw(const raw_seqlock_t *sl)
 {
-	unsigned ret = sl->sequence;
+	unsigned ret;
+
+repeat:
+	ret = sl->sequence;
 	smp_rmb();
+	if (unlikely(ret & 1)) {
+		cpu_relax();
+		goto repeat;
+	}
+
 	return ret;
 }
 
