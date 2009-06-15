@@ -1000,10 +1000,12 @@ void drain_local_pages(void *arg)
 	drain_pages(smp_processor_id());
 }
 
+#ifdef CONFIG_PREEMPT_RT
 static void drain_local_pages_work(struct work_struct *wrk)
 {
 	drain_pages(smp_processor_id());
 }
+#endif
 
 /*
  * Spill all the per-cpu pages from all CPUs back into the buddy allocator
