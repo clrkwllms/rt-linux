@@ -892,6 +892,7 @@ static inline int rt_release_bkl(struct rt_mutex *lock, unsigned long flags)
 {
 	int saved_lock_depth = current->lock_depth;
 
+#ifdef CONFIG_LOCK_KERNEL
 	current->lock_depth = -1;
 	/*
 	 * try_to_take_lock set the waiters, make sure it's
@@ -903,14 +904,16 @@ static inline int rt_release_bkl(struct rt_mutex *lock, unsigned long flags)
 	up(&kernel_sem);
 
 	spin_lock_irq(&lock->wait_lock);
-
+#endif
 	return saved_lock_depth;
 }
 
 static inline void rt_reacquire_bkl(int saved_lock_depth)
 {
+#ifdef CONFIG_LOCK_KERNEL
 	down(&kernel_sem);
 	current->lock_depth = saved_lock_depth;
+#endif
 }
 
 /**
