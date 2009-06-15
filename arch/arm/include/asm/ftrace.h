@@ -15,7 +15,7 @@ extern void mcount(void);
 void *return_address(unsigned int);
 
 #define HAVE_ARCH_CALLER_ADDR
-#define CALLER_ADDR0 ((unsigned long)return_address(0))
+#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
 #define CALLER_ADDR1 ((unsigned long)return_address(1))
 #define CALLER_ADDR2 ((unsigned long)return_address(2))
 #define CALLER_ADDR3 ((unsigned long)return_address(3))
