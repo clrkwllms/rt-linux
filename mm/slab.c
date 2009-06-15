@@ -1405,9 +1405,15 @@ static int __cpuinit cpuup_callback(struct notifier_block *nfb,
 	case CPU_UP_PREPARE:
 	case CPU_UP_PREPARE_FROZEN:
 		mutex_lock(&cache_chain_mutex);
+		/*
+		 * lock/unlock cycle to push any holders away -- no new ones
+		 * can come in due to the cpu still being offline.
+		 *
+		 * XXX -- weird case anyway, can it happen?
+		 */
 		slab_irq_disable_this_rt(cpu);
-		err = cpuup_prepare(cpu);
 		slab_irq_enable_rt(cpu);
+		err = cpuup_prepare(cpu);
 		mutex_unlock(&cache_chain_mutex);
 		break;
 	case CPU_ONLINE:
