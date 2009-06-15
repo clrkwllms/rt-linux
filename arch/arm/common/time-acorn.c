@@ -75,7 +75,7 @@ ioc_timer_interrupt(int irq, void *dev_id)
 
 static struct irqaction ioc_timer_irq = {
 	.name		= "timer",
-	.flags		= IRQF_DISABLED,
+	.flags		= IRQF_DISABLED | IRQF_NODELAY,
 	.handler	= ioc_timer_interrupt
 };
 
