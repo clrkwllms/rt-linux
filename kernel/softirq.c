@@ -386,7 +386,7 @@ void irq_exit(void)
 	if (idle_cpu(smp_processor_id()) && !in_interrupt() && !need_resched())
 		tick_nohz_stop_sched_tick(0);
 #endif
-	preempt_enable_no_resched();
+	__preempt_enable_no_resched();
 }
 
 /*
@@ -723,7 +723,7 @@ static int ksoftirqd(void * __data)
 	while (!kthread_should_stop()) {
 		preempt_disable();
 		if (!(local_softirq_pending() & mask)) {
-			preempt_enable_no_resched();
+			__preempt_enable_no_resched();
 			schedule();
 			preempt_disable();
 		}
@@ -742,7 +742,7 @@ static int ksoftirqd(void * __data)
 				goto wait_to_die;
 
 			local_irq_disable();
-			preempt_enable_no_resched();
+			__preempt_enable_no_resched();
 			set_softirq_pending(local_softirq_pending() & ~mask);
 			local_bh_disable();
 			local_irq_enable();
