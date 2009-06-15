@@ -68,8 +68,8 @@ u64 notrace trace_clock(void)
 
 static u64 prev_trace_clock_time;
 
-static raw_spinlock_t trace_clock_lock ____cacheline_aligned_in_smp =
-	(raw_spinlock_t)__RAW_SPIN_LOCK_UNLOCKED;
+static __raw_spinlock_t trace_clock_lock ____cacheline_aligned_in_smp =
+	__RAW_SPIN_LOCK_UNLOCKED;
 
 u64 notrace trace_clock_global(void)
 {
