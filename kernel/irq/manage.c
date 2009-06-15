@@ -533,6 +533,7 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 	/* Reset broken irq detection when installing new handler */
 	desc->irq_count = 0;
 	desc->irqs_unhandled = 0;
+	init_waitqueue_head(&desc->wait_for_handler);
 
 	/*
 	 * Check whether we disabled the irq via the spurious handler
@@ -1022,6 +1023,8 @@ static int start_irq_thread(int irq, struct irq_desc *desc)
 {
 	if (desc->thread || !ok_to_create_irq_threads)
 		return 0;
+
+	init_waitqueue_head(&desc->wait_for_handler);
 
 	desc->thread = kthread_create(do_irqd, desc, "IRQ-%d", irq);
 	if (!desc->thread) {
