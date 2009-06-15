@@ -16,11 +16,11 @@ static DEFINE_PER_CPU(struct call_single_queue, call_single_queue);
 
 static struct {
 	struct list_head	queue;
-	spinlock_t		lock;
+	raw_spinlock_t		lock;
 } call_function __cacheline_aligned_in_smp =
 	{
 		.queue		= LIST_HEAD_INIT(call_function.queue),
-		.lock		= __SPIN_LOCK_UNLOCKED(call_function.lock),
+		.lock		= RAW_SPIN_LOCK_UNLOCKED(call_function.lock),
 	};
 
 enum {
@@ -29,18 +29,18 @@ enum {
 
 struct call_function_data {
 	struct call_single_data	csd;
-	spinlock_t		lock;
+	raw_spinlock_t		lock;
 	unsigned int		refs;
 	cpumask_var_t		cpumask;
 };
 
 struct call_single_queue {
 	struct list_head	list;
-	spinlock_t		lock;
+	raw_spinlock_t		lock;
 };
 
 static DEFINE_PER_CPU(struct call_function_data, cfd_data) = {
-	.lock			= __SPIN_LOCK_UNLOCKED(cfd_data.lock),
+	.lock			= RAW_SPIN_LOCK_UNLOCKED(cfd_data.lock),
 };
 
 static int
