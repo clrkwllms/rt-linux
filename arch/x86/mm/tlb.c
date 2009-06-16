@@ -40,8 +40,8 @@ union smp_flush_state {
 	struct {
 		struct mm_struct *flush_mm;
 		unsigned long flush_va;
-		spinlock_t tlbstate_lock;
 		DECLARE_BITMAP(flush_cpumask, NR_CPUS);
+		raw_spinlock_t tlbstate_lock;
 	};
 	char pad[CONFIG_X86_INTERNODE_CACHE_BYTES];
 } ____cacheline_internodealigned_in_smp;
