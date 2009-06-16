@@ -3,9 +3,11 @@
 /*
  * Reader/writer consistent mechanism without starving writers. This type of
  * lock for data where the reader wants a consistent set of information
- * and is willing to retry if the information changes.  Readers never
- * block but they may have to retry if a writer is in
- * progress. Writers do not wait for readers. 
+ * and is willing to retry if the information changes. Readers block
+ * on write contention (and where applicable, pi-boost the writer).
+ * Readers without contention on entry acquire the critical section
+ * without any atomic operations, but they may have to retry if a writer
+ * enters before the critical section ends. Writers do not wait for readers.
  *
  * This is not as cache friendly as brlock. Also, this will not work
  * for data that contains pointers, because any writer could
@@ -24,6 +26,8 @@
  *
  * Based on x86_64 vsyscall gettimeofday 
  * by Keith Owens and Andrea Arcangeli
+ *
+ * Priority inheritance and live-lock avoidance by Gregory Haskins
  */
 
 #include <linux/spinlock.h>
@@ -31,7 +35,7 @@
 
 typedef struct {
 	unsigned sequence;
-	spinlock_t lock;
+	rwlock_t lock;
 } __seqlock_t;
 
 typedef struct {
@@ -57,7 +61,7 @@ typedef __raw_seqlock_t raw_seqlock_t;
 		{ 0, RAW_SPIN_LOCK_UNLOCKED(lockname) }
 
 #ifdef CONFIG_PREEMPT_RT
-# define __SEQLOCK_UNLOCKED(lockname) { 0, __SPIN_LOCK_UNLOCKED(lockname) }
+# define __SEQLOCK_UNLOCKED(lockname) { 0, __RW_LOCK_UNLOCKED(lockname) }
 #else
 # define __SEQLOCK_UNLOCKED(lockname) __RAW_SEQLOCK_UNLOCKED(lockname)
 #endif
@@ -69,7 +73,7 @@ typedef __raw_seqlock_t raw_seqlock_t;
 	do { *(x) = (raw_seqlock_t) __RAW_SEQLOCK_UNLOCKED(x); spin_lock_init(&(x)->lock); } while (0)
 
 #define seqlock_init(x) \
-		do { *(x) = (seqlock_t) __SEQLOCK_UNLOCKED(x); spin_lock_init(&(x)->lock); } while (0)
+		do { *(x) = (seqlock_t) __SEQLOCK_UNLOCKED(x); rwlock_init(&(x)->lock); } while (0)
 
 #define DEFINE_SEQLOCK(x) \
 		seqlock_t x = __SEQLOCK_UNLOCKED(x)
@@ -85,7 +89,7 @@ typedef __raw_seqlock_t raw_seqlock_t;
  */
 static inline void __write_seqlock(seqlock_t *sl)
 {
-	spin_lock(&sl->lock);
+	write_lock(&sl->lock);
 	++sl->sequence;
 	smp_wmb();
 }
@@ -103,14 +107,14 @@ static inline void __write_sequnlock(seqlock_t *sl)
 {
 	smp_wmb();
 	sl->sequence++;
-	spin_unlock(&sl->lock);
+	write_unlock(&sl->lock);
 }
 
 #define __write_sequnlock_irqrestore(sl, flags)	__write_sequnlock(sl)
 
 static inline int __write_tryseqlock(seqlock_t *sl)
 {
-	int ret = spin_trylock(&sl->lock);
+	int ret = write_trylock(&sl->lock);
 
 	if (ret) {
 		++sl->sequence;
@@ -120,17 +124,24 @@ static inline int __write_tryseqlock(seqlock_t *sl)
 }
 
 /* Start of read calculation -- fetch last complete writer token */
-static __always_inline unsigned __read_seqbegin(const seqlock_t *sl)
+static __always_inline unsigned __read_seqbegin(seqlock_t *sl)
 {
 	unsigned ret;
 
-repeat:
 	ret = sl->sequence;
 	smp_rmb();
 	if (unlikely(ret & 1)) {
-		cpu_relax();
-		goto repeat;
+		/*
+		 * Serialze with the writer which will ensure they are
+		 * pi-boosted if necessary and prevent us from starving
+		 * them.
+		 */
+		read_lock(&sl->lock);
+		ret = sl->sequence;
+		read_unlock(&sl->lock);
 	}
+
+	BUG_ON(ret & 1);
 
 	return ret;
 }
@@ -142,20 +153,8 @@ repeat:
  */
 static inline int __read_seqretry(seqlock_t *sl, unsigned iv)
 {
-	int ret;
-
 	smp_rmb();
-	ret = (sl->sequence != iv);
-	/*
-	 * If invalid then serialize with the writer, to make sure we
-	 * are not livelocking it:
-	 */
-	if (unlikely(ret)) {
-		unsigned long flags;
-		spin_lock_irqsave(&sl->lock, flags);
-		spin_unlock_irqrestore(&sl->lock, flags);
-	}
-	return ret;
+	return (sl->sequence != iv);
 }
 
 static __always_inline void __write_seqlock_raw(raw_seqlock_t *sl)
