@@ -607,6 +607,11 @@ void rt_mutex_adjust_pi(struct task_struct *task)
 	rt_mutex_adjust_prio_chain(task, 0, NULL, NULL, task);
 }
 
+/*
+ * Slow path lock function:
+ */
+static int __sched
+
 /**
  * __rt_mutex_slowlock() - Perform the wait-wake-try-to-take loop
  * @lock:		 the rt_mutex to take
