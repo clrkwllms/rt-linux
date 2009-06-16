@@ -28,7 +28,7 @@ struct rwsem_waiter;
  * - if activity is -1 then there is one active writer
  * - if wait_list is not empty, then there are processes waiting for the semaphore
  */
-struct rw_semaphore {
+struct compat_rw_semaphore {
 	__s32			activity;
 	spinlock_t		wait_lock;
 	struct list_head	wait_list;
@@ -43,33 +43,32 @@ struct rw_semaphore {
 # define __RWSEM_DEP_MAP_INIT(lockname)
 #endif
 
-#define __RWSEM_INITIALIZER(name) \
-{ 0, __SPIN_LOCK_UNLOCKED(name.wait_lock), LIST_HEAD_INIT((name).wait_list) \
-  __RWSEM_DEP_MAP_INIT(name) }
+#define __COMPAT_RWSEM_INITIALIZER(name) \
+{ 0, SPIN_LOCK_UNLOCKED, LIST_HEAD_INIT((name).wait_list) __RWSEM_DEP_MAP_INIT(name) }
 
-#define DECLARE_RWSEM(name) \
-	struct rw_semaphore name = __RWSEM_INITIALIZER(name)
+#define COMPAT_DECLARE_RWSEM(name) \
+	struct compat_rw_semaphore name = __COMPAT_RWSEM_INITIALIZER(name)
 
-extern void __init_rwsem(struct rw_semaphore *sem, const char *name,
+extern void __compat_init_rwsem(struct compat_rw_semaphore *sem, const char *name,
 			 struct lock_class_key *key);
 
-#define init_rwsem(sem)						\
+#define compat_init_rwsem(sem)					\
 do {								\
 	static struct lock_class_key __key;			\
 								\
-	__init_rwsem((sem), #sem, &__key);			\
+	__compat_init_rwsem((sem), #sem, &__key);		\
 } while (0)
 
-extern void __down_read(struct rw_semaphore *sem);
-extern int __down_read_trylock(struct rw_semaphore *sem);
-extern void __down_write(struct rw_semaphore *sem);
-extern void __down_write_nested(struct rw_semaphore *sem, int subclass);
-extern int __down_write_trylock(struct rw_semaphore *sem);
-extern void __up_read(struct rw_semaphore *sem);
-extern void __up_write(struct rw_semaphore *sem);
-extern void __downgrade_write(struct rw_semaphore *sem);
+extern void __down_read(struct compat_rw_semaphore *sem);
+extern int __down_read_trylock(struct compat_rw_semaphore *sem);
+extern void __down_write(struct compat_rw_semaphore *sem);
+extern void __down_write_nested(struct compat_rw_semaphore *sem, int subclass);
+extern int __down_write_trylock(struct compat_rw_semaphore *sem);
+extern void __up_read(struct compat_rw_semaphore *sem);
+extern void __up_write(struct compat_rw_semaphore *sem);
+extern void __downgrade_write(struct compat_rw_semaphore *sem);
 
-static inline int rwsem_is_locked(struct rw_semaphore *sem)
+static inline int compat_rwsem_is_locked(struct compat_rw_semaphore *sem)
 {
 	return (sem->activity != 0);
 }

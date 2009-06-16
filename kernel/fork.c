@@ -80,7 +80,11 @@ int max_threads;		/* tunable limit on nr_threads */
 
 DEFINE_PER_CPU(unsigned long, process_counts) = 0;
 
+#ifdef CONFIG_PREEMPT_RT
+DEFINE_RWLOCK(tasklist_lock);  /* outer */
+#else
 __cacheline_aligned DEFINE_RWLOCK(tasklist_lock);  /* outer */
+#endif
 
 DEFINE_TRACE(sched_process_fork);
 
@@ -909,6 +913,9 @@ static void rt_mutex_init_task(struct task_struct *p)
 #ifdef CONFIG_RT_MUTEXES
 	plist_head_init(&p->pi_waiters, &p->pi_lock);
 	p->pi_blocked_on = NULL;
+# ifdef CONFIG_DEBUG_RT_MUTEXES
+	p->last_kernel_lock = NULL;
+# endif
 #endif
 }
 
@@ -1115,6 +1122,9 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
 		goto bad_fork_cleanup_io;
+#ifdef CONFIG_DEBUG_PREEMPT
+	p->lock_count = 0;
+#endif
 
 	if (pid != &init_struct_pid) {
 		retval = -ENOMEM;
