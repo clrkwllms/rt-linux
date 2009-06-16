@@ -9,6 +9,7 @@
 #include <linux/thread_info.h>
 #include <linux/linkage.h>
 #include <linux/list.h>
+#include <linux/thread_info.h>
 
 #if defined(CONFIG_DEBUG_PREEMPT) || defined(CONFIG_PREEMPT_TRACER)
   extern void add_preempt_count(int val);
@@ -21,11 +22,12 @@
 #define inc_preempt_count() add_preempt_count(1)
 #define dec_preempt_count() sub_preempt_count(1)
 
-#define preempt_count()	(current_thread_info()->preempt_count)
+#define preempt_count()		(current_thread_info()->preempt_count)
 
 #ifdef CONFIG_PREEMPT
 
 asmlinkage void preempt_schedule(void);
+asmlinkage void preempt_schedule_irq(void);
 
 #define preempt_disable() \
 do { \
@@ -33,11 +35,18 @@ do { \
 	barrier(); \
 } while (0)
 
-#define preempt_enable_no_resched() \
+#define __preempt_enable_no_resched() \
 do { \
 	barrier(); \
 	dec_preempt_count(); \
 } while (0)
+
+
+#ifdef CONFIG_DEBUG_PREEMPT
+extern void notrace preempt_enable_no_resched(void);
+#else
+# define preempt_enable_no_resched() __preempt_enable_no_resched()
+#endif
 
 #define preempt_check_resched() \
 do { \
@@ -47,7 +56,7 @@ do { \
 
 #define preempt_enable() \
 do { \
-	preempt_enable_no_resched(); \
+	__preempt_enable_no_resched(); \
 	barrier(); \
 	preempt_check_resched(); \
 } while (0)
@@ -84,12 +93,15 @@ do { \
 
 #define preempt_disable()		do { } while (0)
 #define preempt_enable_no_resched()	do { } while (0)
+#define __preempt_enable_no_resched()	do { } while (0)
 #define preempt_enable()		do { } while (0)
 #define preempt_check_resched()		do { } while (0)
 
 #define preempt_disable_notrace()		do { } while (0)
 #define preempt_enable_no_resched_notrace()	do { } while (0)
 #define preempt_enable_notrace()		do { } while (0)
+
+#define preempt_schedule_irq()		do { } while (0)
 
 #endif
 
