@@ -59,9 +59,8 @@ static int try_one_irq(int irq, struct irq_desc *desc)
 		}
 		action = action->next;
 	}
-	local_irq_disable();
 	/* Now clean up the flags */
-	spin_lock(&desc->lock);
+		spin_lock_irq(&desc->lock);
 	action = desc->action;
 
 	/*
