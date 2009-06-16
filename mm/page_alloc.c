@@ -163,6 +163,53 @@ static unsigned long __meminitdata dma_reserve;
   EXPORT_SYMBOL(movable_zone);
 #endif /* CONFIG_ARCH_POPULATES_NODE_MAP */
 
+#ifdef CONFIG_PREEMPT_RT
+static DEFINE_PER_CPU_LOCKED(int, pcp_locks);
+#endif
+
+static inline void __lock_cpu_pcp(unsigned long *flags, int cpu)
+{
+#ifdef CONFIG_PREEMPT_RT
+	spin_lock(&__get_cpu_lock(pcp_locks, cpu));
+	flags = 0;
+#else
+	local_irq_save(*flags);
+#endif
+}
+
+static inline void lock_cpu_pcp(unsigned long *flags, int *this_cpu)
+{
+#ifdef CONFIG_PREEMPT_RT
+	(void)get_cpu_var_locked(pcp_locks, this_cpu);
+	flags = 0;
+#else
+	local_irq_save(*flags);
+	*this_cpu = smp_processor_id();
+#endif
+}
+
+static inline void unlock_cpu_pcp(unsigned long flags, int this_cpu)
+{
+#ifdef CONFIG_PREEMPT_RT
+	put_cpu_var_locked(pcp_locks, this_cpu);
+#else
+	local_irq_restore(flags);
+#endif
+}
+
+static struct per_cpu_pageset *
+get_zone_pcp(struct zone *zone, unsigned long *flags, int *this_cpu)
+{
+	lock_cpu_pcp(flags, this_cpu);
+	return zone_pcp(zone, *this_cpu);
+}
+
+static void
+put_zone_pcp(struct zone *zone, unsigned long flags, int this_cpu)
+{
+	unlock_cpu_pcp(flags, this_cpu);
+}
+
 #if MAX_NUMNODES > 1
 int nr_node_ids __read_mostly = MAX_NUMNODES;
 EXPORT_SYMBOL(nr_node_ids);
@@ -547,8 +594,7 @@ static void free_one_page(struct zone *zone, struct page *page, int order)
 static void __free_pages_ok(struct page *page, unsigned int order)
 {
 	unsigned long flags;
-	int i;
-	int bad = 0;
+	int i, this_cpu, bad = 0;
 
 	kmemcheck_free_shadow(page, order);
 
@@ -565,10 +611,10 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	arch_free_page(page, order);
 	kernel_map_pages(page, 1 << order, 0);
 
-	local_irq_save(flags);
-	__count_vm_events(PGFREE, 1 << order);
+	lock_cpu_pcp(&flags, &this_cpu);
+	count_vm_events(PGFREE, 1 << order);
 	free_one_page(page_zone(page), page, order);
-	local_irq_restore(flags);
+	unlock_cpu_pcp(flags, this_cpu);
 }
 
 /*
@@ -901,15 +947,16 @@ void drain_zone_pages(struct zone *zone, struct per_cpu_pages *pcp)
 {
 	unsigned long flags;
 	int to_drain;
+	int this_cpu;
 
-	local_irq_save(flags);
+	lock_cpu_pcp(&flags, &this_cpu);
 	if (pcp->count >= pcp->batch)
 		to_drain = pcp->batch;
 	else
 		to_drain = pcp->count;
 	free_pages_bulk(zone, to_drain, &pcp->list, 0);
 	pcp->count -= to_drain;
-	local_irq_restore(flags);
+	unlock_cpu_pcp(flags, this_cpu);
 }
 #endif
 
@@ -933,12 +980,15 @@ static void drain_pages(unsigned int cpu)
 			continue;
 
 		pset = zone_pcp(zone, cpu);
-
+		if (!pset) {
+			WARN_ON(1);
+			continue;
+		}
 		pcp = &pset->pcp;
-		local_irq_save(flags);
+		lock_cpu_pcp(&flags, &cpu);
 		free_pages_bulk(zone, pcp->count, &pcp->list, 0);
 		pcp->count = 0;
-		local_irq_restore(flags);
+		unlock_cpu_pcp(flags, cpu);
 	}
 }
 
@@ -1000,8 +1050,10 @@ void mark_free_pages(struct zone *zone)
 static void free_hot_cold_page(struct page *page, int cold)
 {
 	struct zone *zone = page_zone(page);
+	struct per_cpu_pageset *pset;
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
+	int this_cpu;
 
 	kmemcheck_free_shadow(page, 0);
 
@@ -1017,9 +1069,11 @@ static void free_hot_cold_page(struct page *page, int cold)
 	arch_free_page(page, 0);
 	kernel_map_pages(page, 1, 0);
 
-	pcp = &zone_pcp(zone, get_cpu())->pcp;
-	local_irq_save(flags);
-	__count_vm_event(PGFREE);
+	pset = get_zone_pcp(zone, &flags, &this_cpu);
+	pcp = &pset->pcp;
+
+	count_vm_event(PGFREE);
+
 	if (cold)
 		list_add_tail(&page->lru, &pcp->list);
 	else
@@ -1030,8 +1084,7 @@ static void free_hot_cold_page(struct page *page, int cold)
 		free_pages_bulk(zone, pcp->batch, &pcp->list, 0);
 		pcp->count -= pcp->batch;
 	}
-	local_irq_restore(flags);
-	put_cpu();
+	put_zone_pcp(zone, flags, this_cpu);
 }
 
 void free_hot_page(struct page *page)
@@ -1083,16 +1136,15 @@ static struct page *buffered_rmqueue(struct zone *preferred_zone,
 	unsigned long flags;
 	struct page *page;
 	int cold = !!(gfp_flags & __GFP_COLD);
-	int cpu;
+	struct per_cpu_pageset *pset;
 	int migratetype = allocflags_to_migratetype(gfp_flags);
+	int this_cpu;
 
 again:
-	cpu  = get_cpu();
+	pset = get_zone_pcp(zone, &flags, &this_cpu);
 	if (likely(order == 0)) {
-		struct per_cpu_pages *pcp;
+		struct per_cpu_pages *pcp = &pset->pcp;
 
-		pcp = &zone_pcp(zone, cpu)->pcp;
-		local_irq_save(flags);
 		if (!pcp->count) {
 			pcp->count = rmqueue_bulk(zone, 0,
 					pcp->batch, &pcp->list, migratetype);
@@ -1121,7 +1173,7 @@ again:
 		list_del(&page->lru);
 		pcp->count--;
 	} else {
-		spin_lock_irqsave(&zone->lock, flags);
+		spin_lock(&zone->lock);
 		page = __rmqueue(zone, order, migratetype);
 		spin_unlock(&zone->lock);
 		if (!page)
@@ -1130,8 +1182,7 @@ again:
 
 	__count_zone_vm_events(PGALLOC, zone, 1 << order);
 	zone_statistics(preferred_zone, zone);
-	local_irq_restore(flags);
-	put_cpu();
+	put_zone_pcp(zone, flags, this_cpu);
 
 	VM_BUG_ON(bad_range(zone, page));
 	if (prep_new_page(page, order, gfp_flags))
@@ -1139,8 +1190,7 @@ again:
 	return page;
 
 failed:
-	local_irq_restore(flags);
-	put_cpu();
+	put_zone_pcp(zone, flags, this_cpu);
 	return NULL;
 }
 
