@@ -68,7 +68,7 @@ static inline void wb977_ww(int reg, int val)
 /*
  * This is a lock for accessing ports GP1_IO_BASE and GP2_IO_BASE
  */
-DEFINE_SPINLOCK(nw_gpio_lock);
+DEFINE_RAW_SPINLOCK(nw_gpio_lock);
 EXPORT_SYMBOL(nw_gpio_lock);
 
 static unsigned int current_gpio_op;
