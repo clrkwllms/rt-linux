@@ -821,7 +821,9 @@ static int send_signal(int sig, struct siginfo *info, struct task_struct *t,
 
 	trace_sched_signal_send(sig, t);
 
+#ifdef CONFIG_SMP
 	assert_spin_locked(&t->sighand->siglock);
+#endif
 	if (!prepare_signal(sig, t))
 		return 0;
 
@@ -1575,15 +1577,9 @@ static void ptrace_stop(int exit_code, int clear_code, siginfo_t *info)
 	read_lock(&tasklist_lock);
 	if (may_ptrace_stop()) {
 		do_notify_parent_cldstop(current, CLD_TRAPPED);
-		/*
-		 * Don't want to allow preemption here, because
-		 * sys_ptrace() needs this task to be inactive.
-		 *
-		 * XXX: implement read_unlock_no_resched().
-		 */
-		preempt_disable();
+
+		current->flags &= ~PF_NOSCHED;
 		read_unlock(&tasklist_lock);
-		preempt_enable_no_resched();
 		schedule();
 	} else {
 		/*
@@ -1652,6 +1648,7 @@ finish_stop(int stop_count)
 	}
 
 	do {
+		current->flags &= ~PF_NOSCHED;
 		schedule();
 	} while (try_to_freeze());
 	/*
