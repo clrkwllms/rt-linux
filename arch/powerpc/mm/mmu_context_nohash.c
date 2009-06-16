@@ -46,7 +46,7 @@ static unsigned int next_context, nr_free_contexts;
 static unsigned long *context_map;
 static unsigned long *stale_map[NR_CPUS];
 static struct mm_struct **context_mm;
-static spinlock_t context_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_RAW_SPINLOCK(context_lock);
 
 #define CTX_MAP_SIZE	\
 	(sizeof(unsigned long) * (last_context / BITS_PER_LONG + 1))
