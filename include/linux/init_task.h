@@ -52,7 +52,7 @@ extern struct fs_struct init_fs;
 	.cputimer	= { 						\
 		.cputime = INIT_CPUTIME,				\
 		.running = 0,						\
-		.lock = __SPIN_LOCK_UNLOCKED(sig.cputimer.lock),	\
+		.lock = RAW_SPIN_LOCK_UNLOCKED(sig.cputimer.lock),	\
 	},								\
 }
 
