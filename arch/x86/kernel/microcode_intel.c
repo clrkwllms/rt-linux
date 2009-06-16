@@ -151,7 +151,7 @@ struct extended_sigtable {
 #define exttable_size(et) ((et)->count * EXT_SIGNATURE_SIZE + EXT_HEADER_SIZE)
 
 /* serialize access to the physical write to MSR 0x79 */
-static DEFINE_SPINLOCK(microcode_update_lock);
+static DEFINE_RAW_SPINLOCK(microcode_update_lock);
 
 static int collect_cpu_info(int cpu_num, struct cpu_signature *csig)
 {
