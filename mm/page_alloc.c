@@ -578,6 +578,7 @@ static void free_pages_bulk(struct zone *zone, int count,
 		/* have to delete it as __free_one_page list manipulates */
 		list_del(&page->lru);
 		__free_one_page(page, zone, order);
+		cond_resched_lock(&zone->lock);
 	}
 	spin_unlock(&zone->lock);
 }
