@@ -26,6 +26,10 @@ extern struct irq_desc **irq_desc_ptrs;
 extern struct irq_desc *irq_desc_ptrs[NR_IRQS];
 #endif
 
+extern int redirect_hardirq(struct irq_desc *desc);
+
+void recalculate_desc_flags(struct irq_desc *desc);
+
 #ifdef CONFIG_PROC_FS
 extern void register_irq_proc(unsigned int irq, struct irq_desc *desc);
 extern void register_handler_proc(unsigned int irq, struct irqaction *action);

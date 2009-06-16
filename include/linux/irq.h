@@ -20,10 +20,12 @@
 #include <linux/irqreturn.h>
 #include <linux/irqnr.h>
 #include <linux/errno.h>
+#include <linux/wait.h>
 
 #include <asm/irq.h>
 #include <asm/ptrace.h>
 #include <asm/irq_regs.h>
+#include <asm/timex.h>
 
 struct irq_desc;
 typedef	void (*irq_flow_handler_t)(unsigned int irq,
@@ -65,6 +67,7 @@ typedef	void (*irq_flow_handler_t)(unsigned int irq,
 #define IRQ_SPURIOUS_DISABLED	0x00800000	/* IRQ was disabled by the spurious trap */
 #define IRQ_MOVE_PCNTXT		0x01000000	/* IRQ migration from process context */
 #define IRQ_AFFINITY_SET	0x02000000	/* IRQ affinity was set from userspace*/
+#define IRQ_NODELAY		0x40000000	/* IRQ must run immediately */
 
 #ifdef CONFIG_IRQ_PER_CPU
 # define CHECK_IRQ_PER_CPU(var) ((var) & IRQ_PER_CPU)
@@ -151,6 +154,9 @@ struct irq_2_iommu;
  * @irq_count:		stats field to detect stalled irqs
  * @last_unhandled:	aging timer for unhandled count
  * @irqs_unhandled:	stats field for spurious unhandled interrupts
+ * @thread:		Thread pointer for threaded preemptible irq handling
+ * @wait_for_handler:	Waitqueue to wait for a running preemptible handler
+ * @cycles:		Timestamp for stats and debugging
  * @lock:		locking for SMP
  * @affinity:		IRQ affinity on SMP
  * @cpu:		cpu index useful for balancing
@@ -178,6 +184,9 @@ struct irq_desc {
 	unsigned int		irq_count;	/* For detecting broken IRQs */
 	unsigned long		last_unhandled;	/* Aging timer for unhandled count */
 	unsigned int		irqs_unhandled;
+ 	struct task_struct	*thread;
+ 	wait_queue_head_t	wait_for_handler;
+ 	cycles_t		timestamp;
 	spinlock_t		lock;
 #ifdef CONFIG_SMP
 	cpumask_var_t		affinity;
@@ -410,7 +419,22 @@ extern int set_irq_msi(unsigned int irq, struct msi_desc *entry);
 #define get_irq_desc_data(desc)		((desc)->handler_data)
 #define get_irq_desc_msi(desc)		((desc)->msi_desc)
 
-#endif /* CONFIG_GENERIC_HARDIRQS */
+/* Early initialization of irqs */
+extern void early_init_hardirqs(void);
+extern cycles_t irq_timestamp(unsigned int irq);
+
+#if defined(CONFIG_PREEMPT_HARDIRQS)
+extern void init_hardirqs(void);
+#else
+static inline void init_hardirqs(void) { }
+#endif
+
+#else	/* end GENERIC HARDIRQS */
+
+static inline void early_init_hardirqs(void) { }
+static inline void init_hardirqs(void) { }
+
+#endif /* !CONFIG_GENERIC_HARDIRQS */
 
 #endif /* !CONFIG_S390 */
 
