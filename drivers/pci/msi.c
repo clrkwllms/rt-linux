@@ -323,6 +323,10 @@ static void __pci_restore_msi_state(struct pci_dev *dev)
 		return;
 
 	entry = get_irq_msi(dev->irq);
+	if (!entry) {
+		WARN_ON(1);
+		return;
+	}
 	pos = entry->msi_attrib.pos;
 
 	pci_intx_for_msi(dev, 0);
