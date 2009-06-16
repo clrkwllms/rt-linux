@@ -613,4 +613,7 @@ static inline int bit_spin_is_locked(int bitnum, unsigned long *addr)
 	__cond_lock(lock, PICK_SPIN_OP_RET(__spin_can_lock, _spin_can_lock,\
 		lock))
 
+/* FIXME: porting hack! */
+#define spin_lock_nest_lock(lock, nest_lock) spin_lock_nested(lock, 0)
+
 #endif /* __LINUX_SPINLOCK_H */
