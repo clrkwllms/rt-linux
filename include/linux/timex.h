@@ -180,7 +180,7 @@ struct timex {
  * zero to MAXTC, the PLL will converge in 15 minutes to 16 hours,
  * respectively.
  */
-#define SHIFT_PLL	4	/* PLL frequency factor (shift) */
+#define SHIFT_PLL	2	/* PLL frequency factor (shift) */
 #define SHIFT_FLL	2	/* FLL frequency factor (shift) */
 #define MAXTC		10	/* maximum time constant (shift) */
 
