@@ -293,7 +293,6 @@ static inline void mask_ack_irq(struct irq_desc *desc, int irq)
 	if (desc->chip->mask_ack)
 		desc->chip->mask_ack(irq);
 	else {
-		if (desc->chip->ack)
 		if (desc->chip->mask)
 			desc->chip->mask(irq);
 		if (desc->chip->ack)
