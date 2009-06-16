@@ -1525,7 +1525,7 @@ void run_posix_cpu_timers(struct task_struct *tsk)
 		per_cpu(posix_timer_tasklist, cpu) = tsk;
 	}
 	/* XXX signal the thread somehow */
-	wake_up_process(per_cpu(posix_timer_task,cpu));
+	wake_up_process(per_cpu(posix_timer_task, cpu));
 }
 
 /*
