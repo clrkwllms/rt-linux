@@ -72,6 +72,10 @@ static LIST_HEAD(acpi_pci_roots);
 
 static struct acpi_pci_driver *sub_driver;
 
+#if defined(CONFIG_X86)
+extern int pci_noseg;
+#endif
+
 int acpi_pci_register_driver(struct acpi_pci_driver *driver)
 {
 	int n = 0;
@@ -240,6 +244,13 @@ static int __devinit acpi_pci_root_add(struct acpi_device *device)
 		result = -ENODEV;
 		goto end;
 	}
+
+#if defined(CONFIG_X86)
+	if (root->id.segment && pci_noseg) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "pci=noseg enabled, forcing segment %d to 0\n", root->id.segment));
+		root->id.segment = 0;
+	}
+#endif
 
 	/* 
 	 * Bus
