@@ -248,7 +248,13 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 
 		/* didnt get the lock, go to sleep: */
 		spin_unlock_mutex(&lock->wait_lock, flags);
+
+		local_irq_disable();
+		__preempt_enable_no_resched();
 		__schedule();
+		preempt_disable();
+		local_irq_enable();
+
 		spin_lock_mutex(&lock->wait_lock, flags);
 	}
 
