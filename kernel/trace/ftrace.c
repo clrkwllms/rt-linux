@@ -301,7 +301,7 @@ function_stat_next(void *v, int idx)
 	return rec;
 }
 
-static void *function_stat_start(void)
+static void *function_stat_start(struct tracer_stat *trace)
 {
 	struct ftrace_profile_stat *stat =
 		container_of(trace, struct ftrace_profile_stat, stat);
