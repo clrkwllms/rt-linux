@@ -6646,7 +6646,8 @@ static long DAC960_gam_ioctl(struct file *file, unsigned int Request,
 	  (DAC960_ControllerInfo_T __user *) Argument;
 	DAC960_ControllerInfo_T ControllerInfo;
 	DAC960_Controller_T *Controller;
-	int ControllerNumber;
+	int uninitialized_var(ControllerNumber);
+
 	if (UserSpaceControllerInfo == NULL)
 		ErrorCode = -EINVAL;
 	else ErrorCode = get_user(ControllerNumber,

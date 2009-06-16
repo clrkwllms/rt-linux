@@ -2748,7 +2748,7 @@ static u32 sky2_mhz(const struct sky2_hw *hw)
 		return 156;
 
 	default:
-		BUG();
+		panic("sky2_mhz: unknown chip id!");
 	}
 }
 

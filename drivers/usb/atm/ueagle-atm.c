@@ -1427,7 +1427,7 @@ static int uea_stat_e1(struct uea_softc *sc)
 static int uea_stat_e4(struct uea_softc *sc)
 {
 	u32 data;
-	u32 tmp_arr[2];
+	u32 tmp_arr[2] = { 0, };
 	int ret;
 
 	uea_enters(INS_TO_USBDEV(sc));

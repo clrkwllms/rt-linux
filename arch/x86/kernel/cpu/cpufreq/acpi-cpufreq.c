@@ -33,7 +33,7 @@
 #include <linux/cpufreq.h>
 #include <linux/compiler.h>
 #include <linux/dmi.h>
-#include <linux/ftrace.h>
+#include <trace/power.h>
 
 #include <linux/acpi.h>
 #include <acpi/processor.h>
@@ -69,6 +69,8 @@ struct acpi_cpufreq_data {
 };
 
 static DEFINE_PER_CPU(struct acpi_cpufreq_data *, drv_data);
+
+DEFINE_TRACE(power_mark);
 
 /* acpi_perf_data is a pointer to percpu data. */
 static struct acpi_processor_performance *acpi_perf_data;
@@ -601,7 +603,7 @@ static int acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
 	if (!data)
 		return -ENOMEM;
 
-	data->acpi_data = percpu_ptr(acpi_perf_data, cpu);
+	data->acpi_data = per_cpu_ptr(acpi_perf_data, cpu);
 	per_cpu(drv_data, cpu) = data;
 
 	if (cpu_has(c, X86_FEATURE_CONSTANT_TSC))

@@ -2131,7 +2131,7 @@ static int atm_pcr_check (struct atm_trafprm * tp, unsigned int pcr) {
 static int hrz_open (struct atm_vcc *atm_vcc)
 {
   int error;
-  u16 channel;
+  u16 uninitialized_var(channel);
   
   struct atm_qos * qos;
   struct atm_trafprm * txtp;

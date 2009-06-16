@@ -14,6 +14,7 @@
 #include <linux/proc_fs.h>
 #include <linux/kernel.h>
 #include <linux/syscalls.h>
+#include <linux/stackprotector.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/delay.h>
@@ -61,6 +62,7 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/idr.h>
+#include <linux/kmemcheck.h>
 #include <linux/ftrace.h>
 #include <linux/async.h>
 #include <trace/boot.h>
@@ -70,6 +72,7 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
+#include <trace/kmemtrace.h>
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
@@ -135,14 +138,14 @@ unsigned int __initdata setup_max_cpus = NR_CPUS;
  * greater than 0, limits the maximum number of CPUs activated in
  * SMP mode to <NUM>.
  */
-#ifndef CONFIG_X86_IO_APIC
-static inline void disable_ioapic_setup(void) {};
-#endif
+
+void __weak arch_disable_smp_support(void) { }
 
 static int __init nosmp(char *str)
 {
 	setup_max_cpus = 0;
-	disable_ioapic_setup();
+	arch_disable_smp_support();
+
 	return 0;
 }
 
@@ -152,14 +155,14 @@ static int __init maxcpus(char *str)
 {
 	get_option(&str, &setup_max_cpus);
 	if (setup_max_cpus == 0)
-		disable_ioapic_setup();
+		arch_disable_smp_support();
 
 	return 0;
 }
 
 early_param("maxcpus", maxcpus);
 #else
-#define setup_max_cpus NR_CPUS
+const unsigned int setup_max_cpus = NR_CPUS;
 #endif
 
 /*
@@ -540,6 +543,12 @@ asmlinkage void __init start_kernel(void)
 	 */
 	lockdep_init();
 	debug_objects_early_init();
+
+	/*
+	 * Set up the the initial canary ASAP:
+	 */
+	boot_init_stack_canary();
+
 	cgroup_init_early();
 
 	local_irq_disable();
@@ -642,6 +651,7 @@ asmlinkage void __init start_kernel(void)
 	enable_debug_pagealloc();
 	cpu_hotplug_init();
 	kmem_cache_init();
+	kmemtrace_init();
 	debug_objects_mem_init();
 	idr_init_cache();
 	setup_per_cpu_pageset();
@@ -763,6 +773,7 @@ static void __init do_basic_setup(void)
 {
 	rcu_init_sched(); /* needed by module_init stage. */
 	init_workqueues();
+	cpuset_init_smp();
 	usermodehelper_init();
 	driver_init();
 	init_irq_proc();
@@ -772,6 +783,9 @@ static void __init do_basic_setup(void)
 static void __init do_pre_smp_initcalls(void)
 {
 	initcall_t *call;
+
+	/* kmemcheck must initialize before all early initcalls: */
+	kmemcheck_init();
 
 	for (call = __initcall_start; call < __early_initcall_end; call++)
 		do_one_initcall(*call);
@@ -855,8 +869,6 @@ static int __init kernel_init(void * unused)
 
 	smp_init();
 	sched_init_smp();
-
-	cpuset_init_smp();
 
 	do_basic_setup();
 

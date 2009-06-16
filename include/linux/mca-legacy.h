@@ -9,7 +9,7 @@
 
 #include <linux/mca.h>
 
-#warning "MCA legacy - please move your driver to the new sysfs api"
+/* #warning "MCA legacy - please move your driver to the new sysfs api" */
 
 /* MCA_NOTFOUND is an error condition.  The other two indicate
  * motherboard POS registers contain the adapter.  They might be

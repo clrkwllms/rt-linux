@@ -101,6 +101,66 @@ config LOCALVERSION_AUTO
 
 	  which is done within the script "scripts/setlocalversion".)
 
+config HAVE_KERNEL_GZIP
+	bool
+
+config HAVE_KERNEL_BZIP2
+	bool
+
+config HAVE_KERNEL_LZMA
+	bool
+
+choice
+	prompt "Kernel compression mode"
+	default KERNEL_GZIP
+	depends on HAVE_KERNEL_GZIP || HAVE_KERNEL_BZIP2 || HAVE_KERNEL_LZMA
+	help
+	  The linux kernel is a kind of self-extracting executable.
+	  Several compression algorithms are available, which differ
+	  in efficiency, compression and decompression speed.
+	  Compression speed is only relevant when building a kernel.
+	  Decompression speed is relevant at each boot.
+
+	  If you have any problems with bzip2 or lzma compressed
+	  kernels, mail me (Alain Knaff) <alain@knaff.lu>. (An older
+	  version of this functionality (bzip2 only), for 2.4, was
+	  supplied by Christian Ludwig)
+
+	  High compression options are mostly useful for users, who
+	  are low on disk space (embedded systems), but for whom ram
+	  size matters less.
+
+	  If in doubt, select 'gzip'
+
+config KERNEL_GZIP
+	bool "Gzip"
+	depends on HAVE_KERNEL_GZIP
+	help
+	  The old and tried gzip compression. Its compression ratio is
+	  the poorest among the 3 choices; however its speed (both
+	  compression and decompression) is the fastest.
+
+config KERNEL_BZIP2
+	bool "Bzip2"
+	depends on HAVE_KERNEL_BZIP2
+	help
+	  Its compression ratio and speed is intermediate.
+	  Decompression speed is slowest among the three.  The kernel
+	  size is about 10% smaller with bzip2, in comparison to gzip.
+	  Bzip2 uses a large amount of memory. For modern kernels you
+	  will need at least 8MB RAM or more for booting.
+
+config KERNEL_LZMA
+	bool "LZMA"
+	depends on HAVE_KERNEL_LZMA
+	help
+	  The most recent compression algorithm.
+	  Its ratio is best, decompression speed is between the other
+	  two. Compression is slowest.	The kernel size is about 33%
+	  smaller with LZMA in comparison to gzip.
+
+endchoice
+
 config SWAP
 	bool "Support for paging of anonymous memory (swap)"
 	depends on MMU && BLOCK
@@ -857,6 +917,41 @@ config AIO
           by some high performance threaded applications. Disabling
           this option saves about 7k.
 
+config HAVE_PERF_COUNTERS
+	bool
+
+menu "Performance Counters"
+
+config PERF_COUNTERS
+	bool "Kernel Performance Counters"
+	depends on HAVE_PERF_COUNTERS
+	default y
+	select ANON_INODES
+	help
+	  Enable kernel support for performance counter hardware.
+
+	  Performance counters are special hardware registers available
+	  on most modern CPUs. These registers count the number of certain
+	  types of hw events: such as instructions executed, cachemisses
+	  suffered, or branches mis-predicted - without slowing down the
+	  kernel or applications. These registers can also trigger interrupts
+	  when a threshold number of events have passed - and can thus be
+	  used to profile the code that runs on that CPU.
+
+	  The Linux Performance Counter subsystem provides an abstraction of
+	  these hardware capabilities, available via a system call. It
+	  provides per task and per CPU counters, and it provides event
+	  capabilities on top of those.
+
+	  Say Y if unsure.
+
+config EVENT_PROFILE
+	bool "Tracepoint profile sources"
+	depends on PERF_COUNTERS && EVENT_TRACER
+	default y
+
+endmenu
+
 config VM_EVENT_COUNTERS
 	default y
 	bool "Enable VM event counters for /proc/vmstat" if EMBEDDED
@@ -922,6 +1017,8 @@ config SLUB
 
 config SLOB
 	depends on EMBEDDED
+	# lockups observed:
+	depends on 0
 	bool "SLOB (Simple Allocator)"
 	help
 	   SLOB replaces the stock allocator with a drastically simpler
@@ -945,7 +1042,7 @@ config TRACEPOINTS
 
 config MARKERS
 	bool "Activate markers"
-	depends on TRACEPOINTS
+	select TRACEPOINTS
 	help
 	  Place an empty function call at each marker site. Can be
 	  dynamically changed for a probe function.
@@ -966,7 +1063,6 @@ config SLABINFO
 
 config RT_MUTEXES
 	boolean
-	select PLIST
 
 config BASE_SMALL
 	int

@@ -293,7 +293,7 @@ static void update_edgeport_E2PROM(struct edgeport_serial *edge_serial)
 	__u16 BootBuildNumber;
 	__u32 Bootaddr;
 	const struct ihex_binrec *rec;
-	const struct firmware *fw;
+	const struct firmware *uninitialized_var(fw);
 	const char *fw_name;
 	int response;
 
@@ -2457,7 +2457,7 @@ static int send_cmd_write_baud_rate(struct edgeport_port *edge_port,
 	unsigned char *cmdBuffer;
 	unsigned char *currCmd;
 	int cmdLen = 0;
-	int divisor;
+	int uninitialized_var(divisor);
 	int status;
 	unsigned char number =
 		edge_port->port->number - edge_port->port->serial->minor;
