@@ -205,25 +205,20 @@ do {							\
 	__rt_rwsem_init((sem), #sem, &__key);		\
 } while (0)
 
+extern void __dont_do_this_in_rt(struct rw_semaphore *rwsem);
+
+#define rt_down_read_non_owner(rwsem)	__dont_do_this_in_rt(rwsem)
+#define rt_up_read_non_owner(rwsem)	__dont_do_this_in_rt(rwsem)
+
 extern void  rt_down_write(struct rw_semaphore *rwsem);
 extern void
 rt_down_read_nested(struct rw_semaphore *rwsem, int subclass);
 extern void
 rt_down_write_nested(struct rw_semaphore *rwsem, int subclass);
 extern void  rt_down_read(struct rw_semaphore *rwsem);
-#ifdef CONFIG_DEBUG_LOCK_ALLOC
-extern void  rt_down_read_non_owner(struct rw_semaphore *rwsem);
-#else
-# define rt_down_read_non_owner(rwsem)		rt_down_read(rwsem)
-#endif
 extern int  rt_down_write_trylock(struct rw_semaphore *rwsem);
 extern int  rt_down_read_trylock(struct rw_semaphore *rwsem);
 extern void  rt_up_read(struct rw_semaphore *rwsem);
-#ifdef CONFIG_DEBUG_LOCK_ALLOC
-extern void  rt_up_read_non_owner(struct rw_semaphore *rwsem);
-#else
-# define rt_up_read_non_owner(rwsem)	rt_up_read(rwsem)
-#endif
 extern void  rt_up_write(struct rw_semaphore *rwsem);
 extern void  rt_downgrade_write(struct rw_semaphore *rwsem);
 
