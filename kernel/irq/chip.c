@@ -345,6 +345,8 @@ handle_simple_irq(unsigned int irq, struct irq_desc *desc)
 
 	spin_lock(&desc->lock);
 	desc->status &= ~IRQ_INPROGRESS;
+	if (!(desc->status & IRQ_DISABLED) && desc->chip->unmask)
+		desc->chip->unmask(irq);
 out_unlock:
 	spin_unlock(&desc->lock);
 }
@@ -423,18 +425,16 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
 
 	spin_lock(&desc->lock);
 
-	if (unlikely(desc->status & IRQ_INPROGRESS))
-		goto out;
-
 	desc->status &= ~(IRQ_REPLAY | IRQ_WAITING);
 	kstat_incr_irqs_this_cpu(irq, desc);
 
 	/*
-	 * If its disabled or no action available
+	 * If it's running, disabled or no action available
 	 * then mask it and get out of here:
 	 */
 	action = desc->action;
-	if (unlikely(!action || (desc->status & IRQ_DISABLED))) {
+	if (unlikely(!action || (desc->status & (IRQ_INPROGRESS |
+						 IRQ_DISABLED)))) {
 		desc->status |= IRQ_PENDING;
 		if (desc->chip->mask)
 			desc->chip->mask(irq);
@@ -460,6 +460,8 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
 
 	spin_lock(&desc->lock);
 	desc->status &= ~IRQ_INPROGRESS;
+	if (!(desc->status & IRQ_DISABLED) && desc->chip->unmask)
+		desc->chip->unmask(irq);
 out:
 	desc->chip->eoi(irq);
 	desc = irq_remap_to_desc(irq, desc);
