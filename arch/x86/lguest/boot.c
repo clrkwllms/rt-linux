@@ -173,24 +173,29 @@ static unsigned long save_fl(void)
 {
 	return lguest_data.irq_enabled;
 }
+PV_CALLEE_SAVE_REGS_THUNK(save_fl);
 
 /* restore_flags() just sets the flags back to the value given. */
 static void restore_fl(unsigned long flags)
 {
 	lguest_data.irq_enabled = flags;
 }
+PV_CALLEE_SAVE_REGS_THUNK(restore_fl);
 
 /* Interrupts go off... */
 static void irq_disable(void)
 {
 	lguest_data.irq_enabled = 0;
 }
+PV_CALLEE_SAVE_REGS_THUNK(irq_disable);
 
 /* Interrupts go on... */
 static void irq_enable(void)
 {
 	lguest_data.irq_enabled = X86_EFLAGS_IF;
 }
+PV_CALLEE_SAVE_REGS_THUNK(irq_enable);
+
 /*:*/
 /*M:003 Note that we don't check for outstanding interrupts when we re-enable
  * them (or when we unmask an interrupt).  This seems to work for the moment,
@@ -278,7 +283,7 @@ static void lguest_load_tls(struct thread_struct *t, unsigned int cpu)
 	/* There's one problem which normal hardware doesn't have: the Host
 	 * can't handle us removing entries we're currently using.  So we clear
 	 * the GS register here: if it's needed it'll be reloaded anyway. */
-	loadsegment(gs, 0);
+	lazy_load_gs(0);
 	lazy_hcall(LHCALL_LOAD_TLS, __pa(&t->tls_array), cpu, 0);
 }
 
@@ -836,13 +841,14 @@ static u32 lguest_apic_safe_wait_icr_idle(void)
 	return 0;
 }
 
-static struct apic_ops lguest_basic_apic_ops = {
-	.read = lguest_apic_read,
-	.write = lguest_apic_write,
-	.icr_read = lguest_apic_icr_read,
-	.icr_write = lguest_apic_icr_write,
-	.wait_icr_idle = lguest_apic_wait_icr_idle,
-	.safe_wait_icr_idle = lguest_apic_safe_wait_icr_idle,
+static void set_lguest_basic_apic_ops(void)
+{
+	apic->read = lguest_apic_read;
+	apic->write = lguest_apic_write;
+	apic->icr_read = lguest_apic_icr_read;
+	apic->icr_write = lguest_apic_icr_write;
+	apic->wait_icr_idle = lguest_apic_wait_icr_idle;
+	apic->safe_wait_icr_idle = lguest_apic_safe_wait_icr_idle;
 };
 #endif
 
@@ -997,10 +1003,10 @@ __init void lguest_init(void)
 
 	/* interrupt-related operations */
 	pv_irq_ops.init_IRQ = lguest_init_IRQ;
-	pv_irq_ops.save_fl = save_fl;
-	pv_irq_ops.restore_fl = restore_fl;
-	pv_irq_ops.irq_disable = irq_disable;
-	pv_irq_ops.irq_enable = irq_enable;
+	pv_irq_ops.save_fl = PV_CALLEE_SAVE(save_fl);
+	pv_irq_ops.restore_fl = PV_CALLEE_SAVE(restore_fl);
+	pv_irq_ops.irq_disable = PV_CALLEE_SAVE(irq_disable);
+	pv_irq_ops.irq_enable = PV_CALLEE_SAVE(irq_enable);
 	pv_irq_ops.safe_halt = lguest_safe_halt;
 
 	/* init-time operations */
@@ -1045,7 +1051,7 @@ __init void lguest_init(void)
 
 #ifdef CONFIG_X86_LOCAL_APIC
 	/* apic read/write intercepts */
-	apic_ops = &lguest_basic_apic_ops;
+	set_lguest_basic_apic_ops();
 #endif
 
 	/* time operations */
@@ -1059,14 +1065,6 @@ __init void lguest_init(void)
 	/*G:070 Now we've seen all the paravirt_ops, we return to
 	 * lguest_init() where the rest of the fairly chaotic boot setup
 	 * occurs. */
-
-	/* The native boot code sets up initial page tables immediately after
-	 * the kernel itself, and sets init_pg_tables_end so they're not
-	 * clobbered.  The Launcher places our initial pagetables somewhere at
-	 * the top of our physical memory, so we don't need extra space: set
-	 * init_pg_tables_end to the end of the kernel. */
-	init_pg_tables_start = __pa(pg0);
-	init_pg_tables_end = __pa(pg0);
 
 	/* As described in head_32.S, we map the first 128M of memory. */
 	max_pfn_mapped = (128*1024*1024) >> PAGE_SHIFT;

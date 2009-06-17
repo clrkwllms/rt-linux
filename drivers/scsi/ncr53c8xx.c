@@ -8295,7 +8295,7 @@ __setup("ncr53c8xx=", ncr53c8xx_setup);
 struct Scsi_Host * __init ncr_attach(struct scsi_host_template *tpnt,
 					int unit, struct ncr_device *device)
 {
-	struct host_data *host_data;
+	struct host_data *uninitialized_var(host_data);
 	struct ncb *np = NULL;
 	struct Scsi_Host *instance = NULL;
 	u_long flags = 0;

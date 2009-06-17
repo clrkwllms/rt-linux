@@ -79,7 +79,7 @@ MODULE_PARM_DESC(nowayout,
 							(same as EFER) */
 #define WDT_EFDR (WDT_EFIR+1) /* Extended Function Data Register */
 
-static void w83697ug_select_wd_register(void)
+static int w83697ug_select_wd_register(void)
 {
 	unsigned char c;
 	unsigned char version;
@@ -102,7 +102,7 @@ static void w83697ug_select_wd_register(void)
 
 	} else {
 		printk(KERN_ERR PFX "No W83697UG/UF could be found\n");
-		return;
+		return -EIO;
 	}
 
 	outb_p(0x07, WDT_EFER); /* point to logical device number reg */
@@ -110,6 +110,8 @@ static void w83697ug_select_wd_register(void)
 	outb_p(0x30, WDT_EFER); /* select CR30 */
 	c = inb_p(WDT_EFDR);
 	outb_p(c || 0x01, WDT_EFDR); /* set bit 0 to activate GPIO2 */
+
+	return 0;
 }
 
 static void w83697ug_unselect_wd_register(void)
@@ -117,11 +119,12 @@ static void w83697ug_unselect_wd_register(void)
 	outb_p(0xAA, WDT_EFER); /* Leave extended function mode */
 }
 
-static void w83697ug_init(void)
+static int w83697ug_init(void)
 {
 	unsigned char t;
 
-	w83697ug_select_wd_register();
+	if (w83697ug_select_wd_register())
+		return -EIO;
 
 	outb_p(0xF6, WDT_EFER); /* Select CRF6 */
 	t = inb_p(WDT_EFDR);    /* read CRF6 */
@@ -137,6 +140,8 @@ static void w83697ug_init(void)
 	outb_p(t, WDT_EFDR);    /* Write back to CRF5 */
 
 	w83697ug_unselect_wd_register();
+
+	return 0;
 }
 
 static void wdt_ctrl(int timeout)
@@ -347,7 +352,11 @@ static int __init wdt_init(void)
 		goto out;
 	}
 
-	w83697ug_init();
+	ret = w83697ug_init();
+	if (ret) {
+		printk(KERN_ERR PFX "init failed\n");
+		goto unreg_regions;
+	}
 
 	ret = register_reboot_notifier(&wdt_notifier);
 	if (ret != 0) {

@@ -677,9 +677,7 @@ int relay_late_setup_files(struct rchan *chan,
 	 */
 	for_each_online_cpu(i) {
 		if (unlikely(!chan->buf[i])) {
-			printk(KERN_ERR "relay_late_setup_files: CPU %u "
-					"has no buffer, it must have!\n", i);
-			BUG();
+			WARN_ONCE(1, KERN_ERR "CPU has no buffer!\n");
 			err = -EINVAL;
 			break;
 		}
@@ -750,7 +748,7 @@ size_t relay_switch_subbuf(struct rchan_buf *buf, size_t length)
 			 * from the scheduler (trying to re-grab
 			 * rq->lock), so defer it.
 			 */
-			__mod_timer(&buf->timer, jiffies + 1);
+			mod_timer(&buf->timer, jiffies + 1);
 	}
 
 	old = buf->data;

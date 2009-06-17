@@ -147,7 +147,7 @@ static void vga_recalc_vertical(void)
 int set_mode(u16 mode)
 {
 	int rv;
-	u16 real_mode;
+	u16 uninitialized_var(real_mode);
 
 	/* Very special mode numbers... */
 	if (mode == VIDEO_CURRENT_MODE)

@@ -1980,7 +1980,7 @@ static struct pci_device_id hisax_pci_tbl[] __devinitdata = {
 	{ }				/* Terminating entry */
 };
 
-MODULE_DEVICE_TABLE(pci, hisax_pci_tbl);
+MODULE_STATIC_DEVICE_TABLE(pci, hisax_pci_tbl);
 #endif /* CONFIG_PCI */
 
 module_init(HiSax_init);
