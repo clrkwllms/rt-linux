@@ -1140,9 +1140,22 @@ unsigned long get_next_timer_interrupt(unsigned long now)
 	struct tvec_base *base = __get_cpu_var(tvec_bases);
 	unsigned long expires;
 
+#ifdef CONFIG_PREEMPT_RT
+	/*
+	 * On PREEMPT_RT we cannot sleep here. If the trylock does not
+	 * succeed then we return the worst-case 'expires in 1 tick'
+	 * value:
+	 */
+	if (spin_trylock(&base->lock)) {
+		expires = __next_timer_interrupt(base);
+		spin_unlock(&base->lock);
+	} else
+		expires = now + 1;
+#else
 	spin_lock(&base->lock);
 	expires = __next_timer_interrupt(base);
 	spin_unlock(&base->lock);
+#endif
 
 	if (time_before_eq(expires, now))
 		return now;
