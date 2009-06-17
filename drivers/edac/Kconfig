@@ -129,6 +129,13 @@ config EDAC_I82860
 	  Support for error detection and correction on the Intel
 	  82860 chipset.
 
+config EDAC_K8
+	tristate "AMD K8 (Opteron, Athlon64)"
+	depends on EDAC_MM_EDAC && X86 && PCI
+	help
+	  Support for error detection and correction on the AMD
+	  K8 Memory Controller
+
 config EDAC_R82600
 	tristate "Radisys 82600 embedded chipset"
 	depends on EDAC_MM_EDAC && PCI && X86_32

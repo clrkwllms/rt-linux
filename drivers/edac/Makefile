@@ -29,6 +29,7 @@ obj-$(CONFIG_EDAC_I82975X)		+= i82975x_edac.o
 obj-$(CONFIG_EDAC_I3000)		+= i3000_edac.o
 obj-$(CONFIG_EDAC_X38)			+= x38_edac.o
 obj-$(CONFIG_EDAC_I82860)		+= i82860_edac.o
+obj-$(CONFIG_EDAC_K8)			+= k8_edac.o
 obj-$(CONFIG_EDAC_R82600)		+= r82600_edac.o
 obj-$(CONFIG_EDAC_AMD64_OPTERON)	+= amd64_edac.o
 obj-$(CONFIG_EDAC_PASEMI)		+= pasemi_edac.o
