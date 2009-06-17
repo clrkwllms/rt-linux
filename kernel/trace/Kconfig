@@ -409,6 +409,20 @@ config FTRACE_STARTUP_TEST
 	  functioning properly. It will do tests on all the configured
 	  tracers of ftrace.
 
+config INTERRUPT_OFF_HIST
+	bool "Interrupts off critical timings histogram"
+	depends on IRQSOFF_TRACER
+	help
+	  This option uses the infrastructure of the critical
+	  irqs off timings to create a histogram of latencies.
+
+config PREEMPT_OFF_HIST
+	bool "Preempt off critical timings histogram"
+	depends on PREEMPT_TRACER
+	help
+	  This option uses the infrastructure of the critical
+	  preemption off timings to create a histogram of latencies.
+
 config MMIOTRACE
 	bool "Memory mapped IO tracing"
 	depends on HAVE_MMIOTRACE_SUPPORT && PCI
