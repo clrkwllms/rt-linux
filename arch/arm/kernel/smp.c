@@ -403,7 +403,7 @@ asmlinkage void __exception do_local_timer(struct pt_regs *regs)
 }
 #endif
 
-static DEFINE_SPINLOCK(stop_lock);
+static DEFINE_RAW_SPINLOCK(stop_lock);
 
 /*
  * ipi_cpu_stop - handle IPI from smp_send_stop()
