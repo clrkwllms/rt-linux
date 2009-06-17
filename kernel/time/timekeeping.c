@@ -480,6 +480,7 @@ static void clocksource_adjust(s64 offset)
 void update_wall_time(void)
 {
 	cycle_t offset;
+	int shift = 1;
 
 	/* Make sure we're fully resumed: */
 	if (unlikely(timekeeping_suspended))
@@ -492,30 +493,48 @@ void update_wall_time(void)
 #endif
 	clock->xtime_nsec = (s64)xtime.tv_nsec << clock->shift;
 
+
+	/*
+	 * If NO_HZ is enabled, we may spend too much time in the
+	 * accumulation loop. So try to accumulate logrithmically
+	 */
+	while (offset > (clock->cycle_interval << shift))
+		shift++;
+	shift--;
+
 	/* normally this loop will run just once, however in the
 	 * case of lost or late ticks, it will accumulate correctly.
 	 */
 	while (offset >= clock->cycle_interval) {
+		if (offset < clock->cycle_interval<<shift) {
+			shift--;
+			continue;
+		}
 		/* accumulate one interval */
-		offset -= clock->cycle_interval;
-		clock->cycle_last += clock->cycle_interval;
+		offset -= clock->cycle_interval << shift;
+		clock->cycle_last += clock->cycle_interval << shift;
 
-		clock->xtime_nsec += clock->xtime_interval;
+		clock->xtime_nsec += clock->xtime_interval << shift;
 		if (clock->xtime_nsec >= (u64)NSEC_PER_SEC << clock->shift) {
 			clock->xtime_nsec -= (u64)NSEC_PER_SEC << clock->shift;
 			xtime.tv_sec++;
 			second_overflow();
 		}
 
-		clock->raw_time.tv_nsec += clock->raw_interval;
+		clock->raw_time.tv_nsec += clock->raw_interval << shift;
 		if (clock->raw_time.tv_nsec >= NSEC_PER_SEC) {
 			clock->raw_time.tv_nsec -= NSEC_PER_SEC;
 			clock->raw_time.tv_sec++;
 		}
 
 		/* accumulate error between NTP and clock interval */
-		clock->error += tick_length;
-		clock->error -= clock->xtime_interval << (NTP_SCALE_SHIFT - clock->shift);
+		clock->error += tick_length << shift;
+		clock->error -= clock->xtime_interval
+			<< (NTP_SCALE_SHIFT - clock->shift + shift);
+
+		/* don't roll under! */
+		if (shift > 0)
+			shift--;
 	}
 
 	/* correct the clock when NTP error is too big */
