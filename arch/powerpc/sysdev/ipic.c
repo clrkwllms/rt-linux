@@ -32,7 +32,7 @@
 
 static struct ipic * primary_ipic;
 static struct irq_chip ipic_level_irq_chip, ipic_edge_irq_chip;
-static DEFINE_SPINLOCK(ipic_lock);
+static DEFINE_RAW_SPINLOCK(ipic_lock);
 
 static struct ipic_info ipic_info[] = {
 	[1] = {

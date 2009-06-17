@@ -36,7 +36,7 @@
 
 #define HPTE_LOCK_BIT 3
 
-static DEFINE_SPINLOCK(native_tlbie_lock);
+static DEFINE_RAW_SPINLOCK(native_tlbie_lock);
 
 static inline void __tlbie(unsigned long va, int psize, int ssize)
 {

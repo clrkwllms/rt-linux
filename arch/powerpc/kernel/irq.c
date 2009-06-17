@@ -443,7 +443,7 @@ void do_softirq(void)
  */
 
 static LIST_HEAD(irq_hosts);
-static DEFINE_SPINLOCK(irq_big_lock);
+static DEFINE_RAW_SPINLOCK(irq_big_lock);
 static unsigned int revmap_trees_allocated;
 static DEFINE_MUTEX(revmap_trees_mutex);
 struct irq_map_entry irq_map[NR_IRQS];

@@ -25,7 +25,7 @@ struct device_node *allnodes;
 /* use when traversing tree through the allnext, child, sibling,
  * or parent members of struct device_node.
  */
-DEFINE_RWLOCK(devtree_lock);
+DEFINE_RAW_RWLOCK(devtree_lock);
 
 int of_n_addr_cells(struct device_node *np)
 {

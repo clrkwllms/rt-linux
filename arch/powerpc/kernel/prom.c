@@ -81,7 +81,7 @@ struct boot_param_header *initial_boot_params;
 
 extern struct device_node *allnodes;	/* temporary while merging */
 
-extern rwlock_t devtree_lock;	/* temporary while merging */
+extern raw_rwlock_t devtree_lock;	/* temporary while merging */
 
 /* export that to outside world */
 struct device_node *of_chosen;
