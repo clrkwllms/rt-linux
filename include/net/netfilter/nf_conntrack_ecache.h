@@ -13,6 +13,7 @@
 
 #ifdef CONFIG_NF_CONNTRACK_EVENTS
 struct nf_conntrack_ecache {
+	spinlock_t lock;
 	struct nf_conn *ct;
 	unsigned int events;
 };
@@ -29,7 +30,8 @@ extern int nf_conntrack_register_notifier(struct notifier_block *nb);
 extern int nf_conntrack_unregister_notifier(struct notifier_block *nb);
 
 extern void nf_ct_deliver_cached_events(const struct nf_conn *ct);
-extern void __nf_ct_event_cache_init(struct nf_conn *ct);
+extern void __nf_ct_event_cache_init(struct nf_conn *ct,
+				     struct nf_conntrack_ecache *ecache);
 extern void nf_ct_event_cache_flush(struct net *net);
 
 static inline void
@@ -40,9 +42,11 @@ nf_conntrack_event_cache(enum ip_conntrack_events event, struct nf_conn *ct)
 
 	local_bh_disable();
 	ecache = per_cpu_ptr(net->ct.ecache, raw_smp_processor_id());
+	spin_lock(&ecache->lock);
 	if (ct != ecache->ct)
-		__nf_ct_event_cache_init(ct);
+		__nf_ct_event_cache_init(ct, ecache);
 	ecache->events |= event;
+	spin_unlock(&ecache->lock);
 	local_bh_enable();
 }
 
