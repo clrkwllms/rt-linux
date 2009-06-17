@@ -113,6 +113,11 @@ void *__kmap_atomic_prot(struct page *page, enum km_type type, pgprot_t prot)
 	return (void *)vaddr;
 }
 
+void *__kmap_atomic_direct(struct page *page, enum km_type type)
+{
+	return __kmap_atomic_prot(page, type, kmap_prot);
+}
+
 void *__kmap_atomic(struct page *page, enum km_type type)
 {
 	return kmap_atomic_prot(page, type, kmap_prot);
