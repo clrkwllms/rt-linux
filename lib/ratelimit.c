@@ -14,7 +14,7 @@
 #include <linux/jiffies.h>
 #include <linux/module.h>
 
-static DEFINE_SPINLOCK(ratelimit_lock);
+static DEFINE_RAW_SPINLOCK(ratelimit_lock);
 
 /*
  * __ratelimit - rate limiting
