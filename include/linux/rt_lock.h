@@ -15,6 +15,7 @@
 #include <linux/spinlock_types.h>
 
 #ifdef CONFIG_PREEMPT_RT
+# define preempt_rt 1
 /*
  * spinlocks - an RT mutex plus lock-break field:
  */
@@ -280,6 +281,8 @@ extern void  rt_downgrade_write(struct rw_semaphore *rwsem);
 #define rwsem_is_locked(rwsem) \
 	PICK_RWSEM_OP_RET(compat_rwsem_is_locked, rt_rwsem_is_locked, rwsem)
 
+#else
+# define preempt_rt 0
 #endif /* CONFIG_PREEMPT_RT */
 
 #endif
