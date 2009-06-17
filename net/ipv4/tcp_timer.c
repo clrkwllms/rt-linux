@@ -29,6 +29,8 @@ int sysctl_tcp_keepalive_intvl __read_mostly = TCP_KEEPALIVE_INTVL;
 int sysctl_tcp_retries1 __read_mostly = TCP_RETR1;
 int sysctl_tcp_retries2 __read_mostly = TCP_RETR2;
 int sysctl_tcp_orphan_retries __read_mostly;
+int sysctl_tcp_delack_min __read_mostly = TCP_DELACK_MIN_DEFAULT;
+int sysctl_tcp_ato_min __read_mostly = TCP_ATO_MIN_DEFAULT;
 
 static void tcp_write_timer(unsigned long);
 static void tcp_delack_timer(unsigned long);
