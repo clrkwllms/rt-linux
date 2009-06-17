@@ -3193,7 +3193,6 @@ unsigned int create_irq_nr(unsigned int irq_want)
 	if (irq_want < nr_irqs_gsi)
 		irq_want = nr_irqs_gsi;
 
-	spin_lock_irqsave(&vector_lock, flags);
 	for (new = irq_want; new < nr_irqs; new++) {
 		desc_new = irq_to_desc_alloc_cpu(new, cpu);
 		if (!desc_new) {
@@ -3202,13 +3201,16 @@ unsigned int create_irq_nr(unsigned int irq_want)
 		}
 		cfg_new = desc_new->chip_data;
 
-		if (cfg_new->vector != 0)
+		spin_lock_irqsave(&vector_lock, flags);
+		if (cfg_new->vector != 0) {
+			spin_unlock_irqrestore(&vector_lock, flags);
 			continue;
+		}
 		if (__assign_irq_vector(new, cfg_new, apic->target_cpus()) == 0)
 			irq = new;
+		spin_unlock_irqrestore(&vector_lock, flags);
 		break;
 	}
-	spin_unlock_irqrestore(&vector_lock, flags);
 
 	if (irq > 0) {
 		dynamic_irq_init(irq);
