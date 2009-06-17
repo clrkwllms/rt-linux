@@ -41,11 +41,12 @@ struct mmu_gather {
 	unsigned int		nr;	/* set to ~0U means fast mode */
 	unsigned int		need_flush;/* Really unmapped some ptes? */
 	unsigned int		fullmm; /* non-zero means full mm flush */
+	int			cpu;
 	struct page *		pages[FREE_PTE_NR];
 };
 
 /* Users of the generic TLB shootdown code must declare this storage space. */
-DECLARE_PER_CPU(struct mmu_gather, mmu_gathers);
+DECLARE_PER_CPU_LOCKED(struct mmu_gather, mmu_gathers);
 
 /* tlb_gather_mmu
  *	Return a pointer to an initialized struct mmu_gather.
@@ -53,8 +54,10 @@ DECLARE_PER_CPU(struct mmu_gather, mmu_gathers);
 static inline struct mmu_gather *
 tlb_gather_mmu(struct mm_struct *mm, unsigned int full_mm_flush)
 {
-	struct mmu_gather *tlb = &get_cpu_var(mmu_gathers);
+	int cpu;
+	struct mmu_gather *tlb = &get_cpu_var_locked(mmu_gathers, &cpu);
 
+	tlb->cpu = cpu;
 	tlb->mm = mm;
 
 	/* Use fast mode if only one CPU is online */
@@ -90,7 +93,7 @@ tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 	/* keep the page table cache within bounds */
 	check_pgt_cache();
 
-	put_cpu_var(mmu_gathers);
+	put_cpu_var_locked(mmu_gathers, tlb->cpu);
 }
 
 /* tlb_remove_page
