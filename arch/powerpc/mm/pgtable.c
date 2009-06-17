@@ -29,7 +29,6 @@
 #include <asm/tlbflush.h>
 #include <asm/tlb.h>
 
-static DEFINE_PER_CPU_LOCKED(struct pte_freelist_batch *, pte_freelist_cur);
 static unsigned long pte_freelist_forced_free;
 
 struct pte_freelist_batch
@@ -80,24 +79,20 @@ static void pte_free_submit(struct pte_freelist_batch *batch)
 
 void pgtable_free_tlb(struct mmu_gather *tlb, pgtable_free_t pgf)
 {
-	/* tlb->cpu is set by tlb_gather_mmu */
-	cpumask_t local_cpumask = cpumask_of_cpu(tlb->cpu);
 	struct pte_freelist_batch **batchp;
-	int cpu;
 
-	batchp = &get_cpu_var_locked(pte_freelist_cur, &cpu);
+	batchp = &tlb->arch.batch;
 
-	if (atomic_read(&tlb->mm->mm_users) < 2 ||
-	    cpus_equal(tlb->mm->cpu_vm_mask, local_cpumask)) {
+	if (atomic_read(&tlb->mm->mm_users) < 2) {
 		pgtable_free(pgf);
-		goto cleanup;
+		return;
 	}
 
 	if (*batchp == NULL) {
 		*batchp = (struct pte_freelist_batch *)__get_free_page(GFP_ATOMIC);
 		if (*batchp == NULL) {
 			pgtable_free_now(pgf);
-			goto cleanup;
+			return;
 		}
 		(*batchp)->index = 0;
 	}
@@ -106,22 +101,16 @@ void pgtable_free_tlb(struct mmu_gather *tlb, pgtable_free_t pgf)
 		pte_free_submit(*batchp);
 		*batchp = NULL;
 	}
-
-cleanup:
-	put_cpu_var_locked(pte_freelist_cur, cpu);
 }
 
-void pte_free_finish(void)
+void pte_free_finish(struct mmu_gather *tlb)
 {
 	struct pte_freelist_batch **batchp;
-	int cpu;
 
-	batchp = &get_cpu_var_locked(pte_freelist_cur, &cpu);
+	batchp = &tlb->arch.batch;
 
 	if (*batchp) {
 		pte_free_submit(*batchp);
 		*batchp = NULL;
 	}
-
-	put_cpu_var_locked(pte_freelist_cur, cpu);
 }
