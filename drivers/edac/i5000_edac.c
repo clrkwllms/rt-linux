@@ -77,9 +77,9 @@
 #define			FERR_FAT_M3ERR	0x00000004
 #define			FERR_FAT_M2ERR	0x00000002
 #define			FERR_FAT_M1ERR	0x00000001
+/*FERR_FAT_M3ERR removed per BIOS developers Keith Mannthey 1-16-08*/
 #define			FERR_FAT_MASK	(FERR_FAT_M1ERR | \
-						FERR_FAT_M2ERR | \
-						FERR_FAT_M3ERR)
+						FERR_FAT_M2ERR)
 
 #define		FERR_NF_FBD		0xA0
 
