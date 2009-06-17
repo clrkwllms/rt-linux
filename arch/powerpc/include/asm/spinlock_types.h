@@ -7,13 +7,13 @@
 
 typedef struct {
 	volatile unsigned int slock;
-} raw_spinlock_t;
+} __raw_spinlock_t;
 
 #define __RAW_SPIN_LOCK_UNLOCKED	{ 0 }
 
 typedef struct {
 	volatile signed int lock;
-} raw_rwlock_t;
+} __raw_rwlock_t;
 
 #define __RAW_RW_LOCK_UNLOCKED		{ 0 }
 
