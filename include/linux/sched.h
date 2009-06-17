@@ -2572,6 +2572,8 @@ static inline void mm_init_owner(struct mm_struct *mm, struct task_struct *p)
 
 #define TASK_STATE_TO_CHAR_STR "RSDTtZX"
 
+extern int task_is_current(struct task_struct *task);
+
 #endif /* __KERNEL__ */
 
 #endif
