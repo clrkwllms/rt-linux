@@ -23,10 +23,14 @@ static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 					unsigned *usedp, char **idp)
 {
 	static char ids[][8] = {
+#if DEBUG_STACK > 0
 		[DEBUG_STACK - 1] = "#DB",
+#endif
 		[NMI_STACK - 1] = "NMI",
 		[DOUBLEFAULT_STACK - 1] = "#DF",
+#if STACKFAULT_STACK > 0
 		[STACKFAULT_STACK - 1] = "#SS",
+#endif
 		[MCE_STACK - 1] = "#MC",
 #if DEBUG_STKSZ > EXCEPTION_STKSZ
 		[N_EXCEPTION_STACKS ...
