@@ -6724,15 +6724,14 @@ EXPORT_SYMBOL(__cond_resched_raw_spinlock);
 
 int __cond_resched_spinlock(spinlock_t *lock)
 {
-#if (defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)) || defined(CONFIG_PREEMPT_RT)
-	if (lock->break_lock) {
-		lock->break_lock = 0;
+	int resched = need_resched() && system_state == SYSTEM_RUNNING;
+
+	if (spin_needbreak(lock) || resched) {
 		spin_unlock_no_resched(lock);
 		__cond_resched();
 		spin_lock(lock);
 		return 1;
 	}
-#endif
 	return 0;
 }
 EXPORT_SYMBOL(__cond_resched_spinlock);
