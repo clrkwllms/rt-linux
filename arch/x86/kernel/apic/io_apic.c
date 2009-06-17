@@ -72,8 +72,8 @@
  */
 int sis_apic_bug = -1;
 
-static DEFINE_SPINLOCK(ioapic_lock);
-static DEFINE_SPINLOCK(vector_lock);
+static DEFINE_RAW_SPINLOCK(ioapic_lock);
+static DEFINE_RAW_SPINLOCK(vector_lock);
 
 /*
  * # of IRQ routing registers
