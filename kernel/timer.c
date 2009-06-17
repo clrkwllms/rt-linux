@@ -1184,37 +1184,12 @@ void update_process_times(int user_tick)
 }
 
 /*
- * Time of day handling:
- */
-static inline void update_times(void)
-{
-	static unsigned long last_tick = INITIAL_JIFFIES;
-	unsigned long ticks, flags;
-
-	/*
-	 * Dont take the xtime_lock from every CPU in
-	 * every tick - only when needed:
-	 */
-	if (jiffies == last_tick)
-		return;
-
-	write_seqlock_irqsave(&xtime_lock, flags);
-	ticks = jiffies - last_tick;
-	if (ticks) {
-		last_tick += ticks;
-		update_wall_time();
-	}
-	write_sequnlock_irqrestore(&xtime_lock, flags);
-}
-
-/*
  * This function runs timers and the timer-tq in bottom half context.
  */
 static void run_timer_softirq(struct softirq_action *h)
 {
 	struct tvec_base *base = __get_cpu_var(tvec_bases);
 
-	update_times();
 	hrtimer_run_pending();
 
 	if (time_after_eq(jiffies, base->timer_jiffies))
@@ -1240,6 +1215,7 @@ void run_local_timers(void)
 void do_timer(unsigned long ticks)
 {
 	jiffies_64 += ticks;
+	update_wall_time();
 	calc_global_load();
 }
 
