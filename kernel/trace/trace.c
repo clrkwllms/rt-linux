@@ -265,6 +265,10 @@ unsigned long trace_flags = TRACE_ITER_PRINT_PARENT | TRACE_ITER_PRINTK |
  */
 void trace_wake_up(void)
 {
+#ifdef CONFIG_PREEMPT_RT
+	if (in_atomic() || irqs_disabled())
+		return;
+#endif
 	/*
 	 * The runqueue_is_locked() can fail, but this is the best we
 	 * have for now:
@@ -329,8 +333,7 @@ static const char *trace_options[] = {
  * This is defined as a raw_spinlock_t in order to help
  * with performance when lockdep debugging is enabled.
  */
-static raw_spinlock_t ftrace_max_lock =
-	(raw_spinlock_t)__RAW_SPIN_LOCK_UNLOCKED;
+static __raw_spinlock_t ftrace_max_lock = __RAW_SPIN_LOCK_UNLOCKED;
 
 /*
  * Copy the new maximum trace into the separate maximum-trace
@@ -647,7 +650,7 @@ static unsigned map_pid_to_cmdline[PID_MAX_DEFAULT+1];
 static unsigned map_cmdline_to_pid[SAVED_CMDLINES];
 static char saved_cmdlines[SAVED_CMDLINES][TASK_COMM_LEN];
 static int cmdline_idx;
-static raw_spinlock_t trace_cmdline_lock = __RAW_SPIN_LOCK_UNLOCKED;
+static __raw_spinlock_t trace_cmdline_lock = __RAW_SPIN_LOCK_UNLOCKED;
 
 /* temporary disable recording */
 static atomic_t trace_record_cmdline_disabled __read_mostly;
@@ -660,7 +663,7 @@ static void trace_init_cmdlines(void)
 }
 
 static int trace_stop_count;
-static DEFINE_SPINLOCK(tracing_start_lock);
+static DEFINE_RAW_SPINLOCK(tracing_start_lock);
 
 /**
  * ftrace_off_permanent - disable all ftrace code permanently
@@ -1226,8 +1229,7 @@ void trace_graph_return(struct ftrace_graph_ret *trace)
  */
 int trace_vbprintk(unsigned long ip, const char *fmt, va_list args)
 {
-	static raw_spinlock_t trace_buf_lock =
-		(raw_spinlock_t)__RAW_SPIN_LOCK_UNLOCKED;
+	static __raw_spinlock_t trace_buf_lock = __RAW_SPIN_LOCK_UNLOCKED;
 	static u32 trace_buf[TRACE_BUF_SIZE];
 
 	struct ring_buffer_event *event;
@@ -1285,7 +1287,7 @@ EXPORT_SYMBOL_GPL(trace_vbprintk);
 
 int trace_vprintk(unsigned long ip, const char *fmt, va_list args)
 {
-	static raw_spinlock_t trace_buf_lock = __RAW_SPIN_LOCK_UNLOCKED;
+	static __raw_spinlock_t trace_buf_lock = __RAW_SPIN_LOCK_UNLOCKED;
 	static char trace_buf[TRACE_BUF_SIZE];
 
 	struct ring_buffer_event *event;
@@ -4046,7 +4048,7 @@ trace_printk_seq(struct trace_seq *s)
 
 static void __ftrace_dump(bool disable_tracing)
 {
-	static DEFINE_SPINLOCK(ftrace_dump_lock);
+	static DEFINE_RAW_SPINLOCK(ftrace_dump_lock);
 	/* use static because iter can be a bit big for the stack */
 	static struct trace_iterator iter;
 	unsigned int old_userobj;
