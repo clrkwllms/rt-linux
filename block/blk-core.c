@@ -212,7 +212,7 @@ EXPORT_SYMBOL(blk_dump_rq_flags);
  */
 void blk_plug_device(struct request_queue *q)
 {
-	WARN_ON(!irqs_disabled());
+	WARN_ON_NONRT(!irqs_disabled());
 
 	/*
 	 * don't plug a stopped queue, it must be paired with blk_start_queue()
@@ -252,7 +252,7 @@ EXPORT_SYMBOL(blk_plug_device_unlocked);
  */
 int blk_remove_plug(struct request_queue *q)
 {
-	WARN_ON(!irqs_disabled());
+	WARN_ON_NONRT(!irqs_disabled());
 
 	if (!queue_flag_test_and_clear(QUEUE_FLAG_PLUGGED, q))
 		return 0;
@@ -362,7 +362,7 @@ static void blk_invoke_request_fn(struct request_queue *q)
  **/
 void blk_start_queue(struct request_queue *q)
 {
-	WARN_ON(!irqs_disabled());
+	WARN_ON_NONRT(!irqs_disabled());
 
 	queue_flag_clear(QUEUE_FLAG_STOPPED, q);
 	blk_invoke_request_fn(q);
