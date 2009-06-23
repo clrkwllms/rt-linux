@@ -37,6 +37,10 @@
 #define DECLARE_PER_CPU(type, name)					\
 	DECLARE_PER_CPU_SECTION(type, name, "")
 
+#define DECLARE_PER_CPU_LOCKED(type, name)	\
+	extern PER_CPU_ATTRIBUTES spinlock_t __per_cpu_var_lock(name);	\
+	extern PER_CPU_ATTRIBUTES __typeof__(type) __per_cpu_var_lock_var(name)
+
 #define DEFINE_PER_CPU(type, name)					\
 	DEFINE_PER_CPU_SECTION(type, name, "")
 
