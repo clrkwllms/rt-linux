@@ -14,6 +14,11 @@
 #include <linux/moduleparam.h>
 #include <linux/timer.h>
 
+#ifdef CONFIG_X86_IO_APIC
+# include <asm/apicdef.h>
+# include <asm/io_apic.h>
+#endif
+
 static int irqfixup __read_mostly;
 
 #define POLL_SPURIOUS_IRQ_INTERVAL (HZ/10)
@@ -258,6 +263,12 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		 * The interrupt is stuck
 		 */
 		__report_bad_irq(irq, desc, action_ret);
+#ifdef CONFIG_X86_IO_APIC
+		if (!sis_apic_bug) {
+			sis_apic_bug = 1;
+			printk(KERN_ERR "turning off IO-APIC fast mode.\n");
+		}
+#else
 		/*
 		 * Now kill the IRQ
 		 */
@@ -268,6 +279,7 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 
 		mod_timer(&poll_spurious_irq_timer,
 			  jiffies + POLL_SPURIOUS_IRQ_INTERVAL);
+#endif
 	}
 	desc->irqs_unhandled = 0;
 }
