@@ -631,7 +631,8 @@ static int platform_match(struct device *dev, struct device_driver *drv)
 
 #ifdef CONFIG_PM_SLEEP
 
-static int platform_legacy_suspend(struct device *dev, pm_message_t mesg)
+static inline int
+platform_legacy_suspend(struct device *dev, pm_message_t mesg)
 {
 	int ret = 0;
 
@@ -641,7 +642,8 @@ static int platform_legacy_suspend(struct device *dev, pm_message_t mesg)
 	return ret;
 }
 
-static int platform_legacy_suspend_late(struct device *dev, pm_message_t mesg)
+static inline int
+platform_legacy_suspend_late(struct device *dev, pm_message_t mesg)
 {
 	struct platform_driver *pdrv = to_platform_driver(dev->driver);
 	struct platform_device *pdev = to_platform_device(dev);
@@ -653,7 +655,7 @@ static int platform_legacy_suspend_late(struct device *dev, pm_message_t mesg)
 	return ret;
 }
 
-static int platform_legacy_resume_early(struct device *dev)
+static inline int platform_legacy_resume_early(struct device *dev)
 {
 	struct platform_driver *pdrv = to_platform_driver(dev->driver);
 	struct platform_device *pdev = to_platform_device(dev);
@@ -665,7 +667,7 @@ static int platform_legacy_resume_early(struct device *dev)
 	return ret;
 }
 
-static int platform_legacy_resume(struct device *dev)
+static inline int platform_legacy_resume(struct device *dev)
 {
 	int ret = 0;
 

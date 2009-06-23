@@ -749,6 +749,9 @@ static int iwl_set_tkip_dynamic_key_info(struct iwl_priv *priv,
 	priv->stations[sta_id].sta.key.key_flags = key_flags;
 
 
+	priv->stations[sta_id].sta.key.key_flags = key_flags;
+
+
 	/* This copy is acutally not needed: we get the key with each TX */
 	memcpy(priv->stations[sta_id].keyinfo.key, keyconf->key, 16);
 

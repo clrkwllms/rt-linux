@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 30
-EXTRAVERSION =
+EXTRAVERSION =-rt1
 NAME = Man-Eating Seals of Antiquity
 
 # *DOCUMENTATION*
@@ -555,6 +555,10 @@ endif
 
 ifdef CONFIG_FUNCTION_TRACER
 KBUILD_CFLAGS	+= -pg
+endif
+
+ifndef CONFIG_ALLOW_WARNINGS
+KBUILD_CFLAGS	+= -Werror ${WERROR}
 endif
 
 # We trigger additional mismatches with less inlining

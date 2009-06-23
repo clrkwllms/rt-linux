@@ -561,6 +561,10 @@ static ide_startstop_t ide_transfer_pc(ide_drive_t *drive)
 	if ((drive->atapi_flags & IDE_AFLAG_ZIP_DRIVE) == 0)
 		hwif->tp_ops->output_data(drive, NULL, rq->cmd, cmd_len);
 
+	/* Send the actual packet */
+	if ((drive->atapi_flags & IDE_AFLAG_ZIP_DRIVE) == 0)
+		hwif->tp_ops->output_data(drive, NULL, rq->cmd, cmd_len);
+
 	/* Begin DMA, if necessary */
 	if (dev_is_idecd(drive)) {
 		if (drive->dma)

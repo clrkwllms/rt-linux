@@ -572,6 +572,8 @@ static int __init pnpbios_init(void)
 
 fs_initcall(pnpbios_init);
 
+#ifdef CONFIG_HOTPLUG
+
 static int __init pnpbios_thread_init(void)
 {
 #if defined(CONFIG_PPC)
@@ -594,5 +596,7 @@ static int __init pnpbios_thread_init(void)
 
 /* Start the kernel thread later: */
 module_init(pnpbios_thread_init);
+
+#endif
 
 EXPORT_SYMBOL(pnpbios_protocol);

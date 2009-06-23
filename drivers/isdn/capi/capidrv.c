@@ -1551,8 +1551,8 @@ static int decodeFVteln(char *teln, unsigned long *bmaskp, int *activep)
 
 static int FVteln2capi20(char *teln, u8 AdditionalInfo[1+2+2+31])
 {
-	unsigned long bmask;
-	int active;
+	unsigned long uninitialized_var(bmask);
+	int uninitialized_var(active);
 	int rc, i;
    
 	rc = decodeFVteln(teln, &bmask, &active);

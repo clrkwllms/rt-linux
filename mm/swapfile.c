@@ -1649,7 +1649,7 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 	union swap_header *swap_header = NULL;
 	unsigned int nr_good_pages = 0;
 	int nr_extents = 0;
-	sector_t span;
+	sector_t uninitialized_var(span);
 	unsigned long maxpages = 1;
 	unsigned long swapfilepages;
 	unsigned short *swap_map = NULL;

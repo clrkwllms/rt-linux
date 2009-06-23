@@ -679,6 +679,11 @@ static bool e1000_clean_tx_irq(struct e1000_adapter *adapter)
 		/* Detect a transmit hang in hardware, this serializes the
 		 * check with the clearing of time_stamp and movement of i */
 		adapter->detect_tx_hung = 0;
+		/*
+		 * read barrier to make sure that the ->dma member and time
+		 * stamp are updated fully
+		 */
+		smp_rmb();
 		if (tx_ring->buffer_info[i].time_stamp &&
 		    time_after(jiffies, tx_ring->buffer_info[i].time_stamp
 			       + (adapter->tx_timeout_factor * HZ))
@@ -3844,7 +3849,7 @@ static int e1000_tx_map(struct e1000_adapter *adapter,
 	offset = 0;
 
 	while (len) {
-		buffer_info = &tx_ring->buffer_info[i];
+		struct e1000_buffer *buffer_info = &tx_ring->buffer_info[i];
 		size = min(len, max_per_txd);
 
 		buffer_info->length = size;
@@ -3875,6 +3880,7 @@ static int e1000_tx_map(struct e1000_adapter *adapter,
 			if (i == tx_ring->count)
 				i = 0;
 
+>>>>>>> v2.6.30:drivers/net/e1000e/netdev.c
 			buffer_info = &tx_ring->buffer_info[i];
 			size = min(len, max_per_txd);
 
@@ -3891,6 +3897,7 @@ static int e1000_tx_map(struct e1000_adapter *adapter,
 
 	tx_ring->buffer_info[i].skb = skb;
 	tx_ring->buffer_info[first].next_to_watch = i;
+	smp_wmb();
 
 	return count;
 }

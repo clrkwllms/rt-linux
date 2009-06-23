@@ -218,6 +218,8 @@ config DELL_LAPTOP
 	depends on BACKLIGHT_CLASS_DEVICE
 	depends on RFKILL
 	depends on POWER_SUPPLY
+	# broken build with: config-Thu_Jan_15_01_30_52_CET_2009.bad
+	depends on 0
 	default n
 	---help---
 	This driver adds support for rfkill and backlight control to Dell

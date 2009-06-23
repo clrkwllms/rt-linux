@@ -100,6 +100,7 @@ static int scatter_elem_sz_prev = SG_SCATTER_SZ;
 #define SG_SECTOR_SZ 512
 
 static int sg_add(struct device *, struct class_interface *);
+static void sg_device_destroy(struct kref *kref);
 static void sg_remove(struct device *, struct class_interface *);
 
 static DEFINE_IDR(sg_index_idr);
@@ -199,6 +200,7 @@ static Sg_request *sg_get_rq_mark(Sg_fd * sfp, int pack_id);
 static Sg_request *sg_add_request(Sg_fd * sfp);
 static int sg_remove_request(Sg_fd * sfp, Sg_request * srp);
 static int sg_res_in_use(Sg_fd * sfp);
+static Sg_device *sg_lookup_dev(int dev);
 static Sg_device *sg_get_dev(int dev);
 static void sg_put_dev(Sg_device *sdp);
 

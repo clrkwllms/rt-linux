@@ -963,6 +963,9 @@ static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 		return NULL;
 	}
 
+	/* need to have dev->class ready */
+	dev->cfg_size = pci_cfg_space_size(dev);
+
 	return dev;
 }
 

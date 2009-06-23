@@ -852,6 +852,27 @@ generic_file_splice_write(struct pipe_inode_info *pipe, struct file *out,
 	if (sd.num_spliced)
 		ret = sd.num_spliced;
 
+	pipe_lock(pipe);
+
+	splice_from_pipe_begin(&sd);
+	do {
+		ret = splice_from_pipe_next(pipe, &sd);
+		if (ret <= 0)
+			break;
+
+		mutex_lock_nested(&inode->i_mutex, I_MUTEX_CHILD);
+		ret = file_remove_suid(out);
+		if (!ret)
+			ret = splice_from_pipe_feed(pipe, &sd, pipe_to_file);
+		mutex_unlock(&inode->i_mutex);
+	} while (ret > 0);
+	splice_from_pipe_end(pipe, &sd);
+
+	pipe_unlock(pipe);
+
+	if (sd.num_spliced)
+		ret = sd.num_spliced;
+
 	if (ret > 0) {
 		unsigned long nr_pages;
 

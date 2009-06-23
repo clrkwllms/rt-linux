@@ -43,6 +43,16 @@ static const struct ide_port_ops netcell_port_ops = {
 	.quirkproc		= netcell_quirkproc,
 };
 
+static void netcell_quirkproc(ide_drive_t *drive)
+{
+	/* mark words 85-87 as valid */
+	drive->id[ATA_ID_CSF_DEFAULT] |= 0x4000;
+}
+
+static const struct ide_port_ops netcell_port_ops = {
+	.quirkproc		= netcell_quirkproc,
+};
+
 #define DECLARE_GENERIC_PCI_DEV(extra_flags) \
 	{ \
 		.name		= DRV_NAME, \

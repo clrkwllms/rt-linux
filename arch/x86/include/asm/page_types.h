@@ -40,6 +40,14 @@
 
 #ifndef __ASSEMBLY__
 
+enum bootmem_state {
+	BEFORE_BOOTMEM,
+	DURING_BOOTMEM,
+	AFTER_BOOTMEM
+};
+
+extern enum bootmem_state bootmem_state;
+
 extern int page_is_ram(unsigned long pagenr);
 extern int devmem_is_allowed(unsigned long pagenr);
 

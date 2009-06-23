@@ -34,6 +34,7 @@
 #include <linux/smp.h>
 #include <linux/mm.h>
 
+#include <asm/perf_counter.h>
 #include <asm/pgalloc.h>
 #include <asm/atomic.h>
 #include <asm/mpspec.h>
@@ -761,6 +762,8 @@ static void local_apic_timer_interrupt(void)
 	inc_irq_stat(apic_timer_irqs);
 
 	evt->event_handler(evt);
+
+	perf_counter_unthrottle();
 }
 
 /*
@@ -1133,6 +1136,7 @@ void __cpuinit setup_local_APIC(void)
 		apic_write(APIC_ESR, 0);
 	}
 #endif
+	perf_counters_lapic_init(0);
 
 	preempt_disable();
 

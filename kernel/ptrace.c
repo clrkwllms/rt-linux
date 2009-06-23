@@ -237,6 +237,9 @@ out:
 	return retval;
 }
 
+int ptrace_detach(struct task_struct *child, unsigned int data)
+{
+	bool dead = false;
 /*
  * Called with irqs disabled, returns true if childs should reap themselves.
  */
@@ -288,6 +291,7 @@ static bool __ptrace_detach(struct task_struct *tracer, struct task_struct *p)
 int ptrace_detach(struct task_struct *child, unsigned int data)
 {
 	bool dead = false;
+>>>>>>> v2.6.30:kernel/ptrace.c
 
 	if (!valid_signal(data))
 		return -EIO;

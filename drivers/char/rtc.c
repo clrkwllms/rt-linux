@@ -188,7 +188,9 @@ static int rtc_proc_open(struct inode *inode, struct file *file);
  * timer (but you would need to have an awful timing before you'd trip on it)
  */
 static unsigned long rtc_status;	/* bitmapped status byte.	*/
+#if defined(RTC_IRQ) || defined(CONFIG_PROC_FS)
 static unsigned long rtc_freq;		/* Current periodic IRQ rate	*/
+#endif
 static unsigned long rtc_irq_data;	/* our output to the world	*/
 static unsigned long rtc_max_user_freq = 64; /* > this, need CAP_SYS_RESOURCE */
 
@@ -1074,7 +1076,9 @@ no_irq:
 #endif
 
 #if defined(__alpha__) || defined(__mips__)
+#ifdef CONFIG_PROC_FS
 	rtc_freq = HZ;
+#endif
 
 	/* Each operating system on an Alpha uses its own epoch.
 	   Let's try to guess which one we are using now. */

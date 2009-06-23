@@ -903,7 +903,7 @@ int wlp_parse_f0(struct wlp *wlp, struct sk_buff *skb)
 	size_t len = skb->len;
 	size_t used;
 	ssize_t result;
-	struct wlp_nonce enonce, rnonce;
+	struct wlp_nonce uninitialized_var(enonce), uninitialized_var(rnonce);
 	enum wlp_assc_error assc_err;
 	char enonce_buf[WLP_WSS_NONCE_STRSIZE];
 	char rnonce_buf[WLP_WSS_NONCE_STRSIZE];

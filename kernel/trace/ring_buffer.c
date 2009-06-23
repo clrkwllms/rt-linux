@@ -6,6 +6,7 @@
 #include <linux/ring_buffer.h>
 #include <linux/trace_clock.h>
 #include <linux/ftrace_irq.h>
+#include <linux/kmemcheck.h>
 #include <linux/spinlock.h>
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
@@ -1258,6 +1259,7 @@ __rb_reserve_next(struct ring_buffer_per_cpu *cpu_buffer,
 		if (tail < BUF_PAGE_SIZE) {
 			/* Mark the rest of the page with padding */
 			event = __rb_page_index(tail_page, tail);
+			kmemcheck_annotate_bitfield(event->bitfield);
 			rb_event_set_padding(event);
 		}
 
@@ -1287,6 +1289,7 @@ __rb_reserve_next(struct ring_buffer_per_cpu *cpu_buffer,
 		return NULL;
 
 	event = __rb_page_index(tail_page, tail);
+	kmemcheck_annotate_bitfield(event->bitfield);
 	rb_update_event(event, type, length);
 
 	/*

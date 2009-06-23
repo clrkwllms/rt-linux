@@ -101,7 +101,7 @@ static int __devinit snd_sb8_probe(struct device *pdev, unsigned int dev)
 	struct snd_card *card;
 	struct snd_sb8 *acard;
 	struct snd_opl3 *opl3;
-	int err;
+	int uninitialized_var(err);
 
 	err = snd_card_create(index[dev], id[dev], THIS_MODULE,
 			      sizeof(struct snd_sb8), &card);

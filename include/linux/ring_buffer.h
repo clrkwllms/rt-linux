@@ -1,6 +1,7 @@
 #ifndef _LINUX_RING_BUFFER_H
 #define _LINUX_RING_BUFFER_H
 
+#include <linux/kmemcheck.h>
 #include <linux/mm.h>
 #include <linux/seq_file.h>
 
@@ -11,7 +12,10 @@ struct ring_buffer_iter;
  * Don't refer to this struct directly, use functions below.
  */
 struct ring_buffer_event {
-	u32		type:2, len:3, time_delta:27;
+	kmemcheck_define_bitfield(bitfield, {
+		u32		type:2, len:3, time_delta:27;
+	});
+
 	u32		array[];
 };
 

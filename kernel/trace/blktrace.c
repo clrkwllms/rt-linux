@@ -127,6 +127,13 @@ void __trace_note_message(struct blk_trace *bt, const char *fmt, ...)
 	unsigned long flags;
 	char *buf;
 
+	if (blk_tracer_enabled) {
+		va_start(args, fmt);
+		ftrace_vprintk(fmt, args);
+		va_end(args);
+		return;
+	}
+
 	if (unlikely(bt->trace_state != Blktrace_running &&
 		     !blk_tracer_enabled))
 		return;
@@ -1229,7 +1236,19 @@ static enum print_line_t blk_tracer_print_line(struct trace_iterator *iter)
 	if (!(blk_tracer_flags.val & TRACE_BLK_OPT_CLASSIC))
 		return TRACE_TYPE_UNHANDLED;
 
-	return print_one_line(iter, true);
+	t = (const struct blk_io_trace *)iter->ent;
+	what = t->action & ((1 << BLK_TC_SHIFT) - 1);
+
+	if (unlikely(what == 0 || what >= ARRAY_SIZE(what2act)))
+		ret = trace_seq_printf(&iter->seq, "Bad pc action %x\n", what);
+	else {
+		const bool long_act = !!(trace_flags & TRACE_ITER_VERBOSE);
+		ret = blk_log_action_iter(iter, what2act[what].act[long_act]);
+		if (ret)
+			ret = what2act[what].print(&iter->seq, iter->ent);
+	}
+
+	return ret ? TRACE_TYPE_HANDLED : TRACE_TYPE_PARTIAL_LINE;
 }
 
 static struct tracer blk_tracer __read_mostly = {

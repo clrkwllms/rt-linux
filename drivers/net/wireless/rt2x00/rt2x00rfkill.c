@@ -51,11 +51,46 @@ static void rt2x00rfkill_poll(struct input_polled_dev *poll_dev)
 	}
 }
 
+static int rt2x00rfkill_allocate(struct rt2x00_dev *rt2x00dev)
+{
+	struct device *dev = wiphy_dev(rt2x00dev->hw->wiphy);
+
+	rt2x00dev->rfkill = rfkill_allocate(dev, RFKILL_TYPE_WLAN);
+	if (!rt2x00dev->rfkill)
+		return -ENOMEM;
+
+	rt2x00dev->rfkill->name = rt2x00dev->ops->name;
+	rt2x00dev->rfkill->data = rt2x00dev;
+	rt2x00dev->rfkill->toggle_radio = rt2x00rfkill_toggle_radio;
+	if (test_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags)) {
+		rt2x00dev->rfkill->get_state = rt2x00rfkill_get_state;
+		rt2x00dev->rfkill->state =
+			rt2x00dev->ops->lib->rfkill_poll(rt2x00dev) ?
+			    RFKILL_STATE_SOFT_BLOCKED : RFKILL_STATE_UNBLOCKED;
+	} else {
+		rt2x00dev->rfkill->state = RFKILL_STATE_UNBLOCKED;
+	}
+
+	INIT_DELAYED_WORK(&rt2x00dev->rfkill_work, rt2x00rfkill_poll);
+
+	return 0;
+}
+
+static void rt2x00rfkill_free(struct rt2x00_dev *rt2x00dev)
+{
+	rfkill_free(rt2x00dev->rfkill);
+	rt2x00dev->rfkill = NULL;
+}
+
 void rt2x00rfkill_register(struct rt2x00_dev *rt2x00dev)
 {
-	if (!test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state) ||
-	    test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state))
+	if (test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state))
 		return;
+
+	if (rt2x00rfkill_allocate(rt2x00dev)) {
+		ERROR(rt2x00dev, "Failed to allocate rfkill handler.\n");
+		return;
+	}
 
 	if (input_register_polled_device(rt2x00dev->rfkill_poll_dev)) {
 		ERROR(rt2x00dev, "Failed to register polled device.\n");
@@ -74,8 +109,7 @@ void rt2x00rfkill_register(struct rt2x00_dev *rt2x00dev)
 
 void rt2x00rfkill_unregister(struct rt2x00_dev *rt2x00dev)
 {
-	if (!test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state) ||
-	    !test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state))
+	if (!test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state))
 		return;
 
 	input_unregister_polled_device(rt2x00dev->rfkill_poll_dev);
