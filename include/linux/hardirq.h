@@ -116,7 +116,7 @@
 # define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
 #endif
 
-#if defined(CONFIG_SMP) || defined(CONFIG_GENERIC_HARDIRQS)
+#ifdef CONFIG_SMP
 extern void synchronize_irq(unsigned int irq);
 #else
 # define synchronize_irq(irq)	barrier()
