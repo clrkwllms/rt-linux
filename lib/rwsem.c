@@ -11,8 +11,8 @@
 /*
  * Initialize an rwsem:
  */
-void __init_rwsem(struct rw_semaphore *sem, const char *name,
-		  struct lock_class_key *key)
+void __compat_init_rwsem(struct rw_semaphore *sem, const char *name,
+			 struct lock_class_key *key)
 {
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	/*
@@ -26,7 +26,7 @@ void __init_rwsem(struct rw_semaphore *sem, const char *name,
 	INIT_LIST_HEAD(&sem->wait_list);
 }
 
-EXPORT_SYMBOL(__init_rwsem);
+EXPORT_SYMBOL(__compat_init_rwsem);
 
 struct rwsem_waiter {
 	struct list_head list;

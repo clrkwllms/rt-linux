@@ -28,6 +28,7 @@
 #include <linux/input.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/jiffies.h>
 
