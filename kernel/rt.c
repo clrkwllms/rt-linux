@@ -83,7 +83,7 @@ void zap_rt_locks(void)
 /*
  * struct mutex functions
  */
-void _mutex_init(struct mutex *lock, char *name, struct lock_class_key *key)
+void __mutex_init(struct mutex *lock, char *name, struct lock_class_key *key)
 {
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	/*
@@ -94,7 +94,7 @@ void _mutex_init(struct mutex *lock, char *name, struct lock_class_key *key)
 #endif
 	__rt_mutex_init(&lock->lock, name);
 }
-EXPORT_SYMBOL(_mutex_init);
+EXPORT_SYMBOL(__mutex_init);
 
 void __lockfunc _mutex_lock(struct mutex *lock)
 {
@@ -550,7 +550,7 @@ int rt_down_timeout(struct semaphore *sem, long jiff)
 	do {
 		jiffies_to_timespec(jiff, &ts);
 		hrtimer_init_on_stack(&t.timer, HRTIMER_MODE_REL, CLOCK_MONOTONIC);
-		t.timer.expires = timespec_to_ktime(ts);
+		t.timer._expires = timespec_to_ktime(ts);
 
 		ret = rt_mutex_timed_lock(&sem->lock, &t, 0);
 		if (ret != -EINTR)

@@ -5283,7 +5283,7 @@ need_resched:
 }
 EXPORT_SYMBOL(schedule);
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) && !defined(CONFIG_PREEMPT_RT)
 /*
  * Look out! "owner" is an entirely speculative pointer
  * access and not reliable.
