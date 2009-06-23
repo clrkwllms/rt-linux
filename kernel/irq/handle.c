@@ -430,7 +430,7 @@ int redirect_hardirq(struct irq_desc *desc)
 		return 0;
 
 #ifdef __i386__
-	if (debug_direct_keyboard && (desc - irq_desc == 1))
+	if (debug_direct_keyboard && desc->irq == 1)
 		return 0;
 #endif
 
