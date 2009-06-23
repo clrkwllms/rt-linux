@@ -39,6 +39,7 @@
 
 #include <linux/compat.h>
 #include <linux/syscalls.h>
+#include <linux/rt_lock.h>
 #include <linux/kprobes.h>
 #include <linux/user_namespace.h>
 
