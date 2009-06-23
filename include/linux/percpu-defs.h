@@ -26,6 +26,10 @@
 	__attribute__((__section__(PER_CPU_BASE_SECTION section)))	\
 	PER_CPU_ATTRIBUTES __typeof__(type) per_cpu__##name
 
+#define DEFINE_PER_CPU_SPINLOCK(name, section)				\
+	__attribute__((__section__(PER_CPU_BASE_SECTION section)))	\
+	PER_CPU_ATTRIBUTES __DEFINE_SPINLOCK(per_cpu__lock_##name##_locked);
+
 /*
  * Variant on the per-CPU variable declaration/definition theme used for
  * ordinary per-CPU variables.
@@ -35,6 +39,11 @@
 
 #define DEFINE_PER_CPU(type, name)					\
 	DEFINE_PER_CPU_SECTION(type, name, "")
+
+#define DEFINE_PER_CPU_LOCKED(type, name)				\
+	DEFINE_PER_CPU_SPINLOCK(name, "")				\
+	DEFINE_PER_CPU_SECTION(type, name##_locked, "")
+
 
 /*
  * Declaration/definition used for per-CPU variables that must come first in
@@ -78,7 +87,9 @@
  * Intermodule exports for per-CPU variables.
  */
 #define EXPORT_PER_CPU_SYMBOL(var) EXPORT_SYMBOL(per_cpu__##var)
-#define EXPORT_PER_CPU_SYMBOL_GPL(var) EXPORT_SYMBOL_GPL(per_cpu__##var)
+#define EXPORT_PER_CPU_LOCKED_SYMBOL(var) EXPORT_SYMBOL(per_cpu__##var##_locked)
 
+#define EXPORT_PER_CPU_SYMBOL_GPL(var) EXPORT_SYMBOL_GPL(per_cpu__##var)
+#define EXPORT_PER_CPU_LOCKED_SYMBOL_GPL(var) EXPORT_SYMBOL_GPL(per_cpu__##var##_locked)
 
 #endif /* _LINUX_PERCPU_DEFS_H */
