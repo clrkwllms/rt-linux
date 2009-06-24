@@ -1,0 +1,19 @@
+***************
+*** 4132,4140 ****
+  	if (adapter->hw.mac.tx_pkt_filtering)
+  		e1000_transfer_dhcp_info(adapter, skb);
+  
+- 	if (!spin_trylock_irqsave(&adapter->tx_queue_lock, irq_flags))
+- 		/* Collision - tell upper layer to requeue */
+- 		return NETDEV_TX_LOCKED;
+  
+  	/*
+  	 * need: count + 2 desc gap to keep tail from touching
+--- 4132,4138 ----
+  	if (adapter->hw.mac.tx_pkt_filtering)
+  		e1000_transfer_dhcp_info(adapter, skb);
+  
++ 	spin_lock_irqsave(&adapter->tx_queue_lock, irq_flags);
+  
+  	/*
+  	 * need: count + 2 desc gap to keep tail from touching
