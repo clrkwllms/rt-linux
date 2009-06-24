@@ -540,6 +540,7 @@ static void
 function_profile_call(unsigned long ip, unsigned long parent_ip)
 {
 	struct ftrace_profile_stat *stat;
+	unsigned long long calltime;
 	struct ftrace_profile *rec;
 	unsigned long flags;
 
@@ -551,6 +552,23 @@ function_profile_call(unsigned long ip, unsigned long parent_ip)
 	stat = &__get_cpu_var(ftrace_profile_stats);
 	if (!stat->hash)
 		goto out;
+	calltime = trace->rettime - trace->calltime;
+
+	if (!(trace_flags & TRACE_ITER_GRAPH_TIME)) {
+		int index;
+
+		index = trace->depth;
+
+		/* Append this call time to the parent time to subtract */
+		if (index)
+			current->ret_stack[index - 1].subtime += calltime;
+
+		if (current->ret_stack[index].subtime < calltime)
+			calltime -= current->ret_stack[index].subtime;
+		else
+			calltime = 0;
+	}
+
 
 	rec = ftrace_find_profiled_func(stat, ip);
 	if (!rec) {
@@ -559,6 +577,7 @@ function_profile_call(unsigned long ip, unsigned long parent_ip)
 			goto out;
 	}
 
+	rec->time += calltime;
 	rec->counter++;
  out:
 	local_irq_restore(flags);
