@@ -346,6 +346,7 @@ static int xmon_core(struct pt_regs *regs, int fromipi)
 	unsigned long timeout;
 #endif
 
+	preempt_disable();
 	local_irq_save(flags);
 
 	bp = in_breakpoint_table(regs->nip, &offset);
@@ -522,6 +523,7 @@ static int xmon_core(struct pt_regs *regs, int fromipi)
 	insert_cpu_bpts();
 
 	local_irq_restore(flags);
+	preempt_enable();
 
 	return cmd != 'X' && cmd != EOF;
 }
