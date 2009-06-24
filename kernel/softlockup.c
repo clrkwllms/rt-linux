@@ -20,7 +20,7 @@
 
 #include <asm/irq_regs.h>
 
-static DEFINE_SPINLOCK(print_lock);
+static DEFINE_RAW_SPINLOCK(print_lock);
 
 static DEFINE_PER_CPU(unsigned long, touch_timestamp);
 static DEFINE_PER_CPU(unsigned long, print_timestamp);

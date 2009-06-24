@@ -51,7 +51,7 @@
 #include <video/vga.h>
 #include <asm/io.h>
 
-static DEFINE_SPINLOCK(vga_lock);
+static DEFINE_RAW_SPINLOCK(vga_lock);
 static int cursor_size_lastfrom;
 static int cursor_size_lastto;
 static u32 vgacon_xres;

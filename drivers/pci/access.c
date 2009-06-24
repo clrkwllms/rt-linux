@@ -12,7 +12,7 @@
  * configuration space.
  */
 
-static DEFINE_SPINLOCK(pci_lock);
+static DEFINE_RAW_SPINLOCK(pci_lock);
 
 /*
  *  Wrappers for all PCI configuration access functions.  They just check
