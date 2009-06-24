@@ -199,8 +199,15 @@ static inline unsigned long pte_update(struct mm_struct *mm,
 	if (!huge)
 		assert_pte_locked(mm, addr);
 
-	if (old & _PAGE_HASHPTE)
+	if (old & _PAGE_HASHPTE) {
+#ifdef CONFIG_PREEMPT_RT
+		preempt_disable();
+#endif
 		hpte_need_flush(mm, addr, ptep, old, huge);
+#ifdef CONFIG_PREEMPT_RT
+		preempt_enable();
+#endif
+	}
 	return old;
 }
 
