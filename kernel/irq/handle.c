@@ -485,6 +485,13 @@ unsigned int __do_IRQ(unsigned int irq)
 		desc->chip->end(irq);
 		return 1;
 	}
+	/*
+	 * If the task is currently running in user mode, don't
+	 * detect soft lockups.  If CONFIG_DETECT_SOFTLOCKUP is not
+	 * configured, this should be optimized out.
+	 */
+	if (user_mode(get_irq_regs()))
+		touch_softlockup_watchdog();
 
 	spin_lock(&desc->lock);
 	if (desc->chip->ack) {
