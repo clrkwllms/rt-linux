@@ -43,7 +43,7 @@ int unwind_frame(struct stackframe *frame)
 }
 #endif
 
-void walk_stackframe(struct stackframe *frame,
+void notrace walk_stackframe(struct stackframe *frame,
 		     int (*fn)(struct stackframe *, void *), void *data)
 {
 	while (1) {
