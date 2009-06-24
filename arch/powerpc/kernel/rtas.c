@@ -40,7 +40,7 @@
 #include <asm/atomic.h>
 
 struct rtas_t rtas = {
-	.lock = SPIN_LOCK_UNLOCKED
+	.lock = RAW_SPIN_LOCK_UNLOCKED(lock)
 };
 EXPORT_SYMBOL(rtas);
 

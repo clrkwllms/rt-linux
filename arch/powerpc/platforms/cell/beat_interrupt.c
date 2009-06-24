@@ -30,7 +30,7 @@
 #include "beat_wrapper.h"
 
 #define	MAX_IRQS	NR_IRQS
-static DEFINE_SPINLOCK(beatic_irq_mask_lock);
+static DEFINE_RAW_SPINLOCK(beatic_irq_mask_lock);
 static uint64_t	beatic_irq_mask_enable[(MAX_IRQS+255)/64];
 static uint64_t	beatic_irq_mask_ack[(MAX_IRQS+255)/64];
 
