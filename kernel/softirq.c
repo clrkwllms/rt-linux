@@ -888,7 +888,8 @@ EXPORT_SYMBOL(tasklet_unlock_wait);
 
 static int ksoftirqd(void * __data)
 {
-	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO/2 };
+	/* Priority needs to be below hardirqs */
+	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO/2 - 1};
 	struct softirqdata *data = __data;
 	u32 softirq_mask = (1 << data->nr);
 	struct softirq_action *h;
