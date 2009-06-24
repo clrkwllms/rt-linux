@@ -47,4 +47,7 @@ obj-$(CONFIG_FTRACE_SYSCALLS) += trace_syscalls.o
 obj-$(CONFIG_EVENT_PROFILE) += trace_event_profile.o
 obj-$(CONFIG_EVENT_TRACER) += trace_events_filter.o
 
+obj-$(CONFIG_INTERRUPT_OFF_HIST) += trace_hist.o
+obj-$(CONFIG_PREEMPT_OFF_HIST) += trace_hist.o
+
 libftrace-y := ftrace.o
