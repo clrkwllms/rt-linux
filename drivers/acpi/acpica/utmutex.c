@@ -120,7 +120,7 @@ void acpi_ut_mutex_terminate(void)
 	/* Delete the spinlocks */
 
 	acpi_os_delete_lock(acpi_gbl_gpe_lock);
-	acpi_os_delete_lock(acpi_gbl_hardware_lock);
+	// acpi_os_delete_lock(acpi_gbl_hardware_lock);
 
 	/* Delete the reader/writer lock */
 
