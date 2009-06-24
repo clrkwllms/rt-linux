@@ -25,7 +25,7 @@
 #include <asm/smp.h>
 #include <asm/firmware.h>
 
-void __spin_yield(raw_spinlock_t *lock)
+void __spin_yield(__raw_spinlock_t *lock)
 {
 	unsigned int lock_value, holder_cpu, yield_count;
 
@@ -55,7 +55,7 @@ void __spin_yield(raw_spinlock_t *lock)
  * This turns out to be the same for read and write locks, since
  * we only know the holder if it is write-locked.
  */
-void __rw_yield(raw_rwlock_t *rw)
+void __rw_yield(__raw_rwlock_t *rw)
 {
 	int lock_value;
 	unsigned int holder_cpu, yield_count;
@@ -82,7 +82,7 @@ void __rw_yield(raw_rwlock_t *rw)
 }
 #endif
 
-void __raw_spin_unlock_wait(raw_spinlock_t *lock)
+void __raw_spin_unlock_wait(__raw_spinlock_t *lock)
 {
 	while (lock->slock) {
 		HMT_low();
