@@ -3,7 +3,9 @@
 
 #include <linux/compiler.h>
 
+#ifndef __ASSEMBLY__
 extern void __WARN_ON(const char *func, const char *file, const int line);
+#endif /* __ASSEMBLY__ */
 
 #ifdef CONFIG_BUG
 
