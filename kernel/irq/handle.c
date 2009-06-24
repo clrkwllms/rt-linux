@@ -79,7 +79,7 @@ static struct irq_desc irq_desc_init = {
 	.chip	    = &no_irq_chip,
 	.handle_irq = handle_bad_irq,
 	.depth      = 1,
-	.lock       = __SPIN_LOCK_UNLOCKED(irq_desc_init.lock),
+	.lock       = RAW_SPIN_LOCK_UNLOCKED(irq_desc_init.lock),
 };
 
 void init_kstat_irqs(struct irq_desc *desc, int cpu, int nr)
@@ -137,7 +137,7 @@ static struct irq_desc irq_desc_legacy[NR_IRQS_LEGACY] __cacheline_aligned_in_sm
 		.chip	    = &no_irq_chip,
 		.handle_irq = handle_bad_irq,
 		.depth	    = 1,
-		.lock	    = __SPIN_LOCK_UNLOCKED(irq_desc_init.lock),
+		.lock	    = RAW_SPIN_LOCK_UNLOCKED(irq_desc_init.lock),
 	}
 };
 
