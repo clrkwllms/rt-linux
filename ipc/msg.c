@@ -259,12 +259,19 @@ static void expunge_all(struct msg_queue *msq, int res)
 	while (tmp != &msq->q_receivers) {
 		struct msg_receiver *msr;
 
+		/*
+		 * Make sure that the wakeup doesnt preempt
+		 * this CPU prematurely. (on PREEMPT_RT)
+		 */
+		preempt_disable();
+
 		msr = list_entry(tmp, struct msg_receiver, r_list);
 		tmp = tmp->next;
 		msr->r_msg = NULL;
-		wake_up_process(msr->r_tsk);
-		smp_mb();
+		wake_up_process(msr->r_tsk); /* serializes */
 		msr->r_msg = ERR_PTR(res);
+
+		preempt_enable();
 	}
 }
 
@@ -611,22 +618,28 @@ static inline int pipelined_send(struct msg_queue *msq, struct msg_msg *msg)
 		    !security_msg_queue_msgrcv(msq, msg, msr->r_tsk,
 					       msr->r_msgtype, msr->r_mode)) {
 
+			/*
+			 * Make sure that the wakeup doesnt preempt
+			 * this CPU prematurely. (on PREEMPT_RT)
+			 */
+			preempt_disable();
+
 			list_del(&msr->r_list);
 			if (msr->r_maxsize < msg->m_ts) {
 				msr->r_msg = NULL;
-				wake_up_process(msr->r_tsk);
-				smp_mb();
+				wake_up_process(msr->r_tsk); /* serializes */
 				msr->r_msg = ERR_PTR(-E2BIG);
 			} else {
 				msr->r_msg = NULL;
 				msq->q_lrpid = task_pid_vnr(msr->r_tsk);
 				msq->q_rtime = get_seconds();
-				wake_up_process(msr->r_tsk);
-				smp_mb();
+				wake_up_process(msr->r_tsk); /* serializes */
 				msr->r_msg = msg;
+				preempt_enable();
 
 				return 1;
 			}
+			preempt_enable();
 		}
 	}
 	return 0;
