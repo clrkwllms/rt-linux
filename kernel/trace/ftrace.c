@@ -576,7 +576,7 @@ function_profile_call(unsigned long ip, unsigned long parent_ip)
 	local_irq_save(flags);
 
 	stat = &__get_cpu_var(ftrace_profile_stats);
-	if (!stat->hash)
+	if (!stat->hash || !ftrace_profile_enabled)
 		goto out;
 	calltime = trace->rettime - trace->calltime;
 
@@ -648,7 +648,10 @@ ftrace_profile_write(struct file *filp, const char __user *ubuf,
 			register_ftrace_function(&ftrace_profile_ops);
 			ftrace_profile_enabled = 1;
 		} else {
-			ftrace_profile_enabled = 0;
+			/*
+			 * unregister_ftrace_profiler calls stop_machine
+			 * so this acts like an synchronize_sched.
+			 */
 			unregister_ftrace_function(&ftrace_profile_ops);
 		}
 	}
