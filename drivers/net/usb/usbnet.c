@@ -898,6 +898,8 @@ static void tx_complete (struct urb *urb)
 
 	urb->dev = NULL;
 	entry->state = tx_done;
+	spin_lock_rt(&dev->txq.lock);
+	spin_unlock_rt(&dev->txq.lock);
 	defer_bh(dev, skb, &dev->txq);
 }
 
