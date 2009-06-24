@@ -127,16 +127,6 @@ static void flush_all_zero_pkmaps(void)
 		flush_tlb_kernel_range(PKMAP_ADDR(0), PKMAP_ADDR(LAST_PKMAP));
 }
 
-/**
- * kmap_flush_unused - flush all unused kmap mappings in order to remove stray mappings
- */
-void kmap_flush_unused(void)
-{
-	lock_kmap();
-	flush_all_zero_pkmaps();
-	unlock_kmap();
-}
-
 static inline unsigned long map_new_virtual(struct page *page)
 {
 	unsigned long vaddr;
