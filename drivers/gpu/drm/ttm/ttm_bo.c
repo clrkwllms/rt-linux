@@ -811,6 +811,7 @@ int ttm_bo_wait_cpu(struct ttm_buffer_object *bo, bool no_wait)
 
 	return ret;
 }
+EXPORT_SYMBOL(ttm_bo_wait_cpu);
 
 int ttm_bo_move_buffer(struct ttm_buffer_object *bo,
 		       uint32_t proposed_placement,
@@ -1593,12 +1594,14 @@ int ttm_bo_synccpu_write_grab(struct ttm_buffer_object *bo, bool no_wait)
 	ttm_bo_unreserve(bo);
 	return ret;
 }
+EXPORT_SYMBOL(ttm_bo_synccpu_write_grab);
 
 void ttm_bo_synccpu_write_release(struct ttm_buffer_object *bo)
 {
 	if (atomic_dec_and_test(&bo->cpu_writers))
 		wake_up_all(&bo->event_queue);
 }
+EXPORT_SYMBOL(ttm_bo_synccpu_write_release);
 
 /**
  * A buffer object shrink method that tries to swap out the first
