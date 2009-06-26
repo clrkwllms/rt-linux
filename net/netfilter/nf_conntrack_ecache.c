@@ -61,20 +61,20 @@ void nf_ct_deliver_cached_events(const struct nf_conn *ct)
 
 	local_bh_disable();
 	ecache = per_cpu_ptr(net->ct.ecache, raw_smp_processor_id());
+	spin_lock(&ecache->lock);
 	if (ecache->ct == ct)
 		__nf_ct_deliver_cached_events(ecache);
+	spin_unlock(&ecache->lock);
 	local_bh_enable();
 }
 EXPORT_SYMBOL_GPL(nf_ct_deliver_cached_events);
 
 /* Deliver cached events for old pending events, if current conntrack != old */
-void __nf_ct_event_cache_init(struct nf_conn *ct)
+void __nf_ct_event_cache_init(struct nf_conn *ct,
+			      struct nf_conntrack_ecache *ecache)
 {
 	struct net *net = nf_ct_net(ct);
-	struct nf_conntrack_ecache *ecache;
 
-	/* take care of delivering potentially old events */
-	ecache = per_cpu_ptr(net->ct.ecache, raw_smp_processor_id());
 	BUG_ON(ecache->ct == ct);
 	if (ecache->ct)
 		__nf_ct_deliver_cached_events(ecache);
@@ -93,16 +93,26 @@ void nf_ct_event_cache_flush(struct net *net)
 
 	for_each_possible_cpu(cpu) {
 		ecache = per_cpu_ptr(net->ct.ecache, cpu);
+		spin_lock(&ecache->lock);
 		if (ecache->ct)
 			nf_ct_put(ecache->ct);
+		spin_unlock(&ecache->lock);
 	}
 }
 
 int nf_conntrack_ecache_init(struct net *net)
 {
+	struct nf_conntrack_ecache *ecache;
+	int cpu;
+
 	net->ct.ecache = alloc_percpu(struct nf_conntrack_ecache);
 	if (!net->ct.ecache)
 		return -ENOMEM;
+
+	for_each_possible_cpu(cpu) {
+		ecache = per_cpu_ptr(net->ct.ecache, cpu);
+		spin_lock_init(&ecache->lock);
+	}
 	return 0;
 }
 
