@@ -2342,6 +2342,26 @@ static int sched_balance_self(int cpu, int flag)
 
 #endif /* CONFIG_SMP */
 
+#ifdef CONFIG_DEBUG_PREEMPT
+void notrace preempt_enable_no_resched(void)
+{
+	static int once = 1;
+
+	barrier();
+	dec_preempt_count();
+
+	if (once && !preempt_count()) {
+		once = 0;
+		printk(KERN_ERR "BUG: %s:%d task might have lost a preemption check!\n",
+			current->comm, current->pid);
+		dump_stack();
+	}
+}
+
+EXPORT_SYMBOL(preempt_enable_no_resched);
+#endif
+
+
 /**
  * task_oncpu_function_call - call a function on the cpu on which a task runs
  * @p:		the task to evaluate
@@ -5205,7 +5225,7 @@ asmlinkage void __sched schedule(void)
 need_resched:
 	preempt_disable();
 	__schedule();
-	preempt_enable_no_resched();
+	__preempt_enable_no_resched();
 	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
 		goto need_resched;
 }
@@ -9245,7 +9265,7 @@ void __init sched_init(void)
 	scheduler_running = 1;
 }
 
-#ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
+#if defined(CONFIG_DEBUG_SPINLOCK_SLEEP) || defined(CONFIG_DEBUG_PREEMPT)
 void __might_sleep(char *file, int line)
 {
 #ifdef in_atomic
