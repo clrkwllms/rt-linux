@@ -560,8 +560,10 @@ nv50_crtc_encoder_from_610030(struct drm_device *dev,
 void
 nv50_display_irq_handler(struct drm_device *dev)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	static struct nouveau_encoder *encoder = NULL;
 	static struct nouveau_crtc *crtc = NULL;
+	struct nvbios *bios = &dev_priv->VBIOS;
 	uint32_t intr, tmp;
 	int ret;
 
@@ -601,16 +603,16 @@ nv50_display_irq_handler(struct drm_device *dev)
 			nv_wr32(0x614200 + (crtc->index * 0x800), tmp);
 
 			if (encoder->dcb->type != OUTPUT_ANALOG) {
-				int limit;
+				int tclk;
 
 				if (encoder->dcb->type == OUTPUT_LVDS)
-					limit = 112000;
+					tclk = bios->fp.duallink_transition_clk;
 				else
-					limit = 165000;
+					tclk = 165000;
 
 				tmp = nv_rd32(0x614300 + (encoder->or * 0x800));
 				tmp &= ~0x00000f0f;
-				if (crtc->mode->clock > limit)
+				if (crtc->mode->clock > tclk)
 					tmp |= 0x00000101;
 				nv_wr32(0x614300 + (encoder->or * 0x800), tmp);
 			} else {

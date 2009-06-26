@@ -254,6 +254,7 @@ static const struct drm_encoder_funcs nv50_sor_encoder_funcs = {
 int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 {
 	struct nouveau_encoder *encoder = NULL;
+	bool dum;
 	int type;
 
 	NV_DEBUG(dev, "\n");
@@ -266,6 +267,11 @@ int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 	case OUTPUT_LVDS:
 		NV_INFO(dev, "Detected a LVDS output\n");
 		type = DRM_MODE_ENCODER_LVDS;
+
+		if (nouveau_bios_parse_lvds_table(dev, 0, &dum, &dum)) {
+			NV_ERROR(dev, "Failed parsing LVDS table\n");
+			return -EINVAL;
+		}
 		break;
 	default:
 		return -EINVAL;

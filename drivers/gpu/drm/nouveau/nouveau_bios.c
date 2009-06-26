@@ -3047,14 +3047,11 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 		bios->fp.dual_link = bios->data[lvdsofs] & 1;
 		bios->fp.BITbit1 = bios->data[lvdsofs] & 2;
 		bios->fp.duallink_transition_clk = ROM16(bios->data[bios->fp.lvdsmanufacturerpointer + 5]) * 10;
-#if 0	// currently unused
 		break;
 	case 0x40:
-		/* fairly sure, but not 100% */
-		bios->fp.dual_link = bios->data[lvdsofs] & 1;
+		//bios->fp.dual_link = bios->data[lvdsofs] & 1;
 		bios->fp.duallink_transition_clk = ROM16(bios->data[bios->fp.lvdsmanufacturerpointer + 5]) * 10;
 		break;
-#endif
 	}
 
 	/* set dual_link flag for EDID case */
