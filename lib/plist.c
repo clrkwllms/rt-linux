@@ -57,8 +57,9 @@ static void plist_check_head(struct plist_head *head)
 #ifndef CONFIG_PREEMPT_RT
 	WARN_ON(!head->lock);
 #endif
-	if (head->lock)
-		WARN_ON_SMP(!spin_is_locked(head->lock));
+	/* Avoid plist WARN_ON storm w/ mutex-debugging
+	  if (head->lock)
+		WARN_ON_SMP(!spin_is_locked(head->lock)); */
 	plist_check_list(&head->prio_list);
 	plist_check_list(&head->node_list);
 }
