@@ -60,8 +60,6 @@ unsigned long max_pfn_mapped;
 
 static unsigned long dma_reserve __initdata;
 
-DEFINE_PER_CPU_LOCKED(struct mmu_gather, mmu_gathers);
-
 static int __init parse_direct_gbpages_off(char *arg)
 {
 	direct_gbpages = 0;
