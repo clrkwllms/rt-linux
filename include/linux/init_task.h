@@ -10,6 +10,7 @@
 #include <linux/user_namespace.h>
 #include <linux/securebits.h>
 #include <net/net_namespace.h>
+#include <linux/spinlock.h>
 
 extern struct files_struct init_files;
 extern struct fs_struct init_fs;
@@ -186,8 +187,8 @@ extern struct cred init_cred;
 	.journal_info	= NULL,						\
 	.cpu_timers	= INIT_CPU_TIMERS(tsk.cpu_timers),		\
 	.fs_excl	= ATOMIC_INIT(0),				\
-	.pi_lock	= __SPIN_LOCK_UNLOCKED(tsk.pi_lock),		\
 	.timer_slack_ns = 50000, /* 50 usec default slack */		\
+	.pi_lock	= RAW_SPIN_LOCK_UNLOCKED(tsk.pi_lock),		\
 	.pids = {							\
 		[PIDTYPE_PID]  = INIT_PID_LINK(PIDTYPE_PID),		\
 		[PIDTYPE_PGID] = INIT_PID_LINK(PIDTYPE_PGID),		\
