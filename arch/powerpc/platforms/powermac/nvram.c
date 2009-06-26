@@ -80,7 +80,7 @@ static int is_core_99;
 static int core99_bank = 0;
 static int nvram_partitions[3];
 // XXX Turn that into a sem
-static DEFINE_SPINLOCK(nv_lock);
+static DEFINE_RAW_SPINLOCK(nv_lock);
 
 static int (*core99_write_bank)(int bank, u8* datas);
 static int (*core99_erase_bank)(int bank);
