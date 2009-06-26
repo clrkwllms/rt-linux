@@ -2894,7 +2894,6 @@ asmlinkage void schedule_tail(struct task_struct *prev)
 	__releases(rq->lock)
 {
 	preempt_disable();
-	BUG_ON((preempt_count() & 0xffff) != 2);
 	finish_task_switch(this_rq(), prev);
 	__preempt_enable_no_resched();
 	local_irq_enable();
@@ -5345,18 +5344,14 @@ asmlinkage void __sched __schedule(void)
 	}
 
 	reacquire_kernel_lock(current);
-	BUG_ON(preempt_count() & 0xffff);
 }
 
 asmlinkage void __sched schedule(void)
 {
-	BUG_ON((preempt_count() & 0xffff) && !current->exit_state);
 need_resched:
 	local_irq_disable();
 	__schedule();
 	local_irq_enable();
-
-	BUG_ON(preempt_count() & 0xffff);
 
 	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
 		goto need_resched;
