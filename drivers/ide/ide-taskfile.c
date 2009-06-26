@@ -219,7 +219,7 @@ static void ide_pio_sector(ide_drive_t *drive, struct request *rq,
 	offset %= PAGE_SIZE;
 
 #ifdef CONFIG_HIGHMEM
-	local_irq_save(flags);
+	local_irq_save_nort(flags);
 #endif
 	buf = kmap_atomic(page, KM_BIO_SRC_IRQ) + offset;
 
@@ -239,7 +239,7 @@ static void ide_pio_sector(ide_drive_t *drive, struct request *rq,
 
 	kunmap_atomic(buf, KM_BIO_SRC_IRQ);
 #ifdef CONFIG_HIGHMEM
-	local_irq_restore(flags);
+	local_irq_restore_nort(flags);
 #endif
 }
 
@@ -430,7 +430,7 @@ static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
 	}
 
 	if ((drive->dev_flags & IDE_DFLAG_UNMASK) == 0)
-		local_irq_disable();
+		local_irq_disable_nort();
 
 	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
 	ide_pio_datablock(drive, rq, 1);
