@@ -13,6 +13,7 @@
 #include <linux/irq.h>
 #include <linux/module.h>
 #include <linux/random.h>
+#include <linux/kallsyms.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
 #include <linux/rculist.h>
@@ -354,26 +355,59 @@ irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action)
 	irqreturn_t ret, retval = IRQ_NONE;
 	unsigned int status = 0;
 
-	WARN_ONCE(!in_irq(), "BUG: IRQ handler called from non-hardirq context!");
-
-	if (!(action->flags & IRQF_DISABLED))
-		local_irq_enable_in_hardirq();
+	/*
+	 * Unconditionally enable interrupts for threaded
+	 * IRQ handlers:
+	 */
+	if (!hardirq_count() || !(action->flags & IRQF_DISABLED))
+		local_irq_enable();
 
 	do {
+		unsigned int preempt_count = preempt_count();
+
 		trace_irq_handler_entry(irq, action);
 		ret = action->handler(irq, action->dev_id);
 		trace_irq_handler_exit(irq, action, ret);
+
+		if (preempt_count() != preempt_count) {
+			print_symbol("BUG: unbalanced irq-handler preempt count"
+				     " in %s!\n",
+				     (unsigned long) action->handler);
+			printk("entered with %08x, exited with %08x.\n",
+			       preempt_count, preempt_count());
+			dump_stack();
+			preempt_count() = preempt_count;
+		}
+
 		if (ret == IRQ_HANDLED)
 			status |= action->flags;
 		retval |= ret;
 		action = action->next;
 	} while (action);
 
-	if (status & IRQF_SAMPLE_RANDOM)
+	if (status & IRQF_SAMPLE_RANDOM) {
+		local_irq_enable();
 		add_interrupt_randomness(irq);
+	}
 	local_irq_disable();
 
 	return retval;
+}
+
+int redirect_hardirq(struct irq_desc *desc)
+{
+	/*
+	 * Direct execution:
+	 */
+	if (!hardirq_preemption || (desc->status & IRQ_NODELAY) ||
+	    !desc->thread)
+		return 0;
+
+	BUG_ON(!irqs_disabled());
+	if (desc->thread && desc->thread->state != TASK_RUNNING)
+		wake_up_process(desc->thread);
+
+	return 1;
 }
 
 #ifndef CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ

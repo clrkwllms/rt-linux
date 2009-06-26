@@ -4804,7 +4804,7 @@ void account_system_time(struct task_struct *p, int hardirq_offset,
 
 	/* Add system time to cpustat. */
 	tmp = cputime_to_cputime64(cputime);
-	if (hardirq_count() - hardirq_offset)
+	if (hardirq_count() - hardirq_offset || (p->flags & PF_HARDIRQ))
 		cpustat->irq = cputime64_add(cpustat->irq, tmp);
 	else if (softirq_count() || (p->flags & PF_SOFTIRQ))
 		cpustat->softirq = cputime64_add(cpustat->softirq, tmp);
@@ -6470,6 +6470,27 @@ int __sched cond_resched_softirq_context(void)
 	return 0;
 }
 EXPORT_SYMBOL(cond_resched_softirq_context);
+
+/*
+ * Preempt a hardirq context if necessary (possible with hardirq threading):
+ */
+int cond_resched_hardirq_context(void)
+{
+	WARN_ON_ONCE(!in_irq());
+	WARN_ON_ONCE(!irqs_disabled());
+
+	if (hardirq_need_resched()) {
+		irq_exit();
+		local_irq_enable();
+		__cond_resched();
+		local_irq_disable();
+		__irq_enter();
+
+		return 1;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(cond_resched_hardirq_context);
 
 /**
  * yield - yield the current processor to other threads.
