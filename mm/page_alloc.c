@@ -998,13 +998,14 @@ static void drain_pages(unsigned int cpu)
 		if (!populated_zone(zone))
 			continue;
 
+		__lock_cpu_pcp(&flags, cpu);
 		pset = zone_pcp(zone, cpu);
 		if (!pset) {
+			unlock_cpu_pcp(flags, cpu);
 			WARN_ON(1);
 			continue;
 		}
 		pcp = &pset->pcp;
-		lock_cpu_pcp(&flags, &cpu);
 		isolate_pcp_pages(pcp->count, &pcp->list, &free_list);
 		pcp->count = 0;
 		unlock_cpu_pcp(flags, cpu);
@@ -2951,12 +2952,27 @@ static inline void free_zone_pagesets(int cpu)
 	struct zone *zone;
 
 	for_each_zone(zone) {
-		struct per_cpu_pageset *pset = zone_pcp(zone, cpu);
+		unsigned long flags;
+		struct per_cpu_pageset *pset;
+
+		/*
+		 * On PREEMPT_RT the allocator is preemptible, therefore
+		 * kstopmachine can preempt a process in the middle of an
+		 * allocation, freeing the pset underneath such a process
+		 * isn't a good idea.
+		 *
+		 * Take the per-cpu pcp lock to allow the task to complete
+		 * before we free it. New tasks will be held off by the
+		 * cpu_online() check in get_cpu_var_locked().
+		 */
+		__lock_cpu_pcp(&flags, cpu);
+		pset = zone_pcp(zone, cpu);
+		zone_pcp(zone, cpu) = NULL;
+		unlock_cpu_pcp(flags, cpu);
 
 		/* Free per_cpu_pageset if it is slab allocated */
 		if (pset != &boot_pageset[cpu])
 			kfree(pset);
-		zone_pcp(zone, cpu) = NULL;
 	}
 }
 
