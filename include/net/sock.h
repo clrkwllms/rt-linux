@@ -218,9 +218,11 @@ struct sock {
 #define sk_hash			__sk_common.skc_hash
 #define sk_prot			__sk_common.skc_prot
 #define sk_net			__sk_common.skc_net
-	unsigned char		sk_shutdown : 2,
-				sk_no_check : 2,
-				sk_userlocks : 4;
+	kmemcheck_define_bitfield(flags, {
+		unsigned char		sk_shutdown : 2,
+					sk_no_check : 2,
+					sk_userlocks : 4;
+	});
 	unsigned char		sk_protocol;
 	unsigned short		sk_type;
 	int			sk_rcvbuf;

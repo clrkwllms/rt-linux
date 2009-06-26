@@ -27,7 +27,7 @@
 static void setup_ports(int card)
 {
 
-	outb((sc_adapter[card]->rambase >> 12), sc_adapter[card]->ioport[EXP_BASE]);
+	outb(((long)sc_adapter[card]->rambase >> 12), sc_adapter[card]->ioport[EXP_BASE]);
 
 	/* And the IRQ */
 	outb((sc_adapter[card]->interrupt | 0x80),

@@ -165,36 +165,6 @@ static const struct signature {
 
 #define NO_SIGNATURES ARRAY_SIZE(signatures)
 
-#ifndef MODULE
-/*
- * Function : dtc_setup(char *str, int *ints)
- *
- * Purpose : LILO command line initialization of the overrides array,
- *
- * Inputs : str - unused, ints - array of integer parameters with ints[0]
- *	equal to the number of ints.
- *
- */
-
-static void __init dtc_setup(char *str, int *ints)
-{
-	static int commandline_current = 0;
-	int i;
-	if (ints[0] != 2)
-		printk("dtc_setup: usage dtc=address,irq\n");
-	else if (commandline_current < NO_OVERRIDES) {
-		overrides[commandline_current].address = ints[1];
-		overrides[commandline_current].irq = ints[2];
-		for (i = 0; i < NO_BASES; ++i)
-			if (bases[i].address == ints[1]) {
-				bases[i].noauto = 1;
-				break;
-			}
-		++commandline_current;
-	}
-}
-#endif
-
 /* 
  * Function : int dtc_detect(struct scsi_host_template * tpnt)
  *

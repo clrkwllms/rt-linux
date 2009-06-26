@@ -235,7 +235,7 @@ static int phram_setup(const char *val, struct kernel_param *kp)
 {
 	char buf[64+12+12], *str = buf;
 	char *token[3];
-	char *name;
+	char *uninitialized_var(name);
 	uint32_t start;
 	uint32_t len;
 	int i, ret;
