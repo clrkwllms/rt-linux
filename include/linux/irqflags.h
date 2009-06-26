@@ -13,6 +13,9 @@
 
 #include <linux/typecheck.h>
 
+/* dummy wrapper for now: */
+#define BUILD_CHECK_IRQ_FLAGS(flags)
+
 #ifdef CONFIG_TRACE_IRQFLAGS
   extern void trace_softirqs_on(unsigned long ip);
   extern void trace_softirqs_off(unsigned long ip);
