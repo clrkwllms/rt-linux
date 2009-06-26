@@ -128,7 +128,7 @@ extern struct cred init_cred;
 	.perf_counter_ctx.event_list =					\
 		LIST_HEAD_INIT(tsk.perf_counter_ctx.event_list),	\
 	.perf_counter_ctx.lock =					\
-		__SPIN_LOCK_UNLOCKED(tsk.perf_counter_ctx.lock),
+		RAW_SPIN_LOCK_UNLOCKED(tsk.perf_counter_ctx.lock),
 #else
 # define INIT_PERF_COUNTERS(tsk)
 #endif
