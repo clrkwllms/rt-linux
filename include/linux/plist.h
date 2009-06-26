@@ -103,12 +103,12 @@ struct plist_node {
 /**
  * PLIST_HEAD_INIT - static struct plist_head initializer
  * @head:	struct plist_head variable name
- * @_lock:	lock to initialize for this list
+ * @_lock:	lock * to initialize for this list
  */
 #define PLIST_HEAD_INIT(head, _lock)			\
 {							\
         _PLIST_HEAD_INIT(head),                         \
-	PLIST_HEAD_LOCK_INIT(&(_lock))			\
+	PLIST_HEAD_LOCK_INIT(_lock)			\
 }
 
 /**
