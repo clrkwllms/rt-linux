@@ -465,6 +465,11 @@ unsigned int __do_IRQ(unsigned int irq)
 	struct irqaction *action;
 	unsigned int status;
 
+#ifdef CONFIG_PREEMPT_RT
+	printk(KERN_WARNING "__do_IRQ called for irq %d. "
+	       "PREEMPT_RT will crash your system soon\n", irq);
+	printk(KERN_WARNING "I hope you have a fire-extinguisher handy!\n");
+#endif
 	kstat_incr_irqs_this_cpu(irq, desc);
 
 	if (CHECK_IRQ_PER_CPU(desc->status)) {
