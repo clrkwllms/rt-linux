@@ -21,7 +21,7 @@
 /*
  * the semaphore definition
  */
-struct rw_semaphore {
+struct compat_rw_semaphore {
 	/* XXX this should be able to be an atomic_t  -- paulus */
 	signed int		count;
 #define RWSEM_UNLOCKED_VALUE		0x00000000
@@ -30,7 +30,7 @@ struct rw_semaphore {
 #define RWSEM_WAITING_BIAS		(-0x00010000)
 #define RWSEM_ACTIVE_READ_BIAS		RWSEM_ACTIVE_BIAS
 #define RWSEM_ACTIVE_WRITE_BIAS		(RWSEM_WAITING_BIAS + RWSEM_ACTIVE_BIAS)
-	spinlock_t		wait_lock;
+	raw_spinlock_t		wait_lock;
 	struct list_head	wait_list;
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	struct lockdep_map	dep_map;
@@ -48,17 +48,17 @@ struct rw_semaphore {
 	  LIST_HEAD_INIT((name).wait_list) __RWSEM_DEP_MAP_INIT(name) }
 
 #define DECLARE_RWSEM(name)		\
-	struct rw_semaphore name = __RWSEM_INITIALIZER(name)
+	struct compat_rw_semaphore name = __RWSEM_INITIALIZER(name)
 
-extern struct rw_semaphore *rwsem_down_read_failed(struct rw_semaphore *sem);
-extern struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *sem);
-extern struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem);
-extern struct rw_semaphore *rwsem_downgrade_wake(struct rw_semaphore *sem);
+extern struct compat_rw_semaphore *rwsem_down_read_failed(struct compat_rw_semaphore *sem);
+extern struct compat_rw_semaphore *rwsem_down_write_failed(struct compat_rw_semaphore *sem);
+extern struct compat_rw_semaphore *rwsem_wake(struct compat_rw_semaphore *sem);
+extern struct compat_rw_semaphore *rwsem_downgrade_wake(struct compat_rw_semaphore *sem);
 
-extern void __init_rwsem(struct rw_semaphore *sem, const char *name,
+extern void __init_rwsem(struct compat_rw_semaphore *sem, const char *name,
 			 struct lock_class_key *key);
 
-#define init_rwsem(sem)					\
+#define compat_init_rwsem(sem)					\
 	do {						\
 		static struct lock_class_key __key;	\
 							\
@@ -68,13 +68,13 @@ extern void __init_rwsem(struct rw_semaphore *sem, const char *name,
 /*
  * lock for reading
  */
-static inline void __down_read(struct rw_semaphore *sem)
+static inline void __down_read(struct compat_rw_semaphore *sem)
 {
 	if (unlikely(atomic_inc_return((atomic_t *)(&sem->count)) <= 0))
 		rwsem_down_read_failed(sem);
 }
 
-static inline int __down_read_trylock(struct rw_semaphore *sem)
+static inline int __down_read_trylock(struct compat_rw_semaphore *sem)
 {
 	int tmp;
 
@@ -90,7 +90,7 @@ static inline int __down_read_trylock(struct rw_semaphore *sem)
 /*
  * lock for writing
  */
-static inline void __down_write_nested(struct rw_semaphore *sem, int subclass)
+static inline void __down_write_nested(struct compat_rw_semaphore *sem, int subclass)
 {
 	int tmp;
 
@@ -100,12 +100,12 @@ static inline void __down_write_nested(struct rw_semaphore *sem, int subclass)
 		rwsem_down_write_failed(sem);
 }
 
-static inline void __down_write(struct rw_semaphore *sem)
+static inline void __down_write(struct compat_rw_semaphore *sem)
 {
 	__down_write_nested(sem, 0);
 }
 
-static inline int __down_write_trylock(struct rw_semaphore *sem)
+static inline int __down_write_trylock(struct compat_rw_semaphore *sem)
 {
 	int tmp;
 
@@ -117,7 +117,7 @@ static inline int __down_write_trylock(struct rw_semaphore *sem)
 /*
  * unlock after reading
  */
-static inline void __up_read(struct rw_semaphore *sem)
+static inline void __up_read(struct compat_rw_semaphore *sem)
 {
 	int tmp;
 
@@ -129,7 +129,7 @@ static inline void __up_read(struct rw_semaphore *sem)
 /*
  * unlock after writing
  */
-static inline void __up_write(struct rw_semaphore *sem)
+static inline void __up_write(struct compat_rw_semaphore *sem)
 {
 	if (unlikely(atomic_sub_return(RWSEM_ACTIVE_WRITE_BIAS,
 			      (atomic_t *)(&sem->count)) < 0))
@@ -139,7 +139,7 @@ static inline void __up_write(struct rw_semaphore *sem)
 /*
  * implement atomic add functionality
  */
-static inline void rwsem_atomic_add(int delta, struct rw_semaphore *sem)
+static inline void rwsem_atomic_add(int delta, struct compat_rw_semaphore *sem)
 {
 	atomic_add(delta, (atomic_t *)(&sem->count));
 }
@@ -147,7 +147,7 @@ static inline void rwsem_atomic_add(int delta, struct rw_semaphore *sem)
 /*
  * downgrade write lock to read lock
  */
-static inline void __downgrade_write(struct rw_semaphore *sem)
+static inline void __downgrade_write(struct compat_rw_semaphore *sem)
 {
 	int tmp;
 
@@ -159,12 +159,12 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 /*
  * implement exchange and add functionality
  */
-static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
+static inline int rwsem_atomic_update(int delta, struct compat_rw_semaphore *sem)
 {
 	return atomic_add_return(delta, (atomic_t *)(&sem->count));
 }
 
-static inline int rwsem_is_locked(struct rw_semaphore *sem)
+static inline int compat_rwsem_is_locked(struct compat_rw_semaphore *sem)
 {
 	return (sem->count != 0);
 }
