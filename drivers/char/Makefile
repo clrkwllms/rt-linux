@@ -113,6 +113,7 @@ obj-$(CONFIG_JS_RTC)		+= js-rtc.o
 js-rtc-y = rtc.o
 
 obj-$(CONFIG_ALLOC_RTSJ_MEM) += alloc_rtsj_mem.o
+obj-$(CONFIG_RMEM) += rmem.o
 
 # Files generated that shall be removed upon make clean
 clean-files := consolemap_deftbl.c defkeymap.c
