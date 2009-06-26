@@ -1630,6 +1630,10 @@ config HAVE_ARCH_EARLY_PFN_TO_NID
 	def_bool X86_64
 	depends on NUMA
 
+config HARDIRQS_SW_RESEND
+	bool
+	default y
+
 menu "Power management and ACPI options"
 
 config ARCH_HIBERNATION_HEADER
