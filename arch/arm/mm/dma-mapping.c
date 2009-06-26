@@ -40,7 +40,7 @@
  * These are the page tables (2MB each) covering uncached, DMA consistent allocations
  */
 static pte_t *consistent_pte[NUM_CONSISTENT_PTES];
-static DEFINE_SPINLOCK(consistent_lock);
+static DEFINE_RAW_SPINLOCK(consistent_lock);
 
 /*
  * VM region handling support.
