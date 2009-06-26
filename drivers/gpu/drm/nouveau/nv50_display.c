@@ -566,7 +566,8 @@ nv50_display_irq_handler(struct drm_device *dev)
 	int ret;
 
 	for (;;) {
-		uint32_t unk20 = nv_rd32(0x610020);
+		uint32_t unk20 = nv_rd32(0x610020); (void)unk20;
+
 		intr = nv_rd32(0x610024);
 		if (!intr)
 			break;
