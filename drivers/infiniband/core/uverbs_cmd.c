@@ -1116,12 +1116,12 @@ ssize_t ib_uverbs_create_qp(struct ib_uverbs_file *file,
 		goto err_copy;
 	}
 
-	put_pd_read(pd);
-	put_cq_read(scq);
-	if (rcq != scq)
-		put_cq_read(rcq);
 	if (srq)
 		put_srq_read(srq);
+	if (rcq != scq)
+		put_cq_read(rcq);
+	put_cq_read(scq);
+	put_pd_read(pd);
 
 	mutex_lock(&file->mutex);
 	list_add_tail(&obj->uevent.uobject.list, &file->ucontext->qp_list);
@@ -1140,14 +1140,14 @@ err_destroy:
 	ib_destroy_qp(qp);
 
 err_put:
-	if (pd)
-		put_pd_read(pd);
-	if (scq)
-		put_cq_read(scq);
-	if (rcq && rcq != scq)
-		put_cq_read(rcq);
 	if (srq)
 		put_srq_read(srq);
+	if (rcq && rcq != scq)
+		put_cq_read(rcq);
+	if (scq)
+		put_cq_read(scq);
+	if (pd)
+		put_pd_read(pd);
 
 	put_uobj_write(&obj->uevent.uobject);
 	return ret;
