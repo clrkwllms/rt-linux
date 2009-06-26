@@ -4132,9 +4132,7 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if (adapter->hw.mac.tx_pkt_filtering)
 		e1000_transfer_dhcp_info(adapter, skb);
 
-	if (!spin_trylock_irqsave(&adapter->tx_queue_lock, irq_flags))
-		/* Collision - tell upper layer to requeue */
-		return NETDEV_TX_LOCKED;
+	spin_lock_irqsave(&adapter->tx_queue_lock, irq_flags);
 
 	/*
 	 * need: count + 2 desc gap to keep tail from touching
