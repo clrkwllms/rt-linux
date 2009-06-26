@@ -3205,8 +3205,11 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 		NV_TRACE(dev, "0x%04X: parsing output script 1\n", script);
 		parse_init_table(dev, bios, script, &iexec);
 	} else
-	if (pxclk == -2 && table[4] >= 12) {
-		script = ROM16(otable[10]);
+	if (pxclk == -2) {
+		if (table[4] >= 12)
+			script = ROM16(otable[10]);
+		else
+			script = 0;
 		if (!script) {
 			NV_DEBUG(dev, "output script 2 not found\n");
 			return 1;
