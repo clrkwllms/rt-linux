@@ -31,7 +31,7 @@
 static char led_state;
 static char hw_led_state;
 
-static DEFINE_SPINLOCK(leds_lock);
+static DEFINE_RAW_SPINLOCK(leds_lock);
 
 static void netwinder_leds_event(led_event_t evt)
 {
