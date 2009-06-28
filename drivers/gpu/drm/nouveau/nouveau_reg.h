@@ -738,40 +738,40 @@
 #    define NV50_PDISPLAY_RAM_AMOUNT                        0x00610384
 #    define NV50_PDISPLAY_UNK_388                           0x00610388
 #    define NV50_PDISPLAY_UNK_38C                           0x0061038c
-#    define NV50_PDISPLAY_CRTC_VAL                          0x00610a00
-#    define NV50_PDISPLAY_CRTC_VAL__LEN                            0x2
-#            define NV50_PDISPLAY_CRTC_VAL_UNK_900(i,j) (0x00610a18+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_CLUT_MODE(i,j) (0x00610a24+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_INTERLACE(i,j) (0x00610a48+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_SCALE_CTRL(i,j) (0x00610a50+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_CURSOR_CTRL(i,j) (0x00610a58+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_UNK_904(i,j) (0x00610ab8+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_DEPTH(i,j) (0x00610ac8+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_CLOCK(i,j) (0x00610ad0+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_COLOR_CTRL(i,j) (0x00610ae0+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_SYNC_START_TO_BLANK_END(i,j) (0x00610ae8+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_MODE_UNK1(i,j) (0x00610af0+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_DISPLAY_TOTAL(i,j) (0x00610af8+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_SYNC_DURATION(i,j) (0x00610b00+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_MODE_UNK2(i,j) (0x00610b08+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_UNK_828(i,j) (0x00610b10+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_FB_SIZE(i,j) (0x00610b18+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_FB_PITCH(i,j) (0x00610b20+(i)*0x540+(j)*0x4)
-#                define NV50_PDISPLAY_CRTC_VAL_FB_PITCH_LINEAR_FB (1<<20)
-#            define NV50_PDISPLAY_CRTC_VAL_FB_POS(i,j) (0x00610b28+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_SCALE_CENTER_OFFSET(i,j) (0x00610b38+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_REAL_RES(i,j) (0x00610b40+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_SCALE_RES1(i,j) (0x00610b48+(i)*0x540+(j)*0x4)
-#            define NV50_PDISPLAY_CRTC_VAL_SCALE_RES2(i,j) (0x00610b50+(i)*0x540+(j)*0x4)
+#define NV50_PDISPLAY_CRTC_P(i,r)         ((i) * 0x540 + NV50_PDISPLAY_CRTC_##r)
+#define NV50_PDISPLAY_CRTC_C(i,r)     (4 + (i) * 0x540 + NV50_PDISPLAY_CRTC_##r)
+#define NV50_PDISPLAY_CRTC_UNK_900                                   0x00610a18
+#define NV50_PDISPLAY_CRTC_CLUT_MODE                                 0x00610a24
+#define NV50_PDISPLAY_CRTC_INTERLACE                                 0x00610a48
+#define NV50_PDISPLAY_CRTC_SCALE_CTRL                                0x00610a50
+#define NV50_PDISPLAY_CRTC_CURSOR_CTRL                               0x00610a58
+#define NV50_PDISPLAY_CRTC_UNK_904                                   0x00610ab8
+#define NV50_PDISPLAY_CRTC_DEPTH                                     0x00610ac8
+#define NV50_PDISPLAY_CRTC_CLOCK                                     0x00610ad0
+#define NV50_PDISPLAY_CRTC_COLOR_CTRL                                0x00610ae0
+#define NV50_PDISPLAY_CRTC_SYNC_START_TO_BLANK_END                   0x00610ae8
+#define NV50_PDISPLAY_CRTC_MODE_UNK1                                 0x00610af0
+#define NV50_PDISPLAY_CRTC_DISPLAY_TOTAL                             0x00610af8
+#define NV50_PDISPLAY_CRTC_SYNC_DURATION                             0x00610b00
+#define NV50_PDISPLAY_CRTC_MODE_UNK2                                 0x00610b08
+#define NV50_PDISPLAY_CRTC_UNK_828                                   0x00610b10
+#define NV50_PDISPLAY_CRTC_FB_SIZE                                   0x00610b18
+#define NV50_PDISPLAY_CRTC_FB_PITCH                                  0x00610b20
+#define NV50_PDISPLAY_CRTC_FB_PITCH_LINEAR                           0x00100000
+#define NV50_PDISPLAY_CRTC_FB_POS                                    0x00610b28
+#define NV50_PDISPLAY_CRTC_SCALE_CENTER_OFFSET                       0x00610b38
+#define NV50_PDISPLAY_CRTC_REAL_RES                                  0x00610b40
+#define NV50_PDISPLAY_CRTC_SCALE_RES1                                0x00610b48
+#define NV50_PDISPLAY_CRTC_SCALE_RES2                                0x00610b50
 
 
-#            define NV50_PDISPLAY_DAC_VAL_MODE_CTRL(i,j) (0x00610b58+(i)*0x8+(j)*0x4)
+#define NV50_PDISPLAY_DAC_VAL_MODE_CTRL(i,j) (0x00610b58+(i)*0x8+(j)*0x4)
 
 
-#            define NV50_PDISPLAY_SOR_VAL_MODE_CTRL(i,j) (0x00610b70+(i)*0x8+(j)*0x4)
+#define NV50_PDISPLAY_SOR_VAL_MODE_CTRL(i,j) (0x00610b70+(i)*0x8+(j)*0x4)
 
 
-#            define NV50_PDISPLAY_DAC_VAL_MODE_CTRL2(i,j) (0x00610bdc+(i)*0x8+(j)*0x4)
+#define NV50_PDISPLAY_DAC_VAL_MODE_CTRL2(i,j) (0x00610bdc+(i)*0x8+(j)*0x4)
 
 
 #    define NV50_PDISPLAY_CRTC_CLK                          0x00614000
