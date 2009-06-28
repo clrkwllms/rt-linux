@@ -740,12 +740,13 @@
 #    define NV50_PDISPLAY_UNK_38C                           0x0061038c
 #define NV50_PDISPLAY_CRTC_P(i,r)         ((i) * 0x540 + NV50_PDISPLAY_CRTC_##r)
 #define NV50_PDISPLAY_CRTC_C(i,r)     (4 + (i) * 0x540 + NV50_PDISPLAY_CRTC_##r)
-#define NV50_PDISPLAY_CRTC_UNK_900                                   0x00610a18
+#define NV50_PDISPLAY_CRTC_UNK_0A18 /* mthd 0x0900 */                0x00610a18
 #define NV50_PDISPLAY_CRTC_CLUT_MODE                                 0x00610a24
 #define NV50_PDISPLAY_CRTC_INTERLACE                                 0x00610a48
 #define NV50_PDISPLAY_CRTC_SCALE_CTRL                                0x00610a50
 #define NV50_PDISPLAY_CRTC_CURSOR_CTRL                               0x00610a58
-#define NV50_PDISPLAY_CRTC_UNK_904                                   0x00610ab8
+#define NV50_PDISPLAY_CRTC_UNK0A78 /* mthd 0x0904 */                 0x00610a78
+#define NV50_PDISPLAY_CRTC_UNK0AB8                                   0x00610ab8
 #define NV50_PDISPLAY_CRTC_DEPTH                                     0x00610ac8
 #define NV50_PDISPLAY_CRTC_CLOCK                                     0x00610ad0
 #define NV50_PDISPLAY_CRTC_COLOR_CTRL                                0x00610ae0
@@ -754,7 +755,7 @@
 #define NV50_PDISPLAY_CRTC_DISPLAY_TOTAL                             0x00610af8
 #define NV50_PDISPLAY_CRTC_SYNC_DURATION                             0x00610b00
 #define NV50_PDISPLAY_CRTC_MODE_UNK2                                 0x00610b08
-#define NV50_PDISPLAY_CRTC_UNK_828                                   0x00610b10
+#define NV50_PDISPLAY_CRTC_UNK_0B10 /* mthd 0x0828 */                0x00610b10
 #define NV50_PDISPLAY_CRTC_FB_SIZE                                   0x00610b18
 #define NV50_PDISPLAY_CRTC_FB_PITCH                                  0x00610b20
 #define NV50_PDISPLAY_CRTC_FB_PITCH_LINEAR                           0x00100000
