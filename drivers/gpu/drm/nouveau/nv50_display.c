@@ -521,11 +521,13 @@ nv50_crtc_encoder_from_610030(struct drm_device *dev,
                               struct nouveau_encoder **pencoder)
 {
 	struct drm_encoder *drm_encoder;
-	struct nouveau_encoder *encoder;
+	struct nouveau_encoder *encoder = NULL;
 	struct drm_crtc *drm_crtc;
-	struct nouveau_crtc *crtc;
+	struct nouveau_crtc *crtc = NULL;
 	uint32_t unk30 = nv_rd32(0x610030);
 	int mask = (unk30 >> 9) & 3;
+
+	NV_DEBUG(dev, "0x610030 0x%08x\n", unk30);
 
 	*pcrtc = NULL;
 	*pencoder = NULL;
@@ -553,88 +555,132 @@ nv50_crtc_encoder_from_610030(struct drm_device *dev,
 	return 0;
 }
 
+static void
+nv50_display_vblank_handler(struct drm_device *dev, uint32_t intr)
+{
+	nv_wr32(NV50_PDISPLAY_INTR, intr & NV50_PDISPLAY_INTR_VBLANK_CRTCn);
+}
+
+static void
+nv50_display_unk10_handler(struct drm_device *dev)
+{
+	struct nouveau_encoder *encoder;
+	struct nouveau_crtc *crtc;
+	int ret;
+
+	ret = nv50_crtc_encoder_from_610030(dev, &crtc, &encoder);
+	if (ret) {
+		NV_ERROR(dev, "can't determine outputs: 0x%08x\n",
+			 nv_rd32(0x610030));
+		goto ack;
+	}
+
+	nv_wr32(0x619494, nv_rd32(0x619494) & ~8);
+
+	nouveau_bios_run_display_table(dev, encoder->dcb, -1);
+
+ack:
+	nv_wr32(NV50_PDISPLAY_INTR, NV50_PDISPLAY_INTR_CLK_UNK10);
+	nv_wr32(0x610030, 0x80000000);
+}
+
+static void
+nv50_display_unk20_handler(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
+	struct nouveau_encoder *encoder;
+	struct nouveau_crtc *crtc;
+	uint32_t tmp;
+	int ret;
+
+	ret = nv50_crtc_encoder_from_610030(dev, &crtc, &encoder);
+	if (ret) {
+		NV_ERROR(dev, "can't determine outputs: 0x%08x\n",
+			 nv_rd32(0x610030));
+		goto ack;
+	}
+
+	nouveau_bios_run_display_table(dev, encoder->dcb, -2);
+
+	crtc->set_clock(crtc, crtc->mode);
+
+	nouveau_bios_run_display_table(dev, encoder->dcb, crtc->mode->clock);
+
+	tmp = nv_rd32(0x614200 + (crtc->index * 0x800));
+	tmp &= ~0x000000f;
+	nv_wr32(0x614200 + (crtc->index * 0x800), tmp);
+
+	if (encoder->dcb->type != OUTPUT_ANALOG) {
+		int tclk;
+
+		if (encoder->dcb->type == OUTPUT_LVDS)
+			tclk = bios->fp.duallink_transition_clk;
+		else
+			tclk = 165000;
+
+		tmp = nv_rd32(0x614300 + (encoder->or * 0x800));
+		tmp &= ~0x00000f0f;
+		if (crtc->mode->clock > tclk)
+			tmp |= 0x00000101;
+		nv_wr32(0x614300 + (encoder->or * 0x800), tmp);
+	} else {
+		nv_wr32(0x614280 + (encoder->or * 0x800), 0);
+	}
+
+ack:
+	nv_wr32(NV50_PDISPLAY_INTR, NV50_PDISPLAY_INTR_CLK_UNK20);
+	nv_wr32(0x610030, 0x80000000);
+}
+
+static void
+nv50_display_unk40_handler(struct drm_device *dev)
+{
+	struct nouveau_encoder *encoder;
+	struct nouveau_crtc *crtc;
+	int ret;
+
+	ret = nv50_crtc_encoder_from_610030(dev, &crtc, &encoder);
+	if (ret) {
+		NV_ERROR(dev, "can't determine outputs: 0x%08x\n",
+			 nv_rd32(0x610030));
+		goto ack;
+	}
+
+	nouveau_bios_run_display_table(dev, encoder->dcb, -crtc->mode->clock);
+
+ack:
+	nv_wr32(NV50_PDISPLAY_INTR, NV50_PDISPLAY_INTR_CLK_UNK40);
+	nv_wr32(0x610030, 0x80000000);
+	nv_wr32(0x619494, nv_rd32(0x619494) | 8);
+}
+
 void
 nv50_display_irq_handler(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	static struct nouveau_encoder *encoder = NULL;
-	static struct nouveau_crtc *crtc = NULL;
-	struct nvbios *bios = &dev_priv->VBIOS;
-	uint32_t intr, tmp;
-	int ret;
+	while (nv_rd32(NV50_PMC_INTR_0) & NV50_PMC_INTR_0_DISPLAY) {
+		uint32_t unk20 = nv_rd32(0x610020);
+		uint32_t intr = nv_rd32(NV50_PDISPLAY_INTR);
+		(void)unk20;
 
-	for (;;) {
-		uint32_t unk20 = nv_rd32(0x610020); (void)unk20;
-
-		intr = nv_rd32(NV50_PDISPLAY_INTR);
 		if (!intr)
 			break;
+		NV_DEBUG(dev, "PDISPLAY_INTR 0x%08x\n", intr);
 
-		ret = nv50_crtc_encoder_from_610030(dev, &crtc, &encoder);
-		if (ret) {
-			NV_ERROR(dev, "can't determine outputs: 0x%08x\n",
-				 nv_rd32(0x610030));
-			break;
-		}
-
-		if (intr & ~(NV50_PDISPLAY_INTR_VBLANK_CRTCn |
-			     NV50_PDISPLAY_INTR_CLK_UNK10 |
-			     NV50_PDISPLAY_INTR_CLK_UNK20 |
-			     NV50_PDISPLAY_INTR_CLK_UNK40)) {
+		if (intr & NV50_PDISPLAY_INTR_CLK_UNK10)
+			nv50_display_unk10_handler(dev);
+		else
+		if (intr & NV50_PDISPLAY_INTR_CLK_UNK20)
+			nv50_display_unk20_handler(dev);
+		else
+		if (intr & NV50_PDISPLAY_INTR_CLK_UNK40)
+			nv50_display_unk40_handler(dev);
+		else
+		if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTCn)
+			nv50_display_vblank_handler(dev, intr);
+		else {
 			NV_ERROR(dev, "unknown PDISPLAY_INTR: 0x%08x\n", intr);
-			break;
-		}
-
-		if (intr & NV50_PDISPLAY_INTR_CLK_UNK10) {
-			nv_wr32(0x619494, nv_rd32(0x619494) & ~8);
-			nouveau_bios_run_display_table(dev, encoder->dcb, -1);
-			nv_wr32(NV50_PDISPLAY_INTR,
-				NV50_PDISPLAY_INTR_CLK_UNK10);
-			nv_wr32(0x610030, 0x80000000);
-		} else
-		if (intr & NV50_PDISPLAY_INTR_CLK_UNK20) {
-			nouveau_bios_run_display_table(dev, encoder->dcb, -2);
-			crtc->set_clock(crtc, crtc->mode);
-			nouveau_bios_run_display_table(dev, encoder->dcb,
-						       crtc->mode->clock);
-
-			tmp = nv_rd32(0x614200 + (crtc->index * 0x800));
-			tmp &= ~0x000000f;
-			nv_wr32(0x614200 + (crtc->index * 0x800), tmp);
-
-			if (encoder->dcb->type != OUTPUT_ANALOG) {
-				int tclk;
-
-				if (encoder->dcb->type == OUTPUT_LVDS)
-					tclk = bios->fp.duallink_transition_clk;
-				else
-					tclk = 165000;
-
-				tmp = nv_rd32(0x614300 + (encoder->or * 0x800));
-				tmp &= ~0x00000f0f;
-				if (crtc->mode->clock > tclk)
-					tmp |= 0x00000101;
-				nv_wr32(0x614300 + (encoder->or * 0x800), tmp);
-			} else {
-				nv_wr32(0x614280 + (encoder->or * 0x800), 0);
-			}
-
-			nv_wr32(NV50_PDISPLAY_INTR,
-				NV50_PDISPLAY_INTR_CLK_UNK20);
-			nv_wr32(0x610030, 0x80000000);
-		} else
-		if (intr & NV50_PDISPLAY_INTR_CLK_UNK40) {
-			nouveau_bios_run_display_table(dev, encoder->dcb,
-						       -crtc->mode->clock);
-			nv_wr32(NV50_PDISPLAY_INTR,
-				NV50_PDISPLAY_INTR_CLK_UNK40);
-			nv_wr32(0x610030, 0x80000000);
-			nv_wr32(0x619494, nv_rd32(0x619494) | 8);
-			continue;
-		} else
-		if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTCn) {
-			nv_wr32(NV50_PDISPLAY_INTR,
-				intr & NV50_PDISPLAY_INTR_VBLANK_CRTCn);
+			nv_wr32(NV50_PDISPLAY_INTR, intr);
 		}
 	}
 }
