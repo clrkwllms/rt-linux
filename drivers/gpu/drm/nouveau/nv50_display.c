@@ -149,8 +149,8 @@ nv50_display_init(struct drm_device *dev)
 	/* The precise purpose is unknown, i suspect it has something to do
 	 * with text mode.
 	 */
-	if (nv_rd32(NV50_PDISPLAY_SUPERVISOR) & 0x100) {
-		nv_wr32(NV50_PDISPLAY_SUPERVISOR, 0x100);
+	if (nv_rd32(NV50_PDISPLAY_INTR) & 0x100) {
+		nv_wr32(NV50_PDISPLAY_INTR, 0x100);
 		nv_wr32(0x006194e8, nv_rd32(0x006194e8) & ~1);
 		if (!nv_wait(0x006194e8, 2, 0)) {
 			NV_ERROR(dev, "timeout: (0x6194e8 & 2) != 0\n");
@@ -244,7 +244,9 @@ nv50_display_init(struct drm_device *dev)
 	FIRE_RING (&evo->chan);
 
 	/* enable clock change interrupts. */
-	nv_wr32(NV50_PDISPLAY_SUPERVISOR_INTR, 0x70);
+	nv_wr32(NV50_PDISPLAY_INTR_EN, (NV50_PDISPLAY_INTR_EN_CLK_UNK10 |
+					NV50_PDISPLAY_INTR_EN_CLK_UNK20 |
+					NV50_PDISPLAY_INTR_EN_CLK_UNK40));
 
 	/* enable hotplug interrupts */
 	nv_wr32(NV50_PCONNECTOR_HOTPLUG_CTRL, 0x7FFF7FFF);
@@ -273,25 +275,22 @@ static int nv50_display_disable(struct drm_device *dev)
 	OUT_RING  (&dev_priv->evo.chan, 0);
 	FIRE_RING (&dev_priv->evo.chan);
 
-	/* Almost like ack'ing a vblank interrupt, maybe in the spirit of cleaning up? */
+	/* Almost like ack'ing a vblank interrupt, maybe in the spirit of
+	 * cleaning up?
+	 */
 	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
 		struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
+		uint32_t mask = NV50_PDISPLAY_INTR_VBLANK_CRTC(crtc->index);
 
-		if (crtc->base.enabled) {
-			uint32_t mask;
+		if (!crtc->base.enabled)
+			continue;
 
-			if (crtc->index == 1)
-				mask = NV50_PDISPLAY_SUPERVISOR_CRTC1;
-			else
-				mask = NV50_PDISPLAY_SUPERVISOR_CRTC0;
-
-			nv_wr32(NV50_PDISPLAY_SUPERVISOR, mask);
-			if (!nv_wait(NV50_PDISPLAY_SUPERVISOR, mask, mask)) {
-				NV_ERROR(dev, "timeout: (0x610024 & 0x%08x) == "
-					  "0x%08x\n", mask, mask);
-				NV_ERROR(dev, "0x610024 = 0x%08x\n",
-					  nv_rd32(0x610024));
-			}
+		nv_wr32(NV50_PDISPLAY_INTR, mask);
+		if (!nv_wait(NV50_PDISPLAY_INTR, mask, mask)) {
+			NV_ERROR(dev, "timeout: (0x610024 & 0x%08x) == "
+				      "0x%08x\n", mask, mask);
+			NV_ERROR(dev, "0x610024 = 0x%08x\n",
+				 nv_rd32(NV50_PDISPLAY_INTR));
 		}
 	}
 
@@ -312,9 +311,8 @@ static int nv50_display_disable(struct drm_device *dev)
 		}
 	}
 
-	/* disable clock change interrupts. */
-	nv_wr32(NV50_PDISPLAY_SUPERVISOR_INTR,
-		nv_rd32(NV50_PDISPLAY_SUPERVISOR_INTR) & ~0x70);
+	/* disable interrupts. */
+	nv_wr32(NV50_PDISPLAY_INTR_EN, 0x00000000);
 
 	/* disable hotplug interrupts */
 	nv_wr32(NV50_PCONNECTOR_HOTPLUG_INTR, 0);
@@ -498,22 +496,20 @@ static void nv50_display_vclk_update(struct drm_device *dev)
 void
 nv50_display_irq_handler_old(struct drm_device *dev)
 {
-	uint32_t super = nv_rd32(NV50_PDISPLAY_SUPERVISOR);
+	uint32_t super = nv_rd32(NV50_PDISPLAY_INTR);
 	uint32_t state;
 
 	NV_DEBUG(dev, "0x610024 = 0x%08x\n", super);
 
 	if (super & 0x0000000c)
-		nv_wr32(NV50_PDISPLAY_SUPERVISOR, super & 0x0000000c);
+		nv_wr32(NV50_PDISPLAY_INTR, super & 0x0000000c);
 
-	state   = (super & NV50_PDISPLAY_SUPERVISOR_CLK_MASK);
-	state >>= NV50_PDISPLAY_SUPERVISOR_CLK_MASK__SHIFT;
+	state = (super >> 4) & 7;
 	if (state) {
 		if (state == 2)
 			nv50_display_vclk_update(dev);
 
-		nv_wr32(NV50_PDISPLAY_SUPERVISOR,
-			(super & NV50_PDISPLAY_SUPERVISOR_CLK_MASK));
+		nv_wr32(NV50_PDISPLAY_INTR, super & 0x00000070);
 		nv_wr32(NV50_PDISPLAY_UNK30_CTRL,
 			NV50_PDISPLAY_UNK30_CTRL_PENDING);
 	}
@@ -570,7 +566,7 @@ nv50_display_irq_handler(struct drm_device *dev)
 	for (;;) {
 		uint32_t unk20 = nv_rd32(0x610020); (void)unk20;
 
-		intr = nv_rd32(0x610024);
+		intr = nv_rd32(NV50_PDISPLAY_INTR);
 		if (!intr)
 			break;
 
@@ -581,18 +577,22 @@ nv50_display_irq_handler(struct drm_device *dev)
 			break;
 		}
 
-		if (intr & ~0x0000007c) {
+		if (intr & ~(NV50_PDISPLAY_INTR_VBLANK_CRTCn |
+			     NV50_PDISPLAY_INTR_CLK_UNK10 |
+			     NV50_PDISPLAY_INTR_CLK_UNK20 |
+			     NV50_PDISPLAY_INTR_CLK_UNK40)) {
 			NV_ERROR(dev, "unknown PDISPLAY_INTR: 0x%08x\n", intr);
 			break;
 		}
 
-		if (intr & 0x00000010) {
+		if (intr & NV50_PDISPLAY_INTR_CLK_UNK10) {
 			nv_wr32(0x619494, nv_rd32(0x619494) & ~8);
 			nouveau_bios_run_display_table(dev, encoder->dcb, -1);
-			nv_wr32(0x610024, 0x00000010);
+			nv_wr32(NV50_PDISPLAY_INTR,
+				NV50_PDISPLAY_INTR_CLK_UNK10);
 			nv_wr32(0x610030, 0x80000000);
 		} else
-		if (intr & 0x00000020) {
+		if (intr & NV50_PDISPLAY_INTR_CLK_UNK20) {
 			nouveau_bios_run_display_table(dev, encoder->dcb, -2);
 			crtc->set_clock(crtc, crtc->mode);
 			nouveau_bios_run_display_table(dev, encoder->dcb,
@@ -619,19 +619,22 @@ nv50_display_irq_handler(struct drm_device *dev)
 				nv_wr32(0x614280 + (encoder->or * 0x800), 0);
 			}
 
-			nv_wr32(0x610024, 0x00000020);
+			nv_wr32(NV50_PDISPLAY_INTR,
+				NV50_PDISPLAY_INTR_CLK_UNK20);
 			nv_wr32(0x610030, 0x80000000);
 		} else
-		if (intr & 0x00000040) {
+		if (intr & NV50_PDISPLAY_INTR_CLK_UNK40) {
 			nouveau_bios_run_display_table(dev, encoder->dcb,
 						       -crtc->mode->clock);
-			nv_wr32(0x610024, 0x00000040);
+			nv_wr32(NV50_PDISPLAY_INTR,
+				NV50_PDISPLAY_INTR_CLK_UNK40);
 			nv_wr32(0x610030, 0x80000000);
 			nv_wr32(0x619494, nv_rd32(0x619494) | 8);
 			continue;
 		} else
-		if (intr & 0x0000000c) {
-			nv_wr32(0x610024, intr & 0x0000000c);
+		if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTCn) {
+			nv_wr32(NV50_PDISPLAY_INTR,
+				intr & NV50_PDISPLAY_INTR_VBLANK_CRTCn);
 		}
 	}
 }

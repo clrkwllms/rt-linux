@@ -75,7 +75,8 @@ nv50_irq_work_handler(struct work_struct *work)
 
 	if (status)
 		NV_ERROR(dev, "display irqs still pending: 0x%08x\n", status);
-	nv_wr32(0x140, 1);
+
+	nv_wr32(NV03_PMC_INTR_EN_0, NV_PMC_INTR_EN_0_MASTER_ENABLE);
 }
 
 void
@@ -602,7 +603,7 @@ nouveau_irq_handler(DRM_IRQ_ARGS)
 
 	if (status & (NV_PMC_INTR_0_NV50_DISPLAY_PENDING |
 		      NV_PMC_INTR_0_NV50_I2C_PENDING)) {
-		nv_wr32(0x140, 0);
+		nv_wr32(NV03_PMC_INTR_EN_0, 0);
 		schedule_work(&dev_priv->irq_work);
 		status &= ~(NV_PMC_INTR_0_NV50_DISPLAY_PENDING |
 			    NV_PMC_INTR_0_NV50_I2C_PENDING);

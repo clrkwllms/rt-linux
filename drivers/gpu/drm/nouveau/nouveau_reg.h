@@ -684,20 +684,21 @@
 #define NV50_PDISPLAY__LEN                                         0x1
 #define NV50_PDISPLAY__ESIZE                                   0x10000
 #    define NV50_PDISPLAY_OBJECTS                           0x00610010
-#    define NV50_PDISPLAY_SUPERVISOR                        0x00610024
-#        define NV50_PDISPLAY_SUPERVISOR_CRTCn              0x0000000c
-#        define NV50_PDISPLAY_SUPERVISOR_CRTCn__SHIFT                2
-#        define NV50_PDISPLAY_SUPERVISOR_CRTC0                  (1<<2)
-#        define NV50_PDISPLAY_SUPERVISOR_CRTC1                  (1<<3)
-#        define NV50_PDISPLAY_SUPERVISOR_CLK_MASK           0x00000070
-#        define NV50_PDISPLAY_SUPERVISOR_CLK_MASK__SHIFT             4
-#        define NV50_PDISPLAY_SUPERVISOR_CLK_UPDATE             (1<<5)
-#    define NV50_PDISPLAY_SUPERVISOR_INTR                   0x0061002c
-#        define NV50_PDISPLAY_SUPERVISOR_INTR_VBLANK_CRTC0      (1<<2)
-#        define NV50_PDISPLAY_SUPERVISOR_INTR_VBLANK_CRTC1      (1<<3)
-#        define NV50_PDISPLAY_SUPERVISOR_INTR_UNK1              (1<<4)
-#        define NV50_PDISPLAY_SUPERVISOR_INTR_CLK_UPDATE        (1<<5)
-#        define NV50_PDISPLAY_SUPERVISOR_INTR_UNK4              (1<<6)
+#    define NV50_PDISPLAY_INTR                              0x00610024
+#        define NV50_PDISPLAY_INTR_VBLANK_CRTCn             0x0000000c
+#        define NV50_PDISPLAY_INTR_VBLANK_CRTCn__SHIFT               2
+#        define NV50_PDISPLAY_INTR_VBLANK_CRTC(n)     (1 << ((n) + 2))
+#        define NV50_PDISPLAY_INTR_VBLANK_CRTC0                 (1<<2)
+#        define NV50_PDISPLAY_INTR_VBLANK_CRTC1                 (1<<3)
+#        define NV50_PDISPLAY_INTR_CLK_UNK10                    (1<<4)
+#        define NV50_PDISPLAY_INTR_CLK_UNK20                    (1<<5)
+#        define NV50_PDISPLAY_INTR_CLK_UNK40                    (1<<6)
+#    define NV50_PDISPLAY_INTR_EN                           0x0061002c
+#        define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC0              (1<<2)
+#        define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC1              (1<<3)
+#        define NV50_PDISPLAY_INTR_EN_CLK_UNK10                 (1<<4)
+#        define NV50_PDISPLAY_INTR_EN_CLK_UNK20                 (1<<5)
+#        define NV50_PDISPLAY_INTR_EN_CLK_UNK40                 (1<<6)
 #    define NV50_PDISPLAY_UNK30_CTRL                        0x00610030
 #        define NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK0           (1<<9)
 #        define NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK1          (1<<10)
