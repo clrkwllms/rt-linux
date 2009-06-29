@@ -472,7 +472,7 @@ static void nv50_display_vclk_update(struct drm_device *dev)
 		}
 
 		if (clock_change)
-			nv50_crtc_set_clock(crtc, crtc->mode);
+			nv50_crtc_set_clock(dev, crtc->index, crtc->mode->clock);
 
 		NV_DEBUG(dev, "index %d clock_change %d clock_ack %d\n", crtc_index, clock_change, clock_ack);
 
@@ -603,7 +603,7 @@ nv50_display_unk20_handler(struct drm_device *dev)
 
 	nouveau_bios_run_display_table(dev, encoder->dcb, -2);
 
-	nv50_crtc_set_clock(crtc, crtc->mode);
+	nv50_crtc_set_clock(dev, crtc->index, crtc->mode->clock);
 
 	nouveau_bios_run_display_table(dev, encoder->dcb, crtc->mode->clock);
 

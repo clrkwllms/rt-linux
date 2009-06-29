@@ -40,6 +40,6 @@ void nv50_display_irq_handler_old(struct drm_device *dev);
 int nv50_display_create(struct drm_device *dev);
 int nv50_display_destroy(struct drm_device *dev);
 int nv50_crtc_blank(struct nouveau_crtc *, bool blank);
-int nv50_crtc_set_clock(struct nouveau_crtc *, struct drm_display_mode *);
+int nv50_crtc_set_clock(struct drm_device *, int head, int pclk);
 
 #endif /* __NV50_DISPLAY_H__ */

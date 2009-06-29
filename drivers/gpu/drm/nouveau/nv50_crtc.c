@@ -300,10 +300,9 @@ nv50_crtc_set_scale(struct nouveau_crtc *crtc, int scaling_mode, bool update)
 }
 
 int
-nv50_crtc_set_clock(struct nouveau_crtc *crtc, struct drm_display_mode *mode)
+nv50_crtc_set_clock(struct drm_device *dev, int head, int pclk)
 {
-	uint32_t pll_reg = NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1(crtc->index);
-	struct drm_device *dev = crtc->base.dev;
+	uint32_t pll_reg = NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1(head);
 	struct nouveau_pll_vals pll;
 	struct pll_lims limits;
 	uint32_t reg1, reg2;
@@ -330,7 +329,7 @@ nv50_crtc_set_clock(struct nouveau_crtc *crtc, struct drm_display_mode *mode)
 		limits.max_usable_log2p = 6;
 	}
 
-	ret = nouveau_calc_pll_mnp(dev, &limits, mode->clock, &pll);
+	ret = nouveau_calc_pll_mnp(dev, &limits, pclk, &pll);
 	if (ret <= 0)
 		return ret;
 
