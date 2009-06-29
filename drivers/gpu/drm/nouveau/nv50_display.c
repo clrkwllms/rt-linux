@@ -543,8 +543,19 @@ nv50_display_irq_head(struct drm_device *dev, int *phead,
 	for (i = 0; i < 3; i++) {
 		if (nv_rd32(NV50_PDISPLAY_DAC_MODE_CTRL_P(i)) & (1 << head))
 			dac |= (1 << i);
-		if (nv_rd32(NV50_PDISPLAY_SOR_MODE_CTRL_P(i)) & (1 << head))
-			sor |= (1 << i);
+	}
+
+	if (dev_priv->chipset < 0x90 || dev_priv->chipset == 0x92 ||
+	    dev_priv->chipset == 0xa0) {
+		for (i = 0; i < 4; i++) {
+			if (nv_rd32(NV50_PDISPLAY_SOR_MODE_CTRL_P(i)) & (1 << head))
+				sor |= (1 << i);
+		}
+	} else {
+		for (i = 0; i < 4; i++) {
+			if (nv_rd32(NV90_PDISPLAY_SOR_MODE_CTRL_P(i)) & (1 << head))
+				sor |= (1 << i);
+		}
 	}
 
 	NV_DEBUG(dev, "dac: 0x%08x, sor: 0x%08x\n", dac, sor);
