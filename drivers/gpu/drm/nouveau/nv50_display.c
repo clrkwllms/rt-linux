@@ -472,14 +472,14 @@ static void nv50_display_vclk_update(struct drm_device *dev)
 		}
 
 		if (clock_change)
-			crtc->set_clock(crtc, crtc->mode);
+			nv50_crtc_set_clock(crtc, crtc->mode);
 
 		NV_DEBUG(dev, "index %d clock_change %d clock_ack %d\n", crtc_index, clock_change, clock_ack);
 
 		if (!clock_ack)
 			continue;
 
-		crtc->set_clock_mode(crtc);
+		nv_wr32(NV50_PDISPLAY_CRTC_CLK_CLK_CTRL2(crtc->index), 0);
 
 		list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
 			encoder = to_nouveau_encoder(drm_encoder);
@@ -603,7 +603,7 @@ nv50_display_unk20_handler(struct drm_device *dev)
 
 	nouveau_bios_run_display_table(dev, encoder->dcb, -2);
 
-	crtc->set_clock(crtc, crtc->mode);
+	nv50_crtc_set_clock(crtc, crtc->mode);
 
 	nouveau_bios_run_display_table(dev, encoder->dcb, crtc->mode->clock);
 

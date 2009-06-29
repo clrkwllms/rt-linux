@@ -299,7 +299,7 @@ nv50_crtc_set_scale(struct nouveau_crtc *crtc, int scaling_mode, bool update)
 	return 0;
 }
 
-static int
+int
 nv50_crtc_set_clock(struct nouveau_crtc *crtc, struct drm_display_mode *mode)
 {
 	uint32_t pll_reg = NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1(crtc->index);
@@ -347,18 +347,6 @@ nv50_crtc_set_clock(struct nouveau_crtc *crtc, struct drm_display_mode *mode)
 		nv_wr32(pll_reg + 4, reg1 |
 			(((1<<pll.log2P)-1) << 16) | (pll.M1 << 8) | pll.N1);
 	}
-
-	return 0;
-}
-
-static int nv50_crtc_set_clock_mode(struct nouveau_crtc *crtc)
-{
-	struct drm_device *dev = crtc->base.dev;
-
-	NV_DEBUG(dev, "\n");
-
-	/* This acknowledges a clock request. */
-	nv_wr32(NV50_PDISPLAY_CRTC_CLK_CLK_CTRL2(crtc->index), 0);
 
 	return 0;
 }
@@ -806,8 +794,6 @@ int nv50_crtc_create(struct drm_device *dev, int index)
 	/* set function pointers */
 	crtc->set_dither = nv50_crtc_set_dither;
 	crtc->set_scale = nv50_crtc_set_scale;
-	crtc->set_clock = nv50_crtc_set_clock;
-	crtc->set_clock_mode = nv50_crtc_set_clock_mode;
 
 	crtc->mode_set.crtc = &crtc->base;
 	crtc->mode_set.connectors = (struct drm_connector **)(crtc + 1);
