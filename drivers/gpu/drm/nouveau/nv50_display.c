@@ -516,9 +516,13 @@ nv50_display_irq_handler_old(struct drm_device *dev)
 }
 
 static int
-nv50_display_irq_head(struct drm_device *dev)
+nv50_display_irq_head(struct drm_device *dev, int *phead,
+		      struct dcb_entry **pdcbent)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t unk30 = nv_rd32(NV50_PDISPLAY_UNK30_CTRL);
+	uint32_t dac = 0, sor = 0;
+	int head, i, or;
 
 	/* We're assuming that head 0 *or* head 1 will be active here,
 	 * and not both.  I'm not sure if the hw will even signal both
@@ -527,32 +531,66 @@ nv50_display_irq_head(struct drm_device *dev)
 	 * until we handle each in turn.
 	 */
 	NV_DEBUG(dev, "0x610030: 0x%08x\n", unk30);
-	return ffs((unk30 >> 9) & 3) - 1;
-}
-
-static int
-nv50_crtc_encoder_from_610030(struct drm_device *dev, int *phead,
-			      struct nouveau_encoder **pencoder)
-{
-	struct drm_encoder *drm_encoder;
-	int head;
-
-	head = nv50_display_irq_head(dev);
+	head = ffs((unk30 >> 9) & 3) - 1;
 	if (head < 0) {
 		NV_ERROR(dev, "no active heads: 0x%08x\n", nv_rd32(0x610030));
 		return -EINVAL;
 	}
 
-	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
-		if (to_nouveau_crtc(drm_encoder->crtc)->index == head) {
-			*pencoder = to_nouveau_encoder(drm_encoder);
+	/* This assumes CRTCs are never bound to multiple encoders, which
+	 * should be the case.
+	 */
+	for (i = 0; i < 3; i++) {
+		if (nv_rd32(NV50_PDISPLAY_DAC_MODE_CTRL_P(i)) & (1 << head))
+			dac |= (1 << i);
+		if (nv_rd32(NV50_PDISPLAY_SOR_MODE_CTRL_P(i)) & (1 << head))
+			sor |= (1 << i);
+	}
+
+	NV_DEBUG(dev, "dac: 0x%08x, sor: 0x%08x\n", dac, sor);
+
+	if (dac && sor) {
+		NV_ERROR(dev, "multiple encoders: 0x%08x 0x%08x\n", dac, sor);
+		return -1;
+	} else
+	if (dac) {
+		or = ffs(dac) - 1;
+		if (dac & ~(1 << or)) {
+			NV_ERROR(dev, "multiple DAC: 0x%08x\n", dac);
+			return -1;
+		}
+	} else
+	if (sor) {
+		or = ffs(sor) - 1;
+		if (sor & ~(1 << or)) {
+			NV_ERROR(dev, "multiple SOR: 0x%08x\n", sor);
+			return -1;
+		}
+	} else {
+		NV_ERROR(dev, "no encoders!\n");
+		return -1;
+	}
+
+	for (i = 0; i < dev_priv->vbios->dcb->entries; i++) {
+		struct dcb_entry *dcbent = &dev_priv->vbios->dcb->entry[i];
+
+		if (dac && (dcbent->type != OUTPUT_ANALOG &&
+			    dcbent->type != OUTPUT_TV))
+			continue;
+		else
+		if (sor && (dcbent->type != OUTPUT_TMDS &&
+			    dcbent->type != OUTPUT_LVDS))
+			continue;
+
+		if (dcbent->or & (1 << or)) {
 			*phead = head;
+			*pdcbent = dcbent;
 			return 0;
 		}
 	}
 
-	NV_ERROR(dev, "no encoder found bound to head %d\n", head);
-	return -EINVAL;
+	NV_ERROR(dev, "no DCB entry for %d %d\n", dac != 0, or);
+	return 0;
 }
 
 static void
@@ -564,16 +602,16 @@ nv50_display_vblank_handler(struct drm_device *dev, uint32_t intr)
 static void
 nv50_display_unk10_handler(struct drm_device *dev)
 {
-	struct nouveau_encoder *encoder;
+	struct dcb_entry *dcbent;
 	int head, ret;
 
-	ret = nv50_crtc_encoder_from_610030(dev, &head, &encoder);
+	ret = nv50_display_irq_head(dev, &head, &dcbent);
 	if (ret)
 		goto ack;
 
 	nv_wr32(0x619494, nv_rd32(0x619494) & ~8);
 
-	nouveau_bios_run_display_table(dev, encoder->dcb, -1);
+	nouveau_bios_run_display_table(dev, dcbent, -1);
 
 ack:
 	nv_wr32(NV50_PDISPLAY_INTR, NV50_PDISPLAY_INTR_CLK_UNK10);
@@ -585,41 +623,43 @@ nv50_display_unk20_handler(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;
-	struct nouveau_encoder *encoder;
+	struct dcb_entry *dcbent;
 	uint32_t tmp, pclk;
-	int head, ret;
+	int head, or, ret;
 
-	ret = nv50_crtc_encoder_from_610030(dev, &head, &encoder);
+	ret = nv50_display_irq_head(dev, &head, &dcbent);
 	if (ret)
 		goto ack;
+	or = ffs(dcbent->or) - 1;
 	pclk = nv_rd32(NV50_PDISPLAY_CRTC_P(head, CLOCK)) & 0x3fffff;
+
 	NV_DEBUG(dev, "head %d pxclk: %dKHz\n", head, pclk);
 
-	nouveau_bios_run_display_table(dev, encoder->dcb, -2);
+	nouveau_bios_run_display_table(dev, dcbent, -2);
 
 	nv50_crtc_set_clock(dev, head, pclk);
 
-	nouveau_bios_run_display_table(dev, encoder->dcb, pclk);
+	nouveau_bios_run_display_table(dev, dcbent, pclk);
 
 	tmp = nv_rd32(NV50_PDISPLAY_CRTC_CLK_CTRL2(head));
 	tmp &= ~0x000000f;
 	nv_wr32(NV50_PDISPLAY_CRTC_CLK_CTRL2(head), tmp);
 
-	if (encoder->dcb->type != OUTPUT_ANALOG) {
+	if (dcbent->type != OUTPUT_ANALOG) {
 		int tclk;
 
-		if (encoder->dcb->type == OUTPUT_LVDS)
+		if (dcbent->type == OUTPUT_LVDS)
 			tclk = bios->fp.duallink_transition_clk;
 		else
 			tclk = 165000;
 
-		tmp = nv_rd32(NV50_PDISPLAY_SOR_CLK_CTRL2(encoder->or));
+		tmp = nv_rd32(NV50_PDISPLAY_SOR_CLK_CTRL2(or));
 		tmp &= ~0x00000f0f;
 		if (pclk > tclk)
 			tmp |= 0x00000101;
-		nv_wr32(NV50_PDISPLAY_SOR_CLK_CTRL2(encoder->or), tmp);
+		nv_wr32(NV50_PDISPLAY_SOR_CLK_CTRL2(or), tmp);
 	} else {
-		nv_wr32(NV50_PDISPLAY_DAC_CLK_CTRL2(encoder->or), 0);
+		nv_wr32(NV50_PDISPLAY_DAC_CLK_CTRL2(or), 0);
 	}
 
 ack:
@@ -630,15 +670,15 @@ ack:
 static void
 nv50_display_unk40_handler(struct drm_device *dev)
 {
-	struct nouveau_encoder *encoder;
+	struct dcb_entry *dcbent;
 	int head, pclk, ret;
 
-	ret = nv50_crtc_encoder_from_610030(dev, &head, &encoder);
+	ret = nv50_display_irq_head(dev, &head, &dcbent);
 	if (ret)
 		goto ack;
 	pclk = nv_rd32(NV50_PDISPLAY_CRTC_P(head, CLOCK)) & 0x3fffff;
 
-	nouveau_bios_run_display_table(dev, encoder->dcb, -pclk);
+	nouveau_bios_run_display_table(dev, dcbent, -pclk);
 
 ack:
 	nv_wr32(NV50_PDISPLAY_INTR, NV50_PDISPLAY_INTR_CLK_UNK40);
