@@ -62,7 +62,7 @@ nv50_dac_set_clock_mode(struct nouveau_encoder *encoder,
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
 
-	nv_wr32(NV50_PDISPLAY_DAC_CLK_CLK_CTRL2(encoder->or),  0);
+	nv_wr32(NV50_PDISPLAY_DAC_CLK_CTRL2(encoder->or),  0);
 	return 0;
 }
 

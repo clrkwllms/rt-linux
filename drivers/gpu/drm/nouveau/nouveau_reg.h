@@ -766,31 +766,32 @@
 #define NV50_PDISPLAY_CRTC_SCALE_RES2                                0x00610b50
 
 
-#define NV50_PDISPLAY_DAC_VAL_MODE_CTRL(i,j) (0x00610b58+(i)*0x8+(j)*0x4)
+#define NV50_PDISPLAY_DAC_MODE_CTRL_P(i) (0x00610b58 + (i) * 0x8)
+#define NV50_PDISPLAY_DAC_MODE_CTRL_C(i) (0x00610b5c + (i) * 0x8)
+
+#define NV50_PDISPLAY_SOR_MODE_CTRL_P(i) (0x00610b70 + (i) * 0x8)
+#define NV50_PDISPLAY_SOR_MODE_CTRL_C(i) (0x00610b74 + (i) * 0x8)
+
+#define NV50_PDISPLAY_DAC_MODE_CTRL2_P(i) (0x00610bdc + (i) * 0x8);
+#define NV50_PDISPLAY_DAC_MODE_CTRL2_C(i) (0x00610be0 + (i) * 0x8);
 
 
-#define NV50_PDISPLAY_SOR_VAL_MODE_CTRL(i,j) (0x00610b70+(i)*0x8+(j)*0x4)
+#define NV50_PDISPLAY_CRTC_CLK                                       0x00614000
+#define NV50_PDISPLAY_CRTC_CLK__LEN                                         0x2
+#define NV50_PDISPLAY_CRTC_CLK_CTRL1(i)                 ((i) * 0x800 + 0x614100)
+#define NV50_PDISPLAY_CRTC_CLK_CTRL1_CONNECTED                       0x00000600
+#define NV50_PDISPLAY_CRTC_CLK_CTRL1_CONNECTED__SHIFT                         9
+#define NV50_PDISPLAY_CRTC_CLK_VPLL_A(i)                ((i) * 0x800 + 0x614104)
+#define NV50_PDISPLAY_CRTC_CLK_VPLL_B(i)                ((i) * 0x800 + 0x614108)
+#define NV50_PDISPLAY_CRTC_CLK_CTRL2(i)                 ((i) * 0x800 + 0x614200)
 
+#define NV50_PDISPLAY_DAC_CLK                                        0x00614000
+#define NV50_PDISPLAY_DAC_CLK__LEN                                          0x3
+#define NV50_PDISPLAY_DAC_CLK_CTRL2(i)                  ((i) * 0x800 + 0x614280)
 
-#define NV50_PDISPLAY_DAC_VAL_MODE_CTRL2(i,j) (0x00610bdc+(i)*0x8+(j)*0x4)
-
-
-#    define NV50_PDISPLAY_CRTC_CLK                          0x00614000
-#    define NV50_PDISPLAY_CRTC_CLK__LEN                            0x2
-#        define NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1(i) (0x00614100+(i)*0x800)
-#            define NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1_CONNECTED 0x00000600
-#            define NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1_CONNECTED__SHIFT 9
-#        define NV50_PDISPLAY_CRTC_CLK_VPLL_A(i) (0x00614104+(i)*0x800)
-#        define NV50_PDISPLAY_CRTC_CLK_VPLL_B(i) (0x00614108+(i)*0x800)
-#        define NV50_PDISPLAY_CRTC_CLK_CLK_CTRL2(i) (0x00614200+(i)*0x800)
-
-#    define NV50_PDISPLAY_DAC_CLK                           0x00614000
-#    define NV50_PDISPLAY_DAC_CLK__LEN                             0x3
-#        define NV50_PDISPLAY_DAC_CLK_CLK_CTRL2(i) (0x00614280+(i)*0x800)
-
-#    define NV50_PDISPLAY_SOR_CLK                           0x00614000
-#    define NV50_PDISPLAY_SOR_CLK__LEN                             0x3
-#        define NV50_PDISPLAY_SOR_CLK_CLK_CTRL2(i) (0x00614300+(i)*0x800)
+#define NV50_PDISPLAY_SOR_CLK                                        0x00614000
+#define NV50_PDISPLAY_SOR_CLK__LEN                                          0x3
+#define NV50_PDISPLAY_SOR_CLK_CTRL2(i)                  ((i) * 0x800 + 0x614300)
 
 #    define NV50_PDISPLAY_DAC_REGS                          0x0061a000
 #    define NV50_PDISPLAY_DAC_REGS__LEN                            0x3

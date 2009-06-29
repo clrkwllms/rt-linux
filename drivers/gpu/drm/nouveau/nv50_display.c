@@ -479,7 +479,7 @@ static void nv50_display_vclk_update(struct drm_device *dev)
 		if (!clock_ack)
 			continue;
 
-		nv_wr32(NV50_PDISPLAY_CRTC_CLK_CLK_CTRL2(crtc->index), 0);
+		nv_wr32(NV50_PDISPLAY_CRTC_CLK_CTRL2(crtc->index), 0);
 
 		list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
 			encoder = to_nouveau_encoder(drm_encoder);
@@ -516,43 +516,43 @@ nv50_display_irq_handler_old(struct drm_device *dev)
 }
 
 static int
-nv50_crtc_encoder_from_610030(struct drm_device *dev,
-                              struct nouveau_crtc **pcrtc,
-                              struct nouveau_encoder **pencoder)
+nv50_display_irq_head(struct drm_device *dev)
+{
+	uint32_t unk30 = nv_rd32(NV50_PDISPLAY_UNK30_CTRL);
+
+	/* We're assuming that head 0 *or* head 1 will be active here,
+	 * and not both.  I'm not sure if the hw will even signal both
+	 * ever, but it definitely shouldn't for us as we commit each
+	 * CRTC separately, and submission will be blocked by the GPU
+	 * until we handle each in turn.
+	 */
+	NV_DEBUG(dev, "0x610030: 0x%08x\n", unk30);
+	return ffs((unk30 >> 9) & 3) - 1;
+}
+
+static int
+nv50_crtc_encoder_from_610030(struct drm_device *dev, int *phead,
+			      struct nouveau_encoder **pencoder)
 {
 	struct drm_encoder *drm_encoder;
-	struct nouveau_encoder *encoder = NULL;
-	struct drm_crtc *drm_crtc;
-	struct nouveau_crtc *crtc = NULL;
-	uint32_t unk30 = nv_rd32(0x610030);
-	int mask = (unk30 >> 9) & 3;
+	int head;
 
-	NV_DEBUG(dev, "0x610030 0x%08x\n", unk30);
-
-	*pcrtc = NULL;
-	*pencoder = NULL;
-
-	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
-		crtc = to_nouveau_crtc(drm_crtc);
-		if (mask & (1 << crtc->index))
-			break;
-	}
-
-	if (!(mask & (1 << crtc->index)))
+	head = nv50_display_irq_head(dev);
+	if (head < 0) {
+		NV_ERROR(dev, "no active heads: 0x%08x\n", nv_rd32(0x610030));
 		return -EINVAL;
+	}
 
 	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
-		encoder = to_nouveau_encoder(drm_encoder);
-		if (drm_encoder->crtc == drm_crtc)
-			break;
+		if (to_nouveau_crtc(drm_encoder->crtc)->index == head) {
+			*pencoder = to_nouveau_encoder(drm_encoder);
+			*phead = head;
+			return 0;
+		}
 	}
 
-	if (drm_encoder->crtc != drm_crtc)
-		return -EINVAL;
-
-	*pcrtc = crtc;
-	*pencoder = encoder;
-	return 0;
+	NV_ERROR(dev, "no encoder found bound to head %d\n", head);
+	return -EINVAL;
 }
 
 static void
@@ -565,15 +565,11 @@ static void
 nv50_display_unk10_handler(struct drm_device *dev)
 {
 	struct nouveau_encoder *encoder;
-	struct nouveau_crtc *crtc;
-	int ret;
+	int head, ret;
 
-	ret = nv50_crtc_encoder_from_610030(dev, &crtc, &encoder);
-	if (ret) {
-		NV_ERROR(dev, "can't determine outputs: 0x%08x\n",
-			 nv_rd32(0x610030));
+	ret = nv50_crtc_encoder_from_610030(dev, &head, &encoder);
+	if (ret)
 		goto ack;
-	}
 
 	nv_wr32(0x619494, nv_rd32(0x619494) & ~8);
 
@@ -590,26 +586,24 @@ nv50_display_unk20_handler(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;
 	struct nouveau_encoder *encoder;
-	struct nouveau_crtc *crtc;
-	uint32_t tmp;
-	int ret;
+	uint32_t tmp, pclk;
+	int head, ret;
 
-	ret = nv50_crtc_encoder_from_610030(dev, &crtc, &encoder);
-	if (ret) {
-		NV_ERROR(dev, "can't determine outputs: 0x%08x\n",
-			 nv_rd32(0x610030));
+	ret = nv50_crtc_encoder_from_610030(dev, &head, &encoder);
+	if (ret)
 		goto ack;
-	}
+	pclk = nv_rd32(NV50_PDISPLAY_CRTC_P(head, CLOCK)) & 0x3fffff;
+	NV_DEBUG(dev, "head %d pxclk: %dKHz\n", head, pclk);
 
 	nouveau_bios_run_display_table(dev, encoder->dcb, -2);
 
-	nv50_crtc_set_clock(dev, crtc->index, crtc->mode->clock);
+	nv50_crtc_set_clock(dev, head, pclk);
 
-	nouveau_bios_run_display_table(dev, encoder->dcb, crtc->mode->clock);
+	nouveau_bios_run_display_table(dev, encoder->dcb, pclk);
 
-	tmp = nv_rd32(0x614200 + (crtc->index * 0x800));
+	tmp = nv_rd32(NV50_PDISPLAY_CRTC_CLK_CTRL2(head));
 	tmp &= ~0x000000f;
-	nv_wr32(0x614200 + (crtc->index * 0x800), tmp);
+	nv_wr32(NV50_PDISPLAY_CRTC_CLK_CTRL2(head), tmp);
 
 	if (encoder->dcb->type != OUTPUT_ANALOG) {
 		int tclk;
@@ -619,13 +613,13 @@ nv50_display_unk20_handler(struct drm_device *dev)
 		else
 			tclk = 165000;
 
-		tmp = nv_rd32(0x614300 + (encoder->or * 0x800));
+		tmp = nv_rd32(NV50_PDISPLAY_SOR_CLK_CTRL2(encoder->or));
 		tmp &= ~0x00000f0f;
-		if (crtc->mode->clock > tclk)
+		if (pclk > tclk)
 			tmp |= 0x00000101;
-		nv_wr32(0x614300 + (encoder->or * 0x800), tmp);
+		nv_wr32(NV50_PDISPLAY_SOR_CLK_CTRL2(encoder->or), tmp);
 	} else {
-		nv_wr32(0x614280 + (encoder->or * 0x800), 0);
+		nv_wr32(NV50_PDISPLAY_DAC_CLK_CTRL2(encoder->or), 0);
 	}
 
 ack:
@@ -637,17 +631,14 @@ static void
 nv50_display_unk40_handler(struct drm_device *dev)
 {
 	struct nouveau_encoder *encoder;
-	struct nouveau_crtc *crtc;
-	int ret;
+	int head, pclk, ret;
 
-	ret = nv50_crtc_encoder_from_610030(dev, &crtc, &encoder);
-	if (ret) {
-		NV_ERROR(dev, "can't determine outputs: 0x%08x\n",
-			 nv_rd32(0x610030));
+	ret = nv50_crtc_encoder_from_610030(dev, &head, &encoder);
+	if (ret)
 		goto ack;
-	}
+	pclk = nv_rd32(NV50_PDISPLAY_CRTC_P(head, CLOCK)) & 0x3fffff;
 
-	nouveau_bios_run_display_table(dev, encoder->dcb, -crtc->mode->clock);
+	nouveau_bios_run_display_table(dev, encoder->dcb, -pclk);
 
 ack:
 	nv_wr32(NV50_PDISPLAY_INTR, NV50_PDISPLAY_INTR_CLK_UNK40);

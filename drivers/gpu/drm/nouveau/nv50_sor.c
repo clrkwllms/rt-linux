@@ -74,7 +74,7 @@ nv50_sor_set_clock_mode(struct nouveau_encoder *encoder,
 	 * initialisation on certain gpu's. I presume it's some kind of
 	 * clock setting, but what precisely i do not know.
 	 */
-	nv_wr32(NV50_PDISPLAY_SOR_CLK_CLK_CTRL2(encoder->or),
+	nv_wr32(NV50_PDISPLAY_SOR_CLK_CTRL2(encoder->or),
 		0x70000 | ((mode->clock > limit) ? 0x101 : 0));
 
 	return 0;
