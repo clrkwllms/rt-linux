@@ -122,11 +122,10 @@ nouveau_bo_pin(struct nouveau_bo *nvbo, uint32_t memtype)
 	struct ttm_buffer_object *bo = &nvbo->bo;
 	int ret;
 
-	if (nvbo->pin_refcnt &&
-	    (bo->proposed_placement & TTM_PL_MASK_MEM) != memtype) {
+	if (nvbo->pin_refcnt && !(memtype & (1 << bo->mem.mem_type))) {
 		NV_ERROR(nouveau_bdev(bo->bdev)->dev,
 			 "bo %p pinned elsewhere: 0x%08x vs 0x%08x\n", bo,
-			 bo->proposed_placement, memtype);
+			 1 << bo->mem.mem_type, memtype);
 		return -EINVAL;
 	}
 
