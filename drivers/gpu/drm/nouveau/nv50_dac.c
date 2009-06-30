@@ -211,6 +211,11 @@ static void nv50_dac_mode_set(struct drm_encoder *drm_encoder,
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
 
+	ret = dev_priv->in_modeset;
+	dev_priv->in_modeset = false;
+	nv50_dac_dpms(drm_encoder, DRM_MODE_DPMS_ON);
+	dev_priv->in_modeset = ret;
+
 	if (crtc->index == 1)
 		mode_ctl |= NV50_DAC_MODE_CTRL_CRTC1;
 	else
