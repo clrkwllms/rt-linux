@@ -516,8 +516,8 @@ static int nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	size = mode_cmd.pitch * mode_cmd.height;
 	size = ALIGN(size, PAGE_SIZE);
 
-	ret = nouveau_bo_new(dev, dev_priv->channel, size, 0, TTM_PL_FLAG_VRAM,
-			     0, 0x0000, false, true, &nvbo);
+	ret = nouveau_gem_new(dev, dev_priv->channel, size, 0, TTM_PL_FLAG_VRAM,
+			      0, 0x0000, false, true, &nvbo);
 	if (ret) {
 		NV_ERROR(dev, "failed to allocate framebuffer\n");
 		goto out;
@@ -529,13 +529,6 @@ static int nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 		nouveau_bo_ref(NULL, &nvbo);
 		goto out;
 	}
-
-	nvbo->gem = drm_gem_object_alloc(dev, nvbo->bo.mem.size);
-	if (!nvbo->gem) {
-		nouveau_bo_ref(NULL, &nvbo);
-		goto out;
-	}
-	nvbo->gem->driver_private = nvbo;
 
 	mutex_lock(&dev->struct_mutex);
 

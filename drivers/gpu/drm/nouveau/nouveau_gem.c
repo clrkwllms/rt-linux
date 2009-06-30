@@ -59,6 +59,32 @@ nouveau_gem_object_del(struct drm_gem_object *gem)
 	ttm_bo_unref(&bo);
 }
 
+int
+nouveau_gem_new(struct drm_device *dev, struct nouveau_channel *chan,
+		int size, int align, uint32_t flags, uint32_t tile_mode,
+		uint32_t tile_flags, bool no_vm, bool mappable,
+		struct nouveau_bo **pnvbo)
+{
+	struct nouveau_bo *nvbo;
+	int ret;
+
+	ret = nouveau_bo_new(dev, chan, size, align, flags, tile_mode,
+			     tile_flags, no_vm, mappable, pnvbo);
+	if (ret)
+		return ret;
+	nvbo = *pnvbo;
+
+	nvbo->gem = drm_gem_object_alloc(dev, nvbo->bo.mem.size);
+	if (!nvbo->gem) {
+		nouveau_bo_ref(NULL, pnvbo);
+		return -ENOMEM;
+	}
+
+	nvbo->bo.persistant_swap_storage = nvbo->gem->filp;
+	nvbo->gem->driver_private = nvbo;
+	return 0;
+}
+
 static int
 nouveau_gem_info(struct drm_gem_object *gem, struct drm_nouveau_gem_info *rep)
 {
@@ -84,7 +110,6 @@ nouveau_gem_ioctl_new(struct drm_device *dev, void *data,
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_gem_new *req = data;
 	struct nouveau_bo *nvbo = NULL;
-	struct drm_gem_object *gem;
 	struct nouveau_channel *chan = NULL;
 	uint32_t flags = 0;
 	int ret = 0;
@@ -122,23 +147,14 @@ nouveau_gem_ioctl_new(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 
-	ret = nouveau_bo_new(dev, chan, req->info.size, req->align, flags,
-			     req->info.tile_mode, req->info.tile_flags, false,
-			     !!(req->info.domain & NOUVEAU_GEM_DOMAIN_MAPPABLE),
-			     &nvbo);
+	ret = nouveau_gem_new(dev, chan, req->info.size, req->align, flags,
+			      req->info.tile_mode, req->info.tile_flags, false,
+			      (req->info.domain & NOUVEAU_GEM_DOMAIN_MAPPABLE),
+			      &nvbo);
 	if (ret)
 		return ret;
 
-	gem = drm_gem_object_alloc(dev, nvbo->bo.mem.size);
-	if (!gem) {
-		nouveau_bo_ref(NULL, &nvbo);
-		return -ENOMEM;
-	}
-
-	gem->driver_private = nvbo;
-	nvbo->gem = gem;
-
-	ret = nouveau_gem_info(gem, &req->info);
+	ret = nouveau_gem_info(nvbo->gem, &req->info);
 	if (ret)
 		goto out;
 
