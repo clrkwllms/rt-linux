@@ -846,8 +846,16 @@ extern int nv04_connector_create(struct drm_device *, int i2c_index,
 /* nv04_crtc.c */
 extern int nv04_crtc_create(struct drm_device *, int index);
 
-/* nouveau_buffer.c */
+/* nouveau_bo.c */
 extern struct ttm_bo_driver nouveau_bo_driver;
+extern int nouveau_bo_new(struct drm_device *, struct nouveau_channel *,
+			  int size, int align, uint32_t flags,
+			  uint32_t tile_mode, uint32_t tile_flags,
+			  bool no_vm, bool mappable, struct nouveau_bo **);
+extern int nouveau_bo_pin(struct nouveau_bo *, uint32_t flags);
+extern int nouveau_bo_unpin(struct nouveau_bo *);
+extern int nouveau_bo_map(struct nouveau_bo *);
+extern void nouveau_bo_unmap(struct nouveau_bo *);
 
 /* nouveau_fence.c */
 struct nouveau_fence;
@@ -867,14 +875,6 @@ extern void nouveau_fence_handler(struct drm_device *dev, int channel);
 /* nouveau_gem.c */
 extern int nouveau_gem_object_new(struct drm_gem_object *);
 extern void nouveau_gem_object_del(struct drm_gem_object *);
-extern int nouveau_bo_new(struct drm_device *, struct nouveau_channel *,
-			  int size, int align, uint32_t flags,
-			  uint32_t tile_mode, uint32_t tile_flags,
-			  bool no_vm, bool mappable, struct nouveau_bo **);
-extern int nouveau_bo_pin(struct nouveau_bo *, uint32_t flags);
-extern int nouveau_bo_unpin(struct nouveau_bo *);
-extern int nouveau_bo_map(struct nouveau_bo *);
-extern void nouveau_bo_unmap(struct nouveau_bo *);
 extern int nouveau_gem_ioctl_new(struct drm_device *, void *,
 				 struct drm_file *);
 extern int nouveau_gem_ioctl_pushbuf(struct drm_device *, void *,
