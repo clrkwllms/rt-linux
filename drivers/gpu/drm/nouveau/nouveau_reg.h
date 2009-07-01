@@ -838,7 +838,7 @@
 #define NV50_PDISPLAY_USER(i)                          (0x00640000 + (i)*0x1000)
 #define NV50_PDISPLAY_USER__SIZE                                               6
 #define NV50_PDISPLAY_USER_PUT(i)                      (0x00640000 + (i)*0x1000)
-#define NV50_PDISPLAY_USER_GET(i)                      (0x00640000 + (i)*0x1000)
+#define NV50_PDISPLAY_USER_GET(i)                      (0x00640004 + (i)*0x1000)
 
 #define NV50_HW_CURSOR                                      0x00647000
 #define NV50_HW_CURSOR__LEN                                        0x2
