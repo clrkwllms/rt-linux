@@ -1030,6 +1030,7 @@ void mm_init_owner(struct mm_struct *mm, struct task_struct *p)
  */
 static void posix_cpu_timers_init(struct task_struct *tsk)
 {
+	tsk->posix_timer_list = NULL;
 	tsk->cputime_expires.prof_exp = cputime_zero;
 	tsk->cputime_expires.virt_exp = cputime_zero;
 	tsk->cputime_expires.sched_exp = 0;
