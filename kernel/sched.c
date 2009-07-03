@@ -4799,9 +4799,8 @@ long __sched sleep_on_timeout(wait_queue_head_t *q, long timeout)
 EXPORT_SYMBOL(sleep_on_timeout);
 
 #ifdef CONFIG_RT_MUTEXES
-
 /*
- * rt_mutex_setprio - set the current priority of a task
+ * task_setprio - set the current priority of a task
  * @p: task
  * @prio: prio value (kernel-internal form)
  *
@@ -4810,7 +4809,7 @@ EXPORT_SYMBOL(sleep_on_timeout);
  *
  * Used by the rt_mutex code to implement priority inheritance logic.
  */
-void rt_mutex_setprio(struct task_struct *p, int prio)
+void task_setprio(struct task_struct *p, int prio)
 {
 	int oldprio, on_rq, running;
 	struct rq *rq;
@@ -4845,7 +4844,6 @@ void rt_mutex_setprio(struct task_struct *p, int prio)
 	check_class_changed(rq, p, prev_class, oldprio);
 	__task_rq_unlock(rq);
 }
-
 #endif
 
 void set_user_nice(struct task_struct *p, long nice)
