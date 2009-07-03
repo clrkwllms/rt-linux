@@ -16,7 +16,7 @@
 #include <asm/mmu_context.h>
 #include <asm/tlbflush.h>
 
-static DEFINE_SPINLOCK(cpu_asid_lock);
+static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
 unsigned int cpu_last_asid = ASID_FIRST_VERSION;
 #ifdef CONFIG_SMP
 DEFINE_PER_CPU(struct mm_struct *, current_mm);
@@ -117,7 +117,7 @@ void __new_context(struct mm_struct *mm)
 {
 	unsigned int asid;
 
-	spin_lock(&cpu_asid_lock);
+	raw_spin_lock(&cpu_asid_lock);
 #ifdef CONFIG_SMP
 	/*
 	 * Check the ASID again, in case the change was broadcast from
@@ -125,7 +125,7 @@ void __new_context(struct mm_struct *mm)
 	 */
 	if (unlikely(((mm->context.id ^ cpu_last_asid) >> ASID_BITS) == 0)) {
 		cpumask_set_cpu(smp_processor_id(), mm_cpumask(mm));
-		spin_unlock(&cpu_asid_lock);
+		raw_spin_unlock(&cpu_asid_lock);
 		return;
 	}
 #endif
@@ -153,5 +153,5 @@ void __new_context(struct mm_struct *mm)
 	}
 
 	set_mm_context(mm, asid);
-	spin_unlock(&cpu_asid_lock);
+	raw_spin_unlock(&cpu_asid_lock);
 }
