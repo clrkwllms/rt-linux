@@ -295,8 +295,7 @@ int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry)
 			 DRM_MODE_ENCODER_DAC);
 	drm_encoder_helper_add(&encoder->base, &nv50_dac_helper_funcs);
 
-	/* I've never seen possible crtc's restricted. */
-	encoder->base.possible_crtcs = 3;
+	encoder->base.possible_crtcs = entry->heads;
 	encoder->base.possible_clones = 0;
 	return 0;
 }

@@ -292,8 +292,7 @@ int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 	drm_encoder_init(dev, &encoder->base, &nv50_sor_encoder_funcs, type);
 	drm_encoder_helper_add(&encoder->base, &nv50_sor_helper_funcs);
 
-	/* I've never seen possible crtc's restricted. */
-	encoder->base.possible_crtcs = 3;
+	encoder->base.possible_crtcs = entry->heads;
 	encoder->base.possible_clones = 0;
 
 	/* Some default state, unknown what it precisely means. */
