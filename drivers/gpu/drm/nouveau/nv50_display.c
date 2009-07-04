@@ -242,6 +242,8 @@ nv50_display_init(struct drm_device *dev)
 	BEGIN_RING(&evo->chan, 0, NV50_CRTC0_UNK82C, 1);
 	OUT_RING  (&evo->chan, 0);
 	FIRE_RING (&evo->chan);
+	if (!nv_wait(0x640004, 0xffffffff, evo->chan.dma.put << 2))
+		NV_ERROR(dev, "evo pushbuf stalled\n");
 
 	/* enable clock change interrupts. */
 	nv_wr32(NV50_PDISPLAY_INTR_EN, (NV50_PDISPLAY_INTR_EN_CLK_UNK10 |
