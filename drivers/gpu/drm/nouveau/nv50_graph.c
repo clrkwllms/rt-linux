@@ -113,6 +113,9 @@ nv50_graph_init_ctxctl(struct drm_device *dev)
 	case 0xaa:
 		voodoo = nvaa_ctxprog;
 		break;
+	case 0xac:
+		voodoo = nvac_ctxprog;
+		break;
 	default:
 		NV_ERROR(dev, "no ctxprog for chipset NV%02x\n", dev_priv->chipset);
 		return -EINVAL;
@@ -225,6 +228,9 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 		break;
 	case 0xaa:
 		ctxvals = nvaa_ctxvals;
+		break;
+	case 0xac:
+		ctxvals = nvac_ctxvals;
 		break;
 	default:
 		break;
