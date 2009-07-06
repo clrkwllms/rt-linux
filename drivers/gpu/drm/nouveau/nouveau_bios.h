@@ -174,6 +174,8 @@ struct nvbios {
 	uint16_t pll_limit_tbl_ptr;
 	uint16_t ram_restrict_tbl_ptr;
 
+	uint16_t init96_tbl_ptr;
+
 	struct bios_parsed_dcb bdcb;
 
 	struct {

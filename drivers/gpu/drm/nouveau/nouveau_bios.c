@@ -2366,6 +2366,45 @@ static bool init_reserved(struct drm_device *dev, struct nvbios *bios, uint16_t 
 	return true;
 }
 
+static bool
+init_96(struct drm_device *dev, struct nvbios *bios, uint16_t offset,
+	init_exec_t *iexec)
+{
+	/* INIT_96   opcode: 0x96 ('')
+	 *
+	 * offset      (8  bit): opcode
+	 * offset + 1  (32 bit): sreg
+	 * offset + 5  (8  bit): sshift
+	 * offset + 6  (8  bit): smask
+	 * offset + 7  (8  bit): index
+	 * offset + 8  (32 bit): reg
+	 * offset + 12 (32 bit): mask
+	 * offset + 16 (8  bit): shift
+	 *
+	 */
+
+	uint16_t xlatptr = bios->init96_tbl_ptr + (bios->data[offset + 7] * 2);
+	uint32_t reg = ROM32(bios->data[offset + 8]);
+	uint32_t mask = ROM32(bios->data[offset + 12]);
+	uint32_t val;
+
+	val = bios_rd32(dev, ROM32(bios->data[offset + 1]));
+	if (bios->data[offset + 5] < 0x80)
+		val >>= bios->data[offset + 5];
+	else
+		val <<= (0x100 - bios->data[offset + 5]);
+	val &= bios->data[offset + 6];
+
+	val   = bios->data[xlatptr + val];
+	val <<= bios->data[offset + 16];
+
+	if (!iexec->execute)
+		return true;
+
+	bios_wr32(dev, reg, (bios_rd32(dev, reg) & mask) | val);
+	return true;
+}
+
 static init_tbl_entry_t itbl_entry[] = {
 	/* command name                       , id  , length  , offset  , mult    , command handler                 */
 	/* INIT_PROG (0x31, 15, 10, 4) removed due to no example of use */
@@ -2419,6 +2458,7 @@ static init_tbl_entry_t itbl_entry[] = {
 	{ "INIT_COPY_ZM_REG"                  , 0x90, 9       , 0       , 0       , init_copy_zm_reg                },
 	{ "INIT_ZM_REG_GROUP_ADDRESS_LATCHED" , 0x91, 6       , 5       , 4       , init_zm_reg_group_addr_latched  },
 	{ "INIT_RESERVED"                     , 0x92, 1       , 0       , 0       , init_reserved                   },
+	{ "INIT_96"                           , 0x96, 17      , 0       , 0       , init_96                         },
 	{ 0                                   , 0   , 0       , 0       , 0       , 0                               }
 };
 
@@ -3736,6 +3776,9 @@ static int parse_bit_init_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	}
 
 	parse_script_table_pointers(bios, bitentry->offset);
+
+	if (bitentry->length >= 18)
+		bios->init96_tbl_ptr = ROM16(bios->data[bitentry->offset + 16]);
 
 	return 0;
 }
