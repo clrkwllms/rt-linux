@@ -32,7 +32,6 @@
 #include "nouveau_encoder.h"
 #include "nouveau_crtc.h"
 #include "nv50_display.h"
-#include "nv50_display_commands.h"
 
 static void
 nv50_dac_disconnect(struct nouveau_encoder *encoder)
@@ -40,7 +39,6 @@ nv50_dac_disconnect(struct nouveau_encoder *encoder)
 	struct drm_device *dev = encoder->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *evo = &dev_priv->evo.chan;
-	uint32_t offset = encoder->or * 0x80;
 	int ret;
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
@@ -50,8 +48,8 @@ nv50_dac_disconnect(struct nouveau_encoder *encoder)
 		NV_ERROR(dev, "no space while disconnecting DAC\n");
 		return;
 	}
-	BEGIN_RING(evo, 0, NV50_DAC0_MODE_CTRL + offset, 1);
-	OUT_RING  (evo, NV50_DAC_MODE_CTRL_OFF);
+	BEGIN_RING(evo, 0, NV50_EVO_DAC(encoder->or, MODE_CTRL), 1);
+	OUT_RING  (evo, 0);
 }
 
 static int
@@ -204,9 +202,7 @@ static void nv50_dac_mode_set(struct drm_encoder *drm_encoder,
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *evo = &dev_priv->evo.chan;
 	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_encoder->crtc);
-	uint32_t offset = encoder->or * 0x80;
-	uint32_t mode_ctl = NV50_DAC_MODE_CTRL_OFF;
-	uint32_t mode_ctl2 = 0;
+	uint32_t mode_ctl = 0, mode_ctl2 = 0;
 	int ret;
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
@@ -217,9 +213,9 @@ static void nv50_dac_mode_set(struct drm_encoder *drm_encoder,
 	dev_priv->in_modeset = ret;
 
 	if (crtc->index == 1)
-		mode_ctl |= NV50_DAC_MODE_CTRL_CRTC1;
+		mode_ctl |= NV50_EVO_DAC_MODE_CTRL_CRTC1;
 	else
-		mode_ctl |= NV50_DAC_MODE_CTRL_CRTC0;
+		mode_ctl |= NV50_EVO_DAC_MODE_CTRL_CRTC0;
 
 	/* Lacking a working tv-out, this is not a 100% sure. */
 	if (encoder->base.encoder_type == DRM_MODE_ENCODER_DAC) {
@@ -230,17 +226,17 @@ static void nv50_dac_mode_set(struct drm_encoder *drm_encoder,
 	}
 
 	if (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC)
-		mode_ctl2 |= NV50_DAC_MODE_CTRL2_NHSYNC;
+		mode_ctl2 |= NV50_EVO_DAC_MODE_CTRL2_NHSYNC;
 
 	if (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC)
-		mode_ctl2 |= NV50_DAC_MODE_CTRL2_NVSYNC;
+		mode_ctl2 |= NV50_EVO_DAC_MODE_CTRL2_NVSYNC;
 
 	ret = RING_SPACE(evo, 3);
 	if (ret) {
 		NV_ERROR(dev, "no space while connecting DAC\n");
 		return;
 	}
-	BEGIN_RING(evo, 0, NV50_DAC0_MODE_CTRL + offset, 2);
+	BEGIN_RING(evo, 0, NV50_EVO_DAC(encoder->or, MODE_CTRL), 2);
 	OUT_RING  (evo, mode_ctl);
 	OUT_RING  (evo, mode_ctl2);
 }

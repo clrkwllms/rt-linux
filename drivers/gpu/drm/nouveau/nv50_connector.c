@@ -33,7 +33,6 @@
 #include "nouveau_crtc.h"
 #include "nouveau_connector.h"
 #include "nv50_display.h"
-#include "nv50_display_commands.h"
 
 static struct nouveau_encoder *
 nv50_connector_to_encoder(struct nouveau_connector *connector, bool digital)

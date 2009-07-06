@@ -230,16 +230,16 @@ nv50_display_init(struct drm_device *dev)
 	nv_wr32(0x610300, nv_rd32(0x610300) & ~1);
 
 	RING_SPACE(&evo->chan, 11);
-	BEGIN_RING(&evo->chan, 0, NV50_UNK84, 2);
-	OUT_RING  (&evo->chan, 0x00000000);
-	OUT_RING  (&evo->chan, 0x00000000);
-	BEGIN_RING(&evo->chan, 0, NV50_CRTC0_BLANK_CTRL, 1);
-	OUT_RING  (&evo->chan, NV50_CRTC0_BLANK_CTRL_BLANK);
-	BEGIN_RING(&evo->chan, 0, NV50_CRTC0_UNK800, 1);
+	BEGIN_RING(&evo->chan, 0, NV50_EVO_UNK84, 2);
+	OUT_RING  (&evo->chan, NV50_EVO_UNK84_NOTIFY_DISABLED);
+	OUT_RING  (&evo->chan, NV50_EVO_DMA_NOTIFY_HANDLE_NONE);
+	BEGIN_RING(&evo->chan, 0, NV50_EVO_CRTC(0, FB_DMA), 1);
+	OUT_RING  (&evo->chan, NV50_EVO_CRTC_FB_DMA_HANDLE_NONE);
+	BEGIN_RING(&evo->chan, 0, NV50_EVO_CRTC(0, UNK0800), 1);
 	OUT_RING  (&evo->chan, 0);
-	BEGIN_RING(&evo->chan, 0, NV50_CRTC0_DISPLAY_START, 1);
+	BEGIN_RING(&evo->chan, 0, NV50_EVO_CRTC(0, DISPLAY_START), 1);
 	OUT_RING  (&evo->chan, 0);
-	BEGIN_RING(&evo->chan, 0, NV50_CRTC0_UNK82C, 1);
+	BEGIN_RING(&evo->chan, 0, NV50_EVO_CRTC(0, UNK082C), 1);
 	OUT_RING  (&evo->chan, 0);
 	FIRE_RING (&evo->chan);
 	if (!nv_wait(0x640004, 0xffffffff, evo->chan.dma.put << 2))
@@ -273,7 +273,7 @@ static int nv50_display_disable(struct drm_device *dev)
 	}
 
 	RING_SPACE(&dev_priv->evo.chan, 2);
-	BEGIN_RING(&dev_priv->evo.chan, 0, NV50_UPDATE_DISPLAY, 1);
+	BEGIN_RING(&dev_priv->evo.chan, 0, NV50_EVO_UPDATE, 1);
 	OUT_RING  (&dev_priv->evo.chan, 0);
 	FIRE_RING (&dev_priv->evo.chan);
 

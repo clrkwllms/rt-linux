@@ -33,7 +33,6 @@
 #include "nouveau_connector.h"
 #include "nouveau_crtc.h"
 #include "nv50_display.h"
-#include "nv50_display_commands.h"
 
 extern int nouveau_duallink;
 
@@ -43,7 +42,6 @@ nv50_sor_disconnect(struct nouveau_encoder *encoder)
 	struct drm_device *dev = encoder->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *evo = &dev_priv->evo.chan;
-	uint32_t offset = encoder->or * 0x40;
 	int ret;
 
 	NV_DEBUG(dev, "Disconnecting SOR %d\n", encoder->or);
@@ -53,8 +51,8 @@ nv50_sor_disconnect(struct nouveau_encoder *encoder)
 		NV_ERROR(dev, "no space while disconnecting SOR\n");
 		return;
 	}
-	BEGIN_RING(evo, 0, NV50_SOR0_MODE_CTRL + offset, 1);
-	OUT_RING  (evo, NV50_SOR_MODE_CTRL_OFF);
+	BEGIN_RING(evo, 0, NV50_EVO_SOR(encoder->or, MODE_CTRL), 1);
+	OUT_RING  (evo, 0);
 }
 
 static int
@@ -183,8 +181,7 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
 	struct drm_device *dev = drm_encoder->dev;
 	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_encoder->crtc);
-	uint32_t offset = encoder->or * 0x40;
-	uint32_t mode_ctl = NV50_SOR_MODE_CTRL_OFF;
+	uint32_t mode_ctl = 0;
 	int ret;
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
@@ -194,31 +191,29 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 	nv50_sor_dpms(drm_encoder, DRM_MODE_DPMS_ON);
 	dev_priv->in_modeset = ret;
 
-	if (encoder->base.encoder_type == DRM_MODE_ENCODER_LVDS) {
-		mode_ctl |= NV50_SOR_MODE_CTRL_LVDS;
-	} else {
-		mode_ctl |= NV50_SOR_MODE_CTRL_TMDS;
+	if (encoder->base.encoder_type != DRM_MODE_ENCODER_LVDS) {
+		mode_ctl |= NV50_EVO_SOR_MODE_CTRL_TMDS;
 		if (adjusted_mode->clock > 165000)
-			mode_ctl |= NV50_SOR_MODE_CTRL_TMDS_DUAL_LINK;
+			mode_ctl |= NV50_EVO_SOR_MODE_CTRL_TMDS_DUAL_LINK;
 	}
 
 	if (crtc->index == 1)
-		mode_ctl |= NV50_SOR_MODE_CTRL_CRTC1;
+		mode_ctl |= NV50_EVO_SOR_MODE_CTRL_CRTC1;
 	else
-		mode_ctl |= NV50_SOR_MODE_CTRL_CRTC0;
+		mode_ctl |= NV50_EVO_SOR_MODE_CTRL_CRTC0;
 
 	if (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC)
-		mode_ctl |= NV50_SOR_MODE_CTRL_NHSYNC;
+		mode_ctl |= NV50_EVO_SOR_MODE_CTRL_NHSYNC;
 
 	if (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC)
-		mode_ctl |= NV50_SOR_MODE_CTRL_NVSYNC;
+		mode_ctl |= NV50_EVO_SOR_MODE_CTRL_NVSYNC;
 
 	ret = RING_SPACE(evo, 2);
 	if (ret) {
 		NV_ERROR(dev, "no space while connecting SOR\n");
 		return;
 	}
-	BEGIN_RING(evo, 0, NV50_SOR0_MODE_CTRL + offset, 1);
+	BEGIN_RING(evo, 0, NV50_EVO_SOR(encoder->or, MODE_CTRL), 1);
 	OUT_RING  (evo, mode_ctl);
 }
 

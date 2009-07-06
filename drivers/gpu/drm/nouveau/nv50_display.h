@@ -33,7 +33,7 @@
 #include "nouveau_dma.h"
 #include "nouveau_reg.h"
 #include "nouveau_crtc.h"
-#include "nv50_display_commands.h"
+#include "nv50_evo.h"
 
 void nv50_display_irq_handler(struct drm_device *dev);
 void nv50_display_irq_handler_old(struct drm_device *dev);
