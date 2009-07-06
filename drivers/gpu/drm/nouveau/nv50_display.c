@@ -31,6 +31,8 @@
 #include "nouveau_fb.h"
 #include "drm_crtc_helper.h"
 
+extern int nouveau_uscript;
+
 static int nv50_display_pre_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -495,7 +497,7 @@ static void nv50_display_vclk_update(struct drm_device *dev)
 	}
 }
 
-void
+static void
 nv50_display_irq_handler_old(struct drm_device *dev)
 {
 	uint32_t super = nv_rd32(NV50_PDISPLAY_INTR);
@@ -700,16 +702,17 @@ ack:
 }
 
 void
-nv50_display_irq_handler(struct drm_device *dev)
+nv50_display_irq_handler_bh(struct work_struct *work)
 {
-	while (nv_rd32(NV50_PMC_INTR_0) & NV50_PMC_INTR_0_DISPLAY) {
+	struct drm_nouveau_private *dev_priv =
+		container_of(work, struct drm_nouveau_private, irq_work);
+	struct drm_device *dev = dev_priv->dev;
+
+	for (;;) {
 		uint32_t unk20 = nv_rd32(0x610020);
 		uint32_t intr = nv_rd32(NV50_PDISPLAY_INTR);
-		(void)unk20;
 
-		if (!intr)
-			break;
-		NV_DEBUG(dev, "PDISPLAY_INTR 0x%08x\n", intr);
+		NV_DEBUG(dev, "PDISPLAY_INTR_BH 0x%08x 0x%08x\n", unk20, intr);
 
 		if (intr & NV50_PDISPLAY_INTR_CLK_UNK10)
 			nv50_display_unk10_handler(dev);
@@ -720,11 +723,51 @@ nv50_display_irq_handler(struct drm_device *dev)
 		if (intr & NV50_PDISPLAY_INTR_CLK_UNK40)
 			nv50_display_unk40_handler(dev);
 		else
-		if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTCn)
+			break;
+	}
+
+	nv_wr32(NV03_PMC_INTR_EN_0, 1);
+}
+
+void
+nv50_display_irq_handler(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t delayed = 0;
+
+	while (nv_rd32(NV50_PMC_INTR_0) & NV50_PMC_INTR_0_DISPLAY) {
+		uint32_t unk20 = nv_rd32(0x610020);
+		uint32_t intr = nv_rd32(NV50_PDISPLAY_INTR);
+		uint32_t clock;
+
+		if (!(intr & ~delayed))
+			break;
+		NV_DEBUG(dev, "PDISPLAY_INTR 0x%08x 0x%08x\n", unk20, intr);
+
+		if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTCn) {
 			nv50_display_vblank_handler(dev, intr);
-		else {
+			intr &= ~NV50_PDISPLAY_INTR_VBLANK_CRTCn;
+		}
+
+		clock = (intr & (NV50_PDISPLAY_INTR_CLK_UNK10 |
+				 NV50_PDISPLAY_INTR_CLK_UNK20 |
+				 NV50_PDISPLAY_INTR_CLK_UNK40));
+		if (nouveau_uscript && clock) {
+			nv_wr32(NV03_PMC_INTR_EN_0, 0);
+			if (!work_pending(&dev_priv->irq_work))
+				schedule_work(&dev_priv->irq_work);
+			delayed |= clock;
+			intr &= ~clock;
+		} else
+		if (!nouveau_uscript && clock) {
+			nv50_display_irq_handler_old(dev);
+			intr &= ~clock;
+		}
+
+		if (intr) {
 			NV_ERROR(dev, "unknown PDISPLAY_INTR: 0x%08x\n", intr);
 			nv_wr32(NV50_PDISPLAY_INTR, intr);
 		}
 	}
 }
+
