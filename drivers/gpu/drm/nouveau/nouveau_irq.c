@@ -126,7 +126,14 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 			uint32_t mthd, data;
 			int ptr;
 
-			ptr = get >> 2;
+			/* NV_PFIFO_CACHE1_GET actually goes to 0xffc before
+			 * wrapping on my G80 chips, but CACHE1 isn't big
+			 * enough for this much data.. Tests show that it
+			 * wraps around to the start at GET=0x800.. No clue
+			 * as to why..
+			 */
+			ptr = (get & 0x7ff) >> 2;
+
 			if (dev_priv->card_type < NV_40) {
 				mthd = nv_rd32(NV04_PFIFO_CACHE1_METHOD(ptr));
 				data = nv_rd32(NV04_PFIFO_CACHE1_DATA(ptr));
