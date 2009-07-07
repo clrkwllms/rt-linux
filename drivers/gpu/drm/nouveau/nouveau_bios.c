@@ -239,20 +239,20 @@ static bool NVShadowVBIOS(struct drm_device *dev, uint8_t *data)
 	return false;
 }
 
-typedef struct {
+struct init_tbl_entry {
 	char* name;
 	uint8_t id;
 	int length;
 	int length_offset;
 	int length_multiplier;
 	bool (*handler)(struct drm_device *dev, struct nvbios *, uint16_t, struct init_exec *);
-} init_tbl_entry_t;
+};
 
-typedef struct {
+struct bit_entry {
 	uint8_t id[2];
 	uint16_t length;
 	uint16_t offset;
-} bit_entry_t;
+};
 
 static int parse_init_table(struct drm_device *dev, struct nvbios *bios, unsigned int offset, struct init_exec *iexec);
 
@@ -2405,7 +2405,7 @@ init_96(struct drm_device *dev, struct nvbios *bios, uint16_t offset,
 	return true;
 }
 
-static init_tbl_entry_t itbl_entry[] = {
+static struct init_tbl_entry itbl_entry[] = {
 	/* command name                       , id  , length  , offset  , mult    , command handler                 */
 	/* INIT_PROG (0x31, 15, 10, 4) removed due to no example of use */
 	{ "INIT_IO_RESTRICT_PROG"             , 0x32, 11      , 6       , 4       , init_io_restrict_prog           },
@@ -3682,7 +3682,7 @@ static void parse_script_table_pointers(struct nvbios *bios, uint16_t offset)
 	bios->init_function_tbl_ptr = ROM16(bios->data[offset + 12]);
 }
 
-static int parse_bit_A_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_A_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* Parses the load detect values for g80 cards.
 	 *
@@ -3727,7 +3727,7 @@ static int parse_bit_A_tbl_entry(struct drm_device *dev, struct nvbios *bios, bi
 	return 0;
 }
 
-static int parse_bit_C_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_C_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* offset + 8  (16 bits): PLL limits table pointer
 	 *
@@ -3744,7 +3744,7 @@ static int parse_bit_C_tbl_entry(struct drm_device *dev, struct nvbios *bios, bi
 	return 0;
 }
 
-static int parse_bit_display_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_display_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* Parses the flat panel table segment that the bit entry points to.
 	 * Starting at bitentry->offset:
@@ -3763,7 +3763,7 @@ static int parse_bit_display_tbl_entry(struct drm_device *dev, struct nvbios *bi
 	return 0;
 }
 
-static int parse_bit_init_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_init_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* Parses the init table segment that the bit entry points to.
 	 *
@@ -3783,7 +3783,7 @@ static int parse_bit_init_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	return 0;
 }
 
-static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* BIT 'i' (info?) table
 	 *
@@ -3840,7 +3840,7 @@ static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, bi
 	return 0;
 }
 
-static int parse_bit_lvds_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_lvds_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* Parses the LVDS table segment that the bit entry points to.
 	 * Starting at bitentry->offset:
@@ -3859,7 +3859,7 @@ static int parse_bit_lvds_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	return 0;
 }
 
-static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* offset + 2  (8  bits): number of options in an INIT_RAM_RESTRICT_ZM_REG_GROUP opcode option set
 	 * offset + 3  (16 bits): pointer to strap xlate table for RAM restrict option selection
@@ -3885,7 +3885,7 @@ static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, bi
 	return 0;
 }
 
-static int parse_bit_tmds_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_tmds_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* Parses the pointer to the TMDS table
 	 *
@@ -3944,7 +3944,7 @@ static int parse_bit_tmds_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 
 static int
 parse_bit_U_tbl_entry(struct drm_device *dev, struct nvbios *bios,
-		      bit_entry_t *bitentry)
+		      struct bit_entry *bitentry)
 {
 	/* Parses the pointer to the G80 output script tables
 	 *
@@ -3967,7 +3967,7 @@ parse_bit_U_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 
 struct bit_table {
 	const char id;
-	int (* const parse_fn)(struct drm_device *, struct nvbios *, bit_entry_t *);
+	int (* const parse_fn)(struct drm_device *, struct nvbios *, struct bit_entry *);
 };
 
 #define BIT_TABLE(id, funcid) ((struct bit_table){ id, parse_bit_##funcid##_tbl_entry })
@@ -3976,7 +3976,7 @@ static int parse_bit_table(struct drm_device *dev, struct nvbios *bios, const ui
 {
 	uint8_t maxentries = bios->data[bitoffset + 4];
 	int i, offset;
-	bit_entry_t bitentry;
+	struct bit_entry bitentry;
 
 	for (i = 0, offset = bitoffset + 6; i < maxentries; i++, offset += 6) {
 		bitentry.id[0] = bios->data[offset];
