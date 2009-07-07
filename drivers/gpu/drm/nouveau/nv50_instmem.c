@@ -427,9 +427,6 @@ nv50_instmem_prepare_access(struct drm_device *dev, bool write)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 
-	BUG_ON(dev_priv->ramin_map != NULL);
-	dev_priv->ramin_map = dev_priv->ramin;
-
 	priv->last_access_wr = write;
 }
 
@@ -438,9 +435,6 @@ nv50_instmem_finish_access(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
-
-	BUG_ON(dev_priv->ramin_map == NULL);
-	dev_priv->ramin_map = NULL;
 
 	if (priv->last_access_wr) {
 		nv_wr32(0x070000, 0x00000001);

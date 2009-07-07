@@ -536,7 +536,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	}
 
 	/* map larger RAMIN aperture on NV40 cards */
-	dev_priv->ramin_map = dev_priv->ramin  = NULL;
+	dev_priv->ramin  = NULL;
 	if (dev_priv->card_type >= NV_40) {
 		int ramin_resource = 2;
 		if (drm_get_resource_len(dev, ramin_resource) == 0)

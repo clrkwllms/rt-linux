@@ -428,7 +428,6 @@ struct drm_nouveau_private {
 
 	struct drm_local_map *mmio;
 	struct drm_local_map *fb;
-	struct drm_local_map *ramin_map;
 	struct drm_local_map *ramin;
 
 	struct work_struct irq_work;
@@ -940,8 +939,8 @@ extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 #define nv_wv32(reg,val) nv_wf32(reg, val)
 
 /* PRAMIN access */
-#define nv_ri32(reg) nv_in32(ramin_map, (reg))
-#define nv_wi32(reg,val) nv_out32(ramin_map, (reg), (val))
+#define nv_ri32(reg) nv_in32(ramin, (reg))
+#define nv_wi32(reg,val) nv_out32(ramin, (reg), (val))
 /* object access */
 #define INSTANCE_RD(o,i) nv_ri32((o)->im_pramin->start + ((i)<<2))
 #define INSTANCE_WR(o,i,v) nv_wi32((o)->im_pramin->start + ((i)<<2), (v))

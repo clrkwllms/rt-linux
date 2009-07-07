@@ -173,18 +173,10 @@ nv04_instmem_unbind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 void
 nv04_instmem_prepare_access(struct drm_device *dev, bool write)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-
-	BUG_ON(dev_priv->ramin_map != NULL);
-	dev_priv->ramin_map = dev_priv->ramin;
 }
 
 void
 nv04_instmem_finish_access(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-
-	BUG_ON(dev_priv->ramin_map == NULL);
-	dev_priv->ramin_map = NULL;
 }
 
