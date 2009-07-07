@@ -138,9 +138,13 @@ nouveau_gem_ioctl_new(struct drm_device *dev, void *data,
 
 	switch (req->info.tile_flags) {
 	case 0x0000:
+	case 0x1800:
 	case 0x2800:
+	case 0x4800:
 	case 0x7000:
+	case 0x7400:
 	case 0x7a00:
+	case 0xe000:
 		break;
 	default:
 		NV_ERROR(dev, "bad page flags: 0x%08x\n", req->info.tile_flags);
