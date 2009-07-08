@@ -772,6 +772,7 @@ extern int  nv04_graph_load_context(struct nouveau_channel *);
 extern int  nv04_graph_save_context(struct nouveau_channel *);
 
 /* nv10_graph.c */
+extern struct nouveau_pgraph_object_class nv10_graph_grclass[];
 extern void nouveau_nv10_context_switch(struct drm_device *);
 extern int  nv10_graph_init(struct drm_device *);
 extern void nv10_graph_takedown(struct drm_device *);
@@ -781,6 +782,8 @@ extern int  nv10_graph_load_context(struct nouveau_channel *);
 extern int  nv10_graph_save_context(struct nouveau_channel *);
 
 /* nv20_graph.c */
+extern struct nouveau_pgraph_object_class nv20_graph_grclass[];
+extern struct nouveau_pgraph_object_class nv30_graph_grclass[];
 extern int  nv20_graph_create_context(struct nouveau_channel *);
 extern void nv20_graph_destroy_context(struct nouveau_channel *);
 extern int  nv20_graph_load_context(struct nouveau_channel *);
@@ -790,6 +793,7 @@ extern void nv20_graph_takedown(struct drm_device *);
 extern int  nv30_graph_init(struct drm_device *);
 
 /* nv40_graph.c */
+extern struct nouveau_pgraph_object_class nv40_graph_grclass[];
 extern int  nv40_graph_init(struct drm_device *);
 extern void nv40_graph_takedown(struct drm_device *);
 extern int  nv40_graph_create_context(struct nouveau_channel *);
@@ -798,6 +802,7 @@ extern int  nv40_graph_load_context(struct nouveau_channel *);
 extern int  nv40_graph_save_context(struct nouveau_channel *);
 
 /* nv50_graph.c */
+extern struct nouveau_pgraph_object_class nv50_graph_grclass[];
 extern int  nv50_graph_init(struct drm_device *);
 extern void nv50_graph_takedown(struct drm_device *);
 extern void nv50_graph_fifo_access(struct drm_device *, bool);

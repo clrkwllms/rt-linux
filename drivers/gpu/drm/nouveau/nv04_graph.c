@@ -558,10 +558,20 @@ struct nouveau_pgraph_object_method nv04_graph_mthds_set_operation[] = {
 
 struct nouveau_pgraph_object_class nv04_graph_grclass[] = {
 	{ 0x0039, false, nv04_graph_mthds_m2mf },
-	{ 0x004a, false, nv04_graph_mthds_set_operation },
-	{ 0x005f, false, nv04_graph_mthds_set_operation },
-	{ 0x0061, false, nv04_graph_mthds_set_operation },
-	{ 0x0077, false, nv04_graph_mthds_set_operation },
+	{ 0x004a, false, nv04_graph_mthds_set_operation }, /* gdirect */
+	{ 0x005f, false, nv04_graph_mthds_set_operation }, /* imageblit */
+	{ 0x0061, false, nv04_graph_mthds_set_operation }, /* ifc */
+	{ 0x0077, false, nv04_graph_mthds_set_operation }, /* sifm */
+	{ 0x0030, false, NULL }, /* null */
+	{ 0x0042, false, NULL }, /* surf2d */
+	{ 0x0043, false, NULL }, /* rop */
+	{ 0x0012, false, NULL }, /* beta1 */
+	{ 0x0072, false, NULL }, /* beta4 */
+	{ 0x0019, false, NULL }, /* cliprect */
+	{ 0x0044, false, NULL }, /* pattern */
+	{ 0x0053, false, NULL }, /* surf3d */
+	{ 0x0054, false, NULL }, /* tex_tri */
+	{ 0x0055, false, NULL }, /* multitex_tri */
 	{}
 };
 
