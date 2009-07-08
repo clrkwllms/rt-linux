@@ -1089,18 +1089,31 @@ nouveau_gpuobj_channel_takedown(struct nouveau_channel *chan)
 int nouveau_ioctl_grobj_alloc(struct drm_device *dev, void *data,
 			      struct drm_file *file_priv)
 {
-	struct nouveau_channel *chan;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_grobj_alloc *init = data;
+	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
+	struct nouveau_pgraph_object_class *grc;
 	struct nouveau_gpuobj *gr = NULL;
+	struct nouveau_channel *chan;
 	int ret;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 	NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(init->channel, file_priv, chan);
 
-	//FIXME: check args, only allow trusted objects to be created
-
 	if (init->handle == ~0)
 		return -EINVAL;
+
+	grc = pgraph->grclass;
+	while (grc->id) {
+		if (grc->id == init->class)
+			break;
+		grc++;
+	}
+
+	if (!grc->id) {
+		NV_ERROR(dev, "Illegal object class: 0x%x\n", init->class);
+		return -EPERM;
+	}
 
 	if (nouveau_gpuobj_ref_find(chan, init->handle, NULL) == 0)
 		return -EEXIST;
