@@ -107,11 +107,21 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 				     "Ch %d/%d Mthd 0x%04x Data 0x%08x\n",
 				chid, (mthd >> 13) & 7, mthd & 0x1ffc, data);
 
+			nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, 0);
+			nv_wr32(NV03_PFIFO_INTR_0, NV_PFIFO_INTR_CACHE_ERROR);
+
+			nv_wr32(NV03_PFIFO_CACHE1_PUSH0,
+				nv_rd32(NV03_PFIFO_CACHE1_PUSH0) & ~1);
 			nv_wr32(NV03_PFIFO_CACHE1_GET, get + 4);
+			nv_wr32(NV03_PFIFO_CACHE1_PUSH0,
+				nv_rd32(NV03_PFIFO_CACHE1_PUSH0) | 1);
+			nv_wr32(NV04_PFIFO_CACHE1_HASH, 0);
+
+			nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
+				nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
 			nv_wr32(NV04_PFIFO_CACHE1_PULL0, 1);
 
 			status &= ~NV_PFIFO_INTR_CACHE_ERROR;
-			nv_wr32(NV03_PFIFO_INTR_0, NV_PFIFO_INTR_CACHE_ERROR);
 		}
 
 		if (status & NV_PFIFO_INTR_DMA_PUSHER) {
