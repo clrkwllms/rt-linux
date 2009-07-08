@@ -280,7 +280,21 @@ struct nouveau_fifo_engine {
 	int  (*save_context)(struct nouveau_channel *);
 };
 
+struct nouveau_pgraph_object_method {
+	int id;
+	int (*exec)(struct nouveau_channel *chan, int grclass, int mthd,
+		      uint32_t data);
+};
+
+struct nouveau_pgraph_object_class {
+	int id;
+	bool software;
+	struct nouveau_pgraph_object_method *methods;
+};
+
 struct nouveau_pgraph_engine {
+	struct nouveau_pgraph_object_class *grclass;
+
 	int  (*init)(struct drm_device *);
 	void (*takedown)(struct drm_device *);
 
@@ -747,6 +761,7 @@ extern int  nv50_fifo_load_context(struct nouveau_channel *);
 extern int  nv50_fifo_save_context(struct nouveau_channel *);
 
 /* nv04_graph.c */
+extern struct nouveau_pgraph_object_class nv04_graph_grclass[];
 extern void nouveau_nv04_context_switch(struct drm_device *);
 extern int  nv04_graph_init(struct drm_device *);
 extern void nv04_graph_takedown(struct drm_device *);

@@ -35,7 +35,6 @@
 #include "nouveau_drm.h"
 #include "nouveau_drv.h"
 #include "nouveau_reg.h"
-#include "nouveau_swmthd.h"
 
 /* needed for hotplug irq */
 #include "nouveau_connector.h"
@@ -328,36 +327,57 @@ nouveau_graph_dump_trap_info(struct drm_device *dev, const char *id,
 		 trap->data2, trap->data);
 }
 
+static int
+nouveau_pgraph_intr_swmthd(struct drm_device *dev,
+			   struct nouveau_pgraph_trap *trap)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_engine *engine = &dev_priv->engine;
+	struct nouveau_pgraph_object_class *grc = engine->graph.grclass;
+	struct nouveau_pgraph_object_method *mthd;
+	struct nouveau_channel *chan = NULL;
+
+	if (trap->channel >= 0 && trap->channel < engine->fifo.channels)
+		chan = dev_priv->fifos[trap->channel];
+	if (!chan)
+		return -ENODEV;
+
+	while (grc->id) {
+		if (grc->id != trap->class) {
+			grc++;
+			continue;
+		}
+
+		mthd = grc->methods;
+		if (!mthd)
+			break;
+
+		while (mthd->id) {
+			if (mthd->id != trap->mthd) {
+				mthd++;
+				continue;
+			}
+
+			return mthd->exec(chan, grc->id, mthd->id, trap->data);
+		}
+
+		break;
+	}
+
+	return -ENODEV;
+}
+
 static inline void
 nouveau_pgraph_intr_notify(struct drm_device *dev, uint32_t nsource)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *chan = NULL;
 	struct nouveau_pgraph_trap trap;
 	int unhandled = 0;
 
 	nouveau_graph_trap_info(dev, &trap);
 
-	if (trap.channel >= 0 && trap.channel < dev_priv->engine.fifo.channels)
-		chan = dev_priv->fifos[trap.channel];
-
 	if (nsource & NV03_PGRAPH_NSOURCE_ILLEGAL_MTHD) {
-		/* NV4 (nvidia TNT 1) reports software methods with
-		 * PGRAPH NOTIFY ILLEGAL_MTHD
-		 */
-		NV_DEBUG(dev, "Got NV04 software method method %x for class %#x\n",
-			  trap.mthd, trap.class);
-
-		if (trap.class == 0x0039 && trap.mthd == 0x0150) {
-			chan->fence.last_sequence_irq = trap.data;
-			nouveau_fence_handler(dev, trap.channel);
-		} else
-		if (nouveau_sw_method_execute(dev, trap.class, trap.mthd)) {
-			NV_ERROR(dev, "Unable to execute NV04 software method "
-				       "%x for class %x. Please report.\n",
-				 trap.mthd, trap.class);
+		if (nouveau_pgraph_intr_swmthd(dev, &trap))
 			unhandled = 1;
-		}
 	} else {
 		unhandled = 1;
 	}
@@ -376,12 +396,8 @@ nouveau_pgraph_intr_error(struct drm_device *dev, uint32_t nsource)
 	trap.nsource = nsource;
 
 	if (nsource & NV03_PGRAPH_NSOURCE_ILLEGAL_MTHD) {
-		if (trap.channel >= 0 && trap.mthd == 0x0150) {
-			nouveau_fence_handler(dev, trap.channel);
-		} else
-		if (nouveau_sw_method_execute(dev, trap.class, trap.mthd)) {
+		if (nouveau_pgraph_intr_swmthd(dev, &trap))
 			unhandled = 1;
-		}
 	} else {
 		unhandled = 1;
 	}

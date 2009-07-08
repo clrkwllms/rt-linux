@@ -518,3 +518,50 @@ nv04_graph_fifo_access(struct drm_device *dev, bool enabled)
 		nv_wr32(NV04_PGRAPH_FIFO, nv_rd32(NV04_PGRAPH_FIFO) & ~1);
 }
 
+static int
+nv04_graph_mthd_set_ref(struct nouveau_channel *chan, int grclass,
+			int mthd, uint32_t data)
+{
+	chan->fence.last_sequence_irq = data;
+	nouveau_fence_handler(chan->dev, chan->id);
+	return 0;
+}
+
+static int
+nv04_graph_mthd_set_operation(struct nouveau_channel *chan, int grclass,
+			      int mthd, uint32_t data)
+{
+	struct drm_device *dev = chan->dev;
+	uint32_t instance = nv_rd32(NV04_PGRAPH_CTX_SWITCH4) & 0xffff;
+	int subc = (nv_rd32(NV04_PGRAPH_TRAPPED_ADDR) >> 13) & 0x7;
+	uint32_t tmp;
+
+	tmp  = nv_ri32(instance);
+	tmp &= ~0x00038000;
+	tmp |= ((data & 7) << 15);
+
+	nv_wi32(instance, tmp);
+	nv_wr32(NV04_PGRAPH_CTX_SWITCH1, tmp);
+	nv_wr32(NV04_PGRAPH_CTX_CACHE1 + subc, tmp);
+	return 0;
+}
+
+static struct nouveau_pgraph_object_method nv04_graph_mthds_m2mf[] = {
+	{ 0x0150, nv04_graph_mthd_set_ref },
+	{}
+};
+
+struct nouveau_pgraph_object_method nv04_graph_mthds_set_operation[] = {
+	{ 0x02fc, nv04_graph_mthd_set_operation },
+	{},
+};
+
+struct nouveau_pgraph_object_class nv04_graph_grclass[] = {
+	{ 0x0039, false, nv04_graph_mthds_m2mf },
+	{ 0x004a, false, nv04_graph_mthds_set_operation },
+	{ 0x005f, false, nv04_graph_mthds_set_operation },
+	{ 0x0061, false, nv04_graph_mthds_set_operation },
+	{ 0x0077, false, nv04_graph_mthds_set_operation },
+	{}
+};
+

@@ -58,6 +58,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->timer.takedown	= nv04_timer_takedown;
 		engine->fb.init		= nv04_fb_init;
 		engine->fb.takedown	= nv04_fb_takedown;
+		engine->graph.grclass	= nv04_graph_grclass;
 		engine->graph.init	= nv04_graph_init;
 		engine->graph.takedown	= nv04_graph_takedown;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
