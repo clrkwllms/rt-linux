@@ -173,6 +173,8 @@ struct nouveau_channel
 
 	/* Fencing */
 	struct {
+		/* lock protects the pending list only */
+		spinlock_t lock;
 		struct list_head pending;
 		uint32_t sequence;
 		uint32_t sequence_ack;

@@ -64,6 +64,8 @@ nouveau_fence_update(struct nouveau_channel *chan)
 	struct nouveau_fence *fence;
 	uint32_t sequence;
 
+	BUG_ON(!spin_is_locked(&chan->fence.lock));
+
 	if (USE_REFCNT)
 		sequence = nvchan_rd32(0x48);
 	else
@@ -119,6 +121,7 @@ nouveau_fence_emit(struct nouveau_fence *fence)
 {
 	struct drm_nouveau_private *dev_priv = fence->channel->dev->dev_private;
 	struct nouveau_channel *chan = fence->channel;
+	unsigned long flags;
 	int ret;
 
 	ret = RING_SPACE(chan, 2);
@@ -126,7 +129,10 @@ nouveau_fence_emit(struct nouveau_fence *fence)
 		return ret;
 
 	if (unlikely(chan->fence.sequence == chan->fence.sequence_ack - 1)) {
+		spin_lock_irqsave(&chan->fence.lock, flags);
 		nouveau_fence_update(chan);
+		spin_unlock_irqrestore(&chan->fence.lock, flags);
+
 		BUG_ON(chan->fence.sequence ==
 		       chan->fence.sequence_ack - 1);
 	}
@@ -138,7 +144,9 @@ nouveau_fence_emit(struct nouveau_fence *fence)
 	FIRE_RING (chan);
 
 	kref_get(&fence->refcount);
+	spin_lock_irqsave(&chan->fence.lock, flags);
 	list_add_tail(&fence->entry, &chan->fence.pending);
+	spin_unlock_irqrestore(&chan->fence.lock, flags);
 	return 0;
 }
 
@@ -165,11 +173,15 @@ bool
 nouveau_fence_signalled(void *sync_obj, void *sync_arg)
 {
 	struct nouveau_fence *fence = nouveau_fence(sync_obj);
+	struct nouveau_channel *chan = fence->channel;
+	unsigned long flags;
 
 	if (fence->signalled)
 		return true;
 
-	nouveau_fence_update(fence->channel);
+	spin_lock_irqsave(&chan->fence.lock, flags);
+	nouveau_fence_update(chan);
+	spin_unlock_irqrestore(&chan->fence.lock, flags);
 	return fence->signalled;
 }
 
@@ -219,15 +231,18 @@ nouveau_fence_handler(struct drm_device *dev, int channel)
 	if (channel >= 0 && channel < dev_priv->engine.fifo.channels)
 		chan = dev_priv->fifos[channel];
 
-	if (chan)
+	if (chan) {
+		spin_lock_irq(&chan->fence.lock);
 		nouveau_fence_update(chan);
+		spin_unlock_irq(&chan->fence.lock);
+	}
 }
 
 int
 nouveau_fence_init(struct nouveau_channel *chan)
 {
 	INIT_LIST_HEAD(&chan->fence.pending);
-
+	spin_lock_init(&chan->fence.lock);
 	return 0;
 }
 
