@@ -507,7 +507,8 @@ nv_output_get_modes(struct drm_connector *connector)
 
 	/* panels only have one mode, and it doesn't change */
 	if (nv_connector->native_mode) {
-		drm_mode_probed_add(connector, nv_connector->native_mode);
+		drm_mode_probed_add(connector, drm_mode_duplicate(dev,
+				    nv_connector->native_mode));
 		return 1;
 	}
 
@@ -519,7 +520,7 @@ nv_output_get_modes(struct drm_connector *connector)
 		mode.type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 
 		nv_connector->native_mode = drm_mode_duplicate(dev, &mode);
-		drm_mode_probed_add(connector, &mode);
+		drm_mode_probed_add(connector, drm_mode_duplicate(dev, &mode));
 		ret = 1;
 	} else {
 		ret = nv_output_get_edid_modes(connector);
