@@ -44,6 +44,14 @@ MODULE_PARM_DESC(uscript, "Execute output scripts (>=GeForce 8)");
 int nouveau_uscript = 1;
 module_param_named(uscript, nouveau_uscript, int, 0400);
 
+MODULE_PARM_DESC(uscript_lvds, "LVDS output script table ID (>=GeForce 8)");
+int nouveau_uscript_lvds = -1;
+module_param_named(uscript_lvds, nouveau_uscript_lvds, int, 0400);
+
+MODULE_PARM_DESC(uscript_tmds, "TMDS output script table ID (>=GeForce 8)");
+int nouveau_uscript_tmds = -1;
+module_param_named(uscript_tmds, nouveau_uscript_tmds, int, 0400);
+
 int nouveau_fbpercrtc = 0;
 #if 0
 module_param_named(fbpercrtc, nouveau_fbpercrtc, int, 0400);

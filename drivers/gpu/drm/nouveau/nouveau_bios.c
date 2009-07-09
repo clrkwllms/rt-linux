@@ -3103,6 +3103,9 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 	return 0;
 }
 
+extern int nouveau_uscript_lvds;
+extern int nouveau_uscript_tmds;
+
 int
 nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 			       int pxclk)
@@ -3202,10 +3205,16 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 	/* Anyone have an idea to know which to use for certain? */
 	switch (dcbent->type) {
 	case OUTPUT_LVDS:
-		sub = 0x0100; /* 0x0000 0x0100 0x0200 0x0300 */
+		if (nouveau_uscript_lvds >= 0)
+			sub = nouveau_uscript_lvds;
+		else
+			sub = 0x0100; /* 0x0000 0x0100 0x0200 0x0300 */
 		break;
 	case OUTPUT_TMDS:
-		sub = 0x0001; /* 0x0001 0x0002 0x0105 */
+		if (nouveau_uscript_tmds >= 0)
+			sub = nouveau_uscript_tmds;
+		else
+			sub = 0x0001; /* 0x0001 0x0002 0x0105 */
 		break;
 	default:
 		sub = 0x0000; /* 0x0000 */
@@ -3217,8 +3226,11 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 			break;
 	}
 
-	if (i == otable[5])
+	if (i == otable[5]) {
+		NV_ERROR(dev, "Table 0x%04x not found for %d/%d, using first\n",
+			 sub, dcbent->type, dcbent->or);
 		i = 0;
+	}
 
 	bios->display.head = ffs(dcbent->or) - 1;
 
