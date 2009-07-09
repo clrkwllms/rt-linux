@@ -275,11 +275,7 @@ nv04_fbcon_accel_init(struct fb_info *info)
 	OUT_RING  (chan, NvImagePatt);
 	OUT_RING  (chan, NvRop);
 	BEGIN_RING(chan, NvSubGdiRect, 0x0304, 1);
-#ifdef __BIG_ENDIAN
-	OUT_RING  (chan, 2);
-#else
 	OUT_RING  (chan, 1);
-#endif
 	BEGIN_RING(chan, NvSubGdiRect, 0x0300, 1);
 	OUT_RING  (chan, rect_fmt);
 	BEGIN_RING(chan, NvSubGdiRect, 0x02fc, 1);
