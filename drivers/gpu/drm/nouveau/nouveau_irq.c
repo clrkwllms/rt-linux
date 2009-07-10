@@ -113,6 +113,8 @@ nouveau_fifo_swmthd(struct nouveau_channel *chan, uint32_t addr, uint32_t data)
 			return false;
 
 		chan->sw_subchannel[subc] = ref->gpuobj->class;
+		nv_wr32(NV04_PFIFO_CACHE1_ENGINE, nv_rd32(
+			NV04_PFIFO_CACHE1_ENGINE & ~(0xf << subc*4)));
 		return true;
 	}
 
