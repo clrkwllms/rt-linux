@@ -99,27 +99,28 @@ nouveau_call_method(struct nouveau_channel *chan, int class, int mthd, int data)
 static bool
 nouveau_fifo_swmthd(struct nouveau_channel *chan, uint32_t addr, uint32_t data)
 {
+	struct drm_device *dev = chan->dev;
 	const int subc = (addr >> 13) & 0x7;
 	const int mthd = addr & 0x1ffc;
 
-	/*XXX: this needs some work. */
 	if (mthd == 0x0000) {
 		struct nouveau_gpuobj_ref *ref = NULL;
 
 		if (nouveau_gpuobj_ref_find(chan, data, &ref))
 			return false;
 
-		if (ref->gpuobj->class != 0x506e)
+		if (ref->gpuobj->engine != NVOBJ_ENGINE_SW)
 			return false;
 
-		chan->nvsw.subc = (1 << subc);
+		chan->sw_subchannel[subc] = ref->gpuobj->class;
 		return true;
 	}
 
-	if (chan->nvsw.subc != (1 << subc))
+	/* hw object */
+	if (nv_rd32(NV04_PFIFO_CACHE1_ENGINE) & (1 << subc))
 		return false;
 
-	if (nouveau_call_method(chan, 0x506e, mthd, data))
+	if (nouveau_call_method(chan, chan->sw_subchannel[subc], mthd, data))
 		return false;
 
 	return true;

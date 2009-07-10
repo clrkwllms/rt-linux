@@ -227,8 +227,9 @@ struct nouveau_channel
 		volatile uint32_t *pushbuf;
 	} dma;
 
+	uint32_t sw_subchannel[8];
+
 	struct {
-		uint32_t subc; /*XXX: read off GPU! */
 		struct nouveau_gpuobj *vblsem;
 		uint32_t vblsem_offset;
 		uint32_t vblsem_rval;
