@@ -694,6 +694,7 @@
 #        define NV50_PDISPLAY_INTR_CLK_UNK20                    (1<<5)
 #        define NV50_PDISPLAY_INTR_CLK_UNK40                    (1<<6)
 #    define NV50_PDISPLAY_INTR_EN                           0x0061002c
+#        define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC(n)  (1 << ((n) + 2))
 #        define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC0              (1<<2)
 #        define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC1              (1<<3)
 #        define NV50_PDISPLAY_INTR_EN_CLK_UNK10                 (1<<4)

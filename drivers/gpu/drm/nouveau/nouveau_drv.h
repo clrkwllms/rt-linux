@@ -232,6 +232,7 @@ struct nouveau_channel
 		struct nouveau_gpuobj *vblsem;
 		uint32_t vblsem_offset;
 		uint32_t vblsem_rval;
+		struct list_head vbl_wait;
 	} nvsw;
 };
 
@@ -454,6 +455,7 @@ struct drm_nouveau_private {
 	struct drm_local_map *ramin;
 
 	struct work_struct irq_work;
+	struct list_head vbl_waiting;
 
 	struct {
 		struct ttm_global_reference mem_global_ref;

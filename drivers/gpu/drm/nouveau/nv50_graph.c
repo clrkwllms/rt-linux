@@ -345,7 +345,7 @@ static int
 nv50_graph_nvsw_dma_vblsem(struct nouveau_channel *chan, int grclass,
 			   int mthd, uint32_t data)
 {
-	struct nouveau_gpuobj_ref *ref;
+	struct nouveau_gpuobj_ref *ref = NULL;
 
 	if (nouveau_gpuobj_ref_find(chan, data, &ref))
 		return -ENOENT;
@@ -381,12 +381,21 @@ static int
 nv50_graph_nvsw_vblsem_release(struct nouveau_channel *chan, int grclass,
 			       int mthd, uint32_t data)
 {
-	uint32_t *sem = chan->notifier_bo->kmap.virtual;
+	struct drm_device *dev = chan->dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
-	if (!chan->nvsw.vblsem || chan->nvsw.vblsem_offset == ~0)
+	if (!chan->nvsw.vblsem || chan->nvsw.vblsem_offset == ~0 || data > 1)
 		return -EINVAL;
 
-	sem[chan->nvsw.vblsem_offset] = chan->nvsw.vblsem_rval;
+	if (!(nv_rd32(NV50_PDISPLAY_INTR_EN) &
+		      NV50_PDISPLAY_INTR_EN_VBLANK_CRTC(data))) {
+		nv_wr32(NV50_PDISPLAY_INTR,
+			NV50_PDISPLAY_INTR_VBLANK_CRTC(data));
+		nv_wr32(NV50_PDISPLAY_INTR_EN, nv_rd32(NV50_PDISPLAY_INTR_EN) |
+			NV50_PDISPLAY_INTR_EN_VBLANK_CRTC(data));
+	}
+
+	list_add(&chan->nvsw.vbl_wait, &dev_priv->vbl_waiting);
 	return 0;
 }
 

@@ -609,8 +609,32 @@ nv50_display_irq_head(struct drm_device *dev, int *phead,
 }
 
 static void
+nv50_display_vblank_crtc_handler(struct drm_device *dev, int crtc)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_channel *chan;
+	struct list_head *entry, *tmp;
+	uint32_t *sem;
+
+	list_for_each_safe(entry, tmp, &dev_priv->vbl_waiting) {
+		chan = list_entry(entry, struct nouveau_channel, nvsw.vbl_wait);
+
+		sem = chan->notifier_bo->kmap.virtual;
+		sem[chan->nvsw.vblsem_offset] = chan->nvsw.vblsem_rval;
+
+		list_del(&chan->nvsw.vbl_wait);
+	}
+}
+
+static void
 nv50_display_vblank_handler(struct drm_device *dev, uint32_t intr)
 {
+	if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTC0)
+		nv50_display_vblank_crtc_handler(dev, 0);
+
+	if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTC1)
+		nv50_display_vblank_crtc_handler(dev, 1);
+
 	nv_wr32(NV50_PDISPLAY_INTR, intr & NV50_PDISPLAY_INTR_VBLANK_CRTCn);
 }
 
