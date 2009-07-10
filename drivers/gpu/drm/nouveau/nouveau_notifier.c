@@ -152,6 +152,24 @@ nouveau_notifier_alloc(struct nouveau_channel *chan, uint32_t handle,
 }
 
 int
+nouveau_notifier_offset(struct nouveau_gpuobj *nobj, uint32_t *poffset)
+{
+	if (!nobj || nobj->dtor != nouveau_notifier_gpuobj_dtor)
+		return -EINVAL;
+
+	if (poffset) {
+		struct mem_block *mem = nobj->priv;
+
+		if (*poffset >= mem->size)
+			return false;
+
+		*poffset += mem->start;
+	}
+
+	return 0;
+}
+
+int
 nouveau_ioctl_notifier_alloc(struct drm_device *dev, void *data,
 			     struct drm_file *file_priv)
 {

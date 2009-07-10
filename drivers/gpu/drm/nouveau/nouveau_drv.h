@@ -618,6 +618,7 @@ extern int  nouveau_notifier_init_channel(struct nouveau_channel *);
 extern void nouveau_notifier_takedown_channel(struct nouveau_channel *);
 extern int  nouveau_notifier_alloc(struct nouveau_channel *, uint32_t handle,
 				   int cout, uint32_t *offset);
+extern int  nouveau_notifier_offset(struct nouveau_gpuobj *, uint32_t *);
 extern int  nouveau_ioctl_notifier_alloc(struct drm_device *, void *data,
 					 struct drm_file *);
 extern int  nouveau_ioctl_notifier_free(struct drm_device *, void *data,
