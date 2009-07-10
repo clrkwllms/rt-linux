@@ -1156,7 +1156,7 @@ int nouveau_ioctl_grobj_alloc(struct drm_device *dev, void *data,
 
 	ret = nouveau_gpuobj_ref_add(dev, chan, init->handle, gr, NULL);
 	if (ret) {
-		NV_ERROR(dev, "Error referencing object: %d (%d/0x%08x\n)",
+		NV_ERROR(dev, "Error referencing object: %d (%d/0x%08x)\n",
 			 ret, init->channel, init->handle);
 		nouveau_gpuobj_del(dev, &gr);
 		return ret;
