@@ -228,6 +228,7 @@ struct nouveau_channel
 	} dma;
 
 	struct {
+		uint32_t subc; /*XXX: read off GPU! */
 		struct nouveau_gpuobj *vblsem;
 		uint32_t vblsem_offset;
 		uint32_t vblsem_rval;

@@ -67,6 +67,62 @@ nouveau_irq_uninstall(struct drm_device *dev)
 	nv_wr32(NV03_PMC_INTR_EN_0, 0);
 }
 
+static int
+nouveau_call_method(struct nouveau_channel *chan, int class, int mthd, int data)
+{
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
+	struct nouveau_pgraph_object_method *grm;
+	struct nouveau_pgraph_object_class *grc;
+
+	grc = dev_priv->engine.graph.grclass;
+	while (grc->id) {
+		if (grc->id == class)
+			break;
+		grc++;
+	}
+
+	if (grc->id != class)
+		return -ENOENT;
+
+	grm = grc->methods;
+	while (grm->id) {
+		if (grm->id == mthd)
+			return grm->exec(chan, class, mthd, data);
+		grm++;
+	}
+
+	return -ENOENT;
+}
+
+static bool
+nouveau_fifo_swmthd(struct nouveau_channel *chan, uint32_t addr, uint32_t data)
+{
+	const int subc = (addr >> 13) & 0x7;
+	const int mthd = addr & 0x1ffc;
+
+	/*XXX: this needs some work. */
+	if (mthd == 0x0000) {
+		struct nouveau_gpuobj_ref *ref = NULL;
+
+		if (nouveau_gpuobj_ref_find(chan, data, &ref))
+			return false;
+
+		if (ref->gpuobj->class != 0x506e)
+			return false;
+
+		chan->nvsw.subc = (1 << subc);
+		return true;
+	}
+
+	if (chan->nvsw.subc != (1 << subc))
+		return false;
+
+	if (nouveau_call_method(chan, 0x506e, mthd, data))
+		return false;
+
+	return true;
+}
+
 static void
 nouveau_fifo_irq_handler(struct drm_device *dev)
 {
@@ -76,11 +132,14 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 
 	reassign = nv_rd32(NV03_PFIFO_CACHES) & 1;
 	while ((status = nv_rd32(NV03_PFIFO_INTR_0))) {
+		struct nouveau_channel *chan = NULL;
 		uint32_t chid, get;
 
 		nv_wr32(NV03_PFIFO_CACHES, 0);
 
 		chid = engine->fifo.channel_id(dev);
+		if (chid >= 0 && chid < engine->fifo.channels)
+			chan = dev_priv->fifos[chid];
 		get  = nv_rd32(NV03_PFIFO_CACHE1_GET);
 
 		if (status & NV_PFIFO_INTR_CACHE_ERROR) {
@@ -103,9 +162,12 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 				data = nv_rd32(NV40_PFIFO_CACHE1_DATA(ptr));
 			}
 
-			NV_INFO(dev, "PFIFO_CACHE_ERROR - "
-				     "Ch %d/%d Mthd 0x%04x Data 0x%08x\n",
-				chid, (mthd >> 13) & 7, mthd & 0x1ffc, data);
+			if (!chan || !nouveau_fifo_swmthd(chan, mthd, data)) {
+				NV_INFO(dev, "PFIFO_CACHE_ERROR - Ch %d/%d "
+					     "Mthd 0x%04x Data 0x%08x\n",
+					chid, (mthd >> 13) & 7, mthd & 0x1ffc,
+					data);
+			}
 
 			nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, 0);
 			nv_wr32(NV03_PFIFO_INTR_0, NV_PFIFO_INTR_CACHE_ERROR);
@@ -342,39 +404,14 @@ nouveau_pgraph_intr_swmthd(struct drm_device *dev,
 			   struct nouveau_pgraph_trap *trap)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->engine;
-	struct nouveau_pgraph_object_class *grc = engine->graph.grclass;
-	struct nouveau_pgraph_object_method *mthd;
-	struct nouveau_channel *chan = NULL;
 
-	if (trap->channel >= 0 && trap->channel < engine->fifo.channels)
-		chan = dev_priv->fifos[trap->channel];
-	if (!chan)
+	if (trap->channel < 0 ||
+	    trap->channel >= dev_priv->engine.fifo.channels ||
+	    !dev_priv->fifos[trap->channel])
 		return -ENODEV;
 
-	while (grc->id) {
-		if (grc->id != trap->class) {
-			grc++;
-			continue;
-		}
-
-		mthd = grc->methods;
-		if (!mthd)
-			break;
-
-		while (mthd->id) {
-			if (mthd->id != trap->mthd) {
-				mthd++;
-				continue;
-			}
-
-			return mthd->exec(chan, grc->id, mthd->id, trap->data);
-		}
-
-		break;
-	}
-
-	return -ENODEV;
+	return nouveau_call_method(dev_priv->fifos[trap->channel],
+				   trap->class, trap->mthd, trap->data);
 }
 
 static inline void
