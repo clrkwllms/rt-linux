@@ -226,6 +226,12 @@ struct nouveau_channel
 
 		volatile uint32_t *pushbuf;
 	} dma;
+
+	struct {
+		struct nouveau_gpuobj *vblsem;
+		uint32_t vblsem_offset;
+		uint32_t vblsem_rval;
+	} nvsw;
 };
 
 struct nouveau_config {

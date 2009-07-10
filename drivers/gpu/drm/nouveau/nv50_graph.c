@@ -341,7 +341,65 @@ nv50_graph_save_context(struct nouveau_channel *chan)
 	return nv50_graph_transfer_context(dev, inst, 1);
 }
 
+static int
+nv50_graph_nvsw_dma_vblsem(struct nouveau_channel *chan, int grclass,
+			   int mthd, uint32_t data)
+{
+	struct nouveau_gpuobj_ref *ref;
+
+	if (nouveau_gpuobj_ref_find(chan, data, &ref))
+		return -ENOENT;
+
+	if (nouveau_notifier_offset(ref->gpuobj, NULL))
+		return -EINVAL;
+
+	chan->nvsw.vblsem = ref->gpuobj;
+	chan->nvsw.vblsem_offset = ~0;
+	return 0;
+}
+
+static int
+nv50_graph_nvsw_vblsem_offset(struct nouveau_channel *chan, int grclass,
+			      int mthd, uint32_t data)
+{
+	if (nouveau_notifier_offset(chan->nvsw.vblsem, &data))
+		return -ERANGE;
+
+	chan->nvsw.vblsem_offset = data >> 2;
+	return 0;
+}
+
+static int
+nv50_graph_nvsw_vblsem_release_val(struct nouveau_channel *chan, int grclass,
+				   int mthd, uint32_t data)
+{
+	chan->nvsw.vblsem_rval = data;
+	return 0;
+}
+
+static int
+nv50_graph_nvsw_vblsem_release(struct nouveau_channel *chan, int grclass,
+			       int mthd, uint32_t data)
+{
+	uint32_t *sem = chan->notifier_bo->kmap.virtual;
+
+	if (!chan->nvsw.vblsem || chan->nvsw.vblsem_offset == ~0)
+		return -EINVAL;
+
+	sem[chan->nvsw.vblsem_offset] = chan->nvsw.vblsem_rval;
+	return 0;
+}
+
+struct nouveau_pgraph_object_method nv50_graph_nvsw_methods[] = {
+	{ 0x018c, nv50_graph_nvsw_dma_vblsem },
+	{ 0x0400, nv50_graph_nvsw_vblsem_offset },
+	{ 0x0404, nv50_graph_nvsw_vblsem_release_val },
+	{ 0x0408, nv50_graph_nvsw_vblsem_release },
+	{}
+};
+
 struct nouveau_pgraph_object_class nv50_graph_grclass[] = {
+	{ 0x506e, true, nv50_graph_nvsw_methods }, /* nvsw */
 	{ 0x0030, false, NULL }, /* null */
 	{ 0x5039, false, NULL }, /* m2mf */
 	{ 0x502d, false, NULL }, /* 2d */
