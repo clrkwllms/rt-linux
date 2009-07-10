@@ -924,6 +924,7 @@ struct nouveau_pgraph_object_class nv10_graph_grclass[] = {
 	{ 0x0072, false, NULL }, /* beta4 */
 	{ 0x0019, false, NULL }, /* cliprect */
 	{ 0x0044, false, NULL }, /* pattern */
+	{ 0x0052, false, NULL }, /* swzsurf */
 	{ 0x0093, false, NULL }, /* surf3d */
 	{ 0x0094, false, NULL }, /* tex_tri */
 	{ 0x0095, false, NULL }, /* multitex_tri */

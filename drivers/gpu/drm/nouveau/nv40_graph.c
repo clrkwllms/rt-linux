@@ -2192,6 +2192,7 @@ struct nouveau_pgraph_object_class nv40_graph_grclass[] = {
 	{ 0x0072, false, NULL }, /* beta4 */
 	{ 0x0019, false, NULL }, /* cliprect */
 	{ 0x0044, false, NULL }, /* pattern */
+	{ 0x309e, false, NULL }, /* swzsurf */
 	{ 0x4097, false, NULL }, /* curie (nv40) */
 	{ 0x4497, false, NULL }, /* curie (nv44) */
 	{}

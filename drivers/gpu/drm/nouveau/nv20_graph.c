@@ -919,6 +919,7 @@ struct nouveau_pgraph_object_class nv20_graph_grclass[] = {
 	{ 0x0072, false, NULL }, /* beta4 */
 	{ 0x0019, false, NULL }, /* cliprect */
 	{ 0x0044, false, NULL }, /* pattern */
+	{ 0x009e, false, NULL }, /* swzsurf */
 	{ 0x0097, false, NULL }, /* kelvin (nv20) */
 	{ 0x0597, false, NULL }, /* kelvin (nv25) */
 	{}
@@ -938,6 +939,7 @@ struct nouveau_pgraph_object_class nv30_graph_grclass[] = {
 	{ 0x0072, false, NULL }, /* beta4 */
 	{ 0x0019, false, NULL }, /* cliprect */
 	{ 0x0044, false, NULL }, /* pattern */
+	{ 0x039e, false, NULL }, /* swzsurf */
 	{ 0x0397, false, NULL }, /* rankine (nv30) */
 	{ 0x0497, false, NULL }, /* rankine (nv35) */
 	{ 0x0697, false, NULL }, /* rankine (nv34) */

@@ -569,6 +569,7 @@ struct nouveau_pgraph_object_class nv04_graph_grclass[] = {
 	{ 0x0072, false, NULL }, /* beta4 */
 	{ 0x0019, false, NULL }, /* cliprect */
 	{ 0x0044, false, NULL }, /* pattern */
+	{ 0x0052, false, NULL }, /* swzsurf */
 	{ 0x0053, false, NULL }, /* surf3d */
 	{ 0x0054, false, NULL }, /* tex_tri */
 	{ 0x0055, false, NULL }, /* multitex_tri */
