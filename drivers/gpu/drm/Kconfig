@@ -152,6 +152,7 @@ config DRM_NOUVEAU
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
 	select FB
+	select FRAMEBUFFER_CONSOLE if !EMBEDDED
 	help
 	  Choose this option for open-source nVidia support.
 
