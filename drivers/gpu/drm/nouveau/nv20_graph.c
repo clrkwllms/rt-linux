@@ -920,6 +920,7 @@ struct nouveau_pgraph_object_class nv20_graph_grclass[] = {
 	{ 0x0019, false, NULL }, /* cliprect */
 	{ 0x0044, false, NULL }, /* pattern */
 	{ 0x009e, false, NULL }, /* swzsurf */
+	{ 0x0096, false, NULL }, /* celcius */
 	{ 0x0097, false, NULL }, /* kelvin (nv20) */
 	{ 0x0597, false, NULL }, /* kelvin (nv25) */
 	{}
