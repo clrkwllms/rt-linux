@@ -151,6 +151,7 @@ config DRM_NOUVEAU
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
+	select FB
 	help
 	  Choose this option for open-source nVidia support.
 
