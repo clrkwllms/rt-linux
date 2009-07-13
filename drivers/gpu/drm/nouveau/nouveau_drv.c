@@ -24,7 +24,9 @@
 
 #include "drmP.h"
 #include "drm.h"
+#include "drm_crtc_helper.h"
 #include "nouveau_drv.h"
+#include "nouveau_hw.h"
 
 #include "drm_pciids.h"
 
@@ -93,16 +95,65 @@ static int
 nouveau_pci_suspend(struct pci_dev *pdev,  pm_message_t state)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
-	(void)dev;
-	return -ENODEV;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	if (dev_priv->card_type >= NV_50)
+		return -ENODEV;
+
+	if (state.event == PM_EVENT_PRETHAW)
+		return 0;
+
+	pci_save_state(pdev);
+	if (state.event == PM_EVENT_SUSPEND) {
+		pci_disable_device(pdev);
+		pci_set_power_state(pdev, PCI_D3hot);
+	}
+	return 0;
 }
 
 static int
 nouveau_pci_resume(struct pci_dev *pdev)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
-	(void)dev;
-	return -ENODEV;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct drm_encoder *encoder;
+	struct drm_crtc *crtc;
+	int ret;
+
+	if (dev_priv->card_type >= NV_50)
+		return -ENODEV;
+
+	pci_set_power_state(pdev, PCI_D0);
+	pci_restore_state(pdev);
+	if (pci_enable_device(pdev))
+		return -1;
+	pci_set_master(dev->pdev);
+
+	ret = nouveau_run_vbios_init(dev);
+	if (ret)
+		return ret;
+
+	NVLockVgaCrtcs(dev, false);
+
+	/* meh.. modeset apparently doesn't setup all the regs and depends
+	 * on pre-existing state, for now load the state of the card *before*
+	 * nouveau was loaded, and then do a modeset.
+	 *
+	 * best thing to do probably is to make save/restore routines not
+	 * save/restore "pre-load" state, but more general so we can save
+	 * on suspend too.
+	 */
+	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
+		struct drm_encoder_helper_funcs *func = encoder->helper_private;
+
+		func->restore(encoder);
+	}
+
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head)
+		crtc->funcs->restore(crtc);
+
+	drm_helper_resume_force_mode(dev);
+	return 0;
 }
 
 extern struct drm_ioctl_desc nouveau_ioctls[];
