@@ -278,6 +278,13 @@ nouveau_card_init(struct drm_device *dev)
 	engine = &dev_priv->engine;
 	dev_priv->init_state = NOUVEAU_CARD_INIT_FAILED;
 
+	/* Parse BIOS tables / Run init tables if card not POSTed */
+	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
+		ret = nouveau_parse_bios(dev);
+		if (ret)
+			return ret;
+	}
+
 	ret = nouveau_gpuobj_early_init(dev);
 	if (ret) return ret;
 
@@ -294,8 +301,6 @@ nouveau_card_init(struct drm_device *dev)
 
 	ret = nouveau_gpuobj_init(dev);
 	if (ret) return ret;
-
-	/* Parse BIOS tables / Run init tables? */
 
 	/* PMC */
 	ret = engine->mc.init(dev);
@@ -360,10 +365,6 @@ nouveau_card_init(struct drm_device *dev)
 	}
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		ret = nouveau_parse_bios(dev);
-		if (ret)
-			return ret;
-
 		if (dev_priv->card_type >= NV_50) {
 			ret = nv50_display_create(dev);
 			if (ret)
