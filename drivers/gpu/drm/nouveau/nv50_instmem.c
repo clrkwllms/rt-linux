@@ -326,8 +326,16 @@ nv50_instmem_populate(struct drm_device *dev, struct nouveau_gpuobj *gpuobj,
 			     true, false, &gpuobj->im_backing);
 	if (ret) {
 		NV_ERROR(dev, "error getting PRAMIN backing pages: %d\n", ret);
-		return -ENOMEM;
+		return ret;
 	}
+
+	ret = nouveau_bo_pin(gpuobj->im_backing, TTM_PL_FLAG_VRAM);
+	if (ret) {
+		NV_ERROR(dev, "error pinning PRAMIN backing VRAM: %d\n", ret);
+		nouveau_bo_ref(NULL, &gpuobj->im_backing);
+		return ret;
+	}
+
 	gpuobj->im_backing_start = gpuobj->im_backing->bo.mem.mm_node->start;
 	gpuobj->im_backing_start <<= PAGE_SHIFT;
 

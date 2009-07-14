@@ -42,6 +42,12 @@ nouveau_notifier_init_channel(struct nouveau_channel *chan)
 	if (ret)
 		return ret;
 
+	ret = nouveau_bo_pin(ntfy, TTM_PL_FLAG_VRAM);
+	if (ret) {
+		nouveau_bo_ref(NULL, &ntfy);
+		return ret;
+	}
+
 	ret = drm_addmap(dev, (ntfy->bo.mem.mm_node->start << PAGE_SHIFT) +
 			 dev_priv->fb_phys, ntfy->bo.mem.size,
 			 _DRM_FRAME_BUFFER, 0, &chan->notifier_map);

@@ -242,6 +242,13 @@ nouveau_fifo_user_pushbuf_alloc(struct drm_device *dev)
 		return NULL;
 	}
 
+	ret = nouveau_bo_pin(pushbuf, config->cmdbuf.location);
+	if (ret) {
+		NV_ERROR(dev, "error pinning DMA push buffer: %d\n", ret);
+		nouveau_bo_ref(NULL, &pushbuf);
+		return NULL;
+	}
+
 	return pushbuf;
 }
 
