@@ -292,6 +292,27 @@ void nouveau_mem_close(struct drm_device *dev)
 
 	nouveau_ttm_global_release(dev_priv);
 
+	if (drm_core_has_AGP(dev) && dev->agp &&
+	    drm_core_check_feature(dev, DRIVER_MODESET)) {
+		struct drm_agp_mem *entry, *tempe;
+
+		/* Remove AGP resources, but leave dev->agp
+		   intact until drv_cleanup is called. */
+		list_for_each_entry_safe(entry, tempe, &dev->agp->memory, head) {
+			if (entry->bound)
+				drm_unbind_agp(entry->memory);
+			drm_free_agp(entry->memory, entry->pages);
+			kfree(entry);
+		}
+		INIT_LIST_HEAD(&dev->agp->memory);
+
+		if (dev->agp->acquired)
+			drm_agp_release(dev);
+
+		dev->agp->acquired = 0;
+		dev->agp->enabled = 0;
+	}
+
 	if (dev_priv->fb_mtrr) {
 		drm_mtrr_del(dev_priv->fb_mtrr, drm_get_resource_start(dev, 1),
 			     drm_get_resource_len(dev, 1), DRM_MTRR_WC);
