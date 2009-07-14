@@ -100,7 +100,8 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	struct nouveau_engine *engine = &dev_priv->engine;
 	int ret, i;
 
-	if (dev_priv->card_type >= NV_50)
+	if (dev_priv->card_type >= NV_50 ||
+	    !drm_core_check_feature(dev, DRIVER_MODESET))
 		return -ENODEV;
 
 	if (pm_state.event == PM_EVENT_PRETHAW)
@@ -178,7 +179,8 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	struct drm_crtc *crtc;
 	int i, ret;
 
-	if (dev_priv->card_type >= NV_50)
+	if (dev_priv->card_type >= NV_50 ||
+	    !drm_core_check_feature(dev, DRIVER_MODESET))
 		return -ENODEV;
 
 	NV_INFO(dev, "We're back, enabling device...\n");
