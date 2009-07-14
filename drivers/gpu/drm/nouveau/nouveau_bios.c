@@ -4853,14 +4853,6 @@ int nouveau_run_vbios_init(struct drm_device *dev)
 
 	parse_init_tables(dev, bios);
 
-	if (bios->major_version < 5)
-		/* feature_byte on BMP is poor, but init always sets CR4B */
-		bios->is_mobile = NVReadVgaCrtc(dev, 0, NV_CIO_CRE_4B) & 0x40;
-
-	/* all BIT systems need p_f_m_t for digital_min_front_porch */
-	if (bios->is_mobile || bios->major_version >= 5)
-		ret = parse_fp_mode_table(dev, bios);
-
 	NVLockVgaCrtcs(dev, true);
 
 	return ret;
@@ -4899,6 +4891,14 @@ int nouveau_parse_bios(struct drm_device *dev)
 		dev_priv->vbios = NULL;
 		return ret;
 	}
+
+	if (bios->major_version < 5)
+		/* feature_byte on BMP is poor, but init always sets CR4B */
+		bios->is_mobile = NVReadVgaCrtc(dev, 0, NV_CIO_CRE_4B) & 0x40;
+
+	/* all BIT systems need p_f_m_t for digital_min_front_porch */
+	if (bios->is_mobile || bios->major_version >= 5)
+		ret = parse_fp_mode_table(dev, bios);
 
 	/* allow subsequent scripts to execute */
 	bios->execute = true;
