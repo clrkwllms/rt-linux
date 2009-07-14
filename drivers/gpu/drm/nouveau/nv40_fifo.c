@@ -141,7 +141,7 @@ nv40_fifo_load_context(struct nouveau_channel *chan)
 
 	/* Set channel active, and in DMA mode */
 	nv_wr32(NV03_PFIFO_CACHE1_PUSH1,
-		 NV03_PFIFO_CACHE1_PUSH1_DMA | chan->id);
+		NV40_PFIFO_CACHE1_PUSH1_DMA | chan->id);
 
 	/* Reset DMA_CTL_AT_INFO to INVALID */
 	tmp = nv_rd32(NV04_PFIFO_CACHE1_DMA_CTL) & ~(1<<31);
