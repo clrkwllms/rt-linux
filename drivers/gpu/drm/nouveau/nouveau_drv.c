@@ -92,22 +92,78 @@ nouveau_pci_remove(struct pci_dev *pdev)
 }
 
 static int
-nouveau_pci_suspend(struct pci_dev *pdev,  pm_message_t state)
+nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_suspend_resume *state = &dev_priv->susres;
+	struct nouveau_engine *engine = &dev_priv->engine;
+	int ret, i;
 
 	if (dev_priv->card_type >= NV_50)
 		return -ENODEV;
 
-	if (state.event == PM_EVENT_PRETHAW)
+	if (pm_state.event == PM_EVENT_PRETHAW)
 		return 0;
 
+	state->ramin_copy = kmalloc(dev_priv->ramin_rsvd_vram, GFP_KERNEL);
+	if (!state->ramin_copy)
+		return -ENOMEM;
+
+	NV_INFO(dev, "Evicting buffers...\n");
+	ttm_bo_evict_mm(&dev_priv->ttm.bdev, TTM_PL_VRAM);
+
+	NV_INFO(dev, "Idling channels...\n");
+	for (i = 0; i < engine->fifo.channels; i++) {
+		struct nouveau_channel *chan = dev_priv->fifos[i];
+		struct nouveau_fence *fence = NULL;
+
+		if (!chan)
+			continue;
+
+		ret = nouveau_fence_new(chan, &fence, true);
+		if (ret == 0) {
+			ret = nouveau_fence_wait(fence, NULL, false, false);
+			nouveau_fence_unref((void *)&fence);
+		}
+
+		if (ret) {
+			NV_ERROR(dev, "Failed to idle channel %d for suspend\n",
+				 chan->id);
+		}
+	}
+
+	engine->graph.fifo_access(dev, false);
+	nouveau_wait_for_idle(dev);
+
+	nv_wr32(NV03_PFIFO_CACHES, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, nv_rd32(
+		NV04_PFIFO_CACHE1_DMA_PUSH) & ~1);
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000000);
+
+	i = engine->fifo.channel_id(dev);
+	NV_INFO(dev, "Last active channel was %d\n", i);
+	if (i >= 0 && i < engine->fifo.channels && dev_priv->fifos[i]) {
+		struct nouveau_channel *chan = dev_priv->fifos[i];
+
+		NV_INFO(dev, "Saving state of channel %d...\n", chan->id);
+		engine->fifo.save_context(chan);
+		engine->graph.save_context(chan);
+	}
+
+	NV_INFO(dev, "Backing up PRAMIN...\n");
+	for (i = 0; i < dev_priv->ramin_rsvd_vram; i += 4)
+		state->ramin_copy[i/4] = nv_ri32(i);
+	state->fifo_mode = nv_rd32(NV04_PFIFO_MODE);
+
+	NV_INFO(dev, "And we're gone!\n");
 	pci_save_state(pdev);
-	if (state.event == PM_EVENT_SUSPEND) {
+	if (pm_state.event == PM_EVENT_SUSPEND) {
 		pci_disable_device(pdev);
 		pci_set_power_state(pdev, PCI_D3hot);
 	}
+
 	return 0;
 }
 
@@ -116,23 +172,47 @@ nouveau_pci_resume(struct pci_dev *pdev)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_suspend_resume *state = &dev_priv->susres;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	struct drm_encoder *encoder;
 	struct drm_crtc *crtc;
-	int ret;
+	int i, ret;
 
 	if (dev_priv->card_type >= NV_50)
 		return -ENODEV;
 
+	NV_INFO(dev, "We're back, enabling device...\n");
 	pci_set_power_state(pdev, PCI_D0);
 	pci_restore_state(pdev);
 	if (pci_enable_device(pdev))
 		return -1;
 	pci_set_master(dev->pdev);
 
+	NV_INFO(dev, "POSTing device...\n");
 	ret = nouveau_run_vbios_init(dev);
 	if (ret)
 		return ret;
 
+	NV_INFO(dev, "Reinitialising engines...\n");
+	engine->mc.init(dev);
+	engine->timer.init(dev);
+	engine->fb.init(dev);
+	engine->graph.init(dev);
+	engine->fifo.init(dev);
+
+	NV_INFO(dev, "Restoring PRAMIN...\n");
+	for (i = 0; i < dev_priv->ramin_rsvd_vram; i += 4)
+		nv_wi32(i, state->ramin_copy[i/4]);
+	kfree(state->ramin_copy);
+	state->ramin_copy = NULL;
+
+	nouveau_irq_postinstall(dev);
+
+	nv_wr32(NV04_PFIFO_MODE, state->fifo_mode);
+	engine->fifo.load_context(dev_priv->channel);
+	engine->graph.load_context(dev_priv->channel);
+
+	NV_INFO(dev, "Restoring mode...\n");
 	NVLockVgaCrtcs(dev, false);
 
 	/* meh.. modeset apparently doesn't setup all the regs and depends
