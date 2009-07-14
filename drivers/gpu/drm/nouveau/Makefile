@@ -8,7 +8,7 @@ nouveau-y := nouveau_drv.o nouveau_state.o nouveau_fifo.o nouveau_mem.o \
              nouveau_sgdma.o nouveau_dma.o \
              nouveau_bo.o nouveau_fence.o nouveau_gem.o nouveau_ttm.o \
              nouveau_hw.o nouveau_calc.o nouveau_bios.o nouveau_i2c.o \
-	     nouveau_display.o nouveau_fbcon.o nouveau_backlight.o \
+	     nouveau_display.o nouveau_fbcon.o \
              nv04_timer.o \
              nv04_mc.o nv40_mc.o nv50_mc.o \
              nv04_fb.o nv10_fb.o nv40_fb.o \
@@ -19,8 +19,9 @@ nouveau-y := nouveau_drv.o nouveau_state.o nouveau_fifo.o nouveau_mem.o \
              nv50_crtc.o nv50_dac.o nv50_sor.o nv50_connector.o \
              nv50_cursor.o nv50_display.o nv50_fbcon.o \
              nv04_display.o nv04_output.o nv04_crtc.o nv04_cursor.o \
-	     nv04_fbcon.o
+             nv04_fbcon.o
 
 nouveau-$(CONFIG_COMPAT) += nouveau_ioc32.o
+nouveau-$(CONFIG_DRM_NOUVEAU_BACKLIGHT) += nouveau_backlight.o
 
 obj-$(CONFIG_DRM_NOUVEAU)+= nouveau.o

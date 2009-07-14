@@ -708,8 +708,17 @@ extern int  nouveau_dma_init(struct nouveau_channel *);
 extern int  nouveau_dma_wait(struct nouveau_channel *, int size);
 
 /* nouveau_backlight.c */
+#ifdef CONFIG_DRM_NOUVEAU_BACKLIGHT
 extern int nouveau_backlight_init(struct drm_device *);
 extern void nouveau_backlight_exit(struct drm_device *);
+#else
+static inline int nouveau_backlight_init(struct drm_device *dev)
+{
+	return 0;
+}
+
+static inline void nouveau_backlight_exit(struct drm_device *dev) { }
+#endif
 
 /* nouveau_bios.c */
 extern int nouveau_parse_bios(struct drm_device *);
