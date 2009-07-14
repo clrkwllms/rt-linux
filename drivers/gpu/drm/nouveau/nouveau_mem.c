@@ -400,7 +400,7 @@ static void nouveau_mem_reset_agp(struct drm_device *dev)
 	nv_wr32(NV04_PBUS_PCI_NV_1, saved_pci_nv_1);
 }
 
-static int
+int
 nouveau_mem_init_agp(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -413,10 +413,12 @@ nouveau_mem_init_agp(struct drm_device *dev)
 
 	nouveau_mem_reset_agp(dev);
 
-	ret = drm_agp_acquire(dev);
-	if (ret) {
-		NV_ERROR(dev, "Unable to acquire AGP: %d\n", ret);
-		return ret;
+	if (!dev->agp->acquired) {
+		ret = drm_agp_acquire(dev);
+		if (ret) {
+			NV_ERROR(dev, "Unable to acquire AGP: %d\n", ret);
+			return ret;
+		}
 	}
 
 	ret = drm_agp_info(dev, &info);

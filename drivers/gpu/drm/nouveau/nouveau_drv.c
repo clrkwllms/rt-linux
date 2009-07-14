@@ -193,6 +193,14 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	if (ret)
 		return ret;
 
+	if (dev_priv->gart_info.type == NOUVEAU_GART_AGP) {
+		ret = nouveau_mem_init_agp(dev);
+		if (ret) {
+			NV_ERROR(dev, "error reinitialising AGP: %d\n", ret);
+			return ret;
+		}
+	}
+
 	NV_INFO(dev, "Reinitialising engines...\n");
 	engine->mc.init(dev);
 	engine->timer.init(dev);

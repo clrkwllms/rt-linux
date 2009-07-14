@@ -616,6 +616,7 @@ extern void nouveau_mem_free_block(struct mem_block *);
 extern uint64_t nouveau_mem_fb_amount(struct drm_device *);
 extern void nouveau_mem_release(struct drm_file *, struct mem_block *heap);
 extern int  nouveau_mem_init(struct drm_device *);
+extern int  nouveau_mem_init_agp(struct drm_device *);
 extern void nouveau_mem_close(struct drm_device *);
 extern int  nv50_mem_vm_bind_linear(struct drm_device *, uint64_t virt,
 				    uint32_t size, uint32_t flags,
