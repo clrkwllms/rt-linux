@@ -355,14 +355,21 @@ static int valid_reg(struct drm_device *dev, uint32_t reg)
 
 static bool valid_idx_port(struct drm_device *dev, uint16_t port)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
 	/* if adding more ports here, the read/write functions below will need
 	 * updating so that the correct mmio range (PRMCIO, PRMDIO, PRMVIO) is
 	 * used for the port in question
 	 */
-	if (port == NV_CIO_CRX__COLOR)
-		return true;
-	if (port == NV_VIO_SRX)
-		return true;
+	if (dev_priv->card_type < NV_50) {
+		if (port == NV_CIO_CRX__COLOR)
+			return true;
+		if (port == NV_VIO_SRX)
+			return true;
+	} else {
+		if (port == NV_CIO_CRX__COLOR)
+			return true;
+	}
 
 	NV_ERROR(dev, "========== unknown indexed io port 0x%04X ==========\n",
 		 port);
@@ -434,25 +441,36 @@ static void bios_wr32(struct drm_device *dev, uint32_t reg, uint32_t data)
 	}
 }
 
-static uint8_t bios_idxprt_rd(struct drm_device *dev, uint16_t port, uint8_t index)
+static uint8_t
+bios_idxprt_rd(struct drm_device *dev, uint16_t port, uint8_t index)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint8_t data;
 
 	if (!valid_idx_port(dev, port))
 		return 0;
 
-	if (port == NV_VIO_SRX)
-		data = NVReadVgaSeq(dev, crtchead, index);
-	else	/* assume NV_CIO_CRX__COLOR */
-		data = NVReadVgaCrtc(dev, crtchead, index);
+	if (dev_priv->card_type < NV_50) {
+		if (port == NV_VIO_SRX)
+			data = NVReadVgaSeq(dev, crtchead, index);
+		else	/* assume NV_CIO_CRX__COLOR */
+			data = NVReadVgaCrtc(dev, crtchead, index);
+	} else {
+		uint32_t data32;
 
-	BIOSLOG(dev, "	Indexed IO read:  Port: 0x%04X, Index: 0x%02X, Head: 0x%02X, Data: 0x%02X\n",
+		data32 = bios_rd32(dev, NV50_PDISPLAY_VGACRTC(index & ~3));
+		data = (data32 >> ((index & 3) << 3)) & 0xff;
+	}
+
+	BIOSLOG(dev, "	Indexed IO read:  Port: 0x%04X, Index: 0x%02X, "
+		     "Head: 0x%02X, Data: 0x%02X\n",
 		port, index, crtchead, data);
-
 	return data;
 }
 
-static void bios_idxprt_wr(struct drm_device *dev, uint16_t port, uint8_t index, uint8_t data)
+static void
+bios_idxprt_wr(struct drm_device *dev, uint16_t port,
+	       uint8_t index, uint8_t data)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
@@ -465,22 +483,35 @@ static void bios_idxprt_wr(struct drm_device *dev, uint16_t port, uint8_t index,
 	 * As CR44 only exists on CRTC0, we update crtchead to head0 in advance
 	 * of the write, and to head1 after the write
 	 */
-	if (port == NV_CIO_CRX__COLOR && index == NV_CIO_CRE_44 && data != NV_CIO_CRE_44_HEADB)
+	if (port == NV_CIO_CRX__COLOR && index == NV_CIO_CRE_44 &&
+	    data != NV_CIO_CRE_44_HEADB)
 		crtchead = 0;
 
 	LOG_OLD_VALUE(bios_idxprt_rd(dev, port, index));
-	BIOSLOG(dev, "	Indexed IO write: Port: 0x%04X, Index: 0x%02X, Head: 0x%02X, Data: 0x%02X\n",
+	BIOSLOG(dev, "	Indexed IO write: Port: 0x%04X, Index: 0x%02X, "
+		     "Head: 0x%02X, Data: 0x%02X\n",
 		port, index, crtchead, data);
 
-	if (dev_priv->VBIOS.execute) {
+	if (dev_priv->VBIOS.execute && dev_priv->card_type < NV_50) {
 		still_alive();
 		if (port == NV_VIO_SRX)
 			NVWriteVgaSeq(dev, crtchead, index, data);
 		else	/* assume NV_CIO_CRX__COLOR */
 			NVWriteVgaCrtc(dev, crtchead, index, data);
+	} else
+	if (dev_priv->VBIOS.execute) {
+		uint32_t data32, shift = (index & 3) << 8;
+
+		still_alive();
+
+		data32  = bios_rd32(dev, NV50_PDISPLAY_VGACRTC(index & ~3));
+		data32 &= ~(0xff << shift);
+		data32 |= (data << shift);
+		bios_wr32(dev, NV50_PDISPLAY_VGACRTC(index & ~3), data32);
 	}
 
-	if (port == NV_CIO_CRX__COLOR && index == NV_CIO_CRE_44 && data == NV_CIO_CRE_44_HEADB)
+	if (port == NV_CIO_CRX__COLOR &&
+	    index == NV_CIO_CRE_44 && data == NV_CIO_CRE_44_HEADB)
 		crtchead = 1;
 }
 

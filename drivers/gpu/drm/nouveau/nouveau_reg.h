@@ -797,6 +797,8 @@
 #define NV50_PDISPLAY_SOR_CLK__LEN                                          0x3
 #define NV50_PDISPLAY_SOR_CLK_CTRL2(i)                  ((i) * 0x800 + 0x614300)
 
+#define NV50_PDISPLAY_VGACRTC(r)                                ((r) + 0x619400)
+
 #    define NV50_PDISPLAY_DAC_REGS                          0x0061a000
 #    define NV50_PDISPLAY_DAC_REGS__LEN                            0x3
 #    define NV50_PDISPLAY_DAC_REGS__ESIZE                        0x800
