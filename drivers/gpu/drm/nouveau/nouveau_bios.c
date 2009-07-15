@@ -500,7 +500,7 @@ bios_idxprt_wr(struct drm_device *dev, uint16_t port,
 			NVWriteVgaCrtc(dev, crtchead, index, data);
 	} else
 	if (dev_priv->VBIOS.execute) {
-		uint32_t data32, shift = (index & 3) << 8;
+		uint32_t data32, shift = (index & 3) << 3;
 
 		still_alive();
 
