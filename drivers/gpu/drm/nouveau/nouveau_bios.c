@@ -3868,6 +3868,8 @@ static int parse_bit_init_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 
 	parse_script_table_pointers(bios, bitentry->offset);
 
+	if (bitentry->length >= 16)
+		bios->some_script_ptr = ROM16(bios->data[bitentry->offset + 14]);
 	if (bitentry->length >= 18)
 		bios->init96_tbl_ptr = ROM16(bios->data[bitentry->offset + 16]);
 
@@ -4921,7 +4923,7 @@ int nouveau_run_vbios_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;
-	int ret = 0;
+	int i, ret = 0;
 
 	NVLockVgaCrtcs(dev, false);
 	if (nv_two_heads(dev))
@@ -4931,6 +4933,21 @@ int nouveau_run_vbios_init(struct drm_device *dev)
 		load_nv17_hw_sequencer_ucode(dev, bios);
 
 	parse_init_tables(dev, bios);
+
+	/* Runs some additional script seen on G8x VBIOSen.  The VBIOS'
+	 * parser will run this right after the init tables, the binary
+	 * driver appears to run it at some point later.
+	 */
+	if (bios->some_script_ptr) {
+		struct init_exec iexec = {true, false};
+
+		NV_INFO(dev, "Parsing VBIOS init table at offset 0x%04X\n",
+			bios->some_script_ptr);
+		parse_init_table(dev, bios, bios->some_script_ptr, &iexec);
+	}
+
+	for (i = 0; i < bios->bdcb.dcb.entries; i++)
+		nouveau_bios_run_display_table(dev, &bios->bdcb.dcb.entry[i], 0);
 
 	NVLockVgaCrtcs(dev, true);
 
