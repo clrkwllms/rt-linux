@@ -1700,6 +1700,16 @@ static bool init_compute_mem(struct drm_device *dev, struct nvbios *bios, uint16
 
 	/* no iexec->execute check by design */
 
+	/* this appears to be a NOP on G8x chipsets, both io logs of the VBIOS
+	 * and kmmio traces of the binary driver POSTing the card show nothing
+	 * being done for this opcode.  why is it still listed in the table?!
+	 */
+
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	if (dev_priv->card_type >= NV_50)
+		return true;
+
 	/* on every card I've seen, this step gets done for us earlier in the init scripts
 	uint8_t crdata = bios_idxprt_rd(dev, NV_VIO_SRX, 0x01);
 	bios_idxprt_wr(dev, NV_VIO_SRX, 0x01, crdata | 0x20);
