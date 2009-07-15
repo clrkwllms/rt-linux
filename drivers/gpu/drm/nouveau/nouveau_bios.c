@@ -2238,6 +2238,9 @@ static bool init_zm_reg(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	if (!iexec->execute)
 		return true;
 
+	if (reg == 0x000200)
+		value |= 1;
+
 	bios_wr32(dev, reg, value);
 
 	return true;
