@@ -627,12 +627,47 @@ static bool io_condition_met(struct drm_device *dev, struct nvbios *bios, uint16
 	return (data == cmpval);
 }
 
-static int setPLL(struct drm_device *dev, struct nvbios *bios, uint32_t reg, uint32_t clk)
+static int
+nv50_pll_set(struct drm_device *dev, uint32_t reg, uint32_t clk)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t reg0 = nv_rd32(reg + 0);
+	uint32_t reg1 = nv_rd32(reg + 4);
+	struct nouveau_pll_vals pll;
+	struct pll_lims pll_limits;
+	int ret;
+
+	ret = get_pll_limits(dev, reg, &pll_limits);
+	if (ret)
+		return ret;
+
+	clk = nouveau_calc_pll_mnp(dev, &pll_limits, clk, &pll);
+	if (!clk)
+		return -ERANGE;
+
+	reg0 = (reg0 & 0xfff8ffff) | (pll.log2P << 16);
+	reg1 = (reg1 & 0xffff0000) | (pll.N1 << 8) | pll.M1;
+
+	if (dev_priv->VBIOS.execute) {
+		still_alive();
+		nv_wr32(reg + 4, reg1);
+		nv_wr32(reg + 0, reg0);
+	}
+
+	return 0;
+}
+
+static int
+setPLL(struct drm_device *dev, struct nvbios *bios, uint32_t reg, uint32_t clk)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	/* clk in kHz */
 	struct pll_lims pll_lim;
-	int ret;
 	struct nouveau_pll_vals pllvals;
+	int ret;
+
+	if (dev_priv->card_type >= NV_50)
+		return nv50_pll_set(dev, reg, clk);
 
 	/* high regs (such as in the mac g5 table) are not -= 4 */
 	if ((ret = get_pll_limits(dev, reg > 0x405c ? reg : reg - 4, &pll_lim)))
