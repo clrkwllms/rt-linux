@@ -323,12 +323,9 @@ static int valid_reg(struct drm_device *dev, uint32_t reg)
 			return 1;
 	}
 	if (nv_arch(dev) >= NV_50) {
-		/* No clue what they do, but because they are outside normal
-		 * ranges we'd better list them seperately. */
-		if (reg == 0x00020018 || reg == 0x0002004C ||
-		    reg == 0x00020060 || reg == 0x00021028 ||
-		    reg == 0x00021218 || reg == 0x0002130C ||
-		    reg == 0x00089008 || reg == 0x00089028)
+		if (reg >= 0x00020000 && reg < 0x00030000)
+			return 1;
+		if (reg == 0x00089008 || reg == 0x00089028)
 			return 1;
 	}
 	if (WITHIN(reg,NV_PFB_OFFSET,NV_PFB_SIZE))
