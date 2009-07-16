@@ -3363,7 +3363,7 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 			sub = 0x0001; /* 0x0001 0x0002 0x0105 */
 		break;
 	default:
-		sub = 0x0000; /* 0x0000 */
+		sub = 0x00ff; /* 0x00ff */
 		break;
 	}
 
