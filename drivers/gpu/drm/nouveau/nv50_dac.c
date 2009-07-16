@@ -105,7 +105,8 @@ nv50_dac_detect(struct drm_encoder *drm_encoder,
 	load_state = nv_rd32(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or));
 
 	nv_wr32(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or), 0);
-	nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or), dpms_state);
+	nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or), dpms_state |
+		NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
 
 	if ((load_state & NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_PRESENT) ==
 			  NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_PRESENT)
