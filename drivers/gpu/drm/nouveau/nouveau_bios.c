@@ -2523,6 +2523,36 @@ init_96(struct drm_device *dev, struct nvbios *bios, uint16_t offset,
 	return true;
 }
 
+static bool
+init_97(struct drm_device *dev, struct nvbios *bios, uint16_t offset,
+	struct init_exec *iexec)
+{
+	/* INIT_97   opcode: 0x97 ('')
+	 *
+	 * offset      (8  bit): opcode
+	 * offset + 1  (32 bit): register
+	 * offset + 5  (32 bit): mask
+	 * offset + 9  (32 bit): value
+	 *
+	 * Adds "value" to "register" preserving the fields specified
+	 * by "mask"
+	 */
+
+	uint32_t reg = ROM32(bios->data[offset + 1]);
+	uint32_t mask = ROM32(bios->data[offset + 5]);
+	uint32_t add = ROM32(bios->data[offset + 9]);
+	uint32_t val;
+
+	val = bios_rd32(dev, reg);
+	val = (val & mask) | ((val + add) & ~mask);
+
+	if (!iexec->execute)
+		return true;
+
+	bios_wr32(dev, reg, val);
+	return true;
+}
+
 static struct init_tbl_entry itbl_entry[] = {
 	/* command name                       , id  , length  , offset  , mult    , command handler                 */
 	/* INIT_PROG (0x31, 15, 10, 4) removed due to no example of use */
@@ -2577,6 +2607,7 @@ static struct init_tbl_entry itbl_entry[] = {
 	{ "INIT_ZM_REG_GROUP_ADDRESS_LATCHED" , 0x91, 6       , 5       , 4       , init_zm_reg_group_addr_latched  },
 	{ "INIT_RESERVED"                     , 0x92, 1       , 0       , 0       , init_reserved                   },
 	{ "INIT_96"                           , 0x96, 17      , 0       , 0       , init_96                         },
+	{ "INIT_97"                           , 0x97, 13      , 0       , 0       , init_97                         },
 	{ 0                                   , 0   , 0       , 0       , 0       , 0                               }
 };
 
