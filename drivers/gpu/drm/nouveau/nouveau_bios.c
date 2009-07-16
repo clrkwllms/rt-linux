@@ -1915,6 +1915,7 @@ static bool init_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 	 * Assign ((IOVAL("crtc port") & "mask") | "data") to "crtc port"
 	 */
 
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint16_t crtcport = ROM16(bios->data[offset + 1]);
 	uint8_t mask = bios->data[offset + 3];
 	uint8_t data = bios->data[offset + 4];
@@ -1924,6 +1925,44 @@ static bool init_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 
 	BIOSLOG(dev, "0x%04X: Port: 0x%04X, Mask: 0x%02X, Data: 0x%02X\n",
 		offset, crtcport, mask, data);
+
+	/* I have no idea what this does, but NVIDIA do this magic sequence
+	 * in the places where this INIT_IO happens..
+	 */
+	if (dev_priv->card_type >= NV_50 && crtcport == 0x3c3 && data == 1) {
+		int i;
+
+		bios_wr32(dev, 0x614100,
+			  (bios_rd32(dev, 0x614100) & 0x0fffffff) | 0x00800000);
+		bios_wr32(dev, 0x00e18c, bios_rd32(dev, 0x00e18c) | 0x00020000);
+		bios_wr32(dev, 0x614900,
+			  (bios_rd32(dev, 0x614900) & 0x0fffffff) | 0x00800000);
+		bios_wr32(dev, 0x000200, bios_rd32(dev, 0x000200) &~0x40000000);
+		mdelay(10);
+		bios_wr32(dev, 0x00e18c, bios_rd32(dev, 0x00e18c) &~0x00020000);
+		bios_wr32(dev, 0x000200, bios_rd32(dev, 0x000200) | 0x40000000);
+		bios_wr32(dev, 0x614100, 0x00800018);
+		bios_wr32(dev, 0x614900, 0x00800018);
+		mdelay(10);
+		bios_wr32(dev, 0x614100, 0x10000018);
+		bios_wr32(dev, 0x614900, 0x10000018);
+		for (i = 0; i < 3; i++)
+		bios_wr32(dev, 0x614280 + (i*0x800), bios_rd32(
+			  dev, 0x614280 + (i*0x800)) & 0xf0f0f0f0);
+		for (i = 0; i < 2; i++)
+		bios_wr32(dev, 0x614300 + (i*0x800), bios_rd32(
+			  dev, 0x614300 + (i*0x800)) & 0xfffff0f0);
+		for (i = 0; i < 3; i++)
+		bios_wr32(dev, 0x614380 + (i*0x800), bios_rd32(
+			  dev, 0x614380 + (i*0x800)) & 0xfffff0f0);
+		for (i = 0; i < 2; i++)
+		bios_wr32(dev, 0x614200 + (i*0x800), bios_rd32(
+			  dev, 0x614200 + (i*0x800)) & 0xfffffff0);
+		for (i = 0; i < 2; i++)
+		bios_wr32(dev, 0x614108 + (i*0x800), bios_rd32(
+			  dev, 0x614108 + (i*0x800)) & 0x0fffffff);
+		return true;
+	}
 
 	bios_port_wr(dev, crtcport, (bios_port_rd(dev, crtcport) & mask) | data);
 
