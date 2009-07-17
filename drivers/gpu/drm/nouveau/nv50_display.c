@@ -50,6 +50,13 @@ static int nv50_display_pre_init(struct drm_device *dev)
 		return ret;
 	}
 
+	ret = nouveau_bo_pin(evo->ramin);
+	if (ret) {
+		NV_ERROR(dev, "Error pinning EVO channel memory: %d\n", ret);
+		nouveau_bo_ref(NULL, &evo->ramin);
+		return ret;
+	}
+
 	ret = nouveau_bo_map(evo->ramin);
 	if (ret) {
 		NV_ERROR(dev, "Error mapping EVO channel memory: %d\n", ret);
