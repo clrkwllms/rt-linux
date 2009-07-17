@@ -252,6 +252,8 @@ struct nouveau_instmem_engine {
 
 	int	(*init)(struct drm_device *dev);
 	void	(*takedown)(struct drm_device *dev);
+	int	(*suspend)(struct drm_device *dev);
+	void	(*resume)(struct drm_device *dev);
 
 	int	(*populate)(struct drm_device *, struct nouveau_gpuobj *,
 			    uint32_t *size);
@@ -846,6 +848,8 @@ extern void nv04_instmem_finish_access(struct drm_device *);
 /* nv50_instmem.c */
 extern int  nv50_instmem_init(struct drm_device *);
 extern void nv50_instmem_takedown(struct drm_device *);
+extern int  nv50_instmem_suspend(struct drm_device *);
+extern void nv50_instmem_resume(struct drm_device *);
 extern int  nv50_instmem_populate(struct drm_device *, struct nouveau_gpuobj *,
 				  uint32_t *size);
 extern void nv50_instmem_clear(struct drm_device *, struct nouveau_gpuobj *);

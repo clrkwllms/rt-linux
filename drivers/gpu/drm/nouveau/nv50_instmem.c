@@ -310,6 +310,52 @@ nv50_instmem_takedown(struct drm_device *dev)
 }
 
 int
+nv50_instmem_suspend(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_channel *chan = dev_priv->fifos[0];
+	struct nouveau_gpuobj *ramin = chan->ramin->gpuobj;
+	int i;
+
+	ramin->im_backing_suspend = kmalloc(ramin->im_pramin->size, GFP_KERNEL);
+	if (!ramin->im_backing_suspend)
+		return -ENOMEM;
+
+	for (i = 0; i < ramin->im_pramin->size; i += 4)
+		ramin->im_backing_suspend[i/4] = nv_ri32(i);
+	return 0;
+}
+
+void
+nv50_instmem_resume(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
+	struct nouveau_channel *chan = dev_priv->fifos[0];
+	struct nouveau_gpuobj *ramin = chan->ramin->gpuobj;
+	int i;
+
+	nv_wr32(NV50_PUNK_BAR0_PRAMIN, (ramin->im_backing_start >> 16));
+	for (i = 0; i < ramin->im_pramin->size; i += 4)
+		BAR0_WI32(ramin, i, ramin->im_backing_suspend[i/4]);
+	kfree(ramin->im_backing_suspend);
+	ramin->im_backing_suspend = NULL;
+
+	/* Poke the relevant regs, and pray it works :) */
+	nv_wr32(NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12));
+	nv_wr32(NV50_PUNK_UNK1710, 0);
+	nv_wr32(NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12) |
+					 NV50_PUNK_BAR_CFG_BASE_VALID);
+	nv_wr32(NV50_PUNK_BAR1_CTXDMA, (priv->fb_bar->instance >> 4) |
+					NV50_PUNK_BAR1_CTXDMA_VALID);
+	nv_wr32(NV50_PUNK_BAR3_CTXDMA, (priv->pramin_bar->instance >> 4) |
+					NV50_PUNK_BAR3_CTXDMA_VALID);
+
+	for (i = 0; i < 8; i++)
+		nv_wr32(0x1900 + (i*4), 0);
+}
+
+int
 nv50_instmem_populate(struct drm_device *dev, struct nouveau_gpuobj *gpuobj,
 		      uint32_t *sz)
 {

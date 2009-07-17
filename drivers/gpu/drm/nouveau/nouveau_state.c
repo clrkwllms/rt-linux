@@ -214,6 +214,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 	case 0xA0:
 		engine->instmem.init	= nv50_instmem_init;
 		engine->instmem.takedown= nv50_instmem_takedown;
+		engine->instmem.suspend	= nv50_instmem_suspend;
+		engine->instmem.resume	= nv50_instmem_resume;
 		engine->instmem.populate	= nv50_instmem_populate;
 		engine->instmem.clear		= nv50_instmem_clear;
 		engine->instmem.bind		= nv50_instmem_bind;

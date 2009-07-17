@@ -156,6 +156,14 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 		return ret;
 	}
 
+	if (engine->instmem.suspend) {
+		ret = engine->instmem.suspend(dev);
+		if (ret) {
+			NV_ERROR(dev, "... failed: %d\n", ret);
+			return ret;
+		}
+	}
+
 	state->fifo_mode = nv_rd32(NV04_PFIFO_MODE);
 
 	NV_INFO(dev, "And we're gone!\n");
@@ -177,7 +185,7 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	struct nouveau_engine *engine = &dev_priv->engine;
 	struct drm_encoder *encoder;
 	struct drm_crtc *crtc;
-	int i, ret;
+	int ret;
 
 	if (dev_priv->card_type >= NV_50 ||
 	    !drm_core_check_feature(dev, DRIVER_MODESET))
@@ -211,6 +219,8 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	engine->fifo.init(dev);
 
 	NV_INFO(dev, "Restoring GPU objects...\n");
+	if (engine->instmem.resume)
+		engine->instmem.resume(dev);
 	nouveau_gpuobj_resume(dev);
 
 	nouveau_irq_postinstall(dev);
