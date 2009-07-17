@@ -107,10 +107,6 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	if (pm_state.event == PM_EVENT_PRETHAW)
 		return 0;
 
-	state->ramin_copy = kmalloc(dev_priv->ramin_rsvd_vram, GFP_KERNEL);
-	if (!state->ramin_copy)
-		return -ENOMEM;
-
 	NV_INFO(dev, "Evicting buffers...\n");
 	ttm_bo_evict_mm(&dev_priv->ttm.bdev, TTM_PL_VRAM);
 
@@ -153,9 +149,13 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 		engine->graph.save_context(chan);
 	}
 
-	NV_INFO(dev, "Backing up PRAMIN...\n");
-	for (i = 0; i < dev_priv->ramin_rsvd_vram; i += 4)
-		state->ramin_copy[i/4] = nv_ri32(i);
+	NV_INFO(dev, "Suspending GPU objects...\n");
+	ret = nouveau_gpuobj_suspend(dev);
+	if (ret) {
+		NV_ERROR(dev, "... failed: %d\n", ret);
+		return ret;
+	}
+
 	state->fifo_mode = nv_rd32(NV04_PFIFO_MODE);
 
 	NV_INFO(dev, "And we're gone!\n");
@@ -210,11 +210,8 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	engine->graph.init(dev);
 	engine->fifo.init(dev);
 
-	NV_INFO(dev, "Restoring PRAMIN...\n");
-	for (i = 0; i < dev_priv->ramin_rsvd_vram; i += 4)
-		nv_wi32(i, state->ramin_copy[i/4]);
-	kfree(state->ramin_copy);
-	state->ramin_copy = NULL;
+	NV_INFO(dev, "Restoring GPU objects...\n");
+	nouveau_gpuobj_resume(dev);
 
 	nouveau_irq_postinstall(dev);
 
