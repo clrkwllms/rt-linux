@@ -72,6 +72,26 @@ static int nv50_display_pre_init(struct drm_device *dev)
 	evo->objects = evo->hashtab + 4096;
 	evo->pushbuf = evo->objects + 4096;
 
+	/* initialise display objects */
+	if (dev_priv->chipset != 0x50) {
+		evo->data[evo->hashtab/4 + 0] = NvEvoVM;
+		evo->data[evo->hashtab/4 + 1] = (evo->objects << 10) | 2;
+		evo->data[evo->objects/4 + 0] = 0x1e99003d;
+		evo->data[evo->objects/4 + 1] = 0xffffffff;
+		evo->data[evo->objects/4 + 2] = 0x00000000;
+		evo->data[evo->objects/4 + 3] = 0x00000000;
+		evo->data[evo->objects/4 + 4] = 0x00000000;
+		evo->data[evo->objects/4 + 5] = 0x00010000;
+	}
+	evo->data[evo->hashtab/4 + 2] = NvEvoVRAM;
+	evo->data[evo->hashtab/4 + 3] = ((evo->objects + 0x20) << 10) | 2;
+	evo->data[(evo->objects + 0x20)/4 + 0] = 0x0019003d;
+	evo->data[(evo->objects + 0x20)/4 + 1] = nouveau_mem_fb_amount(dev) - 1;
+	evo->data[(evo->objects + 0x20)/4 + 2] = 0x00000000;
+	evo->data[(evo->objects + 0x20)/4 + 3] = 0x00000000;
+	evo->data[(evo->objects + 0x20)/4 + 4] = 0x00000000;
+	evo->data[(evo->objects + 0x20)/4 + 5] = 0x00010000;
+
 	/* Setup enough of a "normal" channel to be able to use PFIFO
 	 * DMA routines.
 	 */
@@ -195,26 +215,6 @@ nv50_display_init(struct drm_device *dev)
 			  nv_rd32(NV50_PDISPLAY_CHANNEL_STAT(0)));
 		return -EBUSY;
 	}
-
-	/* initialise display objects */
-	if (dev_priv->chipset != 0x50) {
-		evo->data[evo->hashtab/4 + 0] = NvEvoVM;
-		evo->data[evo->hashtab/4 + 1] = (evo->objects << 10) | 2;
-		evo->data[evo->objects/4 + 0] = 0x1e99003d;
-		evo->data[evo->objects/4 + 1] = 0xffffffff;
-		evo->data[evo->objects/4 + 2] = 0x00000000;
-		evo->data[evo->objects/4 + 3] = 0x00000000;
-		evo->data[evo->objects/4 + 4] = 0x00000000;
-		evo->data[evo->objects/4 + 5] = 0x00010000;
-	}
-	evo->data[evo->hashtab/4 + 2] = NvEvoVRAM;
-	evo->data[evo->hashtab/4 + 3] = ((evo->objects + 0x20) << 10) | 2;
-	evo->data[(evo->objects + 0x20)/4 + 0] = 0x0019003d;
-	evo->data[(evo->objects + 0x20)/4 + 1] = nouveau_mem_fb_amount(dev) - 1;
-	evo->data[(evo->objects + 0x20)/4 + 2] = 0x00000000;
-	evo->data[(evo->objects + 0x20)/4 + 3] = 0x00000000;
-	evo->data[(evo->objects + 0x20)/4 + 4] = 0x00000000;
-	evo->data[(evo->objects + 0x20)/4 + 5] = 0x00010000;
 
 	nv_wr32(NV50_PDISPLAY_OBJECTS, ((evo->offset + evo->hashtab) >> 8) | 9);
 
