@@ -122,6 +122,7 @@ enum nouveau_flags {
 
 #define NVOBJ_ENGINE_SW		0
 #define NVOBJ_ENGINE_GR		1
+#define NVOBJ_ENGINE_DISPLAY	2
 #define NVOBJ_ENGINE_INT	0xdeadbeef
 
 #define NVOBJ_FLAG_ALLOW_NO_REFS	(1 << 0)
@@ -131,7 +132,7 @@ enum nouveau_flags {
 struct nouveau_gpuobj {
 	struct list_head list;
 
-	int im_channel;
+	struct nouveau_channel *im_channel;
 	struct mem_block *im_pramin;
 	struct nouveau_bo *im_backing;
 	uint32_t im_backing_start;
@@ -153,7 +154,7 @@ struct nouveau_gpuobj_ref {
 	struct nouveau_gpuobj *gpuobj;
 	uint32_t instance;
 
-	int channel;
+	struct nouveau_channel *channel;
 	int handle;
 };
 
