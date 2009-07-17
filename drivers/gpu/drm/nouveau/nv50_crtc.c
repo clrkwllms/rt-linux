@@ -97,7 +97,7 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
+	struct nouveau_channel *evo = dev_priv->evo;
 	int index = crtc->index;
 
 	NV_DEBUG(dev, "index %d\n", crtc->index);
@@ -154,7 +154,7 @@ static int nv50_crtc_set_dither(struct nouveau_crtc *crtc, bool update)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
+	struct nouveau_channel *evo = dev_priv->evo;
 	int ret;
 
 	NV_DEBUG(dev, "\n");
@@ -219,7 +219,7 @@ nv50_crtc_set_scale(struct nouveau_crtc *crtc, int scaling_mode, bool update)
 	struct nouveau_connector *connector = nouveau_crtc_connector_get(crtc);
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
+	struct nouveau_channel *evo = dev_priv->evo;
 	struct drm_display_mode *native_mode = NULL;
 	struct drm_display_mode *mode = &crtc->base.mode;
 	uint32_t outX, outY, horiz, vert;
@@ -504,7 +504,7 @@ static void nv50_crtc_commit(struct drm_crtc *drm_crtc)
 {
 	struct drm_device *dev = drm_crtc->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
+	struct nouveau_channel *evo = dev_priv->evo;
 	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
 	int ret;
 
@@ -534,7 +534,7 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
+	struct nouveau_channel *evo = dev_priv->evo;
 	struct drm_framebuffer *drm_fb = crtc->base.fb;
 	struct nouveau_framebuffer *fb = to_nouveau_framebuffer(drm_fb);
 	int ret;
@@ -621,7 +621,7 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 {
 	struct drm_device *dev = drm_crtc->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
+	struct nouveau_channel *evo = dev_priv->evo;
 	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
 	struct drm_encoder *drm_encoder;
 	struct nouveau_encoder *encoder;

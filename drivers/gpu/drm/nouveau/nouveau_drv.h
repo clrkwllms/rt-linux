@@ -328,16 +328,6 @@ struct nouveau_engine {
 	struct nouveau_fifo_engine    fifo;
 };
 
-struct nv50_evo_channel {
-	struct nouveau_channel chan;
-	struct nouveau_bo *ramin;
-	uint32_t *data;
-	uint32_t offset;
-	uint32_t hashtab;
-	uint32_t pushbuf;
-	uint32_t objects;
-};
-
 struct nouveau_pll_vals {
 	union {
 		struct {
@@ -548,7 +538,7 @@ struct drm_nouveau_private {
 
 	struct backlight_device *backlight;
 
-	struct nv50_evo_channel evo;
+	struct nouveau_channel *evo;
 };
 
 static inline int

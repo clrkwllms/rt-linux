@@ -33,89 +33,168 @@
 
 extern int nouveau_uscript;
 
-static int nv50_display_pre_init(struct drm_device *dev)
+static void
+nv50_evo_channel_del(struct nouveau_channel **pchan)
+{
+	struct nouveau_channel *chan = *pchan;
+
+	if (!chan)
+		return;
+	*pchan = NULL;
+
+	nouveau_gpuobj_channel_takedown(chan);
+	nouveau_bo_ref(NULL, &chan->pushbuf_bo);
+
+	if (chan->user)
+		drm_rmmap(chan->dev, chan->user);
+
+	kfree(chan);
+}
+
+static int
+nv50_evo_channel_new(struct drm_device *dev, struct nouveau_channel **pchan)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_evo_channel *evo = &dev_priv->evo;
+	struct nouveau_gpuobj *dma_vm = NULL, *dma_vram = NULL;
+	struct nouveau_channel *chan;
+	int ret, i;
+
+	chan = kzalloc(sizeof(struct nouveau_channel), GFP_KERNEL);
+	if (!chan)
+		return -ENOMEM;
+	*pchan = chan;
+
+	chan->id = -1;
+	chan->dev = dev;
+	chan->user_get = 4;
+	chan->user_put = 0;
+
+	INIT_LIST_HEAD(&chan->ramht_refs);
+
+	ret = nouveau_gpuobj_new_ref(dev, NULL, NULL, 0, 32768, 0x1000,
+				     NVOBJ_FLAG_ZERO_ALLOC, &chan->ramin);
+	if (ret) {
+		NV_ERROR(dev, "Error allocating EVO channel memory: %d\n", ret);
+		nv50_evo_channel_del(pchan);
+		return ret;
+	}
+
+	ret = nouveau_mem_init_heap(&chan->ramin_heap, chan->ramin->gpuobj->
+				    im_pramin->start, 32768);
+	if (ret) {
+		NV_ERROR(dev, "Error initialising EVO PRAMIN heap: %d\n", ret);
+		nv50_evo_channel_del(pchan);
+		return ret;
+	}
+
+	ret = nouveau_gpuobj_new_ref(dev, chan, chan, 0, 4096, 16,
+				     0, &chan->ramht);
+	if (ret) {
+		NV_ERROR(dev, "Unable to allocate EVO RAMHT: %d\n", ret);
+		nv50_evo_channel_del(pchan);
+		return ret;
+	}
+
+	if (dev_priv->chipset != 0x50) {
+		ret = nouveau_gpuobj_new(dev, chan, 6*4, 32, 0, &dma_vm);
+		if (ret) {
+			nv50_evo_channel_del(pchan);
+			return ret;
+		}
+		dma_vm->engine = NVOBJ_ENGINE_DISPLAY;
+
+		ret = nouveau_gpuobj_ref_add(dev, chan, NvEvoVM, dma_vm, NULL);
+		if (ret) {
+			nouveau_gpuobj_del(dev, &dma_vm);
+			nv50_evo_channel_del(pchan);
+			return ret;
+		}
+
+		dev_priv->engine.instmem.prepare_access(dev, true);
+		INSTANCE_WR(dma_vm, 0, 0x1e99003d);
+		INSTANCE_WR(dma_vm, 1, 0xffffffff);
+		INSTANCE_WR(dma_vm, 2, 0x00000000);
+		INSTANCE_WR(dma_vm, 3, 0x00000000);
+		INSTANCE_WR(dma_vm, 4, 0x00000000);
+		INSTANCE_WR(dma_vm, 5, 0x00010000);
+		dev_priv->engine.instmem.finish_access(dev);
+	}
+
+	ret = nouveau_gpuobj_new(dev, chan, 6*4, 32, 0, &dma_vram);
+	if (ret) {
+		nv50_evo_channel_del(pchan);
+		return ret;
+	}
+	dma_vram->engine = NVOBJ_ENGINE_DISPLAY;
+
+	ret = nouveau_gpuobj_ref_add(dev, chan, NvEvoVRAM, dma_vram, NULL);
+	if (ret) {
+		nouveau_gpuobj_del(dev, &dma_vram);
+		nv50_evo_channel_del(pchan);
+		return ret;
+	}
+
+	dev_priv->engine.instmem.prepare_access(dev, true);
+	INSTANCE_WR(dma_vram, 0, 0x0019003d);
+	INSTANCE_WR(dma_vram, 1, nouveau_mem_fb_amount(dev) - 1);
+	INSTANCE_WR(dma_vram, 2, 0x00000000);
+	INSTANCE_WR(dma_vram, 3, 0x00000000);
+	INSTANCE_WR(dma_vram, 4, 0x00000000);
+	INSTANCE_WR(dma_vram, 5, 0x00010000);
+	dev_priv->engine.instmem.finish_access(dev);
+
+	ret = nouveau_bo_new(dev, NULL, 4096, 0, TTM_PL_FLAG_VRAM, 0, 0,
+			     false, true, &chan->pushbuf_bo);
+	if (ret == 0)
+		ret = nouveau_bo_pin(chan->pushbuf_bo, TTM_PL_FLAG_VRAM);
+	if (ret) {
+		NV_ERROR(dev, "Error creating EVO DMA push buffer: %d\n", ret);
+		nv50_evo_channel_del(pchan);
+		return ret;
+	}
+
+	ret = nouveau_bo_map(chan->pushbuf_bo);
+	if (ret) {
+		NV_ERROR(dev, "Error mapping EVO DMA push buffer: %d\n", ret);
+		nv50_evo_channel_del(pchan);
+		return ret;
+	}
+
+	ret = drm_addmap(dev, drm_get_resource_start(dev, 0) +
+			 NV50_PDISPLAY_USER(0), PAGE_SIZE, _DRM_REGISTERS,
+			 _DRM_DRIVER | _DRM_READ_ONLY, &chan->user);
+	if (ret) {
+		NV_ERROR(dev, "Error mapping EVO control regs: %d\n", ret);
+		nv50_evo_channel_del(pchan);
+		return ret;
+	}
+	chan->dma.max = (chan->pushbuf_bo->bo.mem.size / 4) - 2;
+	chan->dma.put = 0;
+	chan->dma.cur = chan->dma.put;
+	chan->dma.free = chan->dma.max - chan->dma.cur;
+	chan->dma.pushbuf = chan->pushbuf_bo->kmap.virtual;
+
+	RING_SPACE(chan, NOUVEAU_DMA_SKIPS);
+	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
+		OUT_RING  (chan, 0);
+
+	return 0;
+}
+
+static int
+nv50_display_pre_init(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t ram_amount;
 	int ret, i;
 
 	NV_DEBUG(dev, "\n");
 
-	ret = nouveau_bo_new(dev, dev_priv->channel, 16384, 0,
-			     TTM_PL_FLAG_VRAM, 0, 0x0000, false, true,
-			     &evo->ramin);
+	ret = nv50_evo_channel_new(dev, &dev_priv->evo);
 	if (ret) {
-		NV_ERROR(dev, "Error allocating EVO channel memory: %d\n", ret);
+		NV_ERROR(dev, "Error creating EVO channel: %d\n", ret);
 		return ret;
 	}
-
-	ret = nouveau_bo_pin(evo->ramin);
-	if (ret) {
-		NV_ERROR(dev, "Error pinning EVO channel memory: %d\n", ret);
-		nouveau_bo_ref(NULL, &evo->ramin);
-		return ret;
-	}
-
-	ret = nouveau_bo_map(evo->ramin);
-	if (ret) {
-		NV_ERROR(dev, "Error mapping EVO channel memory: %d\n", ret);
-		nouveau_bo_ref(NULL, &evo->ramin);
-		return ret;
-	}
-
-	evo->data = evo->ramin->kmap.virtual;
-	for (i = 0; i < 16384/4; i++)
-		evo->data[i] = 0;
-	evo->offset  = evo->ramin->bo.mem.mm_node->start << PAGE_SHIFT;
-	evo->hashtab = 0;
-	evo->objects = evo->hashtab + 4096;
-	evo->pushbuf = evo->objects + 4096;
-
-	/* initialise display objects */
-	if (dev_priv->chipset != 0x50) {
-		evo->data[evo->hashtab/4 + 0] = NvEvoVM;
-		evo->data[evo->hashtab/4 + 1] = (evo->objects << 10) | 2;
-		evo->data[evo->objects/4 + 0] = 0x1e99003d;
-		evo->data[evo->objects/4 + 1] = 0xffffffff;
-		evo->data[evo->objects/4 + 2] = 0x00000000;
-		evo->data[evo->objects/4 + 3] = 0x00000000;
-		evo->data[evo->objects/4 + 4] = 0x00000000;
-		evo->data[evo->objects/4 + 5] = 0x00010000;
-	}
-	evo->data[evo->hashtab/4 + 2] = NvEvoVRAM;
-	evo->data[evo->hashtab/4 + 3] = ((evo->objects + 0x20) << 10) | 2;
-	evo->data[(evo->objects + 0x20)/4 + 0] = 0x0019003d;
-	evo->data[(evo->objects + 0x20)/4 + 1] = nouveau_mem_fb_amount(dev) - 1;
-	evo->data[(evo->objects + 0x20)/4 + 2] = 0x00000000;
-	evo->data[(evo->objects + 0x20)/4 + 3] = 0x00000000;
-	evo->data[(evo->objects + 0x20)/4 + 4] = 0x00000000;
-	evo->data[(evo->objects + 0x20)/4 + 5] = 0x00010000;
-
-	/* Setup enough of a "normal" channel to be able to use PFIFO
-	 * DMA routines.
-	 */
-	ret = drm_addmap(dev, drm_get_resource_start(dev, 0) +
-			 NV50_PDISPLAY_USER(0), PAGE_SIZE, _DRM_REGISTERS,
-			 _DRM_DRIVER | _DRM_READ_ONLY, &evo->chan.user);
-	if (ret) {
-		NV_ERROR(dev, "Error mapping EVO control regs: %d\n", ret);
-		nouveau_bo_ref(NULL, &evo->ramin);
-		return ret;
-	}
-	evo->chan.dev = dev;
-	evo->chan.id = -1;
-	evo->chan.user_put = 0;
-	evo->chan.user_get = 4;
-	evo->chan.dma.max = (4096 /4) - 2;
-	evo->chan.dma.put = 0;
-	evo->chan.dma.cur = evo->chan.dma.put;
-	evo->chan.dma.free = evo->chan.dma.max - evo->chan.dma.cur;
-	evo->chan.dma.pushbuf = evo->ramin->kmap.virtual + evo->pushbuf;
-
-	RING_SPACE(&evo->chan, NOUVEAU_DMA_SKIPS);
-	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
-		OUT_RING  (&evo->chan, 0);
 
 	nv_wr32(0x00610184, nv_rd32(0x00614004));
 	/*
@@ -169,7 +248,7 @@ nv50_display_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_timer_engine *ptimer = &dev_priv->engine.timer;
-	struct nv50_evo_channel *evo = &dev_priv->evo;
+	struct nouveau_channel *evo = dev_priv->evo;
 	uint64_t start;
 	uint32_t val;
 
@@ -216,11 +295,11 @@ nv50_display_init(struct drm_device *dev)
 		return -EBUSY;
 	}
 
-	nv_wr32(NV50_PDISPLAY_OBJECTS, ((evo->offset + evo->hashtab) >> 8) | 9);
+	nv_wr32(NV50_PDISPLAY_OBJECTS, (evo->ramin->instance >> 8) | 9);
 
 	/* initialise fifo */
 	nv_wr32(NV50_PDISPLAY_CHANNEL_DMA_CB(0),
-		((evo->offset + evo->pushbuf) >> 8) |
+		((evo->pushbuf_bo->bo.mem.mm_node->start << PAGE_SHIFT) >> 8) |
 		NV50_PDISPLAY_CHANNEL_DMA_CB_LOCATION_VRAM |
 		NV50_PDISPLAY_CHANNEL_DMA_CB_VALID);
 	nv_wr32(NV50_PDISPLAY_CHANNEL_UNK2(0), 0x00010000);
@@ -238,20 +317,20 @@ nv50_display_init(struct drm_device *dev)
 		NV50_PDISPLAY_CHANNEL_STAT_DMA_ENABLED);
 	nv_wr32(0x610300, nv_rd32(0x610300) & ~1);
 
-	RING_SPACE(&evo->chan, 11);
-	BEGIN_RING(&evo->chan, 0, NV50_EVO_UNK84, 2);
-	OUT_RING  (&evo->chan, NV50_EVO_UNK84_NOTIFY_DISABLED);
-	OUT_RING  (&evo->chan, NV50_EVO_DMA_NOTIFY_HANDLE_NONE);
-	BEGIN_RING(&evo->chan, 0, NV50_EVO_CRTC(0, FB_DMA), 1);
-	OUT_RING  (&evo->chan, NV50_EVO_CRTC_FB_DMA_HANDLE_NONE);
-	BEGIN_RING(&evo->chan, 0, NV50_EVO_CRTC(0, UNK0800), 1);
-	OUT_RING  (&evo->chan, 0);
-	BEGIN_RING(&evo->chan, 0, NV50_EVO_CRTC(0, DISPLAY_START), 1);
-	OUT_RING  (&evo->chan, 0);
-	BEGIN_RING(&evo->chan, 0, NV50_EVO_CRTC(0, UNK082C), 1);
-	OUT_RING  (&evo->chan, 0);
-	FIRE_RING (&evo->chan);
-	if (!nv_wait(0x640004, 0xffffffff, evo->chan.dma.put << 2))
+	RING_SPACE(evo, 11);
+	BEGIN_RING(evo, 0, NV50_EVO_UNK84, 2);
+	OUT_RING  (evo, NV50_EVO_UNK84_NOTIFY_DISABLED);
+	OUT_RING  (evo, NV50_EVO_DMA_NOTIFY_HANDLE_NONE);
+	BEGIN_RING(evo, 0, NV50_EVO_CRTC(0, FB_DMA), 1);
+	OUT_RING  (evo, NV50_EVO_CRTC_FB_DMA_HANDLE_NONE);
+	BEGIN_RING(evo, 0, NV50_EVO_CRTC(0, UNK0800), 1);
+	OUT_RING  (evo, 0);
+	BEGIN_RING(evo, 0, NV50_EVO_CRTC(0, DISPLAY_START), 1);
+	OUT_RING  (evo, 0);
+	BEGIN_RING(evo, 0, NV50_EVO_CRTC(0, UNK082C), 1);
+	OUT_RING  (evo, 0);
+	FIRE_RING (evo);
+	if (!nv_wait(0x640004, 0xffffffff, evo->dma.put << 2))
 		NV_ERROR(dev, "evo pushbuf stalled\n");
 
 	/* enable clock change interrupts. */
@@ -281,10 +360,10 @@ static int nv50_display_disable(struct drm_device *dev)
 		nv50_crtc_blank(crtc, true);
 	}
 
-	RING_SPACE(&dev_priv->evo.chan, 2);
-	BEGIN_RING(&dev_priv->evo.chan, 0, NV50_EVO_UPDATE, 1);
-	OUT_RING  (&dev_priv->evo.chan, 0);
-	FIRE_RING (&dev_priv->evo.chan);
+	RING_SPACE(dev_priv->evo, 2);
+	BEGIN_RING(dev_priv->evo, 0, NV50_EVO_UPDATE, 1);
+	OUT_RING  (dev_priv->evo, 0);
+	FIRE_RING (dev_priv->evo);
 
 	/* Almost like ack'ing a vblank interrupt, maybe in the spirit of
 	 * cleaning up?
@@ -434,15 +513,7 @@ int nv50_display_destroy(struct drm_device *dev)
 	NV_DEBUG(dev, "\n");
 
 	nv50_display_disable(dev);
-
-	if (dev_priv->evo.ramin && dev_priv->evo.ramin->kmap.virtual)
-		nouveau_bo_unmap(dev_priv->evo.ramin);
-	nouveau_bo_ref(NULL, &dev_priv->evo.ramin);
-
-	if (dev_priv->evo.chan.user) {
-		drm_rmmap(dev, dev_priv->evo.chan.user);
-		dev_priv->evo.chan.user = NULL;
-	}
+	nv50_evo_channel_del(&dev_priv->evo);
 
 	drm_mode_config_cleanup(dev);
 

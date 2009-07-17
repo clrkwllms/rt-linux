@@ -41,7 +41,7 @@ nv50_sor_disconnect(struct nouveau_encoder *encoder)
 {
 	struct drm_device *dev = encoder->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
+	struct nouveau_channel *evo = dev_priv->evo;
 	int ret;
 
 	NV_DEBUG(dev, "Disconnecting SOR %d\n", encoder->or);
@@ -177,7 +177,7 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 			      struct drm_display_mode *adjusted_mode)
 {
 	struct drm_nouveau_private *dev_priv = drm_encoder->dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
+	struct nouveau_channel *evo = dev_priv->evo;
 	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
 	struct drm_device *dev = drm_encoder->dev;
 	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_encoder->crtc);
