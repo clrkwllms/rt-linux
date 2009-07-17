@@ -485,6 +485,9 @@ nouveau_mem_init(struct drm_device *dev)
 		return ret;
 	}
 
+	INIT_LIST_HEAD(&dev_priv->ttm.bo_list);
+	spin_lock_init(&dev_priv->ttm.bo_list_lock);
+
 	/* non-mappable vram */
 	dev_priv->fb_available_size = nouveau_mem_fb_amount(dev);
 	dev_priv->fb_available_size -= dev_priv->ramin_rsvd_vram;

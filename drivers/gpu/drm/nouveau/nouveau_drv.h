@@ -72,6 +72,7 @@ struct nouveau_fpriv {
 struct nouveau_bo {
 	struct ttm_buffer_object bo;
 	struct ttm_bo_kmap_obj kmap;
+	struct list_head head;
 
 	struct list_head entry;
 
@@ -461,6 +462,8 @@ struct drm_nouveau_private {
 	struct {
 		struct ttm_global_reference mem_global_ref;
 		struct ttm_bo_device bdev;
+		spinlock_t bo_list_lock;
+		struct list_head bo_list;
 	} ttm;
 
 	int fifo_alloc_count;

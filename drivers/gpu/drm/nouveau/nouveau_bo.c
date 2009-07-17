@@ -36,6 +36,7 @@
 static void
 nouveau_bo_del_ttm(struct ttm_buffer_object *bo)
 {
+	struct drm_nouveau_private *dev_priv = nouveau_bdev(bo->bdev);
 	struct nouveau_bo *nvbo = nouveau_bo(bo);
 
 	if (unlikely(nvbo->kmap.virtual))
@@ -43,6 +44,10 @@ nouveau_bo_del_ttm(struct ttm_buffer_object *bo)
 
 	if (unlikely(nvbo->gem))
 		DRM_ERROR("bo %p still attached to GEM object\n", bo);
+
+	spin_lock(&dev_priv->ttm.bo_list_lock);
+	list_del(&nvbo->head);
+	spin_unlock(&dev_priv->ttm.bo_list_lock);
 	kfree(nvbo);
 }
 
@@ -86,6 +91,9 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 		return ret;
 	}
 
+	spin_lock(&dev_priv->ttm.bo_list_lock);
+	list_add_tail(&nvbo->head, &dev_priv->ttm.bo_list);
+	spin_unlock(&dev_priv->ttm.bo_list_lock);
 	*pnvbo = nvbo;
 	return 0;
 }
