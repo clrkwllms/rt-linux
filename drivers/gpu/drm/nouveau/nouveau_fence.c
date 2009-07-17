@@ -64,8 +64,6 @@ nouveau_fence_update(struct nouveau_channel *chan)
 	struct nouveau_fence *fence;
 	uint32_t sequence;
 
-	BUG_ON(!spin_is_locked(&chan->fence.lock));
-
 	if (USE_REFCNT)
 		sequence = nvchan_rd32(0x48);
 	else
