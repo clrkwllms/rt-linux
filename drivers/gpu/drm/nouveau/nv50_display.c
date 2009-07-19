@@ -290,7 +290,7 @@ nv50_display_init(struct drm_device *dev)
 		NV50_PDISPLAY_CHANNEL_STAT_DMA_ENABLED);
 	nv_wr32(0x610300, nv_rd32(0x610300) & ~1);
 
-	evo->dma.max = (evo->pushbuf_bo->bo.mem.size / 4) - 2;
+	evo->dma.max = (4096/4) - 2;
 	evo->dma.put = 0;
 	evo->dma.cur = evo->dma.put;
 	evo->dma.free = evo->dma.max - evo->dma.cur;
