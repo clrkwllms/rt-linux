@@ -57,7 +57,7 @@ nv50_evo_channel_new(struct drm_device *dev, struct nouveau_channel **pchan)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gpuobj *dma_vm = NULL, *dma_vram = NULL;
 	struct nouveau_channel *chan;
-	int ret, i;
+	int ret;
 
 	chan = kzalloc(sizeof(struct nouveau_channel), GFP_KERNEL);
 	if (!chan)
@@ -168,20 +168,11 @@ nv50_evo_channel_new(struct drm_device *dev, struct nouveau_channel **pchan)
 		nv50_evo_channel_del(pchan);
 		return ret;
 	}
-	chan->dma.max = (chan->pushbuf_bo->bo.mem.size / 4) - 2;
-	chan->dma.put = 0;
-	chan->dma.cur = chan->dma.put;
-	chan->dma.free = chan->dma.max - chan->dma.cur;
-	chan->dma.pushbuf = chan->pushbuf_bo->kmap.virtual;
-
-	RING_SPACE(chan, NOUVEAU_DMA_SKIPS);
-	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
-		OUT_RING  (chan, 0);
 
 	return 0;
 }
 
-static int
+int
 nv50_display_pre_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -189,12 +180,6 @@ nv50_display_pre_init(struct drm_device *dev)
 	int ret, i;
 
 	NV_DEBUG(dev, "\n");
-
-	ret = nv50_evo_channel_new(dev, &dev_priv->evo);
-	if (ret) {
-		NV_ERROR(dev, "Error creating EVO channel: %d\n", ret);
-		return ret;
-	}
 
 	nv_wr32(0x00610184, nv_rd32(0x00614004));
 	/*
@@ -243,7 +228,7 @@ nv50_display_pre_init(struct drm_device *dev)
 	return 0;
 }
 
-static int
+int
 nv50_display_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -251,6 +236,7 @@ nv50_display_init(struct drm_device *dev)
 	struct nouveau_channel *evo = dev_priv->evo;
 	uint64_t start;
 	uint32_t val;
+	int i;
 
 	NV_DEBUG(dev, "\n");
 
@@ -316,6 +302,16 @@ nv50_display_init(struct drm_device *dev)
 	nv_wr32(NV50_PDISPLAY_CHANNEL_STAT(0), 0x01000003 |
 		NV50_PDISPLAY_CHANNEL_STAT_DMA_ENABLED);
 	nv_wr32(0x610300, nv_rd32(0x610300) & ~1);
+
+	evo->dma.max = (evo->pushbuf_bo->bo.mem.size / 4) - 2;
+	evo->dma.put = 0;
+	evo->dma.cur = evo->dma.put;
+	evo->dma.free = evo->dma.max - evo->dma.cur;
+	evo->dma.pushbuf = evo->pushbuf_bo->kmap.virtual;
+
+	RING_SPACE(evo, NOUVEAU_DMA_SKIPS);
+	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
+		OUT_RING  (evo, 0);
 
 	RING_SPACE(evo, 11);
 	BEGIN_RING(evo, 0, NV50_EVO_UNK84, 2);
@@ -435,6 +431,12 @@ int nv50_display_create(struct drm_device *dev)
 	dev->mode_config.max_height = 8192;
 
 	dev->mode_config.fb_base = dev_priv->fb_phys;
+
+	ret = nv50_evo_channel_new(dev, &dev_priv->evo);
+	if (ret) {
+		NV_ERROR(dev, "Error creating EVO channel: %d\n", ret);
+		return ret;
+	}
 
 	ret = nv50_display_pre_init(dev);
 	if (ret)
