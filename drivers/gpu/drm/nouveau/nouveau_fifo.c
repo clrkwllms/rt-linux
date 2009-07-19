@@ -96,7 +96,13 @@ static int nouveau_fifo_instmem_configure(struct drm_device *dev)
 int nouveau_fifo_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	int ret;
+	uint32_t mode = 0;
+	int ret, i;
+
+	for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+		if (dev_priv->fifos[i])
+			mode |= (1 << i);
+	}
 
 	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) &
 			~NV_PMC_ENABLE_PFIFO);
@@ -168,6 +174,7 @@ int nouveau_fifo_init(struct drm_device *dev)
 	}
 
 	nv_wr32(NV04_PFIFO_DMA_TIMESLICE, 0x001fffff);
+	nv_wr32(NV04_PFIFO_MODE, mode);
 	nv_wr32(NV03_PFIFO_CACHES, 0x00000001);
 	return 0;
 }
