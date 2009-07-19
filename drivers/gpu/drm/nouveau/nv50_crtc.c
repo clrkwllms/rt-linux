@@ -773,7 +773,9 @@ int nv50_crtc_create(struct drm_device *dev, int index)
 	ret = nouveau_bo_new(dev, NULL, 4096, 0x100, TTM_PL_FLAG_VRAM,
 			     0, 0x0000, false, true, &crtc->lut.nvbo);
 	if (!ret) {
-		ret = nouveau_bo_map(crtc->lut.nvbo);
+		ret = nouveau_bo_pin(crtc->lut.nvbo, TTM_PL_FLAG_VRAM);
+		if (!ret)
+			ret = nouveau_bo_map(crtc->lut.nvbo);
 		if (ret)
 			nouveau_bo_ref(NULL, &crtc->lut.nvbo);
 	}
