@@ -114,12 +114,12 @@ nouveau_fifo_swmthd(struct nouveau_channel *chan, uint32_t addr, uint32_t data)
 
 		chan->sw_subchannel[subc] = ref->gpuobj->class;
 		nv_wr32(NV04_PFIFO_CACHE1_ENGINE, nv_rd32(
-			NV04_PFIFO_CACHE1_ENGINE & ~(0xf << subc*4)));
+			NV04_PFIFO_CACHE1_ENGINE) & ~(0xf << subc*4));
 		return true;
 	}
 
 	/* hw object */
-	if (nv_rd32(NV04_PFIFO_CACHE1_ENGINE) & (1 << subc))
+	if (nv_rd32(NV04_PFIFO_CACHE1_ENGINE) & (1 << (subc*4)))
 		return false;
 
 	if (nouveau_call_method(chan, chan->sw_subchannel[subc], mthd, data))
