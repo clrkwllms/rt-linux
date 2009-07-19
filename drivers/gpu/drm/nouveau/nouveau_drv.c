@@ -96,7 +96,6 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_suspend_resume *state = &dev_priv->susres;
 	struct nouveau_engine *engine = &dev_priv->engine;
 	int ret, i;
 
@@ -164,8 +163,6 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 		}
 	}
 
-	state->fifo_mode = nv_rd32(NV04_PFIFO_MODE);
-
 	NV_INFO(dev, "And we're gone!\n");
 	pci_save_state(pdev);
 	if (pm_state.event == PM_EVENT_SUSPEND) {
@@ -181,7 +178,6 @@ nouveau_pci_resume(struct pci_dev *pdev)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_suspend_resume *state = &dev_priv->susres;
 	struct nouveau_engine *engine = &dev_priv->engine;
 	struct drm_encoder *encoder;
 	struct drm_crtc *crtc;
@@ -225,7 +221,6 @@ nouveau_pci_resume(struct pci_dev *pdev)
 
 	nouveau_irq_postinstall(dev);
 
-	nv_wr32(NV04_PFIFO_MODE, state->fifo_mode);
 	engine->fifo.load_context(dev_priv->channel);
 	engine->graph.load_context(dev_priv->channel);
 
