@@ -881,6 +881,7 @@ extern long nouveau_compat_ioctl(struct file *file, unsigned int cmd,
 /* nv04_display.c */
 extern int nv04_display_create(struct drm_device *);
 extern void nv04_display_destroy(struct drm_device *);
+extern void nv04_display_restore(struct drm_device *);
 
 /* nv04_output.c */
 extern int nv04_encoder_create(struct drm_device *, struct dcb_entry *);

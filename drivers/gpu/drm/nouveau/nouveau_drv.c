@@ -27,6 +27,7 @@
 #include "drm_crtc_helper.h"
 #include "nouveau_drv.h"
 #include "nouveau_hw.h"
+#include "nv50_display.h"
 
 #include "drm_pciids.h"
 
@@ -99,8 +100,7 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	struct nouveau_engine *engine = &dev_priv->engine;
 	int ret, i;
 
-	if (dev_priv->card_type >= NV_50 ||
-	    !drm_core_check_feature(dev, DRIVER_MODESET))
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -ENODEV;
 
 	if (pm_state.event == PM_EVENT_PRETHAW)
@@ -114,7 +114,8 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 		struct nouveau_channel *chan = dev_priv->fifos[i];
 		struct nouveau_fence *fence = NULL;
 
-		if (!chan)
+		if (!chan || (dev_priv->card_type >= NV_50 &&
+			      chan == dev_priv->fifos[0]))
 			continue;
 
 		ret = nouveau_fence_new(chan, &fence, true);
@@ -179,12 +180,10 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	struct drm_device *dev = pci_get_drvdata(pdev);
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
-	struct drm_encoder *encoder;
 	struct drm_crtc *crtc;
 	int ret;
 
-	if (dev_priv->card_type >= NV_50 ||
-	    !drm_core_check_feature(dev, DRIVER_MODESET))
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -ENODEV;
 
 	NV_INFO(dev, "We're back, enabling device...\n");
@@ -208,6 +207,8 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	}
 
 	NV_INFO(dev, "Reinitialising engines...\n");
+	if (engine->instmem.resume)
+		engine->instmem.resume(dev);
 	engine->mc.init(dev);
 	engine->timer.init(dev);
 	engine->fb.init(dev);
@@ -215,34 +216,27 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	engine->fifo.init(dev);
 
 	NV_INFO(dev, "Restoring GPU objects...\n");
-	if (engine->instmem.resume)
-		engine->instmem.resume(dev);
 	nouveau_gpuobj_resume(dev);
 
 	nouveau_irq_postinstall(dev);
 
-	engine->fifo.load_context(dev_priv->channel);
-	engine->graph.load_context(dev_priv->channel);
-
-	NV_INFO(dev, "Restoring mode...\n");
-	NVLockVgaCrtcs(dev, false);
-
-	/* meh.. modeset apparently doesn't setup all the regs and depends
-	 * on pre-existing state, for now load the state of the card *before*
-	 * nouveau was loaded, and then do a modeset.
-	 *
-	 * best thing to do probably is to make save/restore routines not
-	 * save/restore "pre-load" state, but more general so we can save
-	 * on suspend too.
-	 */
-	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
-		struct drm_encoder_helper_funcs *func = encoder->helper_private;
-
-		func->restore(encoder);
+	if (dev_priv->card_type < NV_50) {
+		engine->fifo.load_context(dev_priv->channel);
+		engine->graph.load_context(dev_priv->channel);
 	}
 
-	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head)
-		crtc->funcs->restore(crtc);
+	NV_INFO(dev, "Restoring mode...\n");
+	if (dev_priv->card_type < NV_50)
+		nv04_display_restore(dev);
+	else
+		nv50_display_init(dev);
+
+	/* Force CLUT to get re-loaded during modeset */
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		struct nouveau_crtc *nv_crtc = to_nouveau_crtc(crtc);
+
+		nv_crtc->lut.depth = 0;
+	}
 
 	drm_helper_resume_force_mode(dev);
 	return 0;

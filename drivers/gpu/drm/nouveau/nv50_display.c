@@ -180,7 +180,7 @@ nv50_display_init(struct drm_device *dev)
 	struct nouveau_channel *evo = dev_priv->evo;
 	uint32_t val, ram_amount;
 	uint64_t start;
-	int ret, i;
+	int i;
 
 	NV_DEBUG(dev, "\n");
 

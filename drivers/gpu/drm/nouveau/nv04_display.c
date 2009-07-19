@@ -216,3 +216,30 @@ nv04_display_destroy(struct drm_device *dev)
 
 	drm_mode_config_cleanup(dev);
 }
+
+void
+nv04_display_restore(struct drm_device *dev)
+{
+	struct drm_encoder *encoder;
+	struct drm_crtc *crtc;
+
+	NVLockVgaCrtcs(dev, false);
+
+	/* meh.. modeset apparently doesn't setup all the regs and depends
+	 * on pre-existing state, for now load the state of the card *before*
+	 * nouveau was loaded, and then do a modeset.
+	 *
+	 * best thing to do probably is to make save/restore routines not
+	 * save/restore "pre-load" state, but more general so we can save
+	 * on suspend too.
+	 */
+	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
+		struct drm_encoder_helper_funcs *func = encoder->helper_private;
+
+		func->restore(encoder);
+	}
+
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head)
+		crtc->funcs->restore(crtc);
+}
+
