@@ -230,6 +230,16 @@ nouveau_pci_resume(struct pci_dev *pdev)
 		engine->graph.load_context(dev_priv->channel);
 	}
 
+	NV_INFO(dev, "Re-enabling acceleration..\n");
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
+		 nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL1, 0x00000001);
+	nv_wr32(NV03_PFIFO_CACHES, 1);
+
+	engine->graph.fifo_access(dev, true);
+
 	NV_INFO(dev, "Restoring mode...\n");
 	if (dev_priv->card_type < NV_50)
 		nv04_display_restore(dev);
