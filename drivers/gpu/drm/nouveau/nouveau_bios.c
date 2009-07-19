@@ -5046,6 +5046,16 @@ int nouveau_parse_bios(struct drm_device *dev)
 	/* init script execution disabled */
 	bios->execute = false;
 
+	/* ... unless card isn't POSTed already */
+	if (dev_priv->card_type == NV_50) {
+		if (NVReadVgaCrtc(dev, 0, 0x00) == 0 &&
+		    NVReadVgaCrtc(dev, 0, 0x1a) == 0) {
+			NV_INFO(dev, "Adaptor not initialised, "
+				     "running VBIOS init tables\n");
+			bios->execute = true;
+		}
+	}
+
 	bios_wr32(dev, NV_PEXTDEV_BOOT_0, saved_nv_pextdev_boot_0);
 
 	dev_priv->vbios = &bios->pub;
