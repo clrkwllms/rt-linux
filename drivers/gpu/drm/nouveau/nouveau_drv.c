@@ -45,10 +45,6 @@ MODULE_PARM_DESC(duallink, "Allow dual-link TMDS (>=GeForce 8)");
 int nouveau_duallink = 1;
 module_param_named(duallink, nouveau_duallink, int, 0400);
 
-MODULE_PARM_DESC(uscript, "Execute output scripts (>=GeForce 8)");
-int nouveau_uscript = 1;
-module_param_named(uscript, nouveau_uscript, int, 0400);
-
 MODULE_PARM_DESC(uscript_lvds, "LVDS output script table ID (>=GeForce 8)");
 int nouveau_uscript_lvds = -1;
 module_param_named(uscript_lvds, nouveau_uscript_lvds, int, 0400);

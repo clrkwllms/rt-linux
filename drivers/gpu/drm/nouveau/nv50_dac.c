@@ -52,18 +52,6 @@ nv50_dac_disconnect(struct nouveau_encoder *encoder)
 	OUT_RING  (evo, 0);
 }
 
-static int
-nv50_dac_set_clock_mode(struct nouveau_encoder *encoder,
-			struct drm_display_mode *mode)
-{
-	struct drm_device *dev = encoder->base.dev;
-
-	NV_DEBUG(dev, "or %d\n", encoder->or);
-
-	nv_wr32(NV50_PDISPLAY_DAC_CLK_CTRL2(encoder->or),  0);
-	return 0;
-}
-
 static enum drm_connector_status
 nv50_dac_detect(struct drm_encoder *drm_encoder,
 		struct drm_connector *drm_connector)
@@ -284,9 +272,6 @@ int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry)
 
 	encoder->dcb = entry;
 	encoder->or = ffs(entry->or) - 1;
-
-	/* Set function pointers. */
-	encoder->set_clock_mode = nv50_dac_set_clock_mode;
 
 	drm_encoder_init(dev, &encoder->base, &nv50_dac_encoder_funcs,
 			 DRM_MODE_ENCODER_DAC);

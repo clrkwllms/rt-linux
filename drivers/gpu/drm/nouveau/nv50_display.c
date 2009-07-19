@@ -31,8 +31,6 @@
 #include "nouveau_fb.h"
 #include "drm_crtc_helper.h"
 
-extern int nouveau_uscript;
-
 static void
 nv50_evo_channel_del(struct nouveau_channel **pchan)
 {
@@ -508,83 +506,6 @@ int nv50_display_destroy(struct drm_device *dev)
 	return 0;
 }
 
-static void nv50_display_vclk_update(struct drm_device *dev)
-{
-	struct drm_encoder *drm_encoder;
-	struct drm_crtc *drm_crtc;
-	struct nouveau_encoder *encoder = NULL;
-	struct nouveau_crtc *crtc = NULL;
-	int crtc_index;
-	uint32_t unk30 = nv_rd32(NV50_PDISPLAY_UNK30_CTRL);
-
-	for (crtc_index = 0; crtc_index < 2; crtc_index++) {
-		bool clock_change = false;
-		bool clock_ack = false;
-
-		if (crtc_index == 0 && (unk30 & NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK0))
-			clock_change = true;
-
-		if (crtc_index == 1 && (unk30 & NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK1))
-			clock_change = true;
-
-		if (clock_change)
-			clock_ack = true;
-
-#if 0
-		if (dev_priv->last_crtc == crtc_index)
-#endif
-			clock_ack = true;
-
-		list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
-			crtc = to_nouveau_crtc(drm_crtc);
-			if (crtc->index == crtc_index)
-				break;
-		}
-
-		if (clock_change)
-			nv50_crtc_set_clock(dev, crtc->index, crtc->mode->clock);
-
-		NV_DEBUG(dev, "index %d clock_change %d clock_ack %d\n", crtc_index, clock_change, clock_ack);
-
-		if (!clock_ack)
-			continue;
-
-		nv_wr32(NV50_PDISPLAY_CRTC_CLK_CTRL2(crtc->index), 0);
-
-		list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
-			encoder = to_nouveau_encoder(drm_encoder);
-
-			if (!drm_encoder->crtc)
-				continue;
-
-			if (drm_encoder->crtc == drm_crtc)
-				encoder->set_clock_mode(encoder, crtc->mode);
-		}
-	}
-}
-
-static void
-nv50_display_irq_handler_old(struct drm_device *dev)
-{
-	uint32_t super = nv_rd32(NV50_PDISPLAY_INTR);
-	uint32_t state;
-
-	NV_DEBUG(dev, "0x610024 = 0x%08x\n", super);
-
-	if (super & 0x0000000c)
-		nv_wr32(NV50_PDISPLAY_INTR, super & 0x0000000c);
-
-	state = (super >> 4) & 7;
-	if (state) {
-		if (state == 2)
-			nv50_display_vclk_update(dev);
-
-		nv_wr32(NV50_PDISPLAY_INTR, super & 0x00000070);
-		nv_wr32(NV50_PDISPLAY_UNK30_CTRL,
-			NV50_PDISPLAY_UNK30_CTRL_PENDING);
-	}
-}
-
 static int
 nv50_display_irq_head(struct drm_device *dev, int *phead,
 		      struct dcb_entry **pdcbent)
@@ -842,15 +763,11 @@ nv50_display_irq_handler(struct drm_device *dev)
 		clock = (intr & (NV50_PDISPLAY_INTR_CLK_UNK10 |
 				 NV50_PDISPLAY_INTR_CLK_UNK20 |
 				 NV50_PDISPLAY_INTR_CLK_UNK40));
-		if (nouveau_uscript && clock) {
+		if (clock) {
 			nv_wr32(NV03_PMC_INTR_EN_0, 0);
 			if (!work_pending(&dev_priv->irq_work))
 				schedule_work(&dev_priv->irq_work);
 			delayed |= clock;
-			intr &= ~clock;
-		} else
-		if (!nouveau_uscript && clock) {
-			nv50_display_irq_handler_old(dev);
 			intr &= ~clock;
 		}
 
