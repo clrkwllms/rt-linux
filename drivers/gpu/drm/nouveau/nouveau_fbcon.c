@@ -798,6 +798,7 @@ static int nouveau_fbcon_multi_fb_probe(struct drm_device *dev)
 
 static int nouveau_fbcon_single_fb_probe(struct drm_device *dev)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_crtc *crtc;
 	struct drm_connector *connector;
 	unsigned int fb_width = (unsigned)-1, fb_height = (unsigned)-1;
@@ -877,6 +878,7 @@ static int nouveau_fbcon_single_fb_probe(struct drm_device *dev)
 // fail
 
 	info = nouveau_fb->base.fbdev;
+	dev_priv->fbdev_info = info;
 	par = info->par;
 
 	crtc_count = 0;
