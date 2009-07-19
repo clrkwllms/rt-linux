@@ -315,13 +315,14 @@ nv50_fifo_load_context(struct nouveau_channel *chan)
 	struct nouveau_gpuobj *ramfc = chan->ramfc->gpuobj;
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
+	NV_ERROR(chan->dev, "stub!\n");
 
 	/*XXX: incomplete, only touches the regs that NV does */
 	dev_priv->engine.instmem.prepare_access(dev, false);
 
 	nv_wr32(0x3244, INSTANCE_RD(ramfc, 0x08/4));
 	nv_wr32(0x3240, INSTANCE_RD(ramfc, 0x10/4));
-
+#if 0
 	nv_wr32(0x3224, INSTANCE_RD(ramfc, 0x3c/4));
 	nv_wr32(NV04_PFIFO_CACHE1_DMA_INSTANCE, INSTANCE_RD(ramfc, 0x48/4));
 	nv_wr32(0x3234, INSTANCE_RD(ramfc, 0x4c/4));
@@ -332,7 +333,7 @@ nv50_fifo_load_context(struct nouveau_channel *chan)
 		nv_wr32(0x340c, INSTANCE_RD(ramfc, 0x88/4));
 		nv_wr32(0x3410, INSTANCE_RD(ramfc, 0x98/4));
 	}
-
+#endif
 	dev_priv->engine.instmem.finish_access(dev);
 
 	nv_wr32(NV03_PFIFO_CACHE1_PUSH1, chan->id | (1<<16));
@@ -342,7 +343,17 @@ nv50_fifo_load_context(struct nouveau_channel *chan)
 int
 nv50_fifo_save_context(struct nouveau_channel *chan)
 {
+	struct drm_device *dev = chan->dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_gpuobj *ramfc = chan->ramfc->gpuobj;
+
 	NV_DEBUG(chan->dev, "ch%d\n", chan->id);
 	NV_ERROR(chan->dev, "stub!\n");
+
+	dev_priv->engine.instmem.prepare_access(dev, false);
+	INSTANCE_WR(ramfc, 0x08/4, nv_rd32(0x3244));
+	INSTANCE_WR(ramfc, 0x10/4, nv_rd32(0x3240));
+	dev_priv->engine.instmem.finish_access(dev);
 	return 0;
 }
+
