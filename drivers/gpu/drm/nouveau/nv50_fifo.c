@@ -51,9 +51,8 @@ nv50_fifo_init_thingo(struct drm_device *dev)
 	/* We never schedule channel 0 or 127 */
 	dev_priv->engine.instmem.prepare_access(dev, true);
 	for (i = 1, nr = 0; i < 127; i++) {
-		if (dev_priv->fifos[i]) {
+		if (dev_priv->fifos[i])
 			INSTANCE_WR(cur->gpuobj, nr++, i);
-		}
 	}
 	dev_priv->engine.instmem.finish_access(dev);
 
@@ -63,7 +62,7 @@ nv50_fifo_init_thingo(struct drm_device *dev)
 }
 
 static int
-nv50_fifo_channel_enable(struct drm_device *dev, int channel, int nt)
+nv50_fifo_channel_enable(struct drm_device *dev, int channel, bool nt)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *chan = dev_priv->fifos[channel];
@@ -84,7 +83,7 @@ nv50_fifo_channel_enable(struct drm_device *dev, int channel, int nt)
 }
 
 static void
-nv50_fifo_channel_disable(struct drm_device *dev, int channel, int nt)
+nv50_fifo_channel_disable(struct drm_device *dev, int channel, bool nt)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t inst;
@@ -121,12 +120,18 @@ nv50_fifo_init_intr(struct drm_device *dev)
 static void
 nv50_fifo_init_context_table(struct drm_device *dev)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	int i;
 
 	NV_DEBUG(dev, "\n");
 
-	for (i = 0; i < NV50_PFIFO_CTX_TABLE__SIZE; i++)
-		nv50_fifo_channel_disable(dev, i, 1);
+	for (i = 0; i < NV50_PFIFO_CTX_TABLE__SIZE; i++) {
+		if (dev_priv->fifos[i])
+			nv50_fifo_channel_enable(dev, i, true);
+		else
+			nv50_fifo_channel_disable(dev, i, true);
+	}
+
 	nv50_fifo_init_thingo(dev);
 }
 
@@ -151,8 +156,8 @@ nv50_fifo_init_regs(struct drm_device *dev)
 	nv_wr32(0x3270, 0);
 
 	/* Enable dummy channels setup by nv50_instmem.c */
-	nv50_fifo_channel_enable(dev, 0, 1);
-	nv50_fifo_channel_enable(dev, 127, 1);
+	nv50_fifo_channel_enable(dev, 0, true);
+	nv50_fifo_channel_enable(dev, 127, true);
 }
 
 int
@@ -273,7 +278,7 @@ nv50_fifo_create_context(struct nouveau_channel *chan)
 
 	dev_priv->engine.instmem.finish_access(dev);
 
-	ret = nv50_fifo_channel_enable(dev, chan->id, 0);
+	ret = nv50_fifo_channel_enable(dev, chan->id, false);
 	if (ret) {
 		NV_ERROR(dev, "error enabling ch%d: %d\n", chan->id, ret);
 		nouveau_gpuobj_ref_del(dev, &chan->ramfc);
@@ -290,11 +295,11 @@ nv50_fifo_destroy_context(struct nouveau_channel *chan)
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
 
-	nv50_fifo_channel_disable(dev, chan->id, 0);
+	nv50_fifo_channel_disable(dev, chan->id, false);
 
 	/* Dummy channel, also used on ch 127 */
 	if (chan->id == 0)
-		nv50_fifo_channel_disable(dev, 127, 0);
+		nv50_fifo_channel_disable(dev, 127, false);
 
 	if ((nv_rd32(NV03_PFIFO_CACHE1_PUSH1) & 0xffff) == chan->id)
 		nv_wr32(NV03_PFIFO_CACHE1_PUSH1, 127);
