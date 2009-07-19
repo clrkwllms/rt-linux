@@ -173,17 +173,21 @@ nv50_evo_channel_new(struct drm_device *dev, struct nouveau_channel **pchan)
 }
 
 int
-nv50_display_pre_init(struct drm_device *dev)
+nv50_display_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t ram_amount;
+	struct nouveau_timer_engine *ptimer = &dev_priv->engine.timer;
+	struct nouveau_channel *evo = dev_priv->evo;
+	uint32_t val, ram_amount;
+	uint64_t start;
 	int ret, i;
 
 	NV_DEBUG(dev, "\n");
 
 	nv_wr32(0x00610184, nv_rd32(0x00614004));
 	/*
-	 * I think the 0x006101XX range is some kind of main control area that enables things.
+	 * I think the 0x006101XX range is some kind of main control area
+	 * that enables things.
 	 */
 	/* CRTC? */
 	nv_wr32(0x00610190 + 0 * 0x10, nv_rd32(0x00616100 + 0 * 0x800));
@@ -224,21 +228,6 @@ nv50_display_pre_init(struct drm_device *dev)
 	nv_wr32(NV50_PDISPLAY_RAM_AMOUNT, ram_amount - 1);
 	nv_wr32(NV50_PDISPLAY_UNK_388, 0x150000);
 	nv_wr32(NV50_PDISPLAY_UNK_38C, 0);
-
-	return 0;
-}
-
-int
-nv50_display_init(struct drm_device *dev)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_timer_engine *ptimer = &dev_priv->engine.timer;
-	struct nouveau_channel *evo = dev_priv->evo;
-	uint64_t start;
-	uint32_t val;
-	int i;
-
-	NV_DEBUG(dev, "\n");
 
 	/* The precise purpose is unknown, i suspect it has something to do
 	 * with text mode.
@@ -432,15 +421,12 @@ int nv50_display_create(struct drm_device *dev)
 
 	dev->mode_config.fb_base = dev_priv->fb_phys;
 
+	/* Create EVO channel */
 	ret = nv50_evo_channel_new(dev, &dev_priv->evo);
 	if (ret) {
 		NV_ERROR(dev, "Error creating EVO channel: %d\n", ret);
 		return ret;
 	}
-
-	ret = nv50_display_pre_init(dev);
-	if (ret)
-		return ret;
 
 	/* Create CRTC objects */
 	for (i = 0; i < 2; i++)
