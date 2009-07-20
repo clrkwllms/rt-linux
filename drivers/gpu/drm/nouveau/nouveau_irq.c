@@ -83,7 +83,7 @@ nouveau_call_method(struct nouveau_channel *chan, int class, int mthd, int data)
 		grc++;
 	}
 
-	if (grc->id != class)
+	if (grc->id != class || !grc->methods)
 		return -ENOENT;
 
 	grm = grc->methods;
