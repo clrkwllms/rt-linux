@@ -318,27 +318,54 @@ nv50_fifo_load_context(struct nouveau_channel *chan)
 	struct nouveau_gpuobj *ramfc = chan->ramfc->gpuobj;
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
-	NV_ERROR(chan->dev, "stub!\n");
 
-	/*XXX: incomplete, only touches the regs that NV does */
 	dev_priv->engine.instmem.prepare_access(dev, false);
-
-	nv_wr32(0x3244, INSTANCE_RD(ramfc, 0x08/4));
-	nv_wr32(0x3240, INSTANCE_RD(ramfc, 0x10/4));
-#if 0
+	nv_wr32(0x3330, INSTANCE_RD(ramfc, 0x00/4));
+	nv_wr32(0x3334, INSTANCE_RD(ramfc, 0x04/4));
+	nv_wr32(0x3240, INSTANCE_RD(ramfc, 0x08/4));
+	nv_wr32(0x3320, INSTANCE_RD(ramfc, 0x0c/4));
+	nv_wr32(0x3244, INSTANCE_RD(ramfc, 0x10/4));
+	nv_wr32(0x3328, INSTANCE_RD(ramfc, 0x14/4));
+	nv_wr32(0x3368, INSTANCE_RD(ramfc, 0x18/4));
+	nv_wr32(0x336c, INSTANCE_RD(ramfc, 0x1c/4));
+	nv_wr32(0x3370, INSTANCE_RD(ramfc, 0x20/4));
+	nv_wr32(0x3374, INSTANCE_RD(ramfc, 0x24/4));
+	nv_wr32(0x3378, INSTANCE_RD(ramfc, 0x28/4));
+	nv_wr32(0x337c, INSTANCE_RD(ramfc, 0x2c/4));
+	nv_wr32(0x3228, INSTANCE_RD(ramfc, 0x30/4));
+	nv_wr32(0x3364, INSTANCE_RD(ramfc, 0x34/4));
+	nv_wr32(0x32a0, INSTANCE_RD(ramfc, 0x38/4));
 	nv_wr32(0x3224, INSTANCE_RD(ramfc, 0x3c/4));
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_INSTANCE, INSTANCE_RD(ramfc, 0x48/4));
+	nv_wr32(0x324c, INSTANCE_RD(ramfc, 0x40/4));
+	nv_wr32(0x2044, INSTANCE_RD(ramfc, 0x44/4));
+	nv_wr32(0x322c, INSTANCE_RD(ramfc, 0x48/4));
 	nv_wr32(0x3234, INSTANCE_RD(ramfc, 0x4c/4));
-	nv_wr32(0x3254, 1);
-	nv_wr32(NV03_PFIFO_RAMHT, INSTANCE_RD(ramfc, 0x80/4));
-
+	nv_wr32(0x3340, INSTANCE_RD(ramfc, 0x50/4));
+	nv_wr32(0x3344, INSTANCE_RD(ramfc, 0x54/4));
+	nv_wr32(0x3280, INSTANCE_RD(ramfc, 0x58/4));
+	nv_wr32(0x3254, INSTANCE_RD(ramfc, 0x5c/4));
+	nv_wr32(0x3260, INSTANCE_RD(ramfc, 0x60/4));
+	nv_wr32(0x3264, INSTANCE_RD(ramfc, 0x64/4));
+	nv_wr32(0x3268, INSTANCE_RD(ramfc, 0x68/4));
+	nv_wr32(0x326c, INSTANCE_RD(ramfc, 0x6c/4));
+	nv_wr32(0x32e4, INSTANCE_RD(ramfc, 0x70/4));
+	nv_wr32(0x3248, INSTANCE_RD(ramfc, 0x74/4));
+	nv_wr32(0x2088, INSTANCE_RD(ramfc, 0x78/4));
+	nv_wr32(0x2058, INSTANCE_RD(ramfc, 0x7c/4));
+	nv_wr32(0x2210, INSTANCE_RD(ramfc, 0x80/4));
+	/*XXX: what happens for 0x84? */
 	if (!IS_G80) {
+		/* guessing that all the 0x34xx regs aren't on NV50 */
 		nv_wr32(0x340c, INSTANCE_RD(ramfc, 0x88/4));
+		nv_wr32(0x3400, INSTANCE_RD(ramfc, 0x8c/4));
+		nv_wr32(0x3404, INSTANCE_RD(ramfc, 0x90/4));
+		nv_wr32(0x3408, INSTANCE_RD(ramfc, 0x94/4));
 		nv_wr32(0x3410, INSTANCE_RD(ramfc, 0x98/4));
 	}
-#endif
 	dev_priv->engine.instmem.finish_access(dev);
 
+	nv_wr32(0x3210, 0);
+	nv_wr32(0x3270, 0);
 	nv_wr32(NV03_PFIFO_CACHE1_PUSH1, chan->id | (1<<16));
 	return 0;
 }
@@ -351,12 +378,52 @@ nv50_fifo_save_context(struct nouveau_channel *chan)
 	struct nouveau_gpuobj *ramfc = chan->ramfc->gpuobj;
 
 	NV_DEBUG(chan->dev, "ch%d\n", chan->id);
-	NV_ERROR(chan->dev, "stub!\n");
 
-	dev_priv->engine.instmem.prepare_access(dev, false);
-	INSTANCE_WR(ramfc, 0x08/4, nv_rd32(0x3244));
-	INSTANCE_WR(ramfc, 0x10/4, nv_rd32(0x3240));
+	dev_priv->engine.instmem.prepare_access(dev, true);
+	INSTANCE_WR(ramfc, 0x00/4, nv_rd32(0x3330));
+	INSTANCE_WR(ramfc, 0x04/4, nv_rd32(0x3334));
+	INSTANCE_WR(ramfc, 0x08/4, nv_rd32(0x3240));
+	INSTANCE_WR(ramfc, 0x0c/4, nv_rd32(0x3320));
+	INSTANCE_WR(ramfc, 0x10/4, nv_rd32(0x3244));
+	INSTANCE_WR(ramfc, 0x14/4, nv_rd32(0x3328));
+	INSTANCE_WR(ramfc, 0x18/4, nv_rd32(0x3368));
+	INSTANCE_WR(ramfc, 0x1c/4, nv_rd32(0x336c));
+	INSTANCE_WR(ramfc, 0x20/4, nv_rd32(0x3370));
+	INSTANCE_WR(ramfc, 0x24/4, nv_rd32(0x3374));
+	INSTANCE_WR(ramfc, 0x28/4, nv_rd32(0x3378));
+	INSTANCE_WR(ramfc, 0x2c/4, nv_rd32(0x337c));
+	INSTANCE_WR(ramfc, 0x30/4, nv_rd32(0x3228));
+	INSTANCE_WR(ramfc, 0x34/4, nv_rd32(0x3364));
+	INSTANCE_WR(ramfc, 0x38/4, nv_rd32(0x32a0));
+	INSTANCE_WR(ramfc, 0x3c/4, nv_rd32(0x3224));
+	INSTANCE_WR(ramfc, 0x40/4, nv_rd32(0x324c));
+	INSTANCE_WR(ramfc, 0x44/4, nv_rd32(0x2044));
+	INSTANCE_WR(ramfc, 0x48/4, nv_rd32(0x322c));
+	INSTANCE_WR(ramfc, 0x4c/4, nv_rd32(0x3234));
+	INSTANCE_WR(ramfc, 0x50/4, nv_rd32(0x3340));
+	INSTANCE_WR(ramfc, 0x54/4, nv_rd32(0x3344));
+	INSTANCE_WR(ramfc, 0x58/4, nv_rd32(0x3280));
+	INSTANCE_WR(ramfc, 0x5c/4, nv_rd32(0x3254));
+	INSTANCE_WR(ramfc, 0x60/4, nv_rd32(0x3260));
+	INSTANCE_WR(ramfc, 0x64/4, nv_rd32(0x3264));
+	INSTANCE_WR(ramfc, 0x68/4, nv_rd32(0x3268));
+	INSTANCE_WR(ramfc, 0x6c/4, nv_rd32(0x326c));
+	INSTANCE_WR(ramfc, 0x70/4, nv_rd32(0x32e4));
+	INSTANCE_WR(ramfc, 0x74/4, nv_rd32(0x3248));
+	INSTANCE_WR(ramfc, 0x78/4, nv_rd32(0x2088));
+	INSTANCE_WR(ramfc, 0x7c/4, nv_rd32(0x2058));
+	INSTANCE_WR(ramfc, 0x80/4, nv_rd32(0x2210));
+	/*XXX: what happens for 0x84? */
+	if (!IS_G80) {
+		/* guessing that all the 0x34xx regs aren't on NV50 */
+		INSTANCE_WR(ramfc, 0x88/4, nv_rd32(0x340c));
+		INSTANCE_WR(ramfc, 0x8c/4, nv_rd32(0x3400));
+		INSTANCE_WR(ramfc, 0x90/4, nv_rd32(0x3404));
+		INSTANCE_WR(ramfc, 0x94/4, nv_rd32(0x3408));
+		INSTANCE_WR(ramfc, 0x98/4, nv_rd32(0x3410));
+	}
 	dev_priv->engine.instmem.finish_access(dev);
+
 	return 0;
 }
 
