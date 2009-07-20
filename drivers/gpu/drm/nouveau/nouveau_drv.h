@@ -196,6 +196,7 @@ struct nouveau_channel
 
 	/* PFIFO context */
 	struct nouveau_gpuobj_ref *ramfc;
+	struct nouveau_gpuobj_ref *cache;
 
 	/* PGRAPH context */
 	/* XXX may be merge 2 pointers as private data ??? */

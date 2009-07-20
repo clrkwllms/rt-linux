@@ -253,6 +253,11 @@ nv50_fifo_create_context(struct nouveau_channel *chan)
 		if (ret)
 			return ret;
 		ramfc = chan->ramfc->gpuobj;
+
+		ret = nouveau_gpuobj_new_ref(dev, chan, NULL, 0, 4096, 256,
+					     0, &chan->cache);
+		if (ret)
+			return ret;
 	}
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
@@ -275,7 +280,7 @@ nv50_fifo_create_context(struct nouveau_channel *chan)
 		INSTANCE_WR(chan->ramin->gpuobj, 0, chan->id);
 		INSTANCE_WR(chan->ramin->gpuobj, 1, chan->ramfc->instance >> 8);
 
-		INSTANCE_WR(ramfc, 0x88/4, 0x3d520); /* some vram addy >> 10 */
+		INSTANCE_WR(ramfc, 0x88/4, chan->cache->instance >> 10);
 		INSTANCE_WR(ramfc, 0x98/4, chan->ramin->instance >> 12);
 	}
 
@@ -308,6 +313,7 @@ nv50_fifo_destroy_context(struct nouveau_channel *chan)
 		nv_wr32(NV03_PFIFO_CACHE1_PUSH1, 127);
 
 	nouveau_gpuobj_ref_del(dev, &chan->ramfc);
+	nouveau_gpuobj_ref_del(dev, &chan->cache);
 }
 
 int
