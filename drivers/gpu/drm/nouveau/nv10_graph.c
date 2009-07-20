@@ -688,7 +688,7 @@ int nv10_graph_save_context(struct nouveau_channel *chan)
 	return 0;
 }
 
-void nouveau_nv10_context_switch(struct drm_device *dev)
+void nv10_graph_context_switch(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv;
 	struct nouveau_engine *engine;

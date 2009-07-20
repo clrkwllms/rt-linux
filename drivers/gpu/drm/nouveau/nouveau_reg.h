@@ -228,7 +228,14 @@
 #define NV40_PGRAPH_CTXCTL_UCODE_DATA                      0x00400328
 #define NV40_PGRAPH_CTXCTL_CUR                             0x0040032c
 #define NV40_PGRAPH_CTXCTL_CUR_LOADED                      0x01000000
-#define NV40_PGRAPH_CTXCTL_CUR_INST_MASK                   0x000FFFFF
+#define NV40_PGRAPH_CTXCTL_CUR_INSTANCE                    0x000FFFFF
+#define NV40_PGRAPH_CTXCTL_NEXT                            0x00400330
+#define NV40_PGRAPH_CTXCTL_NEXT_INSTANCE                   0x000fffff
+#define NV50_PGRAPH_CTXCTL_CUR                             0x0040032c
+#define NV50_PGRAPH_CTXCTL_CUR_LOADED                      0x80000000
+#define NV50_PGRAPH_CTXCTL_CUR_INSTANCE                    0x00ffffff
+#define NV50_PGRAPH_CTXCTL_NEXT                            0x00400330
+#define NV50_PGRAPH_CTXCTL_NEXT_INSTANCE                   0x00ffffff
 #define NV03_PGRAPH_ABS_X_RAM                              0x00400400
 #define NV03_PGRAPH_ABS_Y_RAM                              0x00400480
 #define NV03_PGRAPH_X_MISC                                 0x00400500

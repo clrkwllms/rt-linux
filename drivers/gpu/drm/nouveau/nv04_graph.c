@@ -350,7 +350,7 @@ struct graph_state {
 	int nv04[sizeof(nv04_graph_ctx_regs)/sizeof(nv04_graph_ctx_regs[0])];
 };
 
-void nouveau_nv04_context_switch(struct drm_device *dev)
+void nv04_graph_context_switch(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;

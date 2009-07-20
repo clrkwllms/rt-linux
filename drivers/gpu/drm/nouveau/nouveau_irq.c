@@ -471,12 +471,12 @@ nouveau_pgraph_intr_context_switch(struct drm_device *dev)
 	switch(dev_priv->card_type) {
 	case NV_04:
 	case NV_05:
-		nouveau_nv04_context_switch(dev);
+		nv04_graph_context_switch(dev);
 		break;
 	case NV_10:
 	case NV_11:
 	case NV_17:
-		nouveau_nv10_context_switch(dev);
+		nv10_graph_context_switch(dev);
 		break;
 	default:
 		NV_ERROR(dev, "Context switch not implemented\n");
@@ -546,6 +546,18 @@ nv50_pgraph_irq_handler(struct drm_device *dev)
 
 		status &= ~0x00000010;
 		nv_wr32(NV03_PGRAPH_INTR, 0x00000010);
+	}
+
+	if (status & 0x00001000) {
+		nv_wr32(0x400500, 0x00000000);
+		nv_wr32(NV03_PGRAPH_INTR, NV_PGRAPH_INTR_CONTEXT_SWITCH);
+		nv_wr32(NV40_PGRAPH_INTR_EN, nv_rd32(
+			NV40_PGRAPH_INTR_EN) & ~NV_PGRAPH_INTR_CONTEXT_SWITCH);
+		nv_wr32(0x400500, 0x00010001);
+
+		nv50_graph_context_switch(dev);
+
+		status &= ~NV_PGRAPH_INTR_CONTEXT_SWITCH;
 	}
 
 	if (status & 0x00100000) {
