@@ -127,29 +127,6 @@ nv50_cursor_set_offset(struct nouveau_crtc *crtc, uint32_t offset)
 int
 nv50_cursor_init(struct nouveau_crtc *crtc)
 {
-	struct drm_device *dev = crtc->base.dev;
-	int idx = crtc->index;
-
-	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx), 0x2000);
-	if (!nv_wait(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx),
-		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS, 0)) {
-		NV_ERROR(dev, "timeout: CURSOR_CTRL2_STATUS == 0\n");
-		NV_ERROR(dev, "CURSOR_CTRL2 = 0x%08x\n",
-			 nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx)));
-		return -EBUSY;
-	}
-
-	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index),
-		NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_ON);
-	if (!nv_wait(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx),
-		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS,
-		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_ACTIVE)) {
-		NV_ERROR(dev, "timeout: CURSOR_CTRL2_STATUS_ACTIVE(%d)\n", idx);
-		NV_ERROR(dev, "CURSOR_CTRL2(%d) = 0x%08x\n", idx,
-			 nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx)));
-		return -EBUSY;
-	}
-
 	crtc->cursor.set_offset = nv50_cursor_set_offset;
 	crtc->cursor.set_pos = nv50_cursor_set_pos;
 	crtc->cursor.hide = nv50_cursor_hide;

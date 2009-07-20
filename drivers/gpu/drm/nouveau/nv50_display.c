@@ -268,6 +268,29 @@ nv50_display_init(struct drm_device *dev)
 		return -EBUSY;
 	}
 
+	for (i = 0; i < 2; i++) {
+		nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(i), 0x2000);
+		if (!nv_wait(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(i),
+			     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS, 0)) {
+			NV_ERROR(dev, "timeout: CURSOR_CTRL2_STATUS == 0\n");
+			NV_ERROR(dev, "CURSOR_CTRL2 = 0x%08x\n",
+				 nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(i)));
+			return -EBUSY;
+		}
+
+		nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(i),
+			NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_ON);
+		if (!nv_wait(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(i),
+			     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS,
+			     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_ACTIVE)) {
+			NV_ERROR(dev, "timeout: "
+				      "CURSOR_CTRL2_STATUS_ACTIVE(%d)\n", i);
+			NV_ERROR(dev, "CURSOR_CTRL2(%d) = 0x%08x\n", i,
+				 nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(i)));
+			return -EBUSY;
+		}
+	}
+
 	nv_wr32(NV50_PDISPLAY_OBJECTS, (evo->ramin->instance >> 8) | 9);
 
 	/* initialise fifo */
