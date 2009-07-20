@@ -169,13 +169,13 @@ nv50_fifo_init(struct drm_device *dev)
 
 	NV_DEBUG(dev, "\n");
 
+	if (dev_priv->engine.fifo.priv)
+		goto just_reset;
+
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 	dev_priv->engine.fifo.priv = priv;
-
-	nv50_fifo_init_reset(dev);
-	nv50_fifo_init_intr(dev);
 
 	ret = nouveau_gpuobj_new_ref(dev, NULL, NULL, 0, 128*4, 0x1000,
 				     NVOBJ_FLAG_ZERO_ALLOC, &priv->thingo[0]);
@@ -191,6 +191,9 @@ nv50_fifo_init(struct drm_device *dev)
 		return ret;
 	}
 
+just_reset:
+	nv50_fifo_init_reset(dev);
+	nv50_fifo_init_intr(dev);
 	nv50_fifo_init_context_table(dev);
 	nv50_fifo_init_regs__nv(dev);
 	nv50_fifo_init_regs(dev);
