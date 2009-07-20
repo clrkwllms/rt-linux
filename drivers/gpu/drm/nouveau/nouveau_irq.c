@@ -278,35 +278,38 @@ static int
 nouveau_graph_chid_from_grctx(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t inst, tmp;
+	uint32_t inst;
 	int i;
 
 	if (dev_priv->card_type < NV_40)
 		return dev_priv->engine.fifo.channels;
 	else
-	if (dev_priv->card_type < NV_50)
+	if (dev_priv->card_type < NV_50) {
 		inst = (nv_rd32(0x40032c) & 0xfffff) << 4;
-	else
-		inst = nv_rd32(0x40032c) & 0xfffff;
 
-	for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
-		struct nouveau_channel *chan = dev_priv->fifos[i];
+		for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+			struct nouveau_channel *chan = dev_priv->fifos[i];
 
-		if (!chan || !chan->ramin_grctx)
-			continue;
+			if (!chan || !chan->ramin_grctx)
+				continue;
 
-		if (dev_priv->card_type < NV_50) {
 			if (inst == chan->ramin_grctx->instance)
 				break;
-		} else {
-			dev_priv->engine.instmem.prepare_access(dev, false);
-			tmp = INSTANCE_RD(chan->ramin_grctx->gpuobj, 0);
-			dev_priv->engine.instmem.finish_access(dev);
+		}
+	} else {
+		inst = (nv_rd32(0x40032c) & 0xfffff) << 12;
 
-			if (inst == tmp)
+		for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+			struct nouveau_channel *chan = dev_priv->fifos[i];
+
+			if (!chan || !chan->ramin)
+				continue;
+
+			if (inst == chan->ramin->instance)
 				break;
 		}
 	}
+
 
 	return i;
 }
