@@ -253,7 +253,7 @@ nouveau_pci_resume(struct pci_dev *pdev)
 
 	/* Force CLUT to get re-loaded during modeset */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-		struct nouveau_crtc *nv_crtc = to_nouveau_crtc(crtc);
+		struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 
 		nv_crtc->lut.depth = 0;
 	}

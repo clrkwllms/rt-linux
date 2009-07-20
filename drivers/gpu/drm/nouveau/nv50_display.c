@@ -338,7 +338,7 @@ static int nv50_display_disable(struct drm_device *dev)
 	NV_DEBUG(dev, "\n");
 
 	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
-		struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
+		struct nouveau_crtc *crtc = nouveau_crtc(drm_crtc);
 
 		nv50_crtc_blank(crtc, true);
 	}
@@ -352,7 +352,7 @@ static int nv50_display_disable(struct drm_device *dev)
 	 * cleaning up?
 	 */
 	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
-		struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
+		struct nouveau_crtc *crtc = nouveau_crtc(drm_crtc);
 		uint32_t mask = NV50_PDISPLAY_INTR_VBLANK_CRTC_(crtc->index);
 
 		if (!crtc->base.enabled)

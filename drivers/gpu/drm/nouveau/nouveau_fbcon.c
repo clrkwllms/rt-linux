@@ -105,7 +105,7 @@ static int nouveau_fbcon_setcolreg(unsigned regno, unsigned red, unsigned green,
 	int i;
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-		struct nouveau_crtc *nouveau_crtc = to_nouveau_crtc(crtc);
+		struct nouveau_crtc *nouveau_crtc = nouveau_crtc(crtc);
 		struct drm_mode_set *modeset = &nouveau_crtc->mode_set;
 		struct drm_framebuffer *fb = modeset->fb;
 
@@ -276,7 +276,7 @@ static int nouveau_fbcon_set_par(struct fb_info *info)
 		int ret;
 
 		list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-			struct nouveau_crtc *nouveau_crtc = to_nouveau_crtc(crtc);
+			struct nouveau_crtc *nouveau_crtc = nouveau_crtc(crtc);
 
 			for (i = 0; i < par->crtc_count; i++)
 				if (crtc->base.id == par->crtc_ids[i])
@@ -316,7 +316,7 @@ static int nouveau_fbcon_pan_display(struct fb_var_screeninfo *var,
 		if (i == par->crtc_count)
 			continue;
 
-		nouveau_crtc = to_nouveau_crtc(crtc);
+		nouveau_crtc = nouveau_crtc(crtc);
 		modeset = &nouveau_crtc->mode_set;
 
 		modeset->x = var->xoffset;
@@ -541,7 +541,7 @@ static int nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 
 	list_add(&fb->filp_head, &dev->mode_config.fb_kernel_list);
 
-	nouveau_fb = to_nouveau_framebuffer(fb);
+	nouveau_fb = nouveau_framebuffer(fb);
 	*nouveau_fb_p = nouveau_fb;
 
 	info = framebuffer_alloc(sizeof(struct nouveau_fbcon_par), device);
@@ -703,7 +703,7 @@ out:
 static int nouveau_fbcon_multi_fb_probe_crtc(struct drm_device *dev,
 					     struct drm_crtc *crtc)
 {
-	struct nouveau_crtc *nouveau_crtc = to_nouveau_crtc(crtc);
+	struct nouveau_crtc *nouveau_crtc = nouveau_crtc(crtc);
 	struct nouveau_framebuffer *nouveau_fb;
 	struct drm_framebuffer *fb;
 	struct drm_connector *connector;
@@ -731,7 +731,7 @@ static int nouveau_fbcon_multi_fb_probe_crtc(struct drm_device *dev,
 		new_fb = 1;
 	} else {
 		fb = nouveau_crtc->mode_set.fb;
-		nouveau_fb = to_nouveau_framebuffer(fb);
+		nouveau_fb = nouveau_framebuffer(fb);
 		if ((nouveau_fb->base.width < width) || (nouveau_fb->base.height < height))
 			return -EINVAL;
 	}
@@ -860,7 +860,7 @@ static int nouveau_fbcon_single_fb_probe(struct drm_device *dev)
 
 		fb = list_first_entry(&dev->mode_config.fb_kernel_list,
 				      struct drm_framebuffer, filp_head);
-		nouveau_fb = to_nouveau_framebuffer(fb);
+		nouveau_fb = nouveau_framebuffer(fb);
 
 		/* if someone hotplugs something bigger than we have already
 		 * allocated, we are pwned.  As really we can't resize an
@@ -887,7 +887,7 @@ static int nouveau_fbcon_single_fb_probe(struct drm_device *dev)
 	 * set configuration.
 	 */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-		struct nouveau_crtc *nouveau_crtc = to_nouveau_crtc(crtc);
+		struct nouveau_crtc *nouveau_crtc = nouveau_crtc(crtc);
 
 		modeset = &nouveau_crtc->mode_set;
 		modeset->fb = &nouveau_fb->base;
@@ -993,7 +993,7 @@ EXPORT_SYMBOL(nouveau_fbcon_probe);
 
 int nouveau_fbcon_remove(struct drm_device *dev, struct drm_framebuffer *fb)
 {
-	struct nouveau_framebuffer *nouveau_fb = to_nouveau_framebuffer(fb);
+	struct nouveau_framebuffer *nouveau_fb = nouveau_framebuffer(fb);
 	struct fb_info *info;
 
 	if (!fb)

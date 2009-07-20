@@ -33,7 +33,7 @@
 static void
 nouveau_user_framebuffer_destroy(struct drm_framebuffer *drm_fb)
 {
-	struct nouveau_framebuffer *fb = to_nouveau_framebuffer(drm_fb);
+	struct nouveau_framebuffer *fb = nouveau_framebuffer(drm_fb);
 	struct drm_device *dev = drm_fb->dev;
 
 	if (drm_fb->fbdev)
@@ -54,7 +54,7 @@ nouveau_user_framebuffer_create_handle(struct drm_framebuffer *drm_fb,
 				       struct drm_file *file_priv,
 				       unsigned int *handle)
 {
-	struct nouveau_framebuffer *fb = to_nouveau_framebuffer(drm_fb);
+	struct nouveau_framebuffer *fb = nouveau_framebuffer(drm_fb);
 
 	return drm_gem_handle_create(file_priv, fb->nvbo->gem, handle);
 }

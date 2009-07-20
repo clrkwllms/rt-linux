@@ -56,7 +56,7 @@ static enum drm_connector_status
 nv50_dac_detect(struct drm_encoder *drm_encoder,
 		struct drm_connector *drm_connector)
 {
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	struct drm_device *dev = encoder->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	enum drm_connector_status status = connector_status_disconnected;
@@ -112,7 +112,7 @@ static void nv50_dac_dpms(struct drm_encoder *drm_encoder, int mode)
 {
 	struct drm_device *dev = drm_encoder->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	uint32_t val;
 	int or = encoder->or;
 
@@ -186,11 +186,11 @@ static void nv50_dac_mode_set(struct drm_encoder *drm_encoder,
 			      struct drm_display_mode *mode,
 			      struct drm_display_mode *adjusted_mode)
 {
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	struct drm_device *dev = drm_encoder->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *evo = dev_priv->evo;
-	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_encoder->crtc);
+	struct nouveau_crtc *crtc = nouveau_crtc(drm_encoder->crtc);
 	uint32_t mode_ctl = 0, mode_ctl2 = 0;
 	int ret;
 
@@ -243,7 +243,7 @@ static const struct drm_encoder_helper_funcs nv50_dac_helper_funcs = {
 
 static void nv50_dac_destroy(struct drm_encoder *drm_encoder)
 {
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 
 	NV_DEBUG(drm_encoder->dev, "\n");
 

@@ -32,7 +32,7 @@ struct nouveau_framebuffer {
 	struct nouveau_bo *nvbo;
 };
 
-#define to_nouveau_framebuffer(x) container_of((x), struct nouveau_framebuffer, base)
+#define nouveau_framebuffer(x) container_of((x), struct nouveau_framebuffer, base)
 
 extern const struct drm_mode_config_funcs nouveau_mode_config_funcs;
 

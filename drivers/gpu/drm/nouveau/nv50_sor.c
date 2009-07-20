@@ -59,7 +59,7 @@ static void nv50_sor_dpms(struct drm_encoder *drm_encoder, int mode)
 {
 	struct drm_device *dev = drm_encoder->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	uint32_t val;
 	int or = encoder->or;
 
@@ -113,7 +113,7 @@ nouveau_encoder_connector_get(struct nouveau_encoder *encoder)
 
 	list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
 		if (drm_connector->encoder == &encoder->base)
-			return to_nouveau_connector(drm_connector);
+			return nouveau_connector(drm_connector);
 	}
 
 	return NULL;
@@ -123,7 +123,7 @@ static bool nv50_sor_mode_fixup(struct drm_encoder *drm_encoder,
 				struct drm_display_mode *mode,
 				struct drm_display_mode *adjusted_mode)
 {
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	struct nouveau_connector *connector;
 
 	connector = nouveau_encoder_connector_get(encoder);
@@ -155,9 +155,9 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 {
 	struct drm_nouveau_private *dev_priv = drm_encoder->dev->dev_private;
 	struct nouveau_channel *evo = dev_priv->evo;
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	struct drm_device *dev = drm_encoder->dev;
-	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_encoder->crtc);
+	struct nouveau_crtc *crtc = nouveau_crtc(drm_encoder->crtc);
 	uint32_t mode_ctl = 0;
 	int ret;
 
@@ -207,7 +207,7 @@ static const struct drm_encoder_helper_funcs nv50_sor_helper_funcs = {
 
 static void nv50_sor_destroy(struct drm_encoder *drm_encoder)
 {
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 
 	NV_DEBUG(drm_encoder->dev, "\n");
 

@@ -50,7 +50,7 @@ nv50_connector_to_encoder(struct nouveau_connector *connector, bool digital)
 		obj = drm_mode_object_find(dev, id, DRM_MODE_OBJECT_ENCODER);
 		if (!obj)
 			continue;
-		encoder = to_nouveau_encoder(obj_to_encoder(obj));
+		encoder = nouveau_encoder(obj_to_encoder(obj));
 
 		if (digital) {
 			switch (encoder->dcb->type) {
@@ -75,7 +75,7 @@ nv50_connector_to_encoder(struct nouveau_connector *connector, bool digital)
 
 static void nv50_connector_destroy(struct drm_connector *drm_connector)
 {
-	struct nouveau_connector *connector = to_nouveau_connector(drm_connector);
+	struct nouveau_connector *connector = nouveau_connector(drm_connector);
 	struct drm_device *dev = connector->base.dev;
 
 	NV_DEBUG(dev, "\n");
@@ -124,7 +124,7 @@ static enum drm_connector_status
 nv50_connector_detect(struct drm_connector *drm_connector)
 {
 	struct drm_device *dev = drm_connector->dev;
-	struct nouveau_connector *connector = to_nouveau_connector(drm_connector);
+	struct nouveau_connector *connector = nouveau_connector(drm_connector);
 	struct nouveau_encoder *encoder = NULL;
 	struct drm_encoder_helper_funcs *helper = NULL;
 
@@ -161,7 +161,7 @@ static int nv50_connector_set_property(struct drm_connector *drm_connector,
 				       uint64_t value)
 {
 	struct drm_device *dev = drm_connector->dev;
-	struct nouveau_connector *connector = to_nouveau_connector(drm_connector);
+	struct nouveau_connector *connector = nouveau_connector(drm_connector);
 	int rval;
 
 	/* Scaling mode */
@@ -193,7 +193,7 @@ static int nv50_connector_set_property(struct drm_connector *drm_connector,
 		connector->scaling_mode = value;
 
 		if (drm_connector->encoder && drm_connector->encoder->crtc)
-			crtc = to_nouveau_crtc(drm_connector->encoder->crtc);
+			crtc = nouveau_crtc(drm_connector->encoder->crtc);
 
 		if (!crtc)
 			return 0;
@@ -224,7 +224,7 @@ static int nv50_connector_set_property(struct drm_connector *drm_connector,
 			connector->use_dithering = false;
 
 		if (drm_connector->encoder && drm_connector->encoder->crtc)
-			crtc = to_nouveau_crtc(drm_connector->encoder->crtc);
+			crtc = nouveau_crtc(drm_connector->encoder->crtc);
 
 		if (!crtc)
 			return 0;
@@ -261,7 +261,7 @@ nv50_connector_native_mode(struct nouveau_connector *connector)
 static int nv50_connector_get_modes(struct drm_connector *drm_connector)
 {
 	struct drm_device *dev = drm_connector->dev;
-	struct nouveau_connector *connector = to_nouveau_connector(drm_connector);
+	struct nouveau_connector *connector = nouveau_connector(drm_connector);
 	struct edid *edid = NULL;
 	int ret = 0;
 
@@ -304,7 +304,7 @@ static int nv50_connector_mode_valid(struct drm_connector *drm_connector,
 				     struct drm_display_mode *mode)
 {
 	struct drm_device *dev = drm_connector->dev;
-	struct nouveau_connector *connector = to_nouveau_connector(drm_connector);
+	struct nouveau_connector *connector = nouveau_connector(drm_connector);
 	struct nouveau_encoder *encoder =
 		nv50_connector_to_encoder(connector, connector->digital);
 	unsigned min_clock, max_clock;
@@ -326,7 +326,7 @@ static int nv50_connector_mode_valid(struct drm_connector *drm_connector,
 			obj = drm_mode_object_find(dev, drm_connector->encoder_ids[i], DRM_MODE_OBJECT_ENCODER);
 			if (!obj)
 				continue;
-			encoder = to_nouveau_encoder(obj_to_encoder(obj));
+			encoder = nouveau_encoder(obj_to_encoder(obj));
 			NV_ERROR(dev, " %d: %d\n", i, encoder->dcb->type);
 		}
 
@@ -371,7 +371,7 @@ static int nv50_connector_mode_valid(struct drm_connector *drm_connector,
 static struct drm_encoder *
 nv50_connector_best_encoder(struct drm_connector *drm_connector)
 {
-	struct nouveau_connector *connector = to_nouveau_connector(drm_connector);
+	struct nouveau_connector *connector = nouveau_connector(drm_connector);
 
 	return &nv50_connector_to_encoder(connector, connector->digital)->base;
 }
@@ -481,7 +481,7 @@ int nv50_connector_create(struct drm_device *dev, int i2c_index, int type)
 
 	/* attach encoders */
 	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
-		struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+		struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 
 		if (encoder->dcb->i2c_index != i2c_index)
 			continue;

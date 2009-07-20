@@ -301,7 +301,7 @@ static void
 update_output_fields(struct drm_connector *connector,
 		     struct nouveau_encoder *det_encoder)
 {
-	struct nouveau_connector *nv_connector = to_nouveau_connector(connector);
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct drm_device *dev = connector->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
@@ -329,7 +329,7 @@ update_output_fields(struct drm_connector *connector,
 static bool
 edid_sink_connected(struct drm_connector *connector)
 {
-	struct nouveau_connector *nv_connector = to_nouveau_connector(connector);
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct drm_device *dev = connector->dev;
 	bool waslocked = NVLockVgaCrtcs(dev, false);
 	bool wastied = nv_heads_tied(dev);
@@ -369,7 +369,7 @@ find_encoder_by_type(struct drm_connector *connector, int type)
 		if (type != -1 && encoder->encoder_type != type)
 			continue;
 
-		return to_nouveau_encoder(encoder);
+		return nouveau_encoder(encoder);
 	}
 
 	return NULL;
@@ -378,7 +378,7 @@ find_encoder_by_type(struct drm_connector *connector, int type)
 static enum drm_connector_status
 nv_output_detect(struct drm_connector *connector)
 {
-	struct nouveau_connector *nv_connector = to_nouveau_connector(connector);
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct drm_device *dev = connector->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_encoder *det_encoder;
@@ -426,7 +426,7 @@ nv_output_detect(struct drm_connector *connector)
 static struct drm_display_mode *
 get_native_mode_from_edid(struct drm_connector *connector)
 {
-	struct nouveau_connector *nv_connector = to_nouveau_connector(connector);
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct drm_device *dev = connector->dev;
 	struct drm_display_mode *mode;
 
@@ -449,7 +449,7 @@ static int
 nv_output_get_edid_modes(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
-	struct nouveau_connector *nv_connector = to_nouveau_connector(connector);
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct nouveau_encoder *nv_encoder = nv_connector->detected_encoder;
 	enum nouveau_encoder_type enctype = nv_encoder->dcb->type;
 	int ret = 0;
@@ -494,7 +494,7 @@ nv_output_get_edid_modes(struct drm_connector *connector)
 static int
 nv_output_get_modes(struct drm_connector *connector)
 {
-	struct nouveau_connector *nv_connector = to_nouveau_connector(connector);
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct nouveau_encoder *nv_encoder = nv_connector->detected_encoder;
 	struct drm_display_mode mode;
 	struct drm_device *dev = connector->dev;
@@ -544,7 +544,7 @@ static int
 nv_output_mode_valid(struct drm_connector *connector,
 		     struct drm_display_mode *mode)
 {
-	struct nouveau_connector *nv_connector = to_nouveau_connector(connector);
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct nouveau_encoder *nv_encoder = nv_connector->detected_encoder;
 
 	/* mode_valid can be called by someone doing addmode on an output
@@ -589,7 +589,7 @@ static bool
 nv_output_mode_fixup(struct drm_encoder *encoder, struct drm_display_mode *mode,
 		     struct drm_display_mode *adjusted_mode)
 {
-	struct nouveau_encoder *nv_encoder = to_nouveau_encoder(encoder);
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 	struct nouveau_connector *nv_connector;
 
 	nv_connector = nouveau_encoder_connector_get(nv_encoder);
@@ -666,11 +666,11 @@ static inline bool is_fpc_off(uint32_t fpc)
 static void
 nv_output_prepare(struct drm_encoder *encoder)
 {
-	struct nouveau_encoder *nv_encoder = to_nouveau_encoder(encoder);
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 	struct drm_encoder_helper_funcs *helper = encoder->helper_private;
 	struct drm_device *dev = encoder->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	int head = to_nouveau_crtc(encoder->crtc)->index;
+	int head = nouveau_crtc(encoder->crtc)->index;
 	struct nv04_crtc_reg *crtcstate = dev_priv->mode_reg.crtc_reg;
 	uint8_t *cr_lcd = &crtcstate[head].CRTC[NV_CIO_CRE_LCD__INDEX];
 	uint8_t *cr_lcd_oth = &crtcstate[head ^ 1].CRTC[NV_CIO_CRE_LCD__INDEX];
@@ -729,11 +729,11 @@ static void
 nv_output_mode_set(struct drm_encoder *encoder, struct drm_display_mode *mode,
 		   struct drm_display_mode *adjusted_mode)
 {
-	struct nouveau_encoder *nv_encoder = to_nouveau_encoder(encoder);
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 	struct drm_device *dev = encoder->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct dcb_entry *dcbe = nv_encoder->dcb;
-	int head = to_nouveau_crtc(encoder->crtc)->index;
+	int head = nouveau_crtc(encoder->crtc)->index;
 
 	NV_TRACE(dev, "%s called for encoder %d\n", __func__,
 		      nv_encoder->dcb->index);
@@ -749,7 +749,7 @@ nv_output_mode_set(struct drm_encoder *encoder, struct drm_display_mode *mode,
 			      head << 8 | NV_PRAMDAC_DACCLK_SEL_DACCLK);
 		/* force any other vga encoders to bind to the other crtc */
 		list_for_each_entry(rebind, &dev->mode_config.encoder_list, head) {
-			struct nouveau_encoder *nv_rebind = to_nouveau_encoder(rebind);
+			struct nouveau_encoder *nv_rebind = nouveau_encoder(rebind);
 
 			if (nv_rebind == nv_encoder || nv_rebind->dcb->type != OUTPUT_ANALOG)
 				continue;
@@ -780,9 +780,9 @@ nv_output_mode_set(struct drm_encoder *encoder, struct drm_display_mode *mode,
 static void
 nv_output_commit(struct drm_encoder *encoder)
 {
-	struct nouveau_encoder *nv_encoder = to_nouveau_encoder(encoder);
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 	struct drm_device *dev = encoder->dev;
-	struct nouveau_crtc *nv_crtc = to_nouveau_crtc(encoder->crtc);
+	struct nouveau_crtc *nv_crtc = nouveau_crtc(encoder->crtc);
 	struct drm_encoder_helper_funcs *helper = encoder->helper_private;
 
 	helper->dpms(encoder, DRM_MODE_DPMS_ON);
@@ -802,7 +802,7 @@ dpms_update_fp_control(struct drm_device *dev,
 	uint32_t *fpc;
 
 	if (mode == DRM_MODE_DPMS_ON) {
-		nv_crtc = to_nouveau_crtc(crtc);
+		nv_crtc = nouveau_crtc(crtc);
 		fpc = &dev_priv->mode_reg.crtc_reg[nv_crtc->index].fp_control;
 
 		if (is_fpc_off(*fpc)) {
@@ -817,7 +817,7 @@ dpms_update_fp_control(struct drm_device *dev,
 		NVWriteRAMDAC(dev, nv_crtc->index, NV_PRAMDAC_FP_TG_CONTROL, *fpc);
 	} else {
 		list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-			nv_crtc = to_nouveau_crtc(crtc);
+			nv_crtc = nouveau_crtc(crtc);
 			fpc = &dev_priv->mode_reg.crtc_reg[nv_crtc->index].fp_control;
 
 			nv_crtc->fp_users &= ~(1 << nv_encoder->dcb->index);
@@ -861,7 +861,7 @@ lvds_encoder_dpms(struct drm_device *dev, struct nouveau_encoder *nv_encoder,
 		/* when removing an output, crtc may not be set, but PANEL_OFF
 		 * must still be run
 		 */
-		int head = crtc ? to_nouveau_crtc(crtc)->index :
+		int head = crtc ? nouveau_crtc(crtc)->index :
 			   nv_get_digital_bound_head(dev, nv_encoder->dcb->or);
 
 		if (mode == DRM_MODE_DPMS_ON)
@@ -878,7 +878,7 @@ lvds_encoder_dpms(struct drm_device *dev, struct nouveau_encoder *nv_encoder,
 	dpms_update_fp_control(dev, nv_encoder, crtc, mode);
 
 	if (mode == DRM_MODE_DPMS_ON)
-		nv_digital_output_prepare_sel_clk(dev, nv_encoder, to_nouveau_crtc(crtc)->index);
+		nv_digital_output_prepare_sel_clk(dev, nv_encoder, nouveau_crtc(crtc)->index);
 	else {
 		dev_priv->mode_reg.sel_clk = NVReadRAMDAC(dev, 0, NV_PRAMDAC_SEL_CLK);
 		dev_priv->mode_reg.sel_clk &= ~0xf0;
@@ -926,7 +926,7 @@ tmds_encoder_dpms(struct drm_device *dev, struct nouveau_encoder *nv_encoder,
 static void
 nv_output_dpms(struct drm_encoder *encoder, int mode)
 {
-	struct nouveau_encoder *nv_encoder = to_nouveau_encoder(encoder);
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 	struct drm_device *dev = encoder->dev;
 	struct drm_crtc *crtc = encoder->crtc;
 	void (* const encoder_dpms[4])(struct drm_device *, struct nouveau_encoder *, struct drm_crtc *, int) =
@@ -939,7 +939,7 @@ nv_output_dpms(struct drm_encoder *encoder, int mode)
 static void
 nv04_encoder_save(struct drm_encoder *encoder)
 {
-	struct nouveau_encoder *nv_encoder = to_nouveau_encoder(encoder);
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 	struct drm_device *dev = encoder->dev;
 
 	if (!nv_encoder->dcb)	/* uninitialised encoder */
@@ -958,7 +958,7 @@ nv04_encoder_save(struct drm_encoder *encoder)
 static void
 nv04_encoder_restore(struct drm_encoder *encoder)
 {
-	struct nouveau_encoder *nv_encoder = to_nouveau_encoder(encoder);
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 	struct drm_device *dev = encoder->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	int head = nv_encoder->restore.head;
@@ -997,7 +997,7 @@ static const struct drm_encoder_helper_funcs nv04_encoder_helper_funcs = {
 static void
 nv04_encoder_destroy(struct drm_encoder *encoder)
 {
-	struct nouveau_encoder *nv_encoder = to_nouveau_encoder(encoder);
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 
 	NV_DEBUG(encoder->dev, "\n");
 
@@ -1048,7 +1048,7 @@ nv04_encoder_create(struct drm_device *dev, struct dcb_entry *entry)
 static struct drm_encoder *
 nv_output_best_encoder(struct drm_connector *connector)
 {
-	struct nouveau_connector *nv_connector = to_nouveau_connector(connector);
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 
 	return &nv_connector->detected_encoder->base;
 }
@@ -1064,7 +1064,7 @@ nv04_connector_set_property(struct drm_connector *connector,
 			    struct drm_property *property, uint64_t value)
 {
 	struct drm_device *dev = connector->dev;
-	struct nouveau_connector *nv_connector = to_nouveau_connector(connector);
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 
 	/* Scaling mode */
 	if (property == dev->mode_config.scaling_mode_property) {
@@ -1109,7 +1109,7 @@ nv04_connector_set_property(struct drm_connector *connector,
 static void
 nv04_connector_destroy(struct drm_connector *connector)
 {
-	struct nouveau_connector *nv_connector = to_nouveau_connector(connector);
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 
 	NV_DEBUG(connector->dev, "\n");
 
@@ -1180,7 +1180,7 @@ nv04_connector_create(struct drm_device *dev, int i2c_index, uint16_t encoders,
 	drm_connector_attach_property(connector, dev->mode_config.dithering_mode_property, nv_connector->use_dithering ? DRM_MODE_DITHERING_ON : DRM_MODE_DITHERING_OFF);
 
 	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
-		struct nouveau_encoder *nv_encoder = to_nouveau_encoder(encoder);
+		struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 
 		if (nv_encoder->dcb->i2c_index != i2c_index)
 			continue;

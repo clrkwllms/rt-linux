@@ -47,7 +47,7 @@ struct nouveau_connector {
 	/*XXX: temp*/
 	struct edid *edid;
 };
-#define to_nouveau_connector(x) container_of((x), struct nouveau_connector, base)
+#define nouveau_connector(x) container_of((x), struct nouveau_connector, base)
 
 int nv50_connector_create(struct drm_device *dev, int i2c_index, int type);
 void nv50_connector_detect_all(struct drm_device *dev);

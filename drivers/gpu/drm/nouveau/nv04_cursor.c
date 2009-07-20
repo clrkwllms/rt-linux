@@ -29,7 +29,7 @@ nv04_cursor_set_pos(struct nouveau_crtc *nv_crtc, int x, int y)
 static void
 crtc_wr_cio_state(struct drm_crtc *crtc, struct nv04_crtc_reg *crtcstate, int index)
 {
-	NVWriteVgaCrtc(crtc->dev, to_nouveau_crtc(crtc)->index, index,
+	NVWriteVgaCrtc(crtc->dev, nouveau_crtc(crtc)->index, index,
 		       crtcstate->CRTC[index]);
 }
 
