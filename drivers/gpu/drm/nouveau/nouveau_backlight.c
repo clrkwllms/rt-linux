@@ -67,7 +67,7 @@ static int nv50_get_intensity(struct backlight_device *bd)
 {
 	struct drm_device *dev = bl_get_data(bd);
 
-	return nv_rd32(NV50_PDISPLAY_BACKLIGHT);
+	return nv_rd32(NV50_PDISPLAY_SOR_BACKLIGHT);
 }
 
 static int nv50_set_intensity(struct backlight_device *bd)
@@ -75,8 +75,8 @@ static int nv50_set_intensity(struct backlight_device *bd)
 	struct drm_device *dev = bl_get_data(bd);
 	int val = bd->props.brightness;
 
-	nv_wr32(NV50_PDISPLAY_BACKLIGHT, val | NV50_PDISPLAY_BACKLIGHT_ENABLE);
-
+	nv_wr32(NV50_PDISPLAY_SOR_BACKLIGHT, val |
+		NV50_PDISPLAY_SOR_BACKLIGHT_ENABLE);
 	return 0;
 }
 
@@ -112,7 +112,7 @@ static int nouveau_nv50_backlight_init(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct backlight_device *bd;
 
-	if (!nv_rd32(NV50_PDISPLAY_BACKLIGHT))
+	if (!nv_rd32(NV50_PDISPLAY_SOR_BACKLIGHT))
 		return 0;
 
 	bd = backlight_device_register("nv_backlight", &dev->pdev->dev, dev,

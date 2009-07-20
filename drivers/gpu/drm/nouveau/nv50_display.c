@@ -211,9 +211,9 @@ nv50_display_init(struct drm_device *dev)
 	nv_wr32(0x006101f0 + 2 * 0x4, nv_rd32(0x0061e000 + 2 * 0x800));
 
 	for (i = 0; i < 3; i++) {
-		nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(i), 0x00550000 |
-			NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
-		nv_wr32(NV50_PDISPLAY_DAC_REGS_CLK_CTRL1(i), 0x00000001);
+		nv_wr32(NV50_PDISPLAY_DAC_DPMS_CTRL(i), 0x00550000 |
+			NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING);
+		nv_wr32(NV50_PDISPLAY_DAC_CLK_CTRL1(i), 0x00000001);
 	}
 
 	/* This used to be in crtc unblank, but seems out of place there. */
@@ -353,7 +353,7 @@ static int nv50_display_disable(struct drm_device *dev)
 	 */
 	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
 		struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
-		uint32_t mask = NV50_PDISPLAY_INTR_VBLANK_CRTC(crtc->index);
+		uint32_t mask = NV50_PDISPLAY_INTR_VBLANK_CRTC_(crtc->index);
 
 		if (!crtc->base.enabled)
 			continue;
@@ -375,12 +375,12 @@ static int nv50_display_disable(struct drm_device *dev)
 			  nv_rd32(NV50_PDISPLAY_CHANNEL_STAT(0)));
 	}
 
-	for (i = 0; i < NV50_PDISPLAY_SOR_REGS__LEN; i++) {
-		if (!nv_wait(NV50_PDISPLAY_SOR_REGS_DPMS_STATE(i),
-			     NV50_PDISPLAY_SOR_REGS_DPMS_STATE_WAIT, 0)) {
+	for (i = 0; i < 3; i++) {
+		if (!nv_wait(NV50_PDISPLAY_SOR_DPMS_STATE(i),
+			     NV50_PDISPLAY_SOR_DPMS_STATE_WAIT, 0)) {
 			NV_ERROR(dev, "timeout: SOR_DPMS_STATE_WAIT(%d) == 0\n", i);
 			NV_ERROR(dev, "SOR_DPMS_STATE(%d) = 0x%08x\n", i,
-				  nv_rd32(NV50_PDISPLAY_SOR_REGS_DPMS_STATE(i)));
+				  nv_rd32(NV50_PDISPLAY_SOR_DPMS_STATE(i)));
 		}
 	}
 
@@ -616,13 +616,13 @@ nv50_display_vblank_crtc_handler(struct drm_device *dev, int crtc)
 static void
 nv50_display_vblank_handler(struct drm_device *dev, uint32_t intr)
 {
-	if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTC0)
+	if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTC_0)
 		nv50_display_vblank_crtc_handler(dev, 0);
 
-	if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTC1)
+	if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTC_1)
 		nv50_display_vblank_crtc_handler(dev, 1);
 
-	nv_wr32(NV50_PDISPLAY_INTR, intr & NV50_PDISPLAY_INTR_VBLANK_CRTCn);
+	nv_wr32(NV50_PDISPLAY_INTR, intr & NV50_PDISPLAY_INTR_VBLANK_CRTC);
 }
 
 static void
@@ -755,9 +755,9 @@ nv50_display_irq_handler(struct drm_device *dev)
 			break;
 		NV_DEBUG(dev, "PDISPLAY_INTR 0x%08x 0x%08x\n", unk20, intr);
 
-		if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTCn) {
+		if (intr & NV50_PDISPLAY_INTR_VBLANK_CRTC) {
 			nv50_display_vblank_handler(dev, intr);
-			intr &= ~NV50_PDISPLAY_INTR_VBLANK_CRTCn;
+			intr &= ~NV50_PDISPLAY_INTR_VBLANK_CRTC;
 		}
 
 		clock = (intr & (NV50_PDISPLAY_INTR_CLK_UNK10 |

@@ -397,11 +397,11 @@ nv50_graph_nvsw_vblsem_release(struct nouveau_channel *chan, int grclass,
 		return -EINVAL;
 
 	if (!(nv_rd32(NV50_PDISPLAY_INTR_EN) &
-		      NV50_PDISPLAY_INTR_EN_VBLANK_CRTC(data))) {
+		      NV50_PDISPLAY_INTR_EN_VBLANK_CRTC_(data))) {
 		nv_wr32(NV50_PDISPLAY_INTR,
-			NV50_PDISPLAY_INTR_VBLANK_CRTC(data));
+			NV50_PDISPLAY_INTR_VBLANK_CRTC_(data));
 		nv_wr32(NV50_PDISPLAY_INTR_EN, nv_rd32(NV50_PDISPLAY_INTR_EN) |
-			NV50_PDISPLAY_INTR_EN_VBLANK_CRTC(data));
+			NV50_PDISPLAY_INTR_EN_VBLANK_CRTC_(data));
 	}
 
 	list_add(&chan->nvsw.vbl_wait, &dev_priv->vbl_waiting);

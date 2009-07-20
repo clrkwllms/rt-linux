@@ -99,10 +99,10 @@ nv50_cursor_set_pos(struct nouveau_crtc *crtc, int x, int y)
 {
 	struct drm_device *dev = crtc->base.dev;
 
-	nv_wr32(NV50_HW_CURSOR_POS(crtc->index),
+	nv_wr32(NV50_PDISPLAY_CURSOR_USER_POS(crtc->index),
 		((y & 0xFFFF) << 16) | (x & 0xFFFF));
 	/* Needed to make the cursor move. */
-	nv_wr32(NV50_HW_CURSOR_POS_CTRL(crtc->index), 0);
+	nv_wr32(NV50_PDISPLAY_CURSOR_USER_POS_CTRL(crtc->index), 0);
 }
 
 static void
@@ -132,7 +132,7 @@ nv50_cursor_init(struct nouveau_crtc *crtc)
 
 	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx), 0x2000);
 	if (!nv_wait(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx),
-		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK, 0)) {
+		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS, 0)) {
 		NV_ERROR(dev, "timeout: CURSOR_CTRL2_STATUS == 0\n");
 		NV_ERROR(dev, "CURSOR_CTRL2 = 0x%08x\n",
 			 nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx)));
@@ -142,7 +142,7 @@ nv50_cursor_init(struct nouveau_crtc *crtc)
 	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index),
 		NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_ON);
 	if (!nv_wait(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx),
-		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_ACTIVE,
+		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS,
 		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_ACTIVE)) {
 		NV_ERROR(dev, "timeout: CURSOR_CTRL2_STATUS_ACTIVE(%d)\n", idx);
 		NV_ERROR(dev, "CURSOR_CTRL2(%d) = 0x%08x\n", idx,
@@ -167,7 +167,7 @@ nv50_cursor_fini(struct nouveau_crtc *crtc)
 
 	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx), 0);
 	if (!nv_wait(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx),
-		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK, 0)) {
+		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS, 0)) {
 		NV_ERROR(dev, "timeout: CURSOR_CTRL2_STATUS == 0\n");
 		NV_ERROR(dev, "CURSOR_CTRL2 = 0x%08x\n",
 			 nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx)));

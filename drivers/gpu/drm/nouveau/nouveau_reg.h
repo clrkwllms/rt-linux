@@ -687,65 +687,57 @@
 #define NV50_PGRAPH__LEN                                           0x1
 #define NV50_PGRAPH__ESIZE                                     0x10000
 
-#define NV50_PDISPLAY                                       0x00610000
-#define NV50_PDISPLAY__LEN                                         0x1
-#define NV50_PDISPLAY__ESIZE                                   0x10000
-#    define NV50_PDISPLAY_OBJECTS                           0x00610010
-#    define NV50_PDISPLAY_INTR                              0x00610024
-#        define NV50_PDISPLAY_INTR_VBLANK_CRTCn             0x0000000c
-#        define NV50_PDISPLAY_INTR_VBLANK_CRTCn__SHIFT               2
-#        define NV50_PDISPLAY_INTR_VBLANK_CRTC(n)     (1 << ((n) + 2))
-#        define NV50_PDISPLAY_INTR_VBLANK_CRTC0                 (1<<2)
-#        define NV50_PDISPLAY_INTR_VBLANK_CRTC1                 (1<<3)
-#        define NV50_PDISPLAY_INTR_CLK_UNK10                    (1<<4)
-#        define NV50_PDISPLAY_INTR_CLK_UNK20                    (1<<5)
-#        define NV50_PDISPLAY_INTR_CLK_UNK40                    (1<<6)
-#    define NV50_PDISPLAY_INTR_EN                           0x0061002c
-#        define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC(n)  (1 << ((n) + 2))
-#        define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC0              (1<<2)
-#        define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC1              (1<<3)
-#        define NV50_PDISPLAY_INTR_EN_CLK_UNK10                 (1<<4)
-#        define NV50_PDISPLAY_INTR_EN_CLK_UNK20                 (1<<5)
-#        define NV50_PDISPLAY_INTR_EN_CLK_UNK40                 (1<<6)
-#    define NV50_PDISPLAY_UNK30_CTRL                        0x00610030
-#        define NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK0           (1<<9)
-#        define NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK1          (1<<10)
-#        define NV50_PDISPLAY_UNK30_CTRL_PENDING               (1<<31)
-#    define NV50_PDISPLAY_UNK50_CTRL                        0x00610050
-#        define NV50_PDISPLAY_UNK50_CTRL_CRTC0_ACTIVE           (1<<1)
-#        define NV50_PDISPLAY_UNK50_CTRL_CRTC0_ACTIVE_MASK  0x00000003
-#        define NV50_PDISPLAY_UNK50_CTRL_CRTC0_ACTIVE_MASK__SHIFT    0
-#        define NV50_PDISPLAY_UNK50_CTRL_CRTC1_ACTIVE           (1<<9)
-#        define NV50_PDISPLAY_UNK50_CTRL_CRTC1_ACTIVE_MASK  0x00000300
-#        define NV50_PDISPLAY_UNK50_CTRL_CRTC1_ACTIVE_MASK__SHIFT    8
-#    define NV50_PDISPLAY_CHANNEL_STAT(i)                (0x00610200 + (i*0x10))
-#    define NV50_PDISPLAY_CHANNEL_STAT_DMA                  0x00000010
-#    define NV50_PDISPLAY_CHANNEL_STAT_DMA_DISABLED         0x00000000
-#    define NV50_PDISPLAY_CHANNEL_STAT_DMA_ENABLED          0x00000010
-#    define NV50_PDISPLAY_CHANNEL_DMA_CB(i)              (0x00610204 + (i*0x10))
-#    define NV50_PDISPLAY_CHANNEL_DMA_CB_LOCATION           0x00000002
-#    define NV50_PDISPLAY_CHANNEL_DMA_CB_LOCATION_VRAM      0x00000000
-#    define NV50_PDISPLAY_CHANNEL_DMA_CB_LOCATION_SYSTEM    0x00000002
-#    define NV50_PDISPLAY_CHANNEL_DMA_CB_VALID              0x00000001
-#    define NV50_PDISPLAY_CHANNEL_UNK2(i)                (0x00610208 + (i*0x10))
-#    define NV50_PDISPLAY_CHANNEL_UNK3(i)                (0x0061020c + (i*0x10))
-#    define NV50_PDISPLAY_CURSOR                            0x00610270
-#    define NV50_PDISPLAY_CURSOR__LEN                              0x2
-#    define NV50_PDISPLAY_CURSOR__ESIZE                           0x10
-#        define NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(i) (0x00610270+(i)*0x10)
-#            define NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_ON        (1<<0)
-#            define NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK 0x00030000
-#            define NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK__SHIFT 16
-#            define NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_ACTIVE (1<<16)
+#define NV50_PDISPLAY                                                0x00610000
+#define NV50_PDISPLAY_OBJECTS                                        0x00610010
+#define NV50_PDISPLAY_INTR                                           0x00610024
+#define NV50_PDISPLAY_INTR_VBLANK_CRTC                               0x0000000c
+#define NV50_PDISPLAY_INTR_VBLANK_CRTC_SHIFT                                  2
+#define NV50_PDISPLAY_INTR_VBLANK_CRTC_(n)                      (1 << ((n) + 2))
+#define NV50_PDISPLAY_INTR_VBLANK_CRTC_0                             0x00000004
+#define NV50_PDISPLAY_INTR_VBLANK_CRTC_1                             0x00000008
+#define NV50_PDISPLAY_INTR_CLK_UNK10                                 0x00000010
+#define NV50_PDISPLAY_INTR_CLK_UNK20                                 0x00000020
+#define NV50_PDISPLAY_INTR_CLK_UNK40                                 0x00000040
+#define NV50_PDISPLAY_INTR_EN                                        0x0061002c
+#define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC                            0x0000000c
+#define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC_(n)                   (1 << ((n) + 2))
+#define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC_0                          0x00000004
+#define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC_1                          0x00000008
+#define NV50_PDISPLAY_INTR_EN_CLK_UNK10                              0x00000010
+#define NV50_PDISPLAY_INTR_EN_CLK_UNK20                              0x00000020
+#define NV50_PDISPLAY_INTR_EN_CLK_UNK40                              0x00000040
+#define NV50_PDISPLAY_UNK30_CTRL                                     0x00610030
+#define NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK0                        0x00000200
+#define NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK1                        0x00000400
+#define NV50_PDISPLAY_UNK30_CTRL_PENDING                             0x80000000
+#define NV50_PDISPLAY_CHANNEL_STAT(i)                  ((i) * 0x10 + 0x00610200)
+#define NV50_PDISPLAY_CHANNEL_STAT_DMA                               0x00000010
+#define NV50_PDISPLAY_CHANNEL_STAT_DMA_DISABLED                      0x00000000
+#define NV50_PDISPLAY_CHANNEL_STAT_DMA_ENABLED                       0x00000010
+#define NV50_PDISPLAY_CHANNEL_DMA_CB(i)                ((i) * 0x10 + 0x00610204)
+#define NV50_PDISPLAY_CHANNEL_DMA_CB_LOCATION                        0x00000002
+#define NV50_PDISPLAY_CHANNEL_DMA_CB_LOCATION_VRAM                   0x00000000
+#define NV50_PDISPLAY_CHANNEL_DMA_CB_LOCATION_SYSTEM                 0x00000002
+#define NV50_PDISPLAY_CHANNEL_DMA_CB_VALID                           0x00000001
+#define NV50_PDISPLAY_CHANNEL_UNK2(i)                  ((i) * 0x10 + 0x00610208)
+#define NV50_PDISPLAY_CHANNEL_UNK3(i)                  ((i) * 0x10 + 0x0061020c)
 
-#    define NV50_PDISPLAY_CTRL_STATE                        0x00610300
-#        define NV50_PDISPLAY_CTRL_STATE_ENABLE                 (1<<0)
-#        define NV50_PDISPLAY_CTRL_STATE_PENDING               (1<<31)
-#    define NV50_PDISPLAY_CTRL_VAL                          0x00610304
-#    define NV50_PDISPLAY_UNK_380                           0x00610380
-#    define NV50_PDISPLAY_RAM_AMOUNT                        0x00610384
-#    define NV50_PDISPLAY_UNK_388                           0x00610388
-#    define NV50_PDISPLAY_UNK_38C                           0x0061038c
+#define NV50_PDISPLAY_CURSOR                                         0x00610270
+#define NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(i)           ((i) * 0x10 + 0x00610270)
+#define NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_ON                         0x00000001
+#define NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS                     0x00030000
+#define NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_ACTIVE              0x00010000
+
+#define NV50_PDISPLAY_CTRL_STATE                                     0x00610300
+#define NV50_PDISPLAY_CTRL_STATE_PENDING                             0x80000000
+#define NV50_PDISPLAY_CTRL_STATE_METHOD                              0x00001ffc
+#define NV50_PDISPLAY_CTRL_STATE_ENABLE                              0x00000001
+#define NV50_PDISPLAY_CTRL_VAL                                       0x00610304
+#define NV50_PDISPLAY_UNK_380                                        0x00610380
+#define NV50_PDISPLAY_RAM_AMOUNT                                     0x00610384
+#define NV50_PDISPLAY_UNK_388                                        0x00610388
+#define NV50_PDISPLAY_UNK_38C                                        0x0061038c
+
 #define NV50_PDISPLAY_CRTC_P(i,r)         ((i) * 0x540 + NV50_PDISPLAY_CRTC_##r)
 #define NV50_PDISPLAY_CRTC_C(i,r)     (4 + (i) * 0x540 + NV50_PDISPLAY_CRTC_##r)
 #define NV50_PDISPLAY_CRTC_UNK_0A18 /* mthd 0x0900 */                0x00610a18
@@ -788,70 +780,52 @@
 #define NV90_PDISPLAY_DAC_MODE_CTRL2_C(i)               (0x00610b84 + (i) * 0x8)
 
 #define NV50_PDISPLAY_CRTC_CLK                                       0x00614000
-#define NV50_PDISPLAY_CRTC_CLK__LEN                                         0x2
 #define NV50_PDISPLAY_CRTC_CLK_CTRL1(i)                 ((i) * 0x800 + 0x614100)
 #define NV50_PDISPLAY_CRTC_CLK_CTRL1_CONNECTED                       0x00000600
-#define NV50_PDISPLAY_CRTC_CLK_CTRL1_CONNECTED__SHIFT                         9
 #define NV50_PDISPLAY_CRTC_CLK_VPLL_A(i)                ((i) * 0x800 + 0x614104)
 #define NV50_PDISPLAY_CRTC_CLK_VPLL_B(i)                ((i) * 0x800 + 0x614108)
 #define NV50_PDISPLAY_CRTC_CLK_CTRL2(i)                 ((i) * 0x800 + 0x614200)
 
 #define NV50_PDISPLAY_DAC_CLK                                        0x00614000
-#define NV50_PDISPLAY_DAC_CLK__LEN                                          0x3
 #define NV50_PDISPLAY_DAC_CLK_CTRL2(i)                  ((i) * 0x800 + 0x614280)
 
 #define NV50_PDISPLAY_SOR_CLK                                        0x00614000
-#define NV50_PDISPLAY_SOR_CLK__LEN                                          0x3
 #define NV50_PDISPLAY_SOR_CLK_CTRL2(i)                  ((i) * 0x800 + 0x614300)
 
 #define NV50_PDISPLAY_VGACRTC(r)                                ((r) + 0x619400)
 
-#    define NV50_PDISPLAY_DAC_REGS                          0x0061a000
-#    define NV50_PDISPLAY_DAC_REGS__LEN                            0x3
-#    define NV50_PDISPLAY_DAC_REGS__ESIZE                        0x800
-#        define NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(i) (0x0061a004+(i)*0x800)
-#            define NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_HSYNC_OFF  (1<<0)
-#            define NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_VSYNC_OFF  (1<<2)
-#            define NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_BLANKED    (1<<4)
-#            define NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_OFF        (1<<6)
-#            define NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING   (1<<31)
-#        define NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(i) (0x0061a00c+(i)*0x800)
-#            define NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_ACTIVE    (1<<20)
-#            define NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_PRESENT 0x38000000
-#            define NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_PRESENT__SHIFT 29
-#            define NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_DONE      (1<<31)
-#        define NV50_PDISPLAY_DAC_REGS_CLK_CTRL1(i) (0x0061a010+(i)*0x800)
-#            define NV50_PDISPLAY_DAC_REGS_CLK_CTRL1_CONNECTED 0x00000600
-#            define NV50_PDISPLAY_DAC_REGS_CLK_CTRL1_CONNECTED__SHIFT 9
+#define NV50_PDISPLAY_DAC                                            0x0061a000
+#define NV50_PDISPLAY_DAC_DPMS_CTRL(i)                (0x0061a004 + (i) * 0x800)
+#define NV50_PDISPLAY_DAC_DPMS_CTRL_HSYNC_OFF                        0x00000001
+#define NV50_PDISPLAY_DAC_DPMS_CTRL_VSYNC_OFF                        0x00000004
+#define NV50_PDISPLAY_DAC_DPMS_CTRL_BLANKED                          0x00000010
+#define NV50_PDISPLAY_DAC_DPMS_CTRL_OFF                              0x00000040
+#define NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING                          0x80000000
+#define NV50_PDISPLAY_DAC_LOAD_CTRL(i)                (0x0061a00c + (i) * 0x800)
+#define NV50_PDISPLAY_DAC_LOAD_CTRL_ACTIVE                           0x00100000
+#define NV50_PDISPLAY_DAC_LOAD_CTRL_PRESENT                          0x38000000
+#define NV50_PDISPLAY_DAC_LOAD_CTRL_DONE                             0x80000000
+#define NV50_PDISPLAY_DAC_CLK_CTRL1(i)                (0x0061a010 + (i) * 0x800)
+#define NV50_PDISPLAY_DAC_CLK_CTRL1_CONNECTED                        0x00000600
 
-#    define NV50_PDISPLAY_SOR_REGS                          0x0061c000
-#    define NV50_PDISPLAY_SOR_REGS__LEN                            0x3
-#    define NV50_PDISPLAY_SOR_REGS__ESIZE                        0x800
-#        define NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(i) (0x0061c004+(i)*0x800)
-#            define NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_ON         (1<<0)
-#            define NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_PENDING   (1<<31)
-#        define NV50_PDISPLAY_SOR_REGS_CLK_CTRL1(i) (0x0061c008+(i)*0x800)
-#            define NV50_PDISPLAY_SOR_REGS_CLK_CTRL1_CONNECTED 0x00000600
-#            define NV50_PDISPLAY_SOR_REGS_CLK_CTRL1_CONNECTED__SHIFT 9
-#        define NV50_PDISPLAY_SOR_REGS_UNK_00C(i) (0x0061c00c+(i)*0x800)
-#        define NV50_PDISPLAY_SOR_REGS_UNK_010(i) (0x0061c010+(i)*0x800)
-#        define NV50_PDISPLAY_SOR_REGS_UNK_014(i) (0x0061c014+(i)*0x800)
-#        define NV50_PDISPLAY_SOR_REGS_UNK_018(i) (0x0061c018+(i)*0x800)
-#        define NV50_PDISPLAY_SOR_REGS_DPMS_STATE(i) (0x0061c030+(i)*0x800)
-#            define NV50_PDISPLAY_SOR_REGS_DPMS_STATE_ACTIVE 0x00030000
-#            define NV50_PDISPLAY_SOR_REGS_DPMS_STATE_ACTIVE__SHIFT 16
-#            define NV50_PDISPLAY_SOR_REGS_DPMS_STATE_BLANKED  (1<<19)
-#            define NV50_PDISPLAY_SOR_REGS_DPMS_STATE_WAIT     (1<<28)
-#define NV50_PDISPLAY_BACKLIGHT				0x0061c084
-#	define NV50_PDISPLAY_BACKLIGHT_ENABLE		0x80000000
+#define NV50_PDISPLAY_SOR                                            0x0061c000
+#define NV50_PDISPLAY_SOR_DPMS_CTRL(i)                (0x0061c004 + (i) * 0x800)
+#define NV50_PDISPLAY_SOR_DPMS_CTRL_PENDING                          0x80000000
+#define NV50_PDISPLAY_SOR_DPMS_CTRL_ON                               0x00000001
+#define NV50_PDISPLAY_SOR_CLK_CTRL1(i)                (0x0061c008 + (i) * 0x800)
+#define NV50_PDISPLAY_SOR_CLK_CTRL1_CONNECTED                        0x00000600
+#define NV50_PDISPLAY_SOR_DPMS_STATE(i)               (0x0061c030 + (i) * 0x800)
+#define NV50_PDISPLAY_SOR_DPMS_STATE_ACTIVE                          0x00030000
+#define NV50_PDISPLAY_SOR_DPMS_STATE_BLANKED                         0x00080000
+#define NV50_PDISPLAY_SOR_DPMS_STATE_WAIT                            0x10000000
+#define NV50_PDISPLAY_SOR_BACKLIGHT                                  0x0061c084
+#define NV50_PDISPLAY_SOR_BACKLIGHT_ENABLE                           0x80000000
+#define NV50_PDISPLAY_SOR_BACKLIGHT_LEVEL                            0x00000fff
 
-#define NV50_PDISPLAY_USER(i)                          (0x00640000 + (i)*0x1000)
-#define NV50_PDISPLAY_USER__SIZE                                               6
-#define NV50_PDISPLAY_USER_PUT(i)                      (0x00640000 + (i)*0x1000)
-#define NV50_PDISPLAY_USER_GET(i)                      (0x00640004 + (i)*0x1000)
+#define NV50_PDISPLAY_USER(i)                        ((i) * 0x1000 + 0x00640000)
+#define NV50_PDISPLAY_USER_PUT(i)                    ((i) * 0x1000 + 0x00640000)
+#define NV50_PDISPLAY_USER_GET(i)                    ((i) * 0x1000 + 0x00640004)
 
-#define NV50_HW_CURSOR                                      0x00647000
-#define NV50_HW_CURSOR__LEN                                        0x2
-#define NV50_HW_CURSOR__ESIZE                                   0x1000
-#    define NV50_HW_CURSOR_POS_CTRL(i)              (0x00647080+(i)*0x1000)
-#    define NV50_HW_CURSOR_POS(i)         (0x00647084+(i)*0x1000)
+#define NV50_PDISPLAY_CURSOR_USER                                    0x00647000
+#define NV50_PDISPLAY_CURSOR_USER_POS_CTRL(i)        ((i) * 0x1000 + 0x00647080)
+#define NV50_PDISPLAY_CURSOR_USER_POS(i)             ((i) * 0x1000 + 0x00647084)
