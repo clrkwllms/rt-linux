@@ -595,7 +595,7 @@ extern int  nouveau_ioctl_setparam(struct drm_device *, void *data,
 				   struct drm_file *);
 extern bool nouveau_wait_until(struct drm_device *, uint64_t timeout,
 			       uint32_t reg, uint32_t mask, uint32_t val);
-extern void nouveau_wait_for_idle(struct drm_device *);
+extern bool nouveau_wait_for_idle(struct drm_device *);
 extern int  nouveau_card_init(struct drm_device *);
 extern int  nouveau_ioctl_card_init(struct drm_device *, void *data,
 				    struct drm_file *);

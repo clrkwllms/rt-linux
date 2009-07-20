@@ -784,19 +784,15 @@ bool nouveau_wait_until(struct drm_device *dev, uint64_t timeout,
 }
 
 /* Waits for PGRAPH to go completely idle */
-void nouveau_wait_for_idle(struct drm_device *dev)
+bool nouveau_wait_for_idle(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv=dev->dev_private;
-
-	switch(dev_priv->card_type) {
-	case NV_50:
-		break;
-	default:
-		if (!nv_wait(NV04_PGRAPH_STATUS, 0xffffffff, 0x00000000)) {
-			NV_ERROR(dev, "timed out with status 0x%08x\n",
-				 nv_rd32(NV04_PGRAPH_STATUS));
-		}
+	if (!nv_wait(NV04_PGRAPH_STATUS, 0xffffffff, 0x00000000)) {
+		NV_ERROR(dev, "timed out with status 0x%08x\n",
+			 nv_rd32(NV04_PGRAPH_STATUS));
+		return false;
 	}
+
+	return true;
 }
 
 static int nouveau_suspend(struct drm_device *dev)

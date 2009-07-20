@@ -278,55 +278,27 @@ nv50_graph_destroy_context(struct nouveau_channel *chan)
 	}
 }
 
-static int
-nv50_graph_transfer_context(struct drm_device *dev, uint32_t inst, int save)
-{
-	uint32_t old_cp, tv = 20000;
-	int i;
-
-	NV_DEBUG(dev, "inst=0x%08x, save=%d\n", inst, save);
-
-	old_cp = nv_rd32(NV20_PGRAPH_CHANNEL_CTX_POINTER);
-	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
-	nv_wr32(0x400824, nv_rd32(0x400824) |
-		 (save ? NV40_PGRAPH_CTXCTL_0310_XFER_SAVE :
-			 NV40_PGRAPH_CTXCTL_0310_XFER_LOAD));
-	nv_wr32(NV40_PGRAPH_CTXCTL_0304, NV40_PGRAPH_CTXCTL_0304_XFER_CTX);
-
-	for (i = 0; i < tv; i++) {
-		if (nv_rd32(NV40_PGRAPH_CTXCTL_030C) == 0)
-			break;
-	}
-	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, old_cp);
-
-	if (i == tv) {
-		NV_ERROR(dev, "failed: inst=0x%08x save=%d\n", inst, save);
-		NV_ERROR(dev, "0x40030C = 0x%08x\n",
-			  nv_rd32(NV40_PGRAPH_CTXCTL_030C));
-		return -EBUSY;
-	}
-
-	return 0;
-}
-
 int
 nv50_graph_load_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	uint32_t inst = chan->ramin->instance >> 12;
-	int ret; (void)ret;
+	uint32_t fifo = nv_rd32(0x400500);
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
 
-#if 0
-	if ((ret = nv50_graph_transfer_context(dev, inst, 0)))
-		return ret;
-#endif
+	nv_wr32(0x400500, fifo & ~1);
+	nv_wr32(0x400784, inst);
+	nv_wr32(0x400824, nv_rd32(0x400824) | 0x40);
+	nv_wr32(0x400320, nv_rd32(0x400320) | 0x11);
+	nv_wr32(0x400040, 0xffffffff);
+	(void)nv_rd32(0x400040);
+	nv_wr32(0x400040, 0x00000000);
+	nv_wr32(0x400304, nv_rd32(0x400304) | 1);
 
-	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
-	nv_wr32(0x400320, 4);
-	nv_wr32(NV40_PGRAPH_CTXCTL_CUR, inst | (1<<31));
-
+	if (nouveau_wait_for_idle(dev))
+		nv_wr32(0x40032c, inst | (1<<31));
+	nv_wr32(0x400500, fifo);
 	return 0;
 }
 
@@ -335,10 +307,18 @@ nv50_graph_save_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	uint32_t inst = chan->ramin->instance >> 12;
+	uint32_t fifo = nv_rd32(0x400500);
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
 
-	return nv50_graph_transfer_context(dev, inst, 1);
+	nv_wr32(0x400500, fifo & ~1);
+	nv_wr32(0x400784, inst);
+	nv_wr32(0x400824, nv_rd32(0x400824) | 0x20);
+	nv_wr32(0x400304, nv_rd32(0x400304) | 0x01);
+	nouveau_wait_for_idle(dev);
+
+	nv_wr32(0x400500, fifo);
+	return 0;
 }
 
 static int
