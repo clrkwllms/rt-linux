@@ -240,12 +240,19 @@ nv50_fifo_create_context(struct nouveau_channel *chan)
 	NV_DEBUG(dev, "ch%d\n", chan->id);
 
 	if (IS_G80) {
-		uint32_t ramfc_offset = chan->ramin->gpuobj->im_pramin->start;
-		uint32_t vram_offset = chan->ramin->gpuobj->im_backing_start;
-		ret = nouveau_gpuobj_new_fake(dev, ramfc_offset, vram_offset,
+		uint32_t ramin_poffset = chan->ramin->gpuobj->im_pramin->start;
+		uint32_t ramin_voffset = chan->ramin->gpuobj->im_backing_start;
+
+		ret = nouveau_gpuobj_new_fake(dev, ramin_poffset, ramin_voffset,
 					      0x100, NVOBJ_FLAG_ZERO_ALLOC |
 					      NVOBJ_FLAG_ZERO_FREE, &ramfc,
 					      &chan->ramfc);
+		if (ret)
+			return ret;
+
+		ret = nouveau_gpuobj_new_fake(dev, ramin_poffset + 0x0400,
+					      ramin_voffset + 0x0400, 4096,
+					      0, NULL, &chan->cache);
 		if (ret)
 			return ret;
 	} else {
@@ -325,10 +332,13 @@ nv50_fifo_load_context(struct nouveau_channel *chan)
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gpuobj *ramfc = chan->ramfc->gpuobj;
+	struct nouveau_gpuobj *cache = chan->cache->gpuobj;
+	int ptr, cnt;
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
 
 	dev_priv->engine.instmem.prepare_access(dev, false);
+
 	nv_wr32(0x3330, INSTANCE_RD(ramfc, 0x00/4));
 	nv_wr32(0x3334, INSTANCE_RD(ramfc, 0x04/4));
 	nv_wr32(0x3240, INSTANCE_RD(ramfc, 0x08/4));
@@ -362,29 +372,26 @@ nv50_fifo_load_context(struct nouveau_channel *chan)
 	nv_wr32(0x2088, INSTANCE_RD(ramfc, 0x78/4));
 	nv_wr32(0x2058, INSTANCE_RD(ramfc, 0x7c/4));
 	nv_wr32(0x2210, INSTANCE_RD(ramfc, 0x80/4));
+
+	cnt = INSTANCE_RD(ramfc, 0x84/4);
+	for (ptr = 0; ptr < cnt; ptr++) {
+		nv_wr32(NV40_PFIFO_CACHE1_METHOD(ptr),
+			INSTANCE_RD(cache, (ptr * 2) + 0));
+		nv_wr32(NV40_PFIFO_CACHE1_DATA(ptr),
+			INSTANCE_RD(cache, (ptr * 2) + 1));
+	}
+	nv_wr32(0x3210, cnt << 2);
+	nv_wr32(0x3270, 0);
+
 	/* guessing that all the 0x34xx regs aren't on NV50 */
 	if (!IS_G80) {
-		struct nouveau_gpuobj *cache = chan->cache->gpuobj;
-		int ptr, cnt = INSTANCE_RD(ramfc, 0x84/4);
-
-		for (ptr = 0; ptr < cnt; ptr++) {
-			nv_wr32(NV40_PFIFO_CACHE1_METHOD(ptr),
-				INSTANCE_RD(cache, (ptr * 2) + 0));
-			nv_wr32(NV40_PFIFO_CACHE1_DATA(ptr),
-				INSTANCE_RD(cache, (ptr * 2) + 1));
-		}
-
-		nv_wr32(0x3210, cnt << 2);
-		nv_wr32(0x3270, 0);
 		nv_wr32(0x340c, INSTANCE_RD(ramfc, 0x88/4));
 		nv_wr32(0x3400, INSTANCE_RD(ramfc, 0x8c/4));
 		nv_wr32(0x3404, INSTANCE_RD(ramfc, 0x90/4));
 		nv_wr32(0x3408, INSTANCE_RD(ramfc, 0x94/4));
 		nv_wr32(0x3410, INSTANCE_RD(ramfc, 0x98/4));
-	} else {
-		nv_wr32(0x3210, 0);
-		nv_wr32(0x3270, 0);
 	}
+
 	dev_priv->engine.instmem.finish_access(dev);
 
 	nv_wr32(NV03_PFIFO_CACHE1_PUSH1, chan->id | (1<<16));
@@ -397,10 +404,13 @@ nv50_fifo_save_context(struct nouveau_channel *chan)
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gpuobj *ramfc = chan->ramfc->gpuobj;
+	struct nouveau_gpuobj *cache = chan->cache->gpuobj;
+	int put, get, ptr;
 
 	NV_DEBUG(chan->dev, "ch%d\n", chan->id);
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
+
 	INSTANCE_WR(ramfc, 0x00/4, nv_rd32(0x3330));
 	INSTANCE_WR(ramfc, 0x04/4, nv_rd32(0x3334));
 	INSTANCE_WR(ramfc, 0x08/4, nv_rd32(0x3240));
@@ -434,20 +444,20 @@ nv50_fifo_save_context(struct nouveau_channel *chan)
 	INSTANCE_WR(ramfc, 0x78/4, nv_rd32(0x2088));
 	INSTANCE_WR(ramfc, 0x7c/4, nv_rd32(0x2058));
 	INSTANCE_WR(ramfc, 0x80/4, nv_rd32(0x2210));
+
+	put = (nv_rd32(NV03_PFIFO_CACHE1_PUT) & 0x7ff) >> 2;
+	get = (nv_rd32(NV03_PFIFO_CACHE1_GET) & 0x7ff) >> 2;
+	ptr = 0;
+	while (put != get) {
+		INSTANCE_WR(cache, ptr++,
+			    nv_rd32(NV40_PFIFO_CACHE1_METHOD(get)));
+		INSTANCE_WR(cache, ptr++,
+			    nv_rd32(NV40_PFIFO_CACHE1_DATA(get)));
+		get = (get + 1) & 0x1ff;
+	}
+
 	/* guessing that all the 0x34xx regs aren't on NV50 */
 	if (!IS_G80) {
-		struct nouveau_gpuobj *cache = chan->cache->gpuobj;
-		int put = (nv_rd32(NV03_PFIFO_CACHE1_PUT) & 0x7ff) >> 2;
-		int get = (nv_rd32(NV03_PFIFO_CACHE1_GET) & 0x7ff) >> 2;
-		int ptr = 0;
-
-		while (put != get) {
-			INSTANCE_WR(cache, ptr++,
-				    nv_rd32(NV40_PFIFO_CACHE1_METHOD(get)));
-			INSTANCE_WR(cache, ptr++,
-				    nv_rd32(NV40_PFIFO_CACHE1_DATA(get)));
-			get = (get + 1) & 0x1ff;
-		}
 
 		INSTANCE_WR(ramfc, 0x84/4, ptr >> 1);
 		INSTANCE_WR(ramfc, 0x88/4, nv_rd32(0x340c));
@@ -456,6 +466,7 @@ nv50_fifo_save_context(struct nouveau_channel *chan)
 		INSTANCE_WR(ramfc, 0x94/4, nv_rd32(0x3408));
 		INSTANCE_WR(ramfc, 0x98/4, nv_rd32(0x3410));
 	}
+
 	dev_priv->engine.instmem.finish_access(dev);
 
 	return 0;
