@@ -169,8 +169,11 @@ nv50_fifo_init(struct drm_device *dev)
 
 	NV_DEBUG(dev, "\n");
 
-	if (dev_priv->engine.fifo.priv)
+	priv = dev_priv->engine.fifo.priv;
+	if (priv) {
+		priv->cur_thingo = !priv->cur_thingo;
 		goto just_reset;
+	}
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
