@@ -154,11 +154,6 @@ int nouveau_fifo_init(struct drm_device *dev)
 #endif
 				      0x00000000);
 
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, 0x00000001);
-	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	nv_wr32(NV04_PFIFO_CACHE1_PULL1, 0x00000001);
-
 	/* FIXME on NV04 */
 	if (dev_priv->card_type >= NV_10) {
 		nv_wr32(NV10_PGRAPH_CTX_USER, 0x0);
@@ -175,7 +170,6 @@ int nouveau_fifo_init(struct drm_device *dev)
 
 	nv_wr32(NV04_PFIFO_DMA_TIMESLICE, 0x001fffff);
 	nv_wr32(NV04_PFIFO_MODE, mode);
-	nv_wr32(NV03_PFIFO_CACHES, 0x00000001);
 	return 0;
 }
 
