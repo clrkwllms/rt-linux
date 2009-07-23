@@ -401,10 +401,10 @@ nv50_graph_nvsw_vblsem_release(struct nouveau_channel *chan, int grclass,
 
 	if (!(nv_rd32(dev, NV50_PDISPLAY_INTR_EN) &
 		      NV50_PDISPLAY_INTR_EN_VBLANK_CRTC_(data))) {
-		nv_wr32(dev, NV50_PDISPLAY_INTR,
-			NV50_PDISPLAY_INTR_VBLANK_CRTC_(data));
-		nv_wr32(dev, NV50_PDISPLAY_INTR_EN,
-			nv_rd32(dev, NV50_PDISPLAY_INTR_EN) |
+		nv_wr32(dev, NV50_PDISPLAY_INTR_1,
+			NV50_PDISPLAY_INTR_1_VBLANK_CRTC_(data));
+		nv_wr32(dev, NV50_PDISPLAY_INTR_EN, nv_rd32(dev,
+			NV50_PDISPLAY_INTR_EN) |
 			NV50_PDISPLAY_INTR_EN_VBLANK_CRTC_(data));
 	}
 
