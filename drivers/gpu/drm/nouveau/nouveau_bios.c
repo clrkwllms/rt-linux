@@ -325,7 +325,7 @@ static int valid_reg(struct drm_device *dev, uint32_t reg)
 	if (nv_arch(dev) >= NV_50) {
 		if (reg >= 0x00020000 && reg < 0x00030000)
 			return 1;
-		if (reg >= 0x00080000 && reg < 0x00080000)
+		if (reg >= 0x00080000 && reg < 0x00090000)
 			return 1;
 	}
 	if (WITHIN(reg,NV_PFB_OFFSET,NV_PFB_SIZE))
