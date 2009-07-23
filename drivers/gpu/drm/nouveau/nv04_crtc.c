@@ -855,6 +855,17 @@ static void nv_crtc_commit(struct drm_crtc *crtc)
 
 static void nv_crtc_destroy(struct drm_crtc *crtc)
 {
+	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
+
+	NV_DEBUG(crtc->dev, "\n");
+
+	if (!nv_crtc)
+		return;
+
+	drm_crtc_cleanup(crtc);
+
+	nouveau_bo_ref(NULL, &nv_crtc->cursor.nvbo);
+	kfree(nv_crtc);
 }
 
 #define DEPTH_SHIFT(val, w) ((val << (8 - w)) | (val >> ((w << 1) - 8)))
@@ -969,11 +980,87 @@ nv04_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 	return 0;
 }
 
+static int
+nv04_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
+		     uint32_t buffer_handle, uint32_t width, uint32_t height)
+{
+	struct drm_device *dev = crtc->dev;
+	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
+	struct nouveau_bo *cursor = NULL;
+	struct drm_gem_object *gem;
+	uint32_t *src, *dst, pixel;
+	int ret = 0, alpha, i;
+
+	if (width != 64 || height != 64)
+		return -EINVAL;
+
+	if (!buffer_handle) {
+		nv_crtc->cursor.hide(nv_crtc, true);
+		return 0;
+	}
+
+	gem = drm_gem_object_lookup(dev, file_priv, buffer_handle);
+	if (!gem)
+		return -EINVAL;
+	cursor = nouveau_gem_object(gem);
+
+	ret = nouveau_bo_map(cursor);
+	if (ret)
+		goto out;
+	src = cursor->kmap.virtual;
+	dst = nv_crtc->cursor.nvbo->kmap.virtual;
+
+	/* nv11+ supports premultiplied (PM), or non-premultiplied (NPM) alpha
+	 * cursors (though NPM in combination with fp dithering may not work on
+	 * nv11, from "nv" driver history)
+	 * NPM mode needs NV_PCRTC_CURSOR_CONFIG_ALPHA_BLEND set and is what the
+	 * blob uses, however we get given PM cursors so we use PM mode
+	 */
+	for (i = 0; i < 64 * 64; i++) {
+		pixel = *src++;
+
+		/* hw gets unhappy if alpha <= rgb values.  for a PM image "less
+		 * than" shouldn't happen; fix "equal to" case by adding one to
+		 * alpha channel (slightly inaccurate, but so is attempting to
+		 * get back to NPM images, due to limits of integer precision)
+		 */
+		alpha = pixel >> 24;
+		if (alpha > 0 && alpha < 255)
+			pixel = (pixel & 0x00ffffff) | ((alpha + 1) << 24);
+
+#ifdef __BIG_ENDIAN
+		if (dev_priv->chipset == 0x11)
+			pixel = lswapl(tmp);
+#endif
+
+		*dst++ = pixel;
+	}
+
+	nouveau_bo_unmap(cursor);
+	nv_crtc->cursor.offset = nv_crtc->cursor.nvbo->bo.offset;
+	nv_crtc->cursor.set_offset(nv_crtc, nv_crtc->cursor.offset);
+	nv_crtc->cursor.show(nv_crtc, true);
+out:
+	mutex_lock(&dev->struct_mutex);
+	drm_gem_object_unreference(gem);
+	mutex_unlock(&dev->struct_mutex);
+	return ret;
+}
+
+static int
+nv04_crtc_cursor_move(struct drm_crtc *crtc, int x, int y)
+{
+	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
+
+	nv_crtc->cursor.set_pos(nv_crtc, x, y);
+	return 0;
+}
+
 static const struct drm_crtc_funcs nv04_crtc_funcs = {
 	.save = nv_crtc_save,
 	.restore = nv_crtc_restore,
-	.cursor_set = nv50_crtc_cursor_set,
-	.cursor_move = nv50_crtc_cursor_move,
+	.cursor_set = nv04_crtc_cursor_set,
+	.cursor_move = nv04_crtc_cursor_move,
 	.gamma_set = nv_crtc_gamma_set,
 	.set_config = drm_crtc_helper_set_config,
 	.destroy = nv_crtc_destroy,
@@ -992,7 +1079,7 @@ int
 nv04_crtc_create(struct drm_device *dev, int crtc_num)
 {
 	struct nouveau_crtc *nv_crtc;
-	int i;
+	int ret, i;
 
 	nv_crtc = kzalloc(sizeof(*nv_crtc) +
 			  NOUVEAUFB_CONN_LIMIT * sizeof(struct drm_connector *),
@@ -1017,6 +1104,16 @@ nv04_crtc_create(struct drm_device *dev, int crtc_num)
 	drm_crtc_init(dev, &nv_crtc->base, &nv04_crtc_funcs);
 	drm_crtc_helper_add(&nv_crtc->base, &nv04_crtc_helper_funcs);
 	drm_mode_crtc_set_gamma_size(&nv_crtc->base, 256);
+
+	ret = nouveau_bo_new(dev, NULL, 64*64*4, 0x100, TTM_PL_FLAG_VRAM,
+			     0, 0x0000, false, true, &nv_crtc->cursor.nvbo);
+	if (!ret) {
+		ret = nouveau_bo_pin(nv_crtc->cursor.nvbo, TTM_PL_FLAG_VRAM);
+		if (!ret)
+			ret = nouveau_bo_map(nv_crtc->cursor.nvbo);
+		if (ret)
+			nouveau_bo_ref(NULL, &nv_crtc->cursor.nvbo);
+	}
 
 	nv04_cursor_init(nv_crtc);
 
