@@ -510,7 +510,8 @@ static int nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	mode_cmd.height = surface_height;
 
 	mode_cmd.bpp = 32;
-	mode_cmd.pitch = ALIGN(mode_cmd.width, 64) * ((mode_cmd.bpp + 1) / 8);
+	mode_cmd.pitch = mode_cmd.width * (mode_cmd.bpp >> 3);
+	mode_cmd.pitch = ALIGN(mode_cmd.pitch, 256);
 	mode_cmd.depth = 24;
 
 	size = mode_cmd.pitch * mode_cmd.height;
