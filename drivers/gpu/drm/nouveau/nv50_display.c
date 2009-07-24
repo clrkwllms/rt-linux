@@ -343,9 +343,10 @@ nv50_display_init(struct drm_device *dev)
 		NV_ERROR(dev, "evo pushbuf stalled\n");
 
 	/* enable clock change interrupts. */
+	nv_wr32(dev, 0x610028, 0x00010001);
 	nv_wr32(dev, NV50_PDISPLAY_INTR_EN, (NV50_PDISPLAY_INTR_EN_CLK_UNK10 |
-					NV50_PDISPLAY_INTR_EN_CLK_UNK20 |
-					NV50_PDISPLAY_INTR_EN_CLK_UNK40));
+					     NV50_PDISPLAY_INTR_EN_CLK_UNK20 |
+					     NV50_PDISPLAY_INTR_EN_CLK_UNK40));
 
 	/* enable hotplug interrupts */
 	nv_wr32(dev, NV50_PCONNECTOR_HOTPLUG_CTRL, 0x7FFF7FFF);
