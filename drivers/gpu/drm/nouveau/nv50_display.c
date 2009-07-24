@@ -768,6 +768,21 @@ nv50_display_irq_handler_bh(struct work_struct *work)
 	nv_wr32(dev, NV03_PMC_INTR_EN_0, 1);
 }
 
+static void
+nv50_display_error_handler(struct drm_device *dev)
+{
+	uint32_t addr, data;
+
+	nv_wr32(dev, NV50_PDISPLAY_INTR_0, 0x00010000);
+	addr = nv_rd32(dev, NV50_PDISPLAY_TRAPPED_ADDR);
+	data = nv_rd32(dev, NV50_PDISPLAY_TRAPPED_DATA);
+
+	NV_ERROR(dev, "EvoCh %d Mthd 0x%04x Data 0x%08x (0x%04x 0x%02x)\n",
+		 0, addr & 0xffc, data, addr >> 16, (addr >> 12) & 0xf);
+
+	nv_wr32(dev, NV50_PDISPLAY_TRAPPED_ADDR, 0x90000000);
+}
+
 void
 nv50_display_irq_handler(struct drm_device *dev)
 {
@@ -779,9 +794,15 @@ nv50_display_irq_handler(struct drm_device *dev)
 		uint32_t intr1 = nv_rd32(dev, NV50_PDISPLAY_INTR_1);
 		uint32_t clock;
 
-		if (!(intr1 & ~delayed))
+		NV_DEBUG(dev, "PDISPLAY_INTR 0x%08x 0x%08x\n", intr0, intr1);
+
+		if (!intr0 && !(intr1 & ~delayed))
 			break;
-		NV_DEBUG(dev, "PDISPLAY_INTR_1 0x%08x 0x%08x\n", intr0, intr1);
+
+		if (intr0 & 0x00010000) {
+			nv50_display_error_handler(dev);
+			intr0 &= ~0x00010000;
+		}
 
 		if (intr1 & NV50_PDISPLAY_INTR_1_VBLANK_CRTC) {
 			nv50_display_vblank_handler(dev, intr1);
@@ -797,6 +818,11 @@ nv50_display_irq_handler(struct drm_device *dev)
 				schedule_work(&dev_priv->irq_work);
 			delayed |= clock;
 			intr1 &= ~clock;
+		}
+
+		if (intr0) {
+			NV_ERROR(dev, "unknown PDISPLAY_INTR_0: 0x%08x\n", intr0);
+			nv_wr32(dev, NV50_PDISPLAY_INTR_0, intr0);
 		}
 
 		if (intr1) {

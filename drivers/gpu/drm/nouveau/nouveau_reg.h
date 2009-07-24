@@ -711,6 +711,8 @@
 #define NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK0                        0x00000200
 #define NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK1                        0x00000400
 #define NV50_PDISPLAY_UNK30_CTRL_PENDING                             0x80000000
+#define NV50_PDISPLAY_TRAPPED_ADDR                                   0x00610080
+#define NV50_PDISPLAY_TRAPPED_DATA                                   0x00610084
 #define NV50_PDISPLAY_CHANNEL_STAT(i)                  ((i) * 0x10 + 0x00610200)
 #define NV50_PDISPLAY_CHANNEL_STAT_DMA                               0x00000010
 #define NV50_PDISPLAY_CHANNEL_STAT_DMA_DISABLED                      0x00000000
