@@ -579,10 +579,12 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	OUT_RING  (evo, crtc->fb.offset >> 8);
 	OUT_RING  (evo, 0);
 	OUT_RING  (evo, (drm_fb->height << 16) | drm_fb->width);
-	if (!crtc->fb.tiled)
+	if (!crtc->fb.tiled) {
 		OUT_RING  (evo, drm_fb->pitch | (1 << 20));
-	else
-		OUT_RING  (evo, (drm_fb->width << 4) | fb->nvbo->tile_mode);
+	} else {
+		OUT_RING  (evo, ((drm_fb->pitch / 4) << 4) |
+				  fb->nvbo->tile_mode);
+	}
 	OUT_RING  (evo, format);
 
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, COLOR_CTRL), 1);
