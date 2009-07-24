@@ -75,9 +75,9 @@
 #define NV50_EVO_CRTC_FB_OFFSET                                      0x00000860
 #define NV50_EVO_CRTC_FB_SIZE                                        0x00000868
 #define NV50_EVO_CRTC_FB_CONFIG                                      0x0000086c
-#define NV50_EVO_CRTC_FB_CONFIG_MODE                                 0x00010000
+#define NV50_EVO_CRTC_FB_CONFIG_MODE                                 0x00100000
 #define NV50_EVO_CRTC_FB_CONFIG_MODE_TILE                            0x00000000
-#define NV50_EVO_CRTC_FB_CONFIG_MODE_PITCH                           0x00010000
+#define NV50_EVO_CRTC_FB_CONFIG_MODE_PITCH                           0x00100000
 #define NV50_EVO_CRTC_FB_DEPTH                                       0x00000870
 #define NV50_EVO_CRTC_FB_DEPTH_8                                     0x00001e00
 #define NV50_EVO_CRTC_FB_DEPTH_15                                    0x0000e900
