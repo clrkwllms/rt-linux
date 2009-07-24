@@ -116,6 +116,7 @@ static inline void *kmap_atomic_primary(struct page *page, enum km_type type)
 {
 	unsigned long paddr;
 
+	preempt_disable();
 	pagefault_disable();
 	paddr = page_to_phys(page);
 
@@ -155,6 +156,7 @@ static inline void kunmap_atomic_primary(void *kvaddr, enum km_type type)
 		BUG();
 	}
 	pagefault_enable();
+	preempt_enable();
 }
 
 void *__kmap_atomic(struct page *page);
