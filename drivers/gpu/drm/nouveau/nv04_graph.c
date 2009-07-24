@@ -347,7 +347,7 @@ static uint32_t nv04_graph_ctx_regs [] = {
 };
 
 struct graph_state {
-	int nv04[sizeof(nv04_graph_ctx_regs)/sizeof(nv04_graph_ctx_regs[0])];
+	int nv04[ARRAY_SIZE(nv04_graph_ctx_regs)];
 };
 
 void nv04_graph_context_switch(struct drm_device *dev)
@@ -456,7 +456,7 @@ int nv04_graph_load_context(struct nouveau_channel *chan)
 	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
-	for (i = 0; i < sizeof(nv04_graph_ctx_regs)/sizeof(nv04_graph_ctx_regs[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(nv04_graph_ctx_regs); i++)
 		nv_wr32(dev, nv04_graph_ctx_regs[i], pgraph_ctx->nv04[i]);
 
 	return 0;
@@ -468,7 +468,7 @@ int nv04_graph_save_context(struct nouveau_channel *chan)
 	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
-	for (i = 0; i < sizeof(nv04_graph_ctx_regs)/sizeof(nv04_graph_ctx_regs[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(nv04_graph_ctx_regs); i++)
 		pgraph_ctx->nv04[i] = nv_rd32(dev, nv04_graph_ctx_regs[i]);
 
 	return 0;

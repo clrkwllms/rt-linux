@@ -386,8 +386,8 @@ NV10_PGRAPH_DEBUG_4,
 };
 
 struct graph_state {
-	int nv10[sizeof(nv10_graph_ctx_regs)/sizeof(nv10_graph_ctx_regs[0])];
-	int nv17[sizeof(nv17_graph_ctx_regs)/sizeof(nv17_graph_ctx_regs[0])];
+	int nv10[ARRAY_SIZE(nv10_graph_ctx_regs)];
+	int nv17[ARRAY_SIZE(nv17_graph_ctx_regs)];
 	struct pipe_state pipe_state;
 };
 
@@ -399,7 +399,7 @@ static void nv10_graph_save_pipe(struct nouveau_channel *chan) {
 #define PIPE_SAVE(addr) \
 	do { \
 		nv_wr32(dev, NV10_PGRAPH_PIPE_ADDRESS, addr); \
-		for (i=0; i < sizeof(fifo_pipe_state->pipe_##addr)/sizeof(fifo_pipe_state->pipe_##addr[0]); i++) \
+		for (i = 0; i < ARRAY_SIZE(fifo_pipe_state->pipe_##addr); i++) \
 			fifo_pipe_state->pipe_##addr[i] = nv_rd32(dev, NV10_PGRAPH_PIPE_DATA); \
 	} while (0)
 
@@ -426,7 +426,7 @@ static void nv10_graph_load_pipe(struct nouveau_channel *chan) {
 #define PIPE_RESTORE(addr) \
 	do { \
 		nv_wr32(dev, NV10_PGRAPH_PIPE_ADDRESS, addr); \
-		for (i=0; i < sizeof(fifo_pipe_state->pipe_##addr)/sizeof(fifo_pipe_state->pipe_##addr[0]); i++) \
+		for (i = 0; i < ARRAY_SIZE(fifo_pipe_state->pipe_##addr); i++) \
 			nv_wr32(dev, NV10_PGRAPH_PIPE_DATA, fifo_pipe_state->pipe_##addr[i]); \
 	} while (0)
 
@@ -487,10 +487,11 @@ static void nv10_graph_create_pipe(struct nouveau_channel *chan) {
 	} while (0)
 #define PIPE_INIT_END(addr) \
 	do { \
-		if (fifo_pipe_state_addr != \
-				sizeof(fifo_pipe_state->pipe_##addr)/sizeof(fifo_pipe_state->pipe_##addr[0]) + fifo_pipe_state->pipe_##addr) \
-			NV_ERROR(dev, "incomplete pipe init for 0x%x :  %p/%p\n", addr, fifo_pipe_state_addr, \
-					sizeof(fifo_pipe_state->pipe_##addr)/sizeof(fifo_pipe_state->pipe_##addr[0]) + fifo_pipe_state->pipe_##addr); \
+		uint32_t *__end_addr = fifo_pipe_state->pipe_##addr + \
+				ARRAY_SIZE(fifo_pipe_state->pipe_##addr); \
+		if (fifo_pipe_state_addr != __end_addr) \
+			NV_ERROR(dev, "incomplete pipe init for 0x%x :  %p/%p\n", \
+				addr, fifo_pipe_state_addr, __end_addr); \
 	} while (0)
 #define NV_WRITE_PIPE_INIT(value) *(fifo_pipe_state_addr++) = value
 
@@ -631,7 +632,7 @@ static void nv10_graph_create_pipe(struct nouveau_channel *chan) {
 static int nv10_graph_ctx_regs_find_offset(struct drm_device *dev, int reg)
 {
 	int i;
-	for (i = 0; i < sizeof(nv10_graph_ctx_regs)/sizeof(nv10_graph_ctx_regs[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(nv10_graph_ctx_regs); i++) {
 		if (nv10_graph_ctx_regs[i] == reg)
 			return i;
 	}
@@ -642,7 +643,7 @@ static int nv10_graph_ctx_regs_find_offset(struct drm_device *dev, int reg)
 static int nv17_graph_ctx_regs_find_offset(struct drm_device *dev, int reg)
 {
 	int i;
-	for (i = 0; i < sizeof(nv17_graph_ctx_regs)/sizeof(nv17_graph_ctx_regs[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(nv17_graph_ctx_regs); i++) {
 		if (nv17_graph_ctx_regs[i] == reg)
 			return i;
 	}
@@ -657,10 +658,10 @@ int nv10_graph_load_context(struct nouveau_channel *chan)
 	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
-	for (i = 0; i < sizeof(nv10_graph_ctx_regs)/sizeof(nv10_graph_ctx_regs[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(nv10_graph_ctx_regs); i++)
 		nv_wr32(dev, nv10_graph_ctx_regs[i], pgraph_ctx->nv10[i]);
-	if (dev_priv->chipset>=0x17) {
-		for (i = 0; i < sizeof(nv17_graph_ctx_regs)/sizeof(nv17_graph_ctx_regs[0]); i++)
+	if (dev_priv->chipset >= 0x17) {
+		for (i = 0; i < ARRAY_SIZE(nv17_graph_ctx_regs); i++)
 			nv_wr32(dev, nv17_graph_ctx_regs[i],
 						pgraph_ctx->nv17[i]);
 	}
@@ -677,10 +678,10 @@ int nv10_graph_save_context(struct nouveau_channel *chan)
 	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
-	for (i = 0; i < sizeof(nv10_graph_ctx_regs)/sizeof(nv10_graph_ctx_regs[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(nv10_graph_ctx_regs); i++)
 		pgraph_ctx->nv10[i] = nv_rd32(dev, nv10_graph_ctx_regs[i]);
-	if (dev_priv->chipset>=0x17) {
-		for (i = 0; i < sizeof(nv17_graph_ctx_regs)/sizeof(nv17_graph_ctx_regs[0]); i++)
+	if (dev_priv->chipset >= 0x17) {
+		for (i = 0; i < ARRAY_SIZE(nv17_graph_ctx_regs); i++)
 			pgraph_ctx->nv17[i] = nv_rd32(dev,
 						nv17_graph_ctx_regs[i]);
 	}

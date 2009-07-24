@@ -755,7 +755,7 @@ static uint32_t get_tmds_index_reg(struct drm_device *dev, uint8_t mlv)
 			dacoffset ^= 8;
 		return (0x6808b0 + dacoffset);
 	} else {
-		if (mlv > (sizeof(pramdac_table) / sizeof(uint32_t))) {
+		if (mlv > ARRAY_SIZE(pramdac_table)) {
 			NV_ERROR(dev, "Magic Lookup Value too big (%02X)\n", mlv);
 			return 0;
 		}

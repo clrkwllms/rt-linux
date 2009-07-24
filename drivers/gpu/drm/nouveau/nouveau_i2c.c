@@ -151,7 +151,7 @@ const uint32_t nv50_i2c_port[] = {
 	0x00e254, 0x00e274, 0x00e764, 0x00e780,
 	0x00e79c, 0x00e7b8
 };
-#define NV50_I2C_PORTS (sizeof(nv50_i2c_port) / sizeof(nv50_i2c_port[0]))
+#define NV50_I2C_PORTS ARRAY_SIZE(nv50_i2c_port)
 
 int
 nouveau_i2c_new(struct drm_device *dev, const char *name, unsigned index,
