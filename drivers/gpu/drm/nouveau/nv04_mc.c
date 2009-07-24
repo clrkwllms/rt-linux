@@ -10,7 +10,7 @@ nv04_mc_init(struct drm_device *dev)
 	 * be done later if needed.
 	 */
 
-	nv_wr32(NV03_PMC_ENABLE, 0xFFFFFFFF);
+	nv_wr32(dev, NV03_PMC_ENABLE, 0xFFFFFFFF);
 	return 0;
 }
 

@@ -16,13 +16,13 @@ nv40_fb_init(struct drm_device *dev)
 	/* I got value 0x52802 instead. For some cards the blob even sets it back to 0x1. */
 	/* Note: the blob doesn't read this value, so i'm pretty sure this is safe for all cards. */
 	/* Any idea what this is? */
-	nv_wr32(NV40_PFB_UNK_800, 0x1);
+	nv_wr32(dev, NV40_PFB_UNK_800, 0x1);
 
 	switch (dev_priv->chipset) {
 	case 0x40:
 	case 0x45:
-		tmp = nv_rd32(NV10_PFB_CLOSE_PAGE2);
-		nv_wr32(NV10_PFB_CLOSE_PAGE2, tmp & ~(1<<15));
+		tmp = nv_rd32(dev, NV10_PFB_CLOSE_PAGE2);
+		nv_wr32(dev, NV10_PFB_CLOSE_PAGE2, tmp & ~(1 << 15));
 		num_tiles = NV10_PFB_TILE__SIZE;
 		break;
 	case 0x46: /* G72 */
@@ -41,14 +41,14 @@ nv40_fb_init(struct drm_device *dev)
 	switch (dev_priv->chipset) {
 	case 0x40:
 		for (i=0; i<num_tiles; i++) {
-			nv_wr32(NV10_PFB_TILE(i), 0);
-			nv_wr32(NV10_PFB_TLIMIT(i), fb_bar_size);
+			nv_wr32(dev, NV10_PFB_TILE(i), 0);
+			nv_wr32(dev, NV10_PFB_TLIMIT(i), fb_bar_size);
 		}
 		break;
 	default:
 		for (i=0; i<num_tiles; i++) {
-			nv_wr32(NV40_PFB_TILE(i), 0);
-			nv_wr32(NV40_PFB_TLIMIT(i), fb_bar_size);
+			nv_wr32(dev, NV40_PFB_TILE(i), 0);
+			nv_wr32(dev, NV40_PFB_TLIMIT(i), fb_bar_size);
 		}
 		break;
 	}

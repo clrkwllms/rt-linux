@@ -104,17 +104,17 @@ static void load_vbios_prom(struct drm_device *dev, uint8_t *data)
 		  save_pci_nv_20 & ~NV_PBUS_PCI_NV_20_ROM_SHADOW_ENABLED);
 
 	/* bail if no rom signature */
-	if (nv_rd08(NV_PROM_OFFSET) != 0x55 ||
-	    nv_rd08(NV_PROM_OFFSET + 1) != 0xaa)
+	if (nv_rd08(dev, NV_PROM_OFFSET) != 0x55 ||
+	    nv_rd08(dev, NV_PROM_OFFSET + 1) != 0xaa)
 		goto out;
 
 	/* additional check (see note below) - read PCI record header */
-	pcir_ptr = nv_rd08(NV_PROM_OFFSET + 0x18) |
-		   nv_rd08(NV_PROM_OFFSET + 0x19) << 8;
-	if (nv_rd08(NV_PROM_OFFSET + pcir_ptr) != 'P' ||
-	    nv_rd08(NV_PROM_OFFSET + pcir_ptr + 1) != 'C' ||
-	    nv_rd08(NV_PROM_OFFSET + pcir_ptr + 2) != 'I' ||
-	    nv_rd08(NV_PROM_OFFSET + pcir_ptr + 3) != 'R')
+	pcir_ptr = nv_rd08(dev, NV_PROM_OFFSET + 0x18) |
+		   nv_rd08(dev, NV_PROM_OFFSET + 0x19) << 8;
+	if (nv_rd08(dev, NV_PROM_OFFSET + pcir_ptr) != 'P' ||
+	    nv_rd08(dev, NV_PROM_OFFSET + pcir_ptr + 1) != 'C' ||
+	    nv_rd08(dev, NV_PROM_OFFSET + pcir_ptr + 2) != 'I' ||
+	    nv_rd08(dev, NV_PROM_OFFSET + pcir_ptr + 3) != 'R')
 		goto out;
 
 	/* on some 6600GT/6800LE prom reads are messed up.  nvclock alleges a
@@ -122,7 +122,7 @@ static void load_vbios_prom(struct drm_device *dev, uint8_t *data)
 	 * each byte.  we'll hope pramin has something usable instead
 	 */
 	for (i = 0; i < NV_PROM_SIZE; i++)
-		data[i] = nv_rd08(NV_PROM_OFFSET + i);
+		data[i] = nv_rd08(dev, NV_PROM_OFFSET + i);
 
 out:
 	/* disable ROM access */
@@ -136,26 +136,26 @@ static void load_vbios_pramin(struct drm_device *dev, uint8_t *data)
 	int i;
 
 	if (nv_arch(dev) >= NV_50) {
-		uint32_t vbios_vram = (nv_rd32(0x619f04) & ~0xff) << 8;
+		uint32_t vbios_vram = (nv_rd32(dev, 0x619f04) & ~0xff) << 8;
 
 		if (!vbios_vram)
-			vbios_vram = (nv_rd32(0x1700) << 16) + 0xf0000;
+			vbios_vram = (nv_rd32(dev, 0x1700) << 16) + 0xf0000;
 
-		old_bar0_pramin = nv_rd32(0x1700);
-		nv_wr32(0x1700, vbios_vram >> 16);
+		old_bar0_pramin = nv_rd32(dev, 0x1700);
+		nv_wr32(dev, 0x1700, vbios_vram >> 16);
 	}
 
 	/* bail if no rom signature */
-	if (nv_rd08(NV_PRAMIN_OFFSET) != 0x55 ||
-	    nv_rd08(NV_PRAMIN_OFFSET + 1) != 0xaa)
+	if (nv_rd08(dev, NV_PRAMIN_OFFSET) != 0x55 ||
+	    nv_rd08(dev, NV_PRAMIN_OFFSET + 1) != 0xaa)
 		goto out;
 
 	for (i = 0; i < NV_PROM_SIZE; i++)
-		data[i] = nv_rd08(NV_PRAMIN_OFFSET + i);
+		data[i] = nv_rd08(dev, NV_PRAMIN_OFFSET + i);
 
 out:
 	if (nv_arch(dev) >= NV_50)
-		nv_wr32(0x1700, old_bar0_pramin);
+		nv_wr32(dev, 0x1700, old_bar0_pramin);
 }
 
 static void load_vbios_pci(struct drm_device *dev, uint8_t *data)
@@ -410,7 +410,7 @@ static uint32_t bios_rd32(struct drm_device *dev, uint32_t reg)
 	if (reg & 0x1)
 		reg &= ~0x1;
 
-	data = nv_rd32(reg);
+	data = nv_rd32(dev, reg);
 
 	BIOSLOG(dev, "	Read:  Reg: 0x%08X, Data: 0x%08X\n", reg, data);
 
@@ -434,7 +434,7 @@ static void bios_wr32(struct drm_device *dev, uint32_t reg, uint32_t data)
 
 	if (dev_priv->VBIOS.execute) {
 		still_alive();
-		nv_wr32(reg, data);
+		nv_wr32(dev, reg, data);
 	}
 }
 
@@ -628,8 +628,8 @@ static int
 nv50_pll_set(struct drm_device *dev, uint32_t reg, uint32_t clk)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t reg0 = nv_rd32(reg + 0);
-	uint32_t reg1 = nv_rd32(reg + 4);
+	uint32_t reg0 = nv_rd32(dev, reg + 0);
+	uint32_t reg1 = nv_rd32(dev, reg + 4);
 	struct nouveau_pll_vals pll;
 	struct pll_lims pll_limits;
 	int ret;
@@ -647,8 +647,8 @@ nv50_pll_set(struct drm_device *dev, uint32_t reg, uint32_t clk)
 
 	if (dev_priv->VBIOS.execute) {
 		still_alive();
-		nv_wr32(reg + 4, reg1);
-		nv_wr32(reg + 0, reg0);
+		nv_wr32(dev, reg + 4, reg1);
+		nv_wr32(dev, reg + 0, reg0);
 	}
 
 	return 0;

@@ -959,8 +959,6 @@ extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 #define nv_in32(map,reg) DRM_READ32(NVDEV->map, (reg))
 #define nv_in16(map,reg) DRM_READ16(NVDEV->map, (reg))
 #endif
-#define nv_out08(map,reg,val) DRM_WRITE8(NVDEV->map, (reg), (val))
-#define nv_in08(map,reg) DRM_READ8(NVDEV->map, (reg))
 
 /* channel control reg access */
 #if defined(__powerpc__)
@@ -973,12 +971,44 @@ extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 
 
 /* register access */
-#define nv_rd32(reg) nv_in32(mmio, (reg))
-#define nv_wr32(reg,val) nv_out32(mmio, (reg), (val))
-#define nv_rd16(reg) nv_in16(mmio, (reg))
-#define nv_wr16(reg,val) nv_out16(mmio, (reg), (val))
-#define nv_rd08(reg) nv_in08(mmio, (reg))
-#define nv_wr08(reg,val) nv_out08(mmio, (reg), (val))
+#if defined(__powerpc__)
+static inline u32 nv_rd32(struct drm_device *dev, unsigned reg)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	return in_be32((void __force __iomem *)dev_priv->mmio->handle + reg);
+}
+
+static inline void nv_wr32(struct drm_device *dev, unsigned reg, u32 val)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	out_be32((void __force __iomem *)dev_priv->mmio->handle + reg, val);
+}
+#else
+static inline u32 nv_rd32(struct drm_device *dev, unsigned reg)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	return readl((void __force __iomem *)dev_priv->mmio->handle + reg);
+}
+
+static inline void nv_wr32(struct drm_device *dev, unsigned reg, u32 val)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	writel(val, (void __force __iomem *)dev_priv->mmio->handle + reg);
+}
+#endif /* not __powerpc__ */
+
+static inline u8 nv_rd08(struct drm_device *dev, unsigned reg)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	return readb((void __force __iomem *)dev_priv->mmio->handle + reg);
+}
+
+static inline void nv_wr08(struct drm_device *dev, unsigned reg, u8 val)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	writeb(val, (void __force __iomem *)dev_priv->mmio->handle + reg);
+}
+
 #define nv_wait(reg,mask,val) nouveau_wait_until(dev, 2000000000ULL, (reg),    \
 						 (mask), (val))
 

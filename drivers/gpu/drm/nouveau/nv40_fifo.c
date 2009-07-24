@@ -70,7 +70,8 @@ nv40_fifo_create_context(struct nouveau_channel *chan)
 	dev_priv->engine.instmem.finish_access(dev);
 
 	/* enable the fifo dma operation */
-	nv_wr32(NV04_PFIFO_MODE,nv_rd32(NV04_PFIFO_MODE)|(1<<chan->id));
+	nv_wr32(dev, NV04_PFIFO_MODE,
+			nv_rd32(dev, NV04_PFIFO_MODE) | (1 << chan->id));
 	return 0;
 }
 
@@ -79,7 +80,8 @@ nv40_fifo_destroy_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 
-	nv_wr32(NV04_PFIFO_MODE, nv_rd32(NV04_PFIFO_MODE)&~(1<<chan->id));
+	nv_wr32(dev, NV04_PFIFO_MODE,
+			nv_rd32(dev, NV04_PFIFO_MODE) & ~(1 << chan->id));
 
 	if (chan->ramfc)
 		nouveau_gpuobj_ref_del(dev, &chan->ramfc);
@@ -94,58 +96,61 @@ nv40_fifo_load_context(struct nouveau_channel *chan)
 
 	dev_priv->engine.instmem.prepare_access(dev, false);
 
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_GET          , RAMFC_RD(DMA_GET));
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUT          , RAMFC_RD(DMA_PUT));
-	nv_wr32(NV10_PFIFO_CACHE1_REF_CNT          , RAMFC_RD(REF_CNT));
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_INSTANCE     , RAMFC_RD(DMA_INSTANCE));
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_DCOUNT       , RAMFC_RD(DMA_DCOUNT));
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_STATE        , RAMFC_RD(DMA_STATE));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_GET,      RAMFC_RD(DMA_GET));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUT,      RAMFC_RD(DMA_PUT));
+	nv_wr32(dev, NV10_PFIFO_CACHE1_REF_CNT,      RAMFC_RD(REF_CNT));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_INSTANCE, RAMFC_RD(DMA_INSTANCE));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_DCOUNT,   RAMFC_RD(DMA_DCOUNT));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_STATE,    RAMFC_RD(DMA_STATE));
 
 	/* No idea what 0x2058 is.. */
 	tmp   = RAMFC_RD(DMA_FETCH);
-	tmp2  = nv_rd32(0x2058) & 0xFFF;
+	tmp2  = nv_rd32(dev, 0x2058) & 0xFFF;
 	tmp2 |= (tmp & 0x30000000);
-	nv_wr32(0x2058, tmp2);
+	nv_wr32(dev, 0x2058, tmp2);
 	tmp  &= ~0x30000000;
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_FETCH        , tmp);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_FETCH, tmp);
 
-	nv_wr32(NV04_PFIFO_CACHE1_ENGINE           , RAMFC_RD(ENGINE));
-	nv_wr32(NV04_PFIFO_CACHE1_PULL1            , RAMFC_RD(PULL1_ENGINE));
-	nv_wr32(NV10_PFIFO_CACHE1_ACQUIRE_VALUE    , RAMFC_RD(ACQUIRE_VALUE));
-	nv_wr32(NV10_PFIFO_CACHE1_ACQUIRE_TIMESTAMP, RAMFC_RD(ACQUIRE_TIMESTAMP));
-	nv_wr32(NV10_PFIFO_CACHE1_ACQUIRE_TIMEOUT  , RAMFC_RD(ACQUIRE_TIMEOUT));
-	nv_wr32(NV10_PFIFO_CACHE1_SEMAPHORE        , RAMFC_RD(SEMAPHORE));
-	nv_wr32(NV10_PFIFO_CACHE1_DMA_SUBROUTINE   , RAMFC_RD(DMA_SUBROUTINE));
-	nv_wr32(NV40_PFIFO_GRCTX_INSTANCE          , RAMFC_RD(GRCTX_INSTANCE));
-	nv_wr32(0x32e4, RAMFC_RD(UNK_40));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_ENGINE,  RAMFC_RD(ENGINE));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL1,   RAMFC_RD(PULL1_ENGINE));
+	nv_wr32(dev, NV10_PFIFO_CACHE1_ACQUIRE_VALUE, RAMFC_RD(ACQUIRE_VALUE));
+	nv_wr32(dev, NV10_PFIFO_CACHE1_ACQUIRE_TIMESTAMP,
+						RAMFC_RD(ACQUIRE_TIMESTAMP));
+	nv_wr32(dev, NV10_PFIFO_CACHE1_ACQUIRE_TIMEOUT,
+						RAMFC_RD(ACQUIRE_TIMEOUT));
+	nv_wr32(dev, NV10_PFIFO_CACHE1_SEMAPHORE, RAMFC_RD(SEMAPHORE));
+	nv_wr32(dev, NV10_PFIFO_CACHE1_DMA_SUBROUTINE,
+						RAMFC_RD(DMA_SUBROUTINE));
+	nv_wr32(dev, NV40_PFIFO_GRCTX_INSTANCE, RAMFC_RD(GRCTX_INSTANCE));
+	nv_wr32(dev, 0x32e4, RAMFC_RD(UNK_40));
 	/* NVIDIA does this next line twice... */
-	nv_wr32(0x32e8, RAMFC_RD(UNK_44));
-	nv_wr32(0x2088, RAMFC_RD(UNK_4C));
-	nv_wr32(0x3300, RAMFC_RD(UNK_50));
+	nv_wr32(dev, 0x32e8, RAMFC_RD(UNK_44));
+	nv_wr32(dev, 0x2088, RAMFC_RD(UNK_4C));
+	nv_wr32(dev, 0x3300, RAMFC_RD(UNK_50));
 
 	/* not sure what part is PUT, and which is GET.. never seen a non-zero
 	 * value appear in a mmio-trace yet..
 	 */
 #if 0
-	tmp = nv_rd32(UNK_84);
-	nv_wr32(NV_PFIFO_CACHE1_GET, tmp ???);
-	nv_wr32(NV_PFIFO_CACHE1_PUT, tmp ???);
+	tmp = nv_rd32(dev, UNK_84);
+	nv_wr32(dev, NV_PFIFO_CACHE1_GET, tmp /* ??? */);
+	nv_wr32(dev, NV_PFIFO_CACHE1_PUT, tmp /* ??? */);
 #endif
 
 	/* Don't clobber the TIMEOUT_ENABLED flag when restoring from RAMFC */
-	tmp  = nv_rd32(NV04_PFIFO_DMA_TIMESLICE) & ~0x1FFFF;
+	tmp  = nv_rd32(dev, NV04_PFIFO_DMA_TIMESLICE) & ~0x1FFFF;
 	tmp |= RAMFC_RD(DMA_TIMESLICE) & 0x1FFFF;
-	nv_wr32(NV04_PFIFO_DMA_TIMESLICE, tmp);
+	nv_wr32(dev, NV04_PFIFO_DMA_TIMESLICE, tmp);
 
 	dev_priv->engine.instmem.finish_access(dev);
 
 	/* Set channel active, and in DMA mode */
-	nv_wr32(NV03_PFIFO_CACHE1_PUSH1,
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1,
 		NV40_PFIFO_CACHE1_PUSH1_DMA | chan->id);
 
 	/* Reset DMA_CTL_AT_INFO to INVALID */
-	tmp = nv_rd32(NV04_PFIFO_CACHE1_DMA_CTL) & ~(1<<31);
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_CTL, tmp);
+	tmp = nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_CTL) & ~(1 << 31);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_CTL, tmp);
 
 	return 0;
 }
@@ -159,43 +164,44 @@ nv40_fifo_save_context(struct nouveau_channel *chan)
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
 
-	RAMFC_WR(DMA_PUT          , nv_rd32(NV04_PFIFO_CACHE1_DMA_PUT));
-	RAMFC_WR(DMA_GET          , nv_rd32(NV04_PFIFO_CACHE1_DMA_GET));
-	RAMFC_WR(REF_CNT          , nv_rd32(NV10_PFIFO_CACHE1_REF_CNT));
-	RAMFC_WR(DMA_INSTANCE     , nv_rd32(NV04_PFIFO_CACHE1_DMA_INSTANCE));
-	RAMFC_WR(DMA_DCOUNT       , nv_rd32(NV04_PFIFO_CACHE1_DMA_DCOUNT));
-	RAMFC_WR(DMA_STATE        , nv_rd32(NV04_PFIFO_CACHE1_DMA_STATE));
+	RAMFC_WR(DMA_PUT,        nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUT));
+	RAMFC_WR(DMA_GET,        nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_GET));
+	RAMFC_WR(REF_CNT,        nv_rd32(dev, NV10_PFIFO_CACHE1_REF_CNT));
+	RAMFC_WR(DMA_INSTANCE,   nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_INSTANCE));
+	RAMFC_WR(DMA_DCOUNT,     nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_DCOUNT));
+	RAMFC_WR(DMA_STATE,      nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_STATE));
 
-	tmp  = nv_rd32(NV04_PFIFO_CACHE1_DMA_FETCH);
-	tmp |= nv_rd32(0x2058) & 0x30000000;
+	tmp  = nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_FETCH);
+	tmp |= nv_rd32(dev, 0x2058) & 0x30000000;
 	RAMFC_WR(DMA_FETCH	  , tmp);
 
-	RAMFC_WR(ENGINE           , nv_rd32(NV04_PFIFO_CACHE1_ENGINE));
-	RAMFC_WR(PULL1_ENGINE     , nv_rd32(NV04_PFIFO_CACHE1_PULL1));
-	RAMFC_WR(ACQUIRE_VALUE    , nv_rd32(NV10_PFIFO_CACHE1_ACQUIRE_VALUE));
-	tmp = nv_rd32(NV10_PFIFO_CACHE1_ACQUIRE_TIMESTAMP);
+	RAMFC_WR(ENGINE,         nv_rd32(dev, NV04_PFIFO_CACHE1_ENGINE));
+	RAMFC_WR(PULL1_ENGINE,   nv_rd32(dev, NV04_PFIFO_CACHE1_PULL1));
+	RAMFC_WR(ACQUIRE_VALUE,  nv_rd32(dev, NV10_PFIFO_CACHE1_ACQUIRE_VALUE));
+	tmp = nv_rd32(dev, NV10_PFIFO_CACHE1_ACQUIRE_TIMESTAMP);
 	RAMFC_WR(ACQUIRE_TIMESTAMP, tmp);
-	RAMFC_WR(ACQUIRE_TIMEOUT  , nv_rd32(NV10_PFIFO_CACHE1_ACQUIRE_TIMEOUT));
-	RAMFC_WR(SEMAPHORE        , nv_rd32(NV10_PFIFO_CACHE1_SEMAPHORE));
+	RAMFC_WR(ACQUIRE_TIMEOUT,
+			nv_rd32(dev, NV10_PFIFO_CACHE1_ACQUIRE_TIMEOUT));
+	RAMFC_WR(SEMAPHORE,      nv_rd32(dev, NV10_PFIFO_CACHE1_SEMAPHORE));
 
 	/* NVIDIA read 0x3228 first, then write DMA_GET here.. maybe something
 	 * more involved depending on the value of 0x3228?
 	 */
-	RAMFC_WR(DMA_SUBROUTINE   , nv_rd32(NV04_PFIFO_CACHE1_DMA_GET));
+	RAMFC_WR(DMA_SUBROUTINE, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_GET));
 
-	RAMFC_WR(GRCTX_INSTANCE   , nv_rd32(NV40_PFIFO_GRCTX_INSTANCE));
+	RAMFC_WR(GRCTX_INSTANCE, nv_rd32(dev, NV40_PFIFO_GRCTX_INSTANCE));
 
 	/* No idea what the below is for exactly, ripped from a mmio-trace */
-	RAMFC_WR(UNK_40           , nv_rd32(NV40_PFIFO_UNK32E4));
+	RAMFC_WR(UNK_40,         nv_rd32(dev, NV40_PFIFO_UNK32E4));
 
 	/* NVIDIA do this next line twice.. bug? */
-	RAMFC_WR(UNK_44           , nv_rd32(0x32e8));
-	RAMFC_WR(UNK_4C           , nv_rd32(0x2088));
-	RAMFC_WR(UNK_50           , nv_rd32(0x3300));
+	RAMFC_WR(UNK_44,         nv_rd32(dev, 0x32e8));
+	RAMFC_WR(UNK_4C,         nv_rd32(dev, 0x2088));
+	RAMFC_WR(UNK_50,         nv_rd32(dev, 0x3300));
 
 #if 0 /* no real idea which is PUT/GET in UNK_48.. */
-	tmp  = nv_rd32(NV04_PFIFO_CACHE1_GET);
-	tmp |= (nv_rd32(NV04_PFIFO_CACHE1_PUT) << 16);
+	tmp  = nv_rd32(dev, NV04_PFIFO_CACHE1_GET);
+	tmp |= (nv_rd32(dev, NV04_PFIFO_CACHE1_PUT) << 16);
 	RAMFC_WR(UNK_48           , tmp);
 #endif
 
@@ -211,6 +217,6 @@ nv40_fifo_init(struct drm_device *dev)
 	if ((ret = nouveau_fifo_init(dev)))
 		return ret;
 
-	nv_wr32(NV04_PFIFO_DMA_TIMESLICE, 0x2101ffff);
+	nv_wr32(dev, NV04_PFIFO_DMA_TIMESLICE, 0x2101ffff);
 	return 0;
 }

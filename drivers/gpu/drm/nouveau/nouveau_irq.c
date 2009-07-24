@@ -46,7 +46,7 @@ nouveau_irq_preinstall(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
 	/* Master disable */
-	nv_wr32(NV03_PMC_INTR_EN_0, 0);
+	nv_wr32(dev, NV03_PMC_INTR_EN_0, 0);
 
 	if (dev_priv->card_type == NV_50) {
 		INIT_WORK(&dev_priv->irq_work, nv50_display_irq_handler_bh);
@@ -58,7 +58,7 @@ int
 nouveau_irq_postinstall(struct drm_device *dev)
 {
 	/* Master enable */
-	nv_wr32(NV03_PMC_INTR_EN_0, NV_PMC_INTR_EN_0_MASTER_ENABLE);
+	nv_wr32(dev, NV03_PMC_INTR_EN_0, NV_PMC_INTR_EN_0_MASTER_ENABLE);
 	return 0;
 }
 
@@ -66,7 +66,7 @@ void
 nouveau_irq_uninstall(struct drm_device *dev)
 {
 	/* Master disable */
-	nv_wr32(NV03_PMC_INTR_EN_0, 0);
+	nv_wr32(dev, NV03_PMC_INTR_EN_0, 0);
 }
 
 static int
@@ -113,13 +113,13 @@ nouveau_fifo_swmthd(struct nouveau_channel *chan, uint32_t addr, uint32_t data)
 			return false;
 
 		chan->sw_subchannel[subc] = ref->gpuobj->class;
-		nv_wr32(NV04_PFIFO_CACHE1_ENGINE, nv_rd32(
-			NV04_PFIFO_CACHE1_ENGINE) & ~(0xf << subc*4));
+		nv_wr32(dev, NV04_PFIFO_CACHE1_ENGINE, nv_rd32(dev,
+			NV04_PFIFO_CACHE1_ENGINE) & ~(0xf << subc * 4));
 		return true;
 	}
 
 	/* hw object */
-	if (nv_rd32(NV04_PFIFO_CACHE1_ENGINE) & (1 << (subc*4)))
+	if (nv_rd32(dev, NV04_PFIFO_CACHE1_ENGINE) & (1 << (subc*4)))
 		return false;
 
 	if (nouveau_call_method(chan, chan->sw_subchannel[subc], mthd, data))
@@ -135,17 +135,17 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 	struct nouveau_engine *engine = &dev_priv->engine;
 	uint32_t status, reassign;
 
-	reassign = nv_rd32(NV03_PFIFO_CACHES) & 1;
-	while ((status = nv_rd32(NV03_PFIFO_INTR_0))) {
+	reassign = nv_rd32(dev, NV03_PFIFO_CACHES) & 1;
+	while ((status = nv_rd32(dev, NV03_PFIFO_INTR_0))) {
 		struct nouveau_channel *chan = NULL;
 		uint32_t chid, get;
 
-		nv_wr32(NV03_PFIFO_CACHES, 0);
+		nv_wr32(dev, NV03_PFIFO_CACHES, 0);
 
 		chid = engine->fifo.channel_id(dev);
 		if (chid >= 0 && chid < engine->fifo.channels)
 			chan = dev_priv->fifos[chid];
-		get  = nv_rd32(NV03_PFIFO_CACHE1_GET);
+		get  = nv_rd32(dev, NV03_PFIFO_CACHE1_GET);
 
 		if (status & NV_PFIFO_INTR_CACHE_ERROR) {
 			uint32_t mthd, data;
@@ -160,11 +160,15 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 			ptr = (get & 0x7ff) >> 2;
 
 			if (dev_priv->card_type < NV_40) {
-				mthd = nv_rd32(NV04_PFIFO_CACHE1_METHOD(ptr));
-				data = nv_rd32(NV04_PFIFO_CACHE1_DATA(ptr));
+				mthd = nv_rd32(dev,
+					NV04_PFIFO_CACHE1_METHOD(ptr));
+				data = nv_rd32(dev,
+					NV04_PFIFO_CACHE1_DATA(ptr));
 			} else {
-				mthd = nv_rd32(NV40_PFIFO_CACHE1_METHOD(ptr));
-				data = nv_rd32(NV40_PFIFO_CACHE1_DATA(ptr));
+				mthd = nv_rd32(dev,
+					NV40_PFIFO_CACHE1_METHOD(ptr));
+				data = nv_rd32(dev,
+					NV40_PFIFO_CACHE1_DATA(ptr));
 			}
 
 			if (!chan || !nouveau_fifo_swmthd(chan, mthd, data)) {
@@ -174,19 +178,20 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 					data);
 			}
 
-			nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, 0);
-			nv_wr32(NV03_PFIFO_INTR_0, NV_PFIFO_INTR_CACHE_ERROR);
+			nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH, 0);
+			nv_wr32(dev, NV03_PFIFO_INTR_0,
+						NV_PFIFO_INTR_CACHE_ERROR);
 
-			nv_wr32(NV03_PFIFO_CACHE1_PUSH0,
-				nv_rd32(NV03_PFIFO_CACHE1_PUSH0) & ~1);
-			nv_wr32(NV03_PFIFO_CACHE1_GET, get + 4);
-			nv_wr32(NV03_PFIFO_CACHE1_PUSH0,
-				nv_rd32(NV03_PFIFO_CACHE1_PUSH0) | 1);
-			nv_wr32(NV04_PFIFO_CACHE1_HASH, 0);
+			nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0,
+				nv_rd32(dev, NV03_PFIFO_CACHE1_PUSH0) & ~1);
+			nv_wr32(dev, NV03_PFIFO_CACHE1_GET, get + 4);
+			nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0,
+				nv_rd32(dev, NV03_PFIFO_CACHE1_PUSH0) | 1);
+			nv_wr32(dev, NV04_PFIFO_CACHE1_HASH, 0);
 
-			nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
-				nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-			nv_wr32(NV04_PFIFO_CACHE1_PULL0, 1);
+			nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
+				nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
+			nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 1);
 
 			status &= ~NV_PFIFO_INTR_CACHE_ERROR;
 		}
@@ -195,22 +200,24 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 			NV_INFO(dev, "PFIFO_DMA_PUSHER - Ch %d\n", chid);
 
 			status &= ~NV_PFIFO_INTR_DMA_PUSHER;
-			nv_wr32(NV03_PFIFO_INTR_0, NV_PFIFO_INTR_DMA_PUSHER);
+			nv_wr32(dev, NV03_PFIFO_INTR_0,
+						NV_PFIFO_INTR_DMA_PUSHER);
 
-			nv_wr32(NV04_PFIFO_CACHE1_DMA_STATE, 0x00000000);
-			if (nv_rd32(NV04_PFIFO_CACHE1_DMA_PUT) != get)
-				nv_wr32(NV04_PFIFO_CACHE1_DMA_GET, get + 4);
+			nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_STATE, 0x00000000);
+			if (nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUT) != get)
+				nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_GET,
+								get + 4);
 		}
 
 		if (status) {
 			NV_INFO(dev, "Unhandled PFIFO_INTR - 0x%08x\n", status);
-			nv_wr32(NV03_PFIFO_INTR_0, status);
+			nv_wr32(dev, NV03_PFIFO_INTR_0, status);
 		}
 
-		nv_wr32(NV03_PFIFO_CACHES, reassign);
+		nv_wr32(dev, NV03_PFIFO_CACHES, reassign);
 	}
 
-	nv_wr32(NV03_PMC_INTR_0, NV_PMC_INTR_0_PFIFO_PENDING);
+	nv_wr32(dev, NV03_PMC_INTR_0, NV_PMC_INTR_0_PFIFO_PENDING);
 }
 
 struct nouveau_bitfield_names {
@@ -285,7 +292,7 @@ nouveau_graph_chid_from_grctx(struct drm_device *dev)
 		return dev_priv->engine.fifo.channels;
 	else
 	if (dev_priv->card_type < NV_50) {
-		inst = (nv_rd32(0x40032c) & 0xfffff) << 4;
+		inst = (nv_rd32(dev, 0x40032c) & 0xfffff) << 4;
 
 		for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
 			struct nouveau_channel *chan = dev_priv->fifos[i];
@@ -297,7 +304,7 @@ nouveau_graph_chid_from_grctx(struct drm_device *dev)
 				break;
 		}
 	} else {
-		inst = (nv_rd32(0x40032c) & 0xfffff) << 12;
+		inst = (nv_rd32(dev, 0x40032c) & 0xfffff) << 12;
 
 		for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
 			struct nouveau_channel *chan = dev_priv->fifos[i];
@@ -322,10 +329,10 @@ nouveau_graph_trapped_channel(struct drm_device *dev, int *channel_ret)
 	int channel;
 
 	if (dev_priv->card_type < NV_10)
-		channel = (nv_rd32(NV04_PGRAPH_TRAPPED_ADDR) >> 24) & 0xf;
+		channel = (nv_rd32(dev, NV04_PGRAPH_TRAPPED_ADDR) >> 24) & 0xf;
 	else
 	if (dev_priv->card_type < NV_40)
-		channel = (nv_rd32(NV04_PGRAPH_TRAPPED_ADDR) >> 20) & 0x1f;
+		channel = (nv_rd32(dev, NV04_PGRAPH_TRAPPED_ADDR) >> 20) & 0x1f;
 	else
 		channel = nouveau_graph_chid_from_grctx(dev);
 
@@ -355,31 +362,31 @@ nouveau_graph_trap_info(struct drm_device *dev,
 
 	trap->nsource = trap->nstatus = 0;
 	if (dev_priv->card_type < NV_50) {
-		trap->nsource = nv_rd32(NV03_PGRAPH_NSOURCE);
-		trap->nstatus = nv_rd32(NV03_PGRAPH_NSTATUS);
+		trap->nsource = nv_rd32(dev, NV03_PGRAPH_NSOURCE);
+		trap->nstatus = nv_rd32(dev, NV03_PGRAPH_NSTATUS);
 	}
 
 	if (nouveau_graph_trapped_channel(dev, &trap->channel))
 		trap->channel = -1;
-	address = nv_rd32(NV04_PGRAPH_TRAPPED_ADDR);
+	address = nv_rd32(dev, NV04_PGRAPH_TRAPPED_ADDR);
 
 	trap->mthd = address & 0x1FFC;
-	trap->data = nv_rd32(NV04_PGRAPH_TRAPPED_DATA);
+	trap->data = nv_rd32(dev, NV04_PGRAPH_TRAPPED_DATA);
 	if (dev_priv->card_type < NV_10) {
 		trap->subc  = (address >> 13) & 0x7;
 	} else {
 		trap->subc  = (address >> 16) & 0x7;
-		trap->data2 = nv_rd32(NV10_PGRAPH_TRAPPED_DATA_HIGH);
+		trap->data2 = nv_rd32(dev, NV10_PGRAPH_TRAPPED_DATA_HIGH);
 	}
 
 	if (dev_priv->card_type < NV_10) {
-		trap->class = nv_rd32(0x400180 + trap->subc*4) & 0xFF;
+		trap->class = nv_rd32(dev, 0x400180 + trap->subc*4) & 0xFF;
 	} else if (dev_priv->card_type < NV_40) {
-		trap->class = nv_rd32(0x400160 + trap->subc*4) & 0xFFF;
+		trap->class = nv_rd32(dev, 0x400160 + trap->subc*4) & 0xFFF;
 	} else if (dev_priv->card_type < NV_50) {
-		trap->class = nv_rd32(0x400160 + trap->subc*4) & 0xFFFF;
+		trap->class = nv_rd32(dev, 0x400160 + trap->subc*4) & 0xFFFF;
 	} else {
-		trap->class = nv_rd32(0x400814);
+		trap->class = nv_rd32(dev, 0x400814);
 	}
 }
 
@@ -492,41 +499,41 @@ nouveau_pgraph_irq_handler(struct drm_device *dev)
 {
 	uint32_t status;
 
-	while ((status = nv_rd32(NV03_PGRAPH_INTR))) {
-		uint32_t nsource = nv_rd32(NV03_PGRAPH_NSOURCE);
+	while ((status = nv_rd32(dev, NV03_PGRAPH_INTR))) {
+		uint32_t nsource = nv_rd32(dev, NV03_PGRAPH_NSOURCE);
 
 		if (status & NV_PGRAPH_INTR_NOTIFY) {
 			nouveau_pgraph_intr_notify(dev, nsource);
 
 			status &= ~NV_PGRAPH_INTR_NOTIFY;
-			nv_wr32(NV03_PGRAPH_INTR, NV_PGRAPH_INTR_NOTIFY);
+			nv_wr32(dev, NV03_PGRAPH_INTR, NV_PGRAPH_INTR_NOTIFY);
 		}
 
 		if (status & NV_PGRAPH_INTR_ERROR) {
 			nouveau_pgraph_intr_error(dev, nsource);
 
 			status &= ~NV_PGRAPH_INTR_ERROR;
-			nv_wr32(NV03_PGRAPH_INTR, NV_PGRAPH_INTR_ERROR);
+			nv_wr32(dev, NV03_PGRAPH_INTR, NV_PGRAPH_INTR_ERROR);
 		}
 
 		if (status & NV_PGRAPH_INTR_CONTEXT_SWITCH) {
 			nouveau_pgraph_intr_context_switch(dev);
 
 			status &= ~NV_PGRAPH_INTR_CONTEXT_SWITCH;
-			nv_wr32(NV03_PGRAPH_INTR,
+			nv_wr32(dev, NV03_PGRAPH_INTR,
 				 NV_PGRAPH_INTR_CONTEXT_SWITCH);
 		}
 
 		if (status) {
 			NV_INFO(dev, "Unhandled PGRAPH_INTR - 0x%08x\n", status);
-			nv_wr32(NV03_PGRAPH_INTR, status);
+			nv_wr32(dev, NV03_PGRAPH_INTR, status);
 		}
 
-		if ((nv_rd32(NV04_PGRAPH_FIFO) & (1 << 0)) == 0)
-			nv_wr32(NV04_PGRAPH_FIFO, 1);
+		if ((nv_rd32(dev, NV04_PGRAPH_FIFO) & (1 << 0)) == 0)
+			nv_wr32(dev, NV04_PGRAPH_FIFO, 1);
 	}
 
-	nv_wr32(NV03_PMC_INTR_0, NV_PMC_INTR_0_PGRAPH_PENDING);
+	nv_wr32(dev, NV03_PMC_INTR_0, NV_PMC_INTR_0_PGRAPH_PENDING);
 }
 
 static void
@@ -534,13 +541,13 @@ nv50_pgraph_irq_handler(struct drm_device *dev)
 {
 	uint32_t status, nsource;
 
-	status = nv_rd32(NV03_PGRAPH_INTR);
-	nsource = nv_rd32(NV03_PGRAPH_NSOURCE);
+	status = nv_rd32(dev, NV03_PGRAPH_INTR);
+	nsource = nv_rd32(dev, NV03_PGRAPH_NSOURCE);
 
 	if (status & 0x00000001) {
 		nouveau_pgraph_intr_notify(dev, nsource);
 		status &= ~0x00000001;
-		nv_wr32(NV03_PGRAPH_INTR, 0x00000001);
+		nv_wr32(dev, NV03_PGRAPH_INTR, 0x00000001);
 	}
 
 	if (status & 0x00000010) {
@@ -548,15 +555,15 @@ nv50_pgraph_irq_handler(struct drm_device *dev)
 					  NV03_PGRAPH_NSOURCE_ILLEGAL_MTHD);
 
 		status &= ~0x00000010;
-		nv_wr32(NV03_PGRAPH_INTR, 0x00000010);
+		nv_wr32(dev, NV03_PGRAPH_INTR, 0x00000010);
 	}
 
 	if (status & 0x00001000) {
-		nv_wr32(0x400500, 0x00000000);
-		nv_wr32(NV03_PGRAPH_INTR, NV_PGRAPH_INTR_CONTEXT_SWITCH);
-		nv_wr32(NV40_PGRAPH_INTR_EN, nv_rd32(
+		nv_wr32(dev, 0x400500, 0x00000000);
+		nv_wr32(dev, NV03_PGRAPH_INTR, NV_PGRAPH_INTR_CONTEXT_SWITCH);
+		nv_wr32(dev, NV40_PGRAPH_INTR_EN, nv_rd32(dev,
 			NV40_PGRAPH_INTR_EN) & ~NV_PGRAPH_INTR_CONTEXT_SWITCH);
-		nv_wr32(0x400500, 0x00010001);
+		nv_wr32(dev, 0x400500, 0x00010001);
 
 		nv50_graph_context_switch(dev);
 
@@ -568,7 +575,7 @@ nv50_pgraph_irq_handler(struct drm_device *dev)
 					  NV03_PGRAPH_NSOURCE_DATA_ERROR);
 
 		status &= ~0x00100000;
-		nv_wr32(NV03_PGRAPH_INTR, 0x00100000);
+		nv_wr32(dev, NV03_PGRAPH_INTR, 0x00100000);
 	}
 
 	if (status & 0x00200000) {
@@ -579,48 +586,48 @@ nv50_pgraph_irq_handler(struct drm_device *dev)
 
 		NV_ERROR(dev, "magic set 1:\n");
 		for (r = 0x408900; r <= 0x408910; r += 4)
-			NV_ERROR(dev, "\t0x%08x: 0x%08x\n", r, nv_rd32(r));
-		nv_wr32(0x408900, nv_rd32(0x408904) | 0xc0000000);
+			NV_ERROR(dev, "\t0x%08x: 0x%08x\n", r, nv_rd32(dev, r));
+		nv_wr32(dev, 0x408900, nv_rd32(dev, 0x408904) | 0xc0000000);
 		for (r = 0x408e08; r <= 0x408e24; r += 4)
-			NV_ERROR(dev, "\t0x%08x: 0x%08x\n", r, nv_rd32(r));
-		nv_wr32(0x408e08, nv_rd32(0x408e08) | 0xc0000000);
+			NV_ERROR(dev, "\t0x%08x: 0x%08x\n", r, nv_rd32(dev, r));
+		nv_wr32(dev, 0x408e08, nv_rd32(dev, 0x408e08) | 0xc0000000);
 
 		NV_ERROR(dev, "magic set 2:\n");
 		for (r = 0x409900; r <= 0x409910; r += 4)
-			NV_ERROR(dev, "\t0x%08x: 0x%08x\n", r, nv_rd32(r));
-		nv_wr32(0x409900, nv_rd32(0x409904) | 0xc0000000);
+			NV_ERROR(dev, "\t0x%08x: 0x%08x\n", r, nv_rd32(dev, r));
+		nv_wr32(dev, 0x409900, nv_rd32(dev, 0x409904) | 0xc0000000);
 		for (r = 0x409e08; r <= 0x409e24; r += 4)
-			NV_ERROR(dev, "\t0x%08x: 0x%08x\n", r, nv_rd32(r));
-		nv_wr32(0x409e08, nv_rd32(0x409e08) | 0xc0000000);
+			NV_ERROR(dev, "\t0x%08x: 0x%08x\n", r, nv_rd32(dev, r));
+		nv_wr32(dev, 0x409e08, nv_rd32(dev, 0x409e08) | 0xc0000000);
 
 		status &= ~0x00200000;
-		nv_wr32(NV03_PGRAPH_NSOURCE, nsource);
-		nv_wr32(NV03_PGRAPH_INTR, 0x00200000);
+		nv_wr32(dev, NV03_PGRAPH_NSOURCE, nsource);
+		nv_wr32(dev, NV03_PGRAPH_INTR, 0x00200000);
 	}
 
 	if (status) {
 		NV_INFO(dev, "Unhandled PGRAPH_INTR - 0x%08x\n", status);
-		nv_wr32(NV03_PGRAPH_INTR, status);
+		nv_wr32(dev, NV03_PGRAPH_INTR, status);
 	}
 
 	{
 		const int isb = (1 << 16) | (1 << 0);
 
-		if ((nv_rd32(0x400500) & isb) != isb)
-			nv_wr32(0x400500, nv_rd32(0x400500) | isb);
+		if ((nv_rd32(dev, 0x400500) & isb) != isb)
+			nv_wr32(dev, 0x400500, nv_rd32(dev, 0x400500) | isb);
 	}
 
-	nv_wr32(NV03_PMC_INTR_0, NV_PMC_INTR_0_PGRAPH_PENDING);
+	nv_wr32(dev, NV03_PMC_INTR_0, NV_PMC_INTR_0_PGRAPH_PENDING);
 }
 
 static void
 nouveau_crtc_irq_handler(struct drm_device *dev, int crtc)
 {
 	if (crtc & 1)
-		nv_wr32(NV_CRTC0_INTSTAT, NV_CRTC_INTR_VBLANK);
+		nv_wr32(dev, NV_CRTC0_INTSTAT, NV_CRTC_INTR_VBLANK);
 
 	if (crtc & 2)
-		nv_wr32(NV_CRTC1_INTSTAT, NV_CRTC_INTR_VBLANK);
+		nv_wr32(dev, NV_CRTC1_INTSTAT, NV_CRTC_INTR_VBLANK);
 }
 
 irqreturn_t
@@ -630,7 +637,7 @@ nouveau_irq_handler(DRM_IRQ_ARGS)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t status;
 
-	status = nv_rd32(NV03_PMC_INTR_0);
+	status = nv_rd32(dev, NV03_PMC_INTR_0);
 	if (!status)
 		return IRQ_NONE;
 

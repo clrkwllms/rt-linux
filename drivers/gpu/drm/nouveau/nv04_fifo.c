@@ -38,8 +38,8 @@
 int
 nv04_fifo_channel_id(struct drm_device *dev)
 {
-	return (nv_rd32(NV03_PFIFO_CACHE1_PUSH1) &
-			NV03_PFIFO_CACHE1_PUSH1_CHID_MASK);
+	return nv_rd32(dev, NV03_PFIFO_CACHE1_PUSH1) &
+			NV03_PFIFO_CACHE1_PUSH1_CHID_MASK;
 }
 
 int
@@ -71,7 +71,8 @@ nv04_fifo_create_context(struct nouveau_channel *chan)
 	dev_priv->engine.instmem.finish_access(dev);
 
 	/* enable the fifo dma operation */
-	nv_wr32(NV04_PFIFO_MODE,nv_rd32(NV04_PFIFO_MODE) | (1<<chan->id));
+	nv_wr32(dev, NV04_PFIFO_MODE,
+		nv_rd32(dev, NV04_PFIFO_MODE) | (1 << chan->id));
 	return 0;
 }
 
@@ -80,7 +81,8 @@ nv04_fifo_destroy_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 
-	nv_wr32(NV04_PFIFO_MODE, nv_rd32(NV04_PFIFO_MODE)&~(1<<chan->id));
+	nv_wr32(dev, NV04_PFIFO_MODE,
+		nv_rd32(dev, NV04_PFIFO_MODE) & ~(1 << chan->id));
 
 	nouveau_gpuobj_ref_del(dev, &chan->ramfc);
 }
@@ -94,26 +96,26 @@ nv04_fifo_load_context(struct nouveau_channel *chan)
 
 	dev_priv->engine.instmem.prepare_access(dev, false);
 
-	nv_wr32(NV03_PFIFO_CACHE1_PUSH1,
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1,
 		 NV03_PFIFO_CACHE1_PUSH1_DMA | chan->id);
 
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_GET, RAMFC_RD(DMA_GET));
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUT, RAMFC_RD(DMA_PUT));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_GET, RAMFC_RD(DMA_GET));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUT, RAMFC_RD(DMA_PUT));
 
 	tmp = RAMFC_RD(DMA_INSTANCE);
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_INSTANCE, tmp & 0xFFFF);
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_DCOUNT, tmp >> 16);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_INSTANCE, tmp & 0xFFFF);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_DCOUNT, tmp >> 16);
 
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_STATE, RAMFC_RD(DMA_STATE));
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_FETCH, RAMFC_RD(DMA_FETCH));
-	nv_wr32(NV04_PFIFO_CACHE1_ENGINE, RAMFC_RD(ENGINE));
-	nv_wr32(NV04_PFIFO_CACHE1_PULL1, RAMFC_RD(PULL1_ENGINE));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_STATE, RAMFC_RD(DMA_STATE));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_FETCH, RAMFC_RD(DMA_FETCH));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_ENGINE, RAMFC_RD(ENGINE));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL1, RAMFC_RD(PULL1_ENGINE));
 
 	dev_priv->engine.instmem.finish_access(dev);
 
 	/* Reset NV04_PFIFO_CACHE1_DMA_CTL_AT_INFO to INVALID */
-	tmp = nv_rd32(NV04_PFIFO_CACHE1_DMA_CTL) & ~(1<<31);
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_CTL, tmp);
+	tmp = nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_CTL) & ~(1 << 31);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_CTL, tmp);
 
 	return 0;
 }
@@ -127,17 +129,17 @@ nv04_fifo_save_context(struct nouveau_channel *chan)
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
 
-	RAMFC_WR(DMA_PUT, nv_rd32(NV04_PFIFO_CACHE1_DMA_PUT));
-	RAMFC_WR(DMA_GET, nv_rd32(NV04_PFIFO_CACHE1_DMA_GET));
+	RAMFC_WR(DMA_PUT, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUT));
+	RAMFC_WR(DMA_GET, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_GET));
 
-	tmp  = nv_rd32(NV04_PFIFO_CACHE1_DMA_DCOUNT) << 16;
-	tmp |= nv_rd32(NV04_PFIFO_CACHE1_DMA_INSTANCE);
+	tmp  = nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_DCOUNT) << 16;
+	tmp |= nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_INSTANCE);
 	RAMFC_WR(DMA_INSTANCE, tmp);
 
-	RAMFC_WR(DMA_STATE, nv_rd32(NV04_PFIFO_CACHE1_DMA_STATE));
-	RAMFC_WR(DMA_FETCH, nv_rd32(NV04_PFIFO_CACHE1_DMA_FETCH));
-	RAMFC_WR(ENGINE, nv_rd32(NV04_PFIFO_CACHE1_ENGINE));
-	RAMFC_WR(PULL1_ENGINE, nv_rd32(NV04_PFIFO_CACHE1_PULL1));
+	RAMFC_WR(DMA_STATE, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_STATE));
+	RAMFC_WR(DMA_FETCH, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_FETCH));
+	RAMFC_WR(ENGINE, nv_rd32(dev, NV04_PFIFO_CACHE1_ENGINE));
+	RAMFC_WR(PULL1_ENGINE, nv_rd32(dev, NV04_PFIFO_CACHE1_PULL1));
 
 	dev_priv->engine.instmem.finish_access(dev);
 	return 0;

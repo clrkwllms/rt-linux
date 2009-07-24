@@ -332,16 +332,16 @@ nv50_crtc_set_clock(struct drm_device *dev, int head, int pclk)
 		return ret;
 
 	if (limits.vco2.maxfreq) {
-		reg1 = nv_rd32(pll_reg + 4) & 0xff00ff00;
-		reg2 = nv_rd32(pll_reg + 8) & 0x8000ff00;
-		nv_wr32(pll_reg, 0x10000611);
-		nv_wr32(pll_reg + 4, reg1 | (pll.M1 << 16) | pll.N1);
-		nv_wr32(pll_reg + 8,
+		reg1 = nv_rd32(dev, pll_reg + 4) & 0xff00ff00;
+		reg2 = nv_rd32(dev, pll_reg + 8) & 0x8000ff00;
+		nv_wr32(dev, pll_reg, 0x10000611);
+		nv_wr32(dev, pll_reg + 4, reg1 | (pll.M1 << 16) | pll.N1);
+		nv_wr32(dev, pll_reg + 8,
 			reg2 | (pll.log2P << 28) | (pll.M2 << 16) | pll.N2);
 	} else {
-		reg1 = nv_rd32(pll_reg + 4) & 0xffc00000;
-		nv_wr32(pll_reg, 0x50000610);
-		nv_wr32(pll_reg + 4, reg1 |
+		reg1 = nv_rd32(dev, pll_reg + 4) & 0xffc00000;
+		nv_wr32(dev, pll_reg, 0x50000610);
+		nv_wr32(dev, pll_reg + 4, reg1 |
 			(((1<<pll.log2P)-1) << 16) | (pll.M1 << 8) | pll.N1);
 	}
 

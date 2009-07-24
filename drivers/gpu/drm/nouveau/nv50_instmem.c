@@ -54,7 +54,7 @@ struct nv50_instmem_priv {
 		offset += (g)->im_pramin->start;                  \
 	}                                                         \
 	offset += (o);                                            \
-	nv_wr32(NV_RAMIN + (offset & 0xfffff), (v));              \
+	nv_wr32(dev, NV_RAMIN + (offset & 0xfffff), (v));              \
 } while(0)
 
 int
@@ -74,7 +74,7 @@ nv50_instmem_init(struct drm_device *dev)
 
 	/* Save state, will restore at takedown. */
 	for (i = 0x1700; i <= 0x1710; i+=4)
-		priv->save1700[(i-0x1700)/4] = nv_rd32(i);
+		priv->save1700[(i-0x1700)/4] = nv_rd32(dev, i);
 
 	/* Reserve the last MiB of VRAM, we should probably try to avoid
 	 * setting up the below tables over the top of the VBIOS image at
@@ -89,7 +89,8 @@ nv50_instmem_init(struct drm_device *dev)
 	pt_size  = NV50_INSTMEM_PT_SIZE(dev_priv->ramin->size);
 
 	NV_DEBUG(dev, " Rsvd VRAM base: 0x%08x\n", c_offset);
-	NV_DEBUG(dev, "    VBIOS image: 0x%08x\n", (nv_rd32(0x619f04)&~0xff)<<8);
+	NV_DEBUG(dev, "    VBIOS image: 0x%08x\n",
+				(nv_rd32(dev, 0x619f04) & ~0xff) << 8);
 	NV_DEBUG(dev, "  Aperture size: %d MiB\n",
 		 (uint32_t)dev_priv->ramin->size >> 20);
 	NV_DEBUG(dev, "        PT size: %d KiB\n", pt_size >> 10);
@@ -119,8 +120,8 @@ nv50_instmem_init(struct drm_device *dev)
 	c_size += dev_priv->vm_vram_pt_nr * (NV50_VM_BLOCK / 65536 * 8);
 
 	/* Map BAR0 PRAMIN aperture over the memory we want to use */
-	save_nv001700 = nv_rd32(NV50_PUNK_BAR0_PRAMIN);
-	nv_wr32(NV50_PUNK_BAR0_PRAMIN, (c_offset >> 16));
+	save_nv001700 = nv_rd32(dev, NV50_PUNK_BAR0_PRAMIN);
+	nv_wr32(dev, NV50_PUNK_BAR0_PRAMIN, (c_offset >> 16));
 
 	/* Create a fake channel, and use it as our "dummy" channels 0/127.
 	 * The main reason for creating a channel is so we can use the gpuobj
@@ -227,23 +228,23 @@ nv50_instmem_init(struct drm_device *dev)
 	BAR0_WI32(priv->fb_bar->gpuobj, 0x14, 0x00000000);
 
 	/* Poke the relevant regs, and pray it works :) */
-	nv_wr32(NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12));
-	nv_wr32(NV50_PUNK_UNK1710, 0);
-	nv_wr32(NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12) |
+	nv_wr32(dev, NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12));
+	nv_wr32(dev, NV50_PUNK_UNK1710, 0);
+	nv_wr32(dev, NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12) |
 					 NV50_PUNK_BAR_CFG_BASE_VALID);
-	nv_wr32(NV50_PUNK_BAR1_CTXDMA, (priv->fb_bar->instance >> 4) |
+	nv_wr32(dev, NV50_PUNK_BAR1_CTXDMA, (priv->fb_bar->instance >> 4) |
 					NV50_PUNK_BAR1_CTXDMA_VALID);
-	nv_wr32(NV50_PUNK_BAR3_CTXDMA, (priv->pramin_bar->instance >> 4) |
+	nv_wr32(dev, NV50_PUNK_BAR3_CTXDMA, (priv->pramin_bar->instance >> 4) |
 					NV50_PUNK_BAR3_CTXDMA_VALID);
 
 	for (i = 0; i < 8; i++)
-		nv_wr32(0x1900 + (i*4), 0);
+		nv_wr32(dev, 0x1900 + (i*4), 0);
 
 	/* Assume that praying isn't enough, check that we can re-read the
 	 * entire fake channel back from the PRAMIN BAR */
 	dev_priv->engine.instmem.prepare_access(dev, false);
 	for (i = 0; i < c_size; i+=4) {
-		if (nv_rd32(NV_RAMIN + i) != nv_ri32(i)) {
+		if (nv_rd32(dev, NV_RAMIN + i) != nv_ri32(i)) {
 			NV_ERROR(dev, "Error reading back PRAMIN at 0x%08x\n", i);
 			dev_priv->engine.instmem.finish_access(dev);
 			return -EINVAL;
@@ -251,7 +252,7 @@ nv50_instmem_init(struct drm_device *dev)
 	}
 	dev_priv->engine.instmem.finish_access(dev);
 
-	nv_wr32(NV50_PUNK_BAR0_PRAMIN, save_nv001700);
+	nv_wr32(dev, NV50_PUNK_BAR0_PRAMIN, save_nv001700);
 
 	/* Global PRAMIN heap */
 	if (nouveau_mem_init_heap(&dev_priv->ramin_heap,
@@ -282,7 +283,7 @@ nv50_instmem_takedown(struct drm_device *dev)
 
 	/* Restore state from before init */
 	for (i = 0x1700; i <= 0x1710; i+=4)
-		nv_wr32(i, priv->save1700[(i-0x1700)/4]);
+		nv_wr32(dev, i, priv->save1700[(i-0x1700)/4]);
 
 	nouveau_gpuobj_ref_del(dev, &priv->fb_bar);
 	nouveau_gpuobj_ref_del(dev, &priv->pramin_bar);
@@ -335,24 +336,24 @@ nv50_instmem_resume(struct drm_device *dev)
 	struct nouveau_gpuobj *ramin = chan->ramin->gpuobj;
 	int i;
 
-	nv_wr32(NV50_PUNK_BAR0_PRAMIN, (ramin->im_backing_start >> 16));
+	nv_wr32(dev, NV50_PUNK_BAR0_PRAMIN, (ramin->im_backing_start >> 16));
 	for (i = 0; i < ramin->im_pramin->size; i += 4)
 		BAR0_WI32(ramin, i, ramin->im_backing_suspend[i/4]);
 	kfree(ramin->im_backing_suspend);
 	ramin->im_backing_suspend = NULL;
 
 	/* Poke the relevant regs, and pray it works :) */
-	nv_wr32(NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12));
-	nv_wr32(NV50_PUNK_UNK1710, 0);
-	nv_wr32(NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12) |
+	nv_wr32(dev, NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12));
+	nv_wr32(dev, NV50_PUNK_UNK1710, 0);
+	nv_wr32(dev, NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12) |
 					 NV50_PUNK_BAR_CFG_BASE_VALID);
-	nv_wr32(NV50_PUNK_BAR1_CTXDMA, (priv->fb_bar->instance >> 4) |
+	nv_wr32(dev, NV50_PUNK_BAR1_CTXDMA, (priv->fb_bar->instance >> 4) |
 					NV50_PUNK_BAR1_CTXDMA_VALID);
-	nv_wr32(NV50_PUNK_BAR3_CTXDMA, (priv->pramin_bar->instance >> 4) |
+	nv_wr32(dev, NV50_PUNK_BAR3_CTXDMA, (priv->pramin_bar->instance >> 4) |
 					NV50_PUNK_BAR3_CTXDMA_VALID);
 
 	for (i = 0; i < 8; i++)
-		nv_wr32(0x1900 + (i*4), 0);
+		nv_wr32(dev, 0x1900 + (i*4), 0);
 }
 
 int
@@ -432,17 +433,17 @@ nv50_instmem_bind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 	}
 	dev_priv->engine.instmem.finish_access(dev);
 
-	nv_wr32(0x100c80, 0x00040001);
+	nv_wr32(dev, 0x100c80, 0x00040001);
 	if (!nv_wait(0x100c80, 0x00000001, 0x00000000)) {
 		NV_ERROR(dev, "timeout: (0x100c80 & 1) == 0 (1)\n");
-		NV_ERROR(dev, "0x100c80 = 0x%08x\n", nv_rd32(0x100c80));
+		NV_ERROR(dev, "0x100c80 = 0x%08x\n", nv_rd32(dev, 0x100c80));
 		return -EBUSY;
 	}
 
-	nv_wr32(0x100c80, 0x00060001);
+	nv_wr32(dev, 0x100c80, 0x00060001);
 	if (!nv_wait(0x100c80, 0x00000001, 0x00000000)) {
 		NV_ERROR(dev, "timeout: (0x100c80 & 1) == 0 (2)\n");
-		NV_ERROR(dev, "0x100c80 = 0x%08x\n", nv_rd32(0x100c80));
+		NV_ERROR(dev, "0x100c80 = 0x%08x\n", nv_rd32(dev, 0x100c80));
 		return -EBUSY;
 	}
 
@@ -491,7 +492,7 @@ nv50_instmem_finish_access(struct drm_device *dev)
 	struct nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 
 	if (priv->last_access_wr) {
-		nv_wr32(0x070000, 0x00000001);
+		nv_wr32(dev, 0x070000, 0x00000001);
 		if (!nv_wait(0x070000, 0x00000001, 0x00000000))
 			NV_ERROR(dev, "PRAMIN flush timeout\n");
 	}

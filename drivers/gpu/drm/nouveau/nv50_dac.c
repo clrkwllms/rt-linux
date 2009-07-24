@@ -63,16 +63,16 @@ nv50_dac_detect(struct drm_encoder *drm_encoder,
 	uint32_t dpms_state, load_pattern, load_state;
 	int or = encoder->or;
 
-	nv_wr32(NV50_PDISPLAY_DAC_CLK_CTRL1(or), 0x00000001);
-	dpms_state = nv_rd32(NV50_PDISPLAY_DAC_DPMS_CTRL(or));
+	nv_wr32(dev, NV50_PDISPLAY_DAC_CLK_CTRL1(or), 0x00000001);
+	dpms_state = nv_rd32(dev, NV50_PDISPLAY_DAC_DPMS_CTRL(or));
 
-	nv_wr32(NV50_PDISPLAY_DAC_DPMS_CTRL(or),
+	nv_wr32(dev, NV50_PDISPLAY_DAC_DPMS_CTRL(or),
 		0x00150000 | NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING);
 	if (!nv_wait(NV50_PDISPLAY_DAC_DPMS_CTRL(or),
 		     NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING, 0)) {
 		NV_ERROR(dev, "timeout: DAC_DPMS_CTRL_PENDING(%d) == 0\n", or);
 		NV_ERROR(dev, "DAC_DPMS_CTRL(%d) = 0x%08x\n", or,
-			  nv_rd32(NV50_PDISPLAY_DAC_DPMS_CTRL(or)));
+			  nv_rd32(dev, NV50_PDISPLAY_DAC_DPMS_CTRL(or)));
 		return status;
 	}
 
@@ -87,13 +87,13 @@ nv50_dac_detect(struct drm_encoder *drm_encoder,
 			 load_pattern);
 	}
 
-	nv_wr32(NV50_PDISPLAY_DAC_LOAD_CTRL(or),
+	nv_wr32(dev, NV50_PDISPLAY_DAC_LOAD_CTRL(or),
 		NV50_PDISPLAY_DAC_LOAD_CTRL_ACTIVE | load_pattern);
 	mdelay(45); /* give it some time to process */
-	load_state = nv_rd32(NV50_PDISPLAY_DAC_LOAD_CTRL(or));
+	load_state = nv_rd32(dev, NV50_PDISPLAY_DAC_LOAD_CTRL(or));
 
-	nv_wr32(NV50_PDISPLAY_DAC_LOAD_CTRL(or), 0);
-	nv_wr32(NV50_PDISPLAY_DAC_DPMS_CTRL(or), dpms_state |
+	nv_wr32(dev, NV50_PDISPLAY_DAC_LOAD_CTRL(or), 0);
+	nv_wr32(dev, NV50_PDISPLAY_DAC_DPMS_CTRL(or), dpms_state |
 		NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING);
 
 	if ((load_state & NV50_PDISPLAY_DAC_LOAD_CTRL_PRESENT) ==
@@ -128,11 +128,11 @@ static void nv50_dac_dpms(struct drm_encoder *drm_encoder, int mode)
 		     NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING, 0)) {
 		NV_ERROR(dev, "timeout: DAC_DPMS_CTRL_PENDING(%d) == 0\n", or);
 		NV_ERROR(dev, "DAC_DPMS_CTRL(%d) = 0x%08x\n", or,
-			  nv_rd32(NV50_PDISPLAY_DAC_DPMS_CTRL(or)));
+			  nv_rd32(dev, NV50_PDISPLAY_DAC_DPMS_CTRL(or)));
 		return;
 	}
 
-	val = nv_rd32(NV50_PDISPLAY_DAC_DPMS_CTRL(or)) & ~0x7F;
+	val = nv_rd32(dev, NV50_PDISPLAY_DAC_DPMS_CTRL(or)) & ~0x7F;
 
 	if (mode != DRM_MODE_DPMS_ON)
 		val |= NV50_PDISPLAY_DAC_DPMS_CTRL_BLANKED;
@@ -153,7 +153,7 @@ static void nv50_dac_dpms(struct drm_encoder *drm_encoder, int mode)
 		break;
 	}
 
-	nv_wr32(NV50_PDISPLAY_DAC_DPMS_CTRL(or), val |
+	nv_wr32(dev, NV50_PDISPLAY_DAC_DPMS_CTRL(or), val |
 		NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING);
 }
 

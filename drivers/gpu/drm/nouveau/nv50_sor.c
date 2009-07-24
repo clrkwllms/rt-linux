@@ -75,23 +75,23 @@ static void nv50_sor_dpms(struct drm_encoder *drm_encoder, int mode)
 		     NV50_PDISPLAY_SOR_DPMS_CTRL_PENDING, 0)) {
 		NV_ERROR(dev, "timeout: SOR_DPMS_CTRL_PENDING(%d) == 0\n", or);
 		NV_ERROR(dev, "SOR_DPMS_CTRL(%d) = 0x%08x\n", or,
-			 nv_rd32(NV50_PDISPLAY_SOR_DPMS_CTRL(or)));
+			 nv_rd32(dev, NV50_PDISPLAY_SOR_DPMS_CTRL(or)));
 	}
 
-	val = nv_rd32(NV50_PDISPLAY_SOR_DPMS_CTRL(or));
+	val = nv_rd32(dev, NV50_PDISPLAY_SOR_DPMS_CTRL(or));
 
 	if (mode == DRM_MODE_DPMS_ON)
 		val |= NV50_PDISPLAY_SOR_DPMS_CTRL_ON;
 	else
 		val &= ~NV50_PDISPLAY_SOR_DPMS_CTRL_ON;
 
-	nv_wr32(NV50_PDISPLAY_SOR_DPMS_CTRL(or), val |
+	nv_wr32(dev, NV50_PDISPLAY_SOR_DPMS_CTRL(or), val |
 		NV50_PDISPLAY_SOR_DPMS_CTRL_PENDING);
 	if (!nv_wait(NV50_PDISPLAY_SOR_DPMS_STATE(or),
 		     NV50_PDISPLAY_SOR_DPMS_STATE_WAIT, 0)) {
 		NV_ERROR(dev, "timeout: SOR_DPMS_STATE_WAIT(%d) == 0\n", or);
 		NV_ERROR(dev, "SOR_DPMS_STATE(%d) = 0x%08x\n", or,
-			 nv_rd32(NV50_PDISPLAY_SOR_DPMS_STATE(or)));
+			 nv_rd32(dev, NV50_PDISPLAY_SOR_DPMS_STATE(or)));
 	}
 }
 

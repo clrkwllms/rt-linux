@@ -135,11 +135,11 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	engine->graph.fifo_access(dev, false);
 	nouveau_wait_for_idle(dev);
 
-	nv_wr32(NV03_PFIFO_CACHES, 0x00000000);
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, nv_rd32(
+	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH, nv_rd32(dev,
 		NV04_PFIFO_CACHE1_DMA_PUSH) & ~1);
-	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
-	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000000);
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000000);
 
 	i = engine->fifo.channel_id(dev);
 	NV_INFO(dev, "Last active channel was %d\n", i);
@@ -236,12 +236,12 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	}
 
 	NV_INFO(dev, "Re-enabling acceleration..\n");
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
-		 nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	nv_wr32(NV04_PFIFO_CACHE1_PULL1, 0x00000001);
-	nv_wr32(NV03_PFIFO_CACHES, 1);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
+		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000001);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL1, 0x00000001);
+	nv_wr32(dev, NV03_PFIFO_CACHES, 1);
 
 	engine->graph.fifo_access(dev, true);
 

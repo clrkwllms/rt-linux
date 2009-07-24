@@ -272,7 +272,7 @@ nouveau_card_init(struct drm_device *dev)
 		dev_priv->chipset = dev_priv->card_type;
 	else
 		dev_priv->chipset =
-			(nv_rd32(NV03_PMC_BOOT_0) & 0x0ff00000) >> 20;
+			(nv_rd32(dev, NV03_PMC_BOOT_0) & 0x0ff00000) >> 20;
 
 	/* Initialise internal driver API hooks */
 	ret = nouveau_init_engine_ptrs(dev);
@@ -487,14 +487,14 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 
 #if defined(__powerpc__)
 	/* Put the card in BE mode if it's not */
-	if (nv_rd32(NV03_PMC_BOOT_1))
-		nv_wr32(NV03_PMC_BOOT_1,0x00000001);
+	if (nv_rd32(dev, NV03_PMC_BOOT_1))
+		nv_wr32(dev, NV03_PMC_BOOT_1, 0x00000001);
 
 	DRM_MEMORYBARRIER();
 #endif
 
 	/* Time to determine the card architecture */
-	reg0 = nv_rd32(NV03_PMC_BOOT_0);
+	reg0 = nv_rd32(dev, NV03_PMC_BOOT_0);
 
 	/* We're dealing with >=NV10 */
 	if ((reg0 & 0x0f000000) > 0 ) {
@@ -776,7 +776,7 @@ bool nouveau_wait_until(struct drm_device *dev, uint64_t timeout,
 	uint64_t start = ptimer->read(dev);
 
 	do {
-		if ((nv_rd32(reg) & mask) == val)
+		if ((nv_rd32(dev, reg) & mask) == val)
 			return true;
 	} while (ptimer->read(dev) - start < timeout);
 
@@ -788,7 +788,7 @@ bool nouveau_wait_for_idle(struct drm_device *dev)
 {
 	if (!nv_wait(NV04_PGRAPH_STATUS, 0xffffffff, 0x00000000)) {
 		NV_ERROR(dev, "timed out with status 0x%08x\n",
-			 nv_rd32(NV04_PGRAPH_STATUS));
+			 nv_rd32(dev, NV04_PGRAPH_STATUS));
 		return false;
 	}
 
@@ -829,22 +829,24 @@ static int nouveau_suspend(struct drm_device *dev)
 	}
 	nouveau_wait_for_idle(dev);
 
-	nv_wr32(NV04_PGRAPH_FIFO, 0);
+	nv_wr32(dev, NV04_PGRAPH_FIFO, 0);
 	/* disable the fifo caches */
-	nv_wr32(NV03_PFIFO_CACHES, 0x00000000);
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
-		 nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) & ~1);
-	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
-	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000000);
+	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
+		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) & ~1);
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000000);
 
-	susres->fifo_mode = nv_rd32(NV04_PFIFO_MODE);
+	susres->fifo_mode = nv_rd32(dev, NV04_PFIFO_MODE);
 
 	if (dev_priv->card_type >= NV_10) {
-		susres->graph_state = nv_rd32(NV10_PGRAPH_STATE);
-		susres->graph_ctx_control = nv_rd32(NV10_PGRAPH_CTX_CONTROL);
+		susres->graph_state = nv_rd32(dev, NV10_PGRAPH_STATE);
+		susres->graph_ctx_control = nv_rd32(dev,
+						NV10_PGRAPH_CTX_CONTROL);
 	} else {
-		susres->graph_state = nv_rd32(NV04_PGRAPH_STATE);
-		susres->graph_ctx_control = nv_rd32(NV04_PGRAPH_CTX_CONTROL);
+		susres->graph_state = nv_rd32(dev, NV04_PGRAPH_STATE);
+		susres->graph_ctx_control = nv_rd32(dev,
+						NV04_PGRAPH_CTX_CONTROL);
 	}
 
 	engine->fifo.save_context(dev_priv->fifos[engine->fifo.channel_id(dev)]);
@@ -857,12 +859,12 @@ static int nouveau_suspend(struct drm_device *dev)
 	engine->instmem.finish_access(dev);
 
 	/* reenable the fifo caches */
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
-		 nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	nv_wr32(NV03_PFIFO_CACHES, 0x00000001);
-	nv_wr32(NV04_PGRAPH_FIFO, 1);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
+		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000001);
+	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000001);
+	nv_wr32(dev, NV04_PGRAPH_FIFO, 1);
 
 	return 0;
 }
@@ -906,13 +908,13 @@ static int nouveau_resume(struct drm_device *dev)
 	engine->graph.init(dev);
 	engine->fifo.init(dev);
 
-	nv_wr32(NV04_PGRAPH_FIFO, 0);
+	nv_wr32(dev, NV04_PGRAPH_FIFO, 0);
 	/* disable the fifo caches */
-	nv_wr32(NV03_PFIFO_CACHES, 0x00000000);
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
-		 nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) & ~1);
-	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
-	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000000);
+	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
+		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) & ~1);
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000000);
 
 	/* PMC power cycling PFIFO in init clobbers some of the stuff stored in
 	 * PRAMIN (such as NV04_PFIFO_CACHE1_DMA_INSTANCE). this is unhelpful
@@ -923,26 +925,28 @@ static int nouveau_resume(struct drm_device *dev)
 	dev_priv->engine.instmem.finish_access(dev);
 
 	engine->fifo.load_context(dev_priv->fifos[0]);
-	nv_wr32(NV04_PFIFO_MODE, susres->fifo_mode);
+	nv_wr32(dev, NV04_PFIFO_MODE, susres->fifo_mode);
 
 	engine->graph.load_context(dev_priv->fifos[0]);
 	nouveau_wait_for_idle(dev);
 
 	if (dev_priv->card_type >= NV_10) {
-		nv_wr32(NV10_PGRAPH_STATE, susres->graph_state);
-		nv_wr32(NV10_PGRAPH_CTX_CONTROL, susres->graph_ctx_control);
+		nv_wr32(dev, NV10_PGRAPH_STATE, susres->graph_state);
+		nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL,
+						susres->graph_ctx_control);
 	} else {
-		nv_wr32(NV04_PGRAPH_STATE, susres->graph_state);
-		nv_wr32(NV04_PGRAPH_CTX_CONTROL, susres->graph_ctx_control);
+		nv_wr32(dev, NV04_PGRAPH_STATE, susres->graph_state);
+		nv_wr32(dev, NV04_PGRAPH_CTX_CONTROL,
+						susres->graph_ctx_control);
 	}
 
 	/* reenable the fifo caches */
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
-		 nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	nv_wr32(NV03_PFIFO_CACHES, 0x00000001);
-	nv_wr32(NV04_PGRAPH_FIFO, 0x1);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
+		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000001);
+	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000001);
+	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x1);
 
 	if (dev->irq_enabled)
 		nouveau_irq_postinstall(dev);

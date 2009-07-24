@@ -38,8 +38,8 @@ nv50_graph_init_reset(struct drm_device *dev)
 
 	NV_DEBUG(dev, "\n");
 
-	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) & ~pmc_e);
-	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) |  pmc_e);
+	nv_wr32(dev, NV03_PMC_ENABLE, nv_rd32(dev, NV03_PMC_ENABLE) & ~pmc_e);
+	nv_wr32(dev, NV03_PMC_ENABLE, nv_rd32(dev, NV03_PMC_ENABLE) |  pmc_e);
 }
 
 static void
@@ -47,9 +47,9 @@ nv50_graph_init_intr(struct drm_device *dev)
 {
 	NV_DEBUG(dev, "\n");
 
-	nv_wr32(NV03_PGRAPH_INTR, 0xffffffff);
-	nv_wr32(0x400138, 0xffffffff);
-	nv_wr32(NV40_PGRAPH_INTR_EN, 0xffffffff);
+	nv_wr32(dev, NV03_PGRAPH_INTR, 0xffffffff);
+	nv_wr32(dev, 0x400138, 0xffffffff);
+	nv_wr32(dev, NV40_PGRAPH_INTR_EN, 0xffffffff);
 }
 
 static void
@@ -57,17 +57,17 @@ nv50_graph_init_regs__nv(struct drm_device *dev)
 {
 	NV_DEBUG(dev, "\n");
 
-	nv_wr32(0x400804, 0xc0000000);
-	nv_wr32(0x406800, 0xc0000000);
-	nv_wr32(0x400c04, 0xc0000000);
-	nv_wr32(0x401804, 0xc0000000);
-	nv_wr32(0x405018, 0xc0000000);
-	nv_wr32(0x402000, 0xc0000000);
+	nv_wr32(dev, 0x400804, 0xc0000000);
+	nv_wr32(dev, 0x406800, 0xc0000000);
+	nv_wr32(dev, 0x400c04, 0xc0000000);
+	nv_wr32(dev, 0x401804, 0xc0000000);
+	nv_wr32(dev, 0x405018, 0xc0000000);
+	nv_wr32(dev, 0x402000, 0xc0000000);
 
-	nv_wr32(0x400108, 0xffffffff);
+	nv_wr32(dev, 0x400108, 0xffffffff);
 
-	nv_wr32(0x400824, 0x00004000);
-	nv_wr32(0x400500, 0x00000000);
+	nv_wr32(dev, 0x400824, 0x00004000);
+	nv_wr32(dev, 0x400500, 0x00000000);
 }
 
 static void
@@ -75,8 +75,9 @@ nv50_graph_init_regs(struct drm_device *dev)
 {
 	NV_DEBUG(dev, "\n");
 
-	nv_wr32(NV04_PGRAPH_DEBUG_3, (1<<2) /* HW_CONTEXT_SWITCH_ENABLED */);
-	nv_wr32(0x402ca8, 0x800);
+	nv_wr32(dev, NV04_PGRAPH_DEBUG_3,
+				(1 << 2) /* HW_CONTEXT_SWITCH_ENABLED */);
+	nv_wr32(dev, 0x402ca8, 0x800);
 }
 
 static int
@@ -121,15 +122,15 @@ nv50_graph_init_ctxctl(struct drm_device *dev)
 		return -EINVAL;
 	}
 
-	nv_wr32(NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
+	nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
 	while (*voodoo != ~0) {
-		nv_wr32(NV40_PGRAPH_CTXCTL_UCODE_DATA, *voodoo);
+		nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_DATA, *voodoo);
 		voodoo++;
 	}
 
-	nv_wr32(0x400320, 4);
-	nv_wr32(NV40_PGRAPH_CTXCTL_CUR, 0);
-	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, 0);
+	nv_wr32(dev, 0x400320, 4);
+	nv_wr32(dev, NV40_PGRAPH_CTXCTL_CUR, 0);
+	nv_wr32(dev, NV20_PGRAPH_CHANNEL_CTX_POINTER, 0);
 
 	return 0;
 }
@@ -165,9 +166,9 @@ nv50_graph_fifo_access(struct drm_device *dev, bool enabled)
 	const uint32_t mask = 0x00010001;
 
 	if (enabled)
-		nv_wr32(0x400500, nv_rd32(0x400500) | mask);
+		nv_wr32(dev, 0x400500, nv_rd32(dev, 0x400500) | mask);
 	else
-		nv_wr32(0x400500, nv_rd32(0x400500) & ~mask);
+		nv_wr32(dev, 0x400500, nv_rd32(dev, 0x400500) & ~mask);
 }
 
 int
@@ -281,20 +282,20 @@ nv50_graph_destroy_context(struct nouveau_channel *chan)
 static int
 nv50_graph_do_load_context(struct drm_device *dev, uint32_t inst)
 {
-	uint32_t fifo = nv_rd32(0x400500);
+	uint32_t fifo = nv_rd32(dev, 0x400500);
 
-	nv_wr32(0x400500, fifo & ~1);
-	nv_wr32(0x400784, inst);
-	nv_wr32(0x400824, nv_rd32(0x400824) | 0x40);
-	nv_wr32(0x400320, nv_rd32(0x400320) | 0x11);
-	nv_wr32(0x400040, 0xffffffff);
-	(void)nv_rd32(0x400040);
-	nv_wr32(0x400040, 0x00000000);
-	nv_wr32(0x400304, nv_rd32(0x400304) | 1);
+	nv_wr32(dev, 0x400500, fifo & ~1);
+	nv_wr32(dev, 0x400784, inst);
+	nv_wr32(dev, 0x400824, nv_rd32(dev, 0x400824) | 0x40);
+	nv_wr32(dev, 0x400320, nv_rd32(dev, 0x400320) | 0x11);
+	nv_wr32(dev, 0x400040, 0xffffffff);
+	(void)nv_rd32(dev, 0x400040);
+	nv_wr32(dev, 0x400040, 0x00000000);
+	nv_wr32(dev, 0x400304, nv_rd32(dev, 0x400304) | 1);
 
 	if (nouveau_wait_for_idle(dev))
-		nv_wr32(0x40032c, inst | (1<<31));
-	nv_wr32(0x400500, fifo);
+		nv_wr32(dev, 0x40032c, inst | (1<<31));
+	nv_wr32(dev, 0x400500, fifo);
 	return 0;
 }
 
@@ -310,15 +311,15 @@ nv50_graph_load_context(struct nouveau_channel *chan)
 static int
 nv50_graph_do_save_context(struct drm_device *dev, uint32_t inst)
 {
-	uint32_t fifo = nv_rd32(0x400500);
+	uint32_t fifo = nv_rd32(dev, 0x400500);
 
-	nv_wr32(0x400500, fifo & ~1);
-	nv_wr32(0x400784, inst);
-	nv_wr32(0x400824, nv_rd32(0x400824) | 0x20);
-	nv_wr32(0x400304, nv_rd32(0x400304) | 0x01);
+	nv_wr32(dev, 0x400500, fifo & ~1);
+	nv_wr32(dev, 0x400784, inst);
+	nv_wr32(dev, 0x400824, nv_rd32(dev, 0x400824) | 0x20);
+	nv_wr32(dev, 0x400304, nv_rd32(dev, 0x400304) | 0x01);
 	nouveau_wait_for_idle(dev);
 
-	nv_wr32(0x400500, fifo);
+	nv_wr32(dev, 0x400500, fifo);
 	return 0;
 }
 
@@ -336,17 +337,19 @@ nv50_graph_context_switch(struct drm_device *dev)
 {
 	uint32_t inst;
 
-	inst = nv_rd32(NV50_PGRAPH_CTXCTL_CUR);
+	inst = nv_rd32(dev, NV50_PGRAPH_CTXCTL_CUR);
 	if (inst & NV50_PGRAPH_CTXCTL_CUR_LOADED)
 		nv50_graph_do_save_context(dev, inst);
-	nv_wr32(NV50_PGRAPH_CTXCTL_CUR, inst & NV50_PGRAPH_CTXCTL_CUR_INSTANCE);
+	nv_wr32(dev, NV50_PGRAPH_CTXCTL_CUR,
+				inst & NV50_PGRAPH_CTXCTL_CUR_INSTANCE);
 
-	inst = nv_rd32(NV50_PGRAPH_CTXCTL_NEXT) &
+	inst = nv_rd32(dev, NV50_PGRAPH_CTXCTL_NEXT) &
 		       NV50_PGRAPH_CTXCTL_NEXT_INSTANCE;
 	nv50_graph_do_load_context(dev, inst);
-	nv_wr32(NV50_PGRAPH_CTXCTL_CUR, inst | NV50_PGRAPH_CTXCTL_CUR_LOADED);
+	nv_wr32(dev, NV50_PGRAPH_CTXCTL_CUR,
+				inst | NV50_PGRAPH_CTXCTL_CUR_LOADED);
 
-	nv_wr32(NV40_PGRAPH_INTR_EN, nv_rd32(
+	nv_wr32(dev, NV40_PGRAPH_INTR_EN, nv_rd32(dev,
 		NV40_PGRAPH_INTR_EN) | NV_PGRAPH_INTR_CONTEXT_SWITCH);
 }
 
@@ -396,11 +399,12 @@ nv50_graph_nvsw_vblsem_release(struct nouveau_channel *chan, int grclass,
 	if (!chan->nvsw.vblsem || chan->nvsw.vblsem_offset == ~0 || data > 1)
 		return -EINVAL;
 
-	if (!(nv_rd32(NV50_PDISPLAY_INTR_EN) &
+	if (!(nv_rd32(dev, NV50_PDISPLAY_INTR_EN) &
 		      NV50_PDISPLAY_INTR_EN_VBLANK_CRTC_(data))) {
-		nv_wr32(NV50_PDISPLAY_INTR,
+		nv_wr32(dev, NV50_PDISPLAY_INTR,
 			NV50_PDISPLAY_INTR_VBLANK_CRTC_(data));
-		nv_wr32(NV50_PDISPLAY_INTR_EN, nv_rd32(NV50_PDISPLAY_INTR_EN) |
+		nv_wr32(dev, NV50_PDISPLAY_INTR_EN,
+			nv_rd32(dev, NV50_PDISPLAY_INTR_EN) |
 			NV50_PDISPLAY_INTR_EN_VBLANK_CRTC_(data));
 	}
 

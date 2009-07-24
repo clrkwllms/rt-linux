@@ -963,11 +963,13 @@ nv_save_state_palette(struct drm_device *dev, int head,
 {
 	int head_offset = head * NV_PRMDIO_SIZE, i;
 
-	nv_wr08(NV_PRMDIO_PIXEL_MASK + head_offset, NV_PRMDIO_PIXEL_MASK_MASK);
-	nv_wr08(NV_PRMDIO_READ_MODE_ADDRESS + head_offset, 0x0);
+	nv_wr08(dev, NV_PRMDIO_PIXEL_MASK + head_offset,
+				NV_PRMDIO_PIXEL_MASK_MASK);
+	nv_wr08(dev, NV_PRMDIO_READ_MODE_ADDRESS + head_offset, 0x0);
 
 	for (i = 0; i < 768; i++) {
-		state->crtc_reg[head].DAC[i] = nv_rd08(NV_PRMDIO_PALETTE_DATA + head_offset);
+		state->crtc_reg[head].DAC[i] = nv_rd08(dev,
+				NV_PRMDIO_PALETTE_DATA + head_offset);
 	}
 
 	NVSetEnablePalette(dev, head, false);
@@ -979,11 +981,13 @@ nouveau_hw_load_state_palette(struct drm_device *dev, int head,
 {
 	int head_offset = head * NV_PRMDIO_SIZE, i;
 
-	nv_wr08(NV_PRMDIO_PIXEL_MASK + head_offset, NV_PRMDIO_PIXEL_MASK_MASK);
-	nv_wr08(NV_PRMDIO_WRITE_MODE_ADDRESS + head_offset, 0x0);
+	nv_wr08(dev, NV_PRMDIO_PIXEL_MASK + head_offset,
+				NV_PRMDIO_PIXEL_MASK_MASK);
+	nv_wr08(dev, NV_PRMDIO_WRITE_MODE_ADDRESS + head_offset, 0x0);
 
 	for (i = 0; i < 768; i++) {
-		nv_wr08(NV_PRMDIO_PALETTE_DATA + head_offset, state->crtc_reg[head].DAC[i]);
+		nv_wr08(dev, NV_PRMDIO_PALETTE_DATA + head_offset,
+				state->crtc_reg[head].DAC[i]);
 	}
 
 	NVSetEnablePalette(dev, head, false);

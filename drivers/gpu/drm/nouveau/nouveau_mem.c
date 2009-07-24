@@ -355,10 +355,12 @@ uint64_t nouveau_mem_fb_amount(struct drm_device *dev)
 	{
 		case NV_04:
 		case NV_05:
-			if (nv_rd32(NV03_BOOT_0) & 0x00000100) {
-				return (((nv_rd32(NV03_BOOT_0) >> 12) & 0xf)*2+2)*1024*1024;
+			if (nv_rd32(dev, NV03_BOOT_0) & 0x00000100) {
+				return (((nv_rd32(dev, NV03_BOOT_0) >> 12) &
+						0xf) * 2 + 2) * 1024 * 1024;
 			} else
-			switch(nv_rd32(NV03_BOOT_0)&NV03_BOOT_0_RAM_AMOUNT)
+			switch (nv_rd32(dev, NV03_BOOT_0) &
+						NV03_BOOT_0_RAM_AMOUNT)
 			{
 				case NV04_BOOT_0_RAM_AMOUNT_32MB:
 					return 32*1024*1024;
@@ -384,7 +386,7 @@ uint64_t nouveau_mem_fb_amount(struct drm_device *dev)
 			} else {
 				uint64_t mem;
 
-				mem = (nv_rd32(NV04_FIFO_DATA) &
+				mem = (nv_rd32(dev, NV04_FIFO_DATA) &
 				       NV10_FIFO_DATA_RAM_AMOUNT_MB_MASK) >>
 				      NV10_FIFO_DATA_RAM_AMOUNT_MB_SHIFT;
 				return mem*1024*1024;
@@ -400,25 +402,26 @@ static void nouveau_mem_reset_agp(struct drm_device *dev)
 {
 	uint32_t saved_pci_nv_1, saved_pci_nv_19, pmc_enable;
 
-	saved_pci_nv_1 = nv_rd32(NV04_PBUS_PCI_NV_1);
-	saved_pci_nv_19 = nv_rd32(NV04_PBUS_PCI_NV_19);
+	saved_pci_nv_1 = nv_rd32(dev, NV04_PBUS_PCI_NV_1);
+	saved_pci_nv_19 = nv_rd32(dev, NV04_PBUS_PCI_NV_19);
 
 	/* clear busmaster bit */
-	nv_wr32(NV04_PBUS_PCI_NV_1, saved_pci_nv_1 & ~0x4);
+	nv_wr32(dev, NV04_PBUS_PCI_NV_1, saved_pci_nv_1 & ~0x4);
 	/* clear SBA and AGP bits */
-	nv_wr32(NV04_PBUS_PCI_NV_19, saved_pci_nv_19 & 0xfffff0ff);
+	nv_wr32(dev, NV04_PBUS_PCI_NV_19, saved_pci_nv_19 & 0xfffff0ff);
 
 	/* power cycle pgraph, if enabled */
-	pmc_enable = nv_rd32(NV03_PMC_ENABLE);
+	pmc_enable = nv_rd32(dev, NV03_PMC_ENABLE);
 	if (pmc_enable & NV_PMC_ENABLE_PGRAPH) {
-		nv_wr32(NV03_PMC_ENABLE, pmc_enable & ~NV_PMC_ENABLE_PGRAPH);
-		nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) |
+		nv_wr32(dev, NV03_PMC_ENABLE,
+				pmc_enable & ~NV_PMC_ENABLE_PGRAPH);
+		nv_wr32(dev, NV03_PMC_ENABLE, nv_rd32(dev, NV03_PMC_ENABLE) |
 				NV_PMC_ENABLE_PGRAPH);
 	}
 
 	/* and restore (gives effect of resetting AGP) */
-	nv_wr32(NV04_PBUS_PCI_NV_19, saved_pci_nv_19);
-	nv_wr32(NV04_PBUS_PCI_NV_1, saved_pci_nv_1);
+	nv_wr32(dev, NV04_PBUS_PCI_NV_19, saved_pci_nv_19);
+	nv_wr32(dev, NV04_PBUS_PCI_NV_1, saved_pci_nv_1);
 }
 
 int

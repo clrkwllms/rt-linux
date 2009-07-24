@@ -11,7 +11,7 @@ nv04_fb_init(struct drm_device *dev)
 	 * (which was 0x701114 in this case)
 	 */
 
-	nv_wr32(NV04_PFB_CFG0, 0x1114);
+	nv_wr32(dev, NV04_PFB_CFG0, 0x1114);
 	return 0;
 }
 

@@ -636,10 +636,10 @@ int nv20_graph_load_context(struct nouveau_channel *chan)
 		return -EINVAL;
 	inst = chan->ramin_grctx->instance >> 4;
 
-	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
-	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_XFER,
+	nv_wr32(dev, NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
+	nv_wr32(dev, NV20_PGRAPH_CHANNEL_CTX_XFER,
 		 NV20_PGRAPH_CHANNEL_CTX_XFER_LOAD);
-	nv_wr32(NV10_PGRAPH_CTX_CONTROL, 0x10010100);
+	nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10010100);
 
 	nouveau_wait_for_idle(dev);
 	return 0;
@@ -654,8 +654,8 @@ int nv20_graph_save_context(struct nouveau_channel *chan)
 		return -EINVAL;
 	inst = chan->ramin_grctx->instance >> 4;
 
-	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
-	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_XFER,
+	nv_wr32(dev, NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
+	nv_wr32(dev, NV20_PGRAPH_CHANNEL_CTX_XFER,
 		 NV20_PGRAPH_CHANNEL_CTX_XFER_SAVE);
 
 	nouveau_wait_for_idle(dev);
@@ -672,9 +672,9 @@ static void nv20_graph_rdi(struct drm_device *dev) {
 		writecount = 15;
 	}
 
-	nv_wr32(NV10_PGRAPH_RDI_INDEX, rdi_index);
+	nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, rdi_index);
 	for (i = 0; i < writecount; i++)
-		nv_wr32(NV10_PGRAPH_RDI_DATA, 0);
+		nv_wr32(dev, NV10_PGRAPH_RDI_DATA, 0);
 
 	nouveau_wait_for_idle(dev);
 }
@@ -685,9 +685,9 @@ int nv20_graph_init(struct drm_device *dev) {
 	uint32_t tmp, vramsz;
 	int ret, i;
 
-	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) &
+	nv_wr32(dev, NV03_PMC_ENABLE, nv_rd32(dev, NV03_PMC_ENABLE) &
 			~NV_PMC_ENABLE_PGRAPH);
-	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) |
+	nv_wr32(dev, NV03_PMC_ENABLE, nv_rd32(dev, NV03_PMC_ENABLE) |
 			 NV_PMC_ENABLE_PGRAPH);
 
 	if (!dev_priv->ctx_table) {
@@ -700,93 +700,100 @@ int nv20_graph_init(struct drm_device *dev) {
 			return ret;
 	}
 
-	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_TABLE,
+	nv_wr32(dev, NV20_PGRAPH_CHANNEL_CTX_TABLE,
 		 dev_priv->ctx_table->instance >> 4);
 
 	nv20_graph_rdi(dev);
 
-	nv_wr32(NV03_PGRAPH_INTR   , 0xFFFFFFFF);
-	nv_wr32(NV03_PGRAPH_INTR_EN, 0xFFFFFFFF);
+	nv_wr32(dev, NV03_PGRAPH_INTR   , 0xFFFFFFFF);
+	nv_wr32(dev, NV03_PGRAPH_INTR_EN, 0xFFFFFFFF);
 
-	nv_wr32(NV04_PGRAPH_DEBUG_0, 0xFFFFFFFF);
-	nv_wr32(NV04_PGRAPH_DEBUG_0, 0x00000000);
-	nv_wr32(NV04_PGRAPH_DEBUG_1, 0x00118700);
-	nv_wr32(NV04_PGRAPH_DEBUG_3, 0xF3CE0475); /* 0x4 = auto ctx switch */
-	nv_wr32(NV10_PGRAPH_DEBUG_4, 0x00000000);
-	nv_wr32(0x40009C           , 0x00000040);
+	nv_wr32(dev, NV04_PGRAPH_DEBUG_0, 0xFFFFFFFF);
+	nv_wr32(dev, NV04_PGRAPH_DEBUG_0, 0x00000000);
+	nv_wr32(dev, NV04_PGRAPH_DEBUG_1, 0x00118700);
+	nv_wr32(dev, NV04_PGRAPH_DEBUG_3, 0xF3CE0475); /* 0x4 = auto ctx switch */
+	nv_wr32(dev, NV10_PGRAPH_DEBUG_4, 0x00000000);
+	nv_wr32(dev, 0x40009C           , 0x00000040);
 
 	if (dev_priv->chipset >= 0x25) {
-		nv_wr32(0x400890, 0x00080000);
-		nv_wr32(0x400610, 0x304B1FB6);
-		nv_wr32(0x400B80, 0x18B82880);
-		nv_wr32(0x400B84, 0x44000000);
-		nv_wr32(0x400098, 0x40000080);
-		nv_wr32(0x400B88, 0x000000ff);
+		nv_wr32(dev, 0x400890, 0x00080000);
+		nv_wr32(dev, 0x400610, 0x304B1FB6);
+		nv_wr32(dev, 0x400B80, 0x18B82880);
+		nv_wr32(dev, 0x400B84, 0x44000000);
+		nv_wr32(dev, 0x400098, 0x40000080);
+		nv_wr32(dev, 0x400B88, 0x000000ff);
 	} else {
-		nv_wr32(0x400880, 0x00080000); /* 0x0008c7df */
-		nv_wr32(0x400094, 0x00000005);
-		nv_wr32(0x400B80, 0x45CAA208); /* 0x45eae20e */
-		nv_wr32(0x400B84, 0x24000000);
-		nv_wr32(0x400098, 0x00000040);
-		nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00E00038);
-		nv_wr32(NV10_PGRAPH_RDI_DATA , 0x00000030);
-		nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00E10038);
-		nv_wr32(NV10_PGRAPH_RDI_DATA , 0x00000030);
+		nv_wr32(dev, 0x400880, 0x00080000); /* 0x0008c7df */
+		nv_wr32(dev, 0x400094, 0x00000005);
+		nv_wr32(dev, 0x400B80, 0x45CAA208); /* 0x45eae20e */
+		nv_wr32(dev, 0x400B84, 0x24000000);
+		nv_wr32(dev, 0x400098, 0x00000040);
+		nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00E00038);
+		nv_wr32(dev, NV10_PGRAPH_RDI_DATA , 0x00000030);
+		nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00E10038);
+		nv_wr32(dev, NV10_PGRAPH_RDI_DATA , 0x00000030);
 	}
 
 	/* copy tile info from PFB */
 	for (i = 0; i < NV10_PFB_TILE__SIZE; i++) {
-		nv_wr32(0x00400904 + i*0x10, nv_rd32(NV10_PFB_TLIMIT(i)));
+		nv_wr32(dev, 0x00400904 + i * 0x10,
+					nv_rd32(dev, NV10_PFB_TLIMIT(i)));
 			/* which is NV40_PGRAPH_TLIMIT0(i) ?? */
-		nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00EA0030+i*4);
-		nv_wr32(NV10_PGRAPH_RDI_DATA, nv_rd32(NV10_PFB_TLIMIT(i)));
-		nv_wr32(0x00400908 + i*0x10, nv_rd32(NV10_PFB_TSIZE(i)));
+		nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00EA0030 + i * 4);
+		nv_wr32(dev, NV10_PGRAPH_RDI_DATA,
+					nv_rd32(dev, NV10_PFB_TLIMIT(i)));
+		nv_wr32(dev, 0x00400908 + i * 0x10,
+					nv_rd32(dev, NV10_PFB_TSIZE(i)));
 			/* which is NV40_PGRAPH_TSIZE0(i) ?? */
-		nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00EA0050+i*4);
-		nv_wr32(NV10_PGRAPH_RDI_DATA, nv_rd32(NV10_PFB_TSIZE(i)));
-		nv_wr32(0x00400900 + i*0x10, nv_rd32(NV10_PFB_TILE(i)));
+		nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00EA0050 + i * 4);
+		nv_wr32(dev, NV10_PGRAPH_RDI_DATA,
+					nv_rd32(dev, NV10_PFB_TSIZE(i)));
+		nv_wr32(dev, 0x00400900 + i * 0x10,
+					nv_rd32(dev, NV10_PFB_TILE(i)));
 			/* which is NV40_PGRAPH_TILE0(i) ?? */
-		nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00EA0010+i*4);
-		nv_wr32(NV10_PGRAPH_RDI_DATA, nv_rd32(NV10_PFB_TILE(i)));
+		nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00EA0010 + i * 4);
+		nv_wr32(dev, NV10_PGRAPH_RDI_DATA,
+					nv_rd32(dev, NV10_PFB_TILE(i)));
 	}
 	for (i = 0; i < 8; i++) {
-		nv_wr32(0x400980+i*4, nv_rd32(0x100300+i*4));
-		nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00EA0090+i*4);
-		nv_wr32(NV10_PGRAPH_RDI_DATA, nv_rd32(0x100300+i*4));
+		nv_wr32(dev, 0x400980 + i * 4, nv_rd32(dev, 0x100300 + i * 4));
+		nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00EA0090 + i * 4);
+		nv_wr32(dev, NV10_PGRAPH_RDI_DATA,
+					nv_rd32(dev, 0x100300 + i * 4));
 	}
-	nv_wr32(0x4009a0, nv_rd32(0x100324));
-	nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00EA000C);
-	nv_wr32(NV10_PGRAPH_RDI_DATA, nv_rd32(0x100324));
+	nv_wr32(dev, 0x4009a0, nv_rd32(dev, 0x100324));
+	nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00EA000C);
+	nv_wr32(dev, NV10_PGRAPH_RDI_DATA, nv_rd32(dev, 0x100324));
 
-	nv_wr32(NV10_PGRAPH_CTX_CONTROL, 0x10000100);
-	nv_wr32(NV10_PGRAPH_STATE      , 0xFFFFFFFF);
+	nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10000100);
+	nv_wr32(dev, NV10_PGRAPH_STATE      , 0xFFFFFFFF);
 
-	tmp = nv_rd32(NV10_PGRAPH_SURFACE) & 0x0007ff00;
-	nv_wr32(NV10_PGRAPH_SURFACE, tmp);
-	tmp = nv_rd32(NV10_PGRAPH_SURFACE) | 0x00020100;
-	nv_wr32(NV10_PGRAPH_SURFACE, tmp);
+	tmp = nv_rd32(dev, NV10_PGRAPH_SURFACE) & 0x0007ff00;
+	nv_wr32(dev, NV10_PGRAPH_SURFACE, tmp);
+	tmp = nv_rd32(dev, NV10_PGRAPH_SURFACE) | 0x00020100;
+	nv_wr32(dev, NV10_PGRAPH_SURFACE, tmp);
 
 	/* begin RAM config */
 	vramsz = drm_get_resource_len(dev, 0) - 1;
-	nv_wr32(0x4009A4, nv_rd32(NV04_PFB_CFG0));
-	nv_wr32(0x4009A8, nv_rd32(NV04_PFB_CFG1));
-	nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00EA0000);
-	nv_wr32(NV10_PGRAPH_RDI_DATA , nv_rd32(NV04_PFB_CFG0));
-	nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00EA0004);
-	nv_wr32(NV10_PGRAPH_RDI_DATA , nv_rd32(NV04_PFB_CFG1));
-	nv_wr32(0x400820, 0);
-	nv_wr32(0x400824, 0);
-	nv_wr32(0x400864, vramsz-1);
-	nv_wr32(0x400868, vramsz-1);
+	nv_wr32(dev, 0x4009A4, nv_rd32(dev, NV04_PFB_CFG0));
+	nv_wr32(dev, 0x4009A8, nv_rd32(dev, NV04_PFB_CFG1));
+	nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00EA0000);
+	nv_wr32(dev, NV10_PGRAPH_RDI_DATA , nv_rd32(dev, NV04_PFB_CFG0));
+	nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00EA0004);
+	nv_wr32(dev, NV10_PGRAPH_RDI_DATA , nv_rd32(dev, NV04_PFB_CFG1));
+	nv_wr32(dev, 0x400820, 0);
+	nv_wr32(dev, 0x400824, 0);
+	nv_wr32(dev, 0x400864, vramsz - 1);
+	nv_wr32(dev, 0x400868, vramsz - 1);
 
 	/* interesting.. the below overwrites some of the tile setup above.. */
-	nv_wr32(0x400B20, 0x00000000);
-	nv_wr32(0x400B04, 0xFFFFFFFF);
+	nv_wr32(dev, 0x400B20, 0x00000000);
+	nv_wr32(dev, 0x400B04, 0xFFFFFFFF);
 
-	nv_wr32(NV03_PGRAPH_ABS_UCLIP_XMIN, 0);
-	nv_wr32(NV03_PGRAPH_ABS_UCLIP_YMIN, 0);
-	nv_wr32(NV03_PGRAPH_ABS_UCLIP_XMAX, 0x7fff);
-	nv_wr32(NV03_PGRAPH_ABS_UCLIP_YMAX, 0x7fff);
+	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_XMIN, 0);
+	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_YMIN, 0);
+	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_XMAX, 0x7fff);
+	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_YMAX, 0x7fff);
 
 	return 0;
 }
@@ -801,12 +808,11 @@ void nv20_graph_takedown(struct drm_device *dev)
 int nv30_graph_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-//	uint32_t vramsz, tmp;
 	int ret, i;
 
-	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) &
+	nv_wr32(dev, NV03_PMC_ENABLE, nv_rd32(dev, NV03_PMC_ENABLE) &
 			~NV_PMC_ENABLE_PGRAPH);
-	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) |
+	nv_wr32(dev, NV03_PMC_ENABLE, nv_rd32(dev, NV03_PMC_ENABLE) |
 			 NV_PMC_ENABLE_PGRAPH);
 
 	if (!dev_priv->ctx_table) {
@@ -819,88 +825,91 @@ int nv30_graph_init(struct drm_device *dev)
 			return ret;
 	}
 
-	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_TABLE,
+	nv_wr32(dev, NV20_PGRAPH_CHANNEL_CTX_TABLE,
 			dev_priv->ctx_table->instance >> 4);
 
-	nv_wr32(NV03_PGRAPH_INTR   , 0xFFFFFFFF);
-	nv_wr32(NV03_PGRAPH_INTR_EN, 0xFFFFFFFF);
+	nv_wr32(dev, NV03_PGRAPH_INTR   , 0xFFFFFFFF);
+	nv_wr32(dev, NV03_PGRAPH_INTR_EN, 0xFFFFFFFF);
 
-	nv_wr32(NV04_PGRAPH_DEBUG_0, 0xFFFFFFFF);
-	nv_wr32(NV04_PGRAPH_DEBUG_0, 0x00000000);
-	nv_wr32(NV04_PGRAPH_DEBUG_1, 0x401287c0);
-	nv_wr32(0x400890, 0x01b463ff);
-	nv_wr32(NV04_PGRAPH_DEBUG_3, 0xf2de0475);
-	nv_wr32(NV10_PGRAPH_DEBUG_4, 0x00008000);
-	nv_wr32(NV04_PGRAPH_LIMIT_VIOL_PIX, 0xf04bdff6);
-	nv_wr32(0x400B80, 0x1003d888);
-	nv_wr32(0x400B84, 0x0c000000);
-	nv_wr32(0x400098, 0x00000000);
-	nv_wr32(0x40009C, 0x0005ad00);
-	nv_wr32(0x400B88, 0x62ff00ff); // suspiciously like PGRAPH_DEBUG_2
-	nv_wr32(0x4000a0, 0x00000000);
-	nv_wr32(0x4000a4, 0x00000008);
-	nv_wr32(0x4008a8, 0xb784a400);
-	nv_wr32(0x400ba0, 0x002f8685);
-	nv_wr32(0x400ba4, 0x00231f3f);
-	nv_wr32(0x4008a4, 0x40000020);
+	nv_wr32(dev, NV04_PGRAPH_DEBUG_0, 0xFFFFFFFF);
+	nv_wr32(dev, NV04_PGRAPH_DEBUG_0, 0x00000000);
+	nv_wr32(dev, NV04_PGRAPH_DEBUG_1, 0x401287c0);
+	nv_wr32(dev, 0x400890, 0x01b463ff);
+	nv_wr32(dev, NV04_PGRAPH_DEBUG_3, 0xf2de0475);
+	nv_wr32(dev, NV10_PGRAPH_DEBUG_4, 0x00008000);
+	nv_wr32(dev, NV04_PGRAPH_LIMIT_VIOL_PIX, 0xf04bdff6);
+	nv_wr32(dev, 0x400B80, 0x1003d888);
+	nv_wr32(dev, 0x400B84, 0x0c000000);
+	nv_wr32(dev, 0x400098, 0x00000000);
+	nv_wr32(dev, 0x40009C, 0x0005ad00);
+	nv_wr32(dev, 0x400B88, 0x62ff00ff); /* suspiciously like PGRAPH_DEBUG_2 */
+	nv_wr32(dev, 0x4000a0, 0x00000000);
+	nv_wr32(dev, 0x4000a4, 0x00000008);
+	nv_wr32(dev, 0x4008a8, 0xb784a400);
+	nv_wr32(dev, 0x400ba0, 0x002f8685);
+	nv_wr32(dev, 0x400ba4, 0x00231f3f);
+	nv_wr32(dev, 0x4008a4, 0x40000020);
 
 	if (dev_priv->chipset == 0x34) {
-		nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00EA0004);
-		nv_wr32(NV10_PGRAPH_RDI_DATA , 0x00200201);
-		nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00EA0008);
-		nv_wr32(NV10_PGRAPH_RDI_DATA , 0x00000008);
-		nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00EA0000);
-		nv_wr32(NV10_PGRAPH_RDI_DATA , 0x00000032);
-		nv_wr32(NV10_PGRAPH_RDI_INDEX, 0x00E00004);
-		nv_wr32(NV10_PGRAPH_RDI_DATA , 0x00000002);
+		nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00EA0004);
+		nv_wr32(dev, NV10_PGRAPH_RDI_DATA , 0x00200201);
+		nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00EA0008);
+		nv_wr32(dev, NV10_PGRAPH_RDI_DATA , 0x00000008);
+		nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00EA0000);
+		nv_wr32(dev, NV10_PGRAPH_RDI_DATA , 0x00000032);
+		nv_wr32(dev, NV10_PGRAPH_RDI_INDEX, 0x00E00004);
+		nv_wr32(dev, NV10_PGRAPH_RDI_DATA , 0x00000002);
 	}
 
-	nv_wr32(0x4000c0, 0x00000016);
+	nv_wr32(dev, 0x4000c0, 0x00000016);
 
 	/* copy tile info from PFB */
 	for (i = 0; i < NV10_PFB_TILE__SIZE; i++) {
-		nv_wr32(0x00400904 + i*0x10, nv_rd32(NV10_PFB_TLIMIT(i)));
+		nv_wr32(dev, 0x00400904 + i * 0x10,
+					nv_rd32(dev, NV10_PFB_TLIMIT(i)));
 			/* which is NV40_PGRAPH_TLIMIT0(i) ?? */
-		nv_wr32(0x00400908 + i*0x10, nv_rd32(NV10_PFB_TSIZE(i)));
+		nv_wr32(dev, 0x00400908 + i * 0x10,
+					nv_rd32(dev, NV10_PFB_TSIZE(i)));
 			/* which is NV40_PGRAPH_TSIZE0(i) ?? */
-		nv_wr32(0x00400900 + i*0x10, nv_rd32(NV10_PFB_TILE(i)));
+		nv_wr32(dev, 0x00400900 + i * 0x10,
+					nv_rd32(dev, NV10_PFB_TILE(i)));
 			/* which is NV40_PGRAPH_TILE0(i) ?? */
 	}
 
-	nv_wr32(NV10_PGRAPH_CTX_CONTROL, 0x10000100);
-	nv_wr32(NV10_PGRAPH_STATE      , 0xFFFFFFFF);
-	nv_wr32(0x0040075c             , 0x00000001);
+	nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10000100);
+	nv_wr32(dev, NV10_PGRAPH_STATE      , 0xFFFFFFFF);
+	nv_wr32(dev, 0x0040075c             , 0x00000001);
 
 	/* begin RAM config */
-//	vramsz = drm_get_resource_len(dev, 0) - 1;
-	nv_wr32(0x4009A4, nv_rd32(NV04_PFB_CFG0));
-	nv_wr32(0x4009A8, nv_rd32(NV04_PFB_CFG1));
+	/* vramsz = drm_get_resource_len(dev, 0) - 1; */
+	nv_wr32(dev, 0x4009A4, nv_rd32(dev, NV04_PFB_CFG0));
+	nv_wr32(dev, 0x4009A8, nv_rd32(dev, NV04_PFB_CFG1));
 	if (dev_priv->chipset != 0x34) {
-		nv_wr32(0x400750, 0x00EA0000);
-		nv_wr32(0x400754, nv_rd32(NV04_PFB_CFG0));
-		nv_wr32(0x400750, 0x00EA0004);
-		nv_wr32(0x400754, nv_rd32(NV04_PFB_CFG1));
+		nv_wr32(dev, 0x400750, 0x00EA0000);
+		nv_wr32(dev, 0x400754, nv_rd32(dev, NV04_PFB_CFG0));
+		nv_wr32(dev, 0x400750, 0x00EA0004);
+		nv_wr32(dev, 0x400754, nv_rd32(dev, NV04_PFB_CFG1));
 	}
 
 #if 0
-	nv_wr32(0x400820, 0);
-	nv_wr32(0x400824, 0);
-	nv_wr32(0x400864, vramsz-1);
-	nv_wr32(0x400868, vramsz-1);
+	nv_wr32(dev, 0x400820, 0);
+	nv_wr32(dev, 0x400824, 0);
+	nv_wr32(dev, 0x400864, vramsz-1);
+	nv_wr32(dev, 0x400868, vramsz-1);
 
-	nv_wr32(0x400B20, 0x00000000);
-	nv_wr32(0x400B04, 0xFFFFFFFF);
+	nv_wr32(dev, 0x400B20, 0x00000000);
+	nv_wr32(dev, 0x400B04, 0xFFFFFFFF);
 
 	/* per-context state, doesn't belong here */
-	tmp = nv_rd32(NV10_PGRAPH_SURFACE) & 0x0007ff00;
-	nv_wr32(NV10_PGRAPH_SURFACE, tmp);
-	tmp = nv_rd32(NV10_PGRAPH_SURFACE) | 0x00020100;
-	nv_wr32(NV10_PGRAPH_SURFACE, tmp);
+	tmp = nv_rd32(dev, NV10_PGRAPH_SURFACE) & 0x0007ff00;
+	nv_wr32(dev, NV10_PGRAPH_SURFACE, tmp);
+	tmp = nv_rd32(dev, NV10_PGRAPH_SURFACE) | 0x00020100;
+	nv_wr32(dev, NV10_PGRAPH_SURFACE, tmp);
 
-	nv_wr32(NV03_PGRAPH_ABS_UCLIP_XMIN, 0);
-	nv_wr32(NV03_PGRAPH_ABS_UCLIP_YMIN, 0);
-	nv_wr32(NV03_PGRAPH_ABS_UCLIP_XMAX, 0x7fff);
-	nv_wr32(NV03_PGRAPH_ABS_UCLIP_YMAX, 0x7fff);
+	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_XMIN, 0);
+	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_YMIN, 0);
+	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_XMAX, 0x7fff);
+	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_YMAX, 0x7fff);
 #endif
 
 	return 0;

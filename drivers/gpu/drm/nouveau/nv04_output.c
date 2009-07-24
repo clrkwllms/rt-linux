@@ -100,14 +100,15 @@ static int sample_load_twice(struct drm_device *dev, bool sense[2])
 
 		udelay(100);
 		/* when level triggers, sense is _LO_ */
-		sense_a = nv_rd08(NV_PRMCIO_INP0) & 0x10;
+		sense_a = nv_rd08(dev, NV_PRMCIO_INP0) & 0x10;
 
 		/* take another reading until it agrees with sense_a... */
 		do {
 			udelay(100);
-			sense_b = nv_rd08(NV_PRMCIO_INP0) & 0x10;
+			sense_b = nv_rd08(dev, NV_PRMCIO_INP0) & 0x10;
 			if (sense_a != sense_b) {
-				sense_b_prime = nv_rd08(NV_PRMCIO_INP0) & 0x10;
+				sense_b_prime =
+					nv_rd08(dev, NV_PRMCIO_INP0) & 0x10;
 				if (sense_b == sense_b_prime) {
 					/* ... unless two consecutive subsequent
 					 * samples agree; sense_a is replaced */
@@ -161,11 +162,11 @@ static bool nv_legacy_load_detect(struct drm_device *dev)
 	saved_rpc1 = NVReadVgaCrtc(dev, 0, NV_CIO_CRE_RPC1_INDEX);
 	NVWriteVgaCrtc(dev, 0, NV_CIO_CRE_RPC1_INDEX, saved_rpc1 & ~0xc0);
 
-	nv_wr08(NV_PRMDIO_READ_MODE_ADDRESS, 0x0);
+	nv_wr08(dev, NV_PRMDIO_READ_MODE_ADDRESS, 0x0);
 	for (i = 0; i < 3; i++)
-		saved_palette0[i] = nv_rd08(NV_PRMDIO_PALETTE_DATA);
-	saved_palette_mask = nv_rd08(NV_PRMDIO_PIXEL_MASK);
-	nv_wr08(NV_PRMDIO_PIXEL_MASK, 0);
+		saved_palette0[i] = nv_rd08(dev, NV_PRMDIO_PALETTE_DATA);
+	saved_palette_mask = nv_rd08(dev, NV_PRMDIO_PIXEL_MASK);
+	nv_wr08(dev, NV_PRMDIO_PIXEL_MASK, 0);
 
 	saved_rgen_ctrl = NVReadRAMDAC(dev, 0, NV_PRAMDAC_GENERAL_CONTROL);
 	NVWriteRAMDAC(dev, 0, NV_PRAMDAC_GENERAL_CONTROL,
@@ -178,11 +179,11 @@ static bool nv_legacy_load_detect(struct drm_device *dev)
 	do {
 		bool sense_pair[2];
 
-		nv_wr08(NV_PRMDIO_WRITE_MODE_ADDRESS, 0);
-		nv_wr08(NV_PRMDIO_PALETTE_DATA, 0);
-		nv_wr08(NV_PRMDIO_PALETTE_DATA, 0);
+		nv_wr08(dev, NV_PRMDIO_WRITE_MODE_ADDRESS, 0);
+		nv_wr08(dev, NV_PRMDIO_PALETTE_DATA, 0);
+		nv_wr08(dev, NV_PRMDIO_PALETTE_DATA, 0);
 		/* testing blue won't find monochrome monitors.  I don't care */
-		nv_wr08(NV_PRMDIO_PALETTE_DATA, blue);
+		nv_wr08(dev, NV_PRMDIO_PALETTE_DATA, blue);
 
 		i = 0;
 		/* take sample pairs until both samples in the pair agree */
@@ -205,11 +206,11 @@ static bool nv_legacy_load_detect(struct drm_device *dev)
 	} while (++blue < 0x18 && sense);
 
 out:
-	nv_wr08(NV_PRMDIO_PIXEL_MASK, saved_palette_mask);
+	nv_wr08(dev, NV_PRMDIO_PIXEL_MASK, saved_palette_mask);
 	NVWriteRAMDAC(dev, 0, NV_PRAMDAC_GENERAL_CONTROL, saved_rgen_ctrl);
-	nv_wr08(NV_PRMDIO_WRITE_MODE_ADDRESS, 0);
+	nv_wr08(dev, NV_PRMDIO_WRITE_MODE_ADDRESS, 0);
 	for (i = 0; i < 3; i++)
-		nv_wr08(NV_PRMDIO_PALETTE_DATA, saved_palette0[i]);
+		nv_wr08(dev, NV_PRMDIO_PALETTE_DATA, saved_palette0[i]);
 	NVWriteRAMDAC(dev, 0, NV_PRAMDAC_TEST_CONTROL, saved_rtest_ctrl);
 	NVWriteVgaCrtc(dev, 0, NV_CIO_CRE_PIXEL_INDEX, saved_pi);
 	NVWriteVgaCrtc(dev, 0, NV_CIO_CRE_RPC1_INDEX, saved_rpc1);
