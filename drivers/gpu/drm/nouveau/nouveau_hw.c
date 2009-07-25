@@ -578,36 +578,36 @@ nouveau_hw_save_vga_fonts(struct drm_device *dev, bool save)
 	NVWriteVgaGr(dev, 0, NV_VIO_GX_READ_MAP_INDEX, 0x0);
 	for (i = 0; i < 16384; i++)
 		if (save)
-			dev_priv->saved_vga_font[0][i] = nv_rf32(i * 4);
+			dev_priv->saved_vga_font[0][i] = nv_rf32(dev, i * 4);
 		else
-			nv_wf32(i * 4, dev_priv->saved_vga_font[0][i]);
+			nv_wf32(dev, i * 4, dev_priv->saved_vga_font[0][i]);
 
 	/* store font in plane 1 */
 	NVWriteVgaSeq(dev, 0, NV_VIO_SR_PLANE_MASK_INDEX, 0x2);
 	NVWriteVgaGr(dev, 0, NV_VIO_GX_READ_MAP_INDEX, 0x1);
 	for (i = 0; i < 16384; i++)
 		if (save)
-			dev_priv->saved_vga_font[1][i] = nv_rf32(i * 4);
+			dev_priv->saved_vga_font[1][i] = nv_rf32(dev, i * 4);
 		else
-			nv_wf32(i * 4, dev_priv->saved_vga_font[1][i]);
+			nv_wf32(dev, i * 4, dev_priv->saved_vga_font[1][i]);
 
 	/* store font in plane 2 */
 	NVWriteVgaSeq(dev, 0, NV_VIO_SR_PLANE_MASK_INDEX, 0x4);
 	NVWriteVgaGr(dev, 0, NV_VIO_GX_READ_MAP_INDEX, 0x2);
 	for (i = 0; i < 16384; i++)
 		if (save)
-			dev_priv->saved_vga_font[2][i] = nv_rf32(i * 4);
+			dev_priv->saved_vga_font[2][i] = nv_rf32(dev, i * 4);
 		else
-			nv_wf32(i * 4, dev_priv->saved_vga_font[2][i]);
+			nv_wf32(dev, i * 4, dev_priv->saved_vga_font[2][i]);
 
 	/* store font in plane 3 */
 	NVWriteVgaSeq(dev, 0, NV_VIO_SR_PLANE_MASK_INDEX, 0x8);
 	NVWriteVgaGr(dev, 0, NV_VIO_GX_READ_MAP_INDEX, 0x3);
 	for (i = 0; i < 16384; i++)
 		if (save)
-			dev_priv->saved_vga_font[3][i] = nv_rf32(i * 4);
+			dev_priv->saved_vga_font[3][i] = nv_rf32(dev, i * 4);
 		else
-			nv_wf32(i * 4, dev_priv->saved_vga_font[3][i]);
+			nv_wf32(dev, i * 4, dev_priv->saved_vga_font[3][i]);
 
 	/* restore control regs */
 	NVWritePRMVIO(dev, 0, NV_PRMVIO_MISC__WRITE, misc);

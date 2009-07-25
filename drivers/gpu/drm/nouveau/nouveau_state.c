@@ -579,12 +579,10 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	}
 
 	/* map first 64KiB of VRAM, holds VGA fonts etc */
-	ret = drm_addmap(dev, drm_get_resource_start(dev, 1), 65536,
-			 _DRM_REGISTERS, _DRM_READ_ONLY | _DRM_DRIVER,
-			 &dev_priv->fb);
-	if (ret) {
-		NV_ERROR(dev, "Failed to map FB BAR: %d\n", ret);
-		return ret;
+	dev_priv->fb = ioremap(pci_resource_start(dev->pdev, 1), 65536);
+	if (!dev_priv->fb) {
+		NV_ERROR(dev, "Failed to map FB BAR\n");
+		return -ENOMEM;
 	}
 
 #if defined(__powerpc__)
@@ -656,7 +654,7 @@ int nouveau_unload(struct drm_device *dev)
 
 	iounmap(dev_priv->mmio);
 	drm_rmmap(dev, dev_priv->ramin);
-	drm_rmmap(dev, dev_priv->fb);
+	iounmap(dev_priv->fb);
 
 	kfree(dev_priv);
 	dev->dev_private = NULL;

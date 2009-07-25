@@ -448,7 +448,7 @@ struct drm_nouveau_private {
 	int flags;
 
 	void __iomem *mmio;
-	struct drm_local_map *fb;
+	void __iomem *fb;
 	struct drm_local_map *ramin;
 
 	struct work_struct irq_work;
@@ -998,10 +998,17 @@ static inline void nv_wr08(struct drm_device *dev, unsigned reg, u8 val)
 						 (mask), (val))
 
 /* VRAM access */
-#define nv_rf32(reg) nv_in32(fb, (reg))
-#define nv_wf32(reg,val) nv_out32(fb, (reg), (val))
-#define nv_rv32(reg) nv_rf32(reg)
-#define nv_wv32(reg,val) nv_wf32(reg, val)
+static inline u32 nv_rf32(struct drm_device *dev, unsigned reg)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	return ioread32_native(dev_priv->fb + reg);
+}
+
+static inline void nv_wf32(struct drm_device *dev, unsigned reg, u32 val)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	iowrite32_native(val, dev_priv->fb + reg);
+}
 
 /* PRAMIN access */
 #define nv_ri32(reg) nv_in32(ramin, (reg))
