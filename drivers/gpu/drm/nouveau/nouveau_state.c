@@ -454,6 +454,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 #endif
 	uint32_t reg0;
 	uint8_t architecture = 0;
+	resource_size_t mmio_start_offs;
 	int ret;
 
 	dev_priv = kzalloc(sizeof(*dev_priv), GFP_KERNEL);
@@ -474,16 +475,15 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	/* resource 6 is bios */
 
 	/* map the mmio regs */
-	ret = drm_addmap(dev, drm_get_resource_start(dev, 0),
-			 0x00800000, _DRM_REGISTERS, _DRM_READ_ONLY |
-			 _DRM_DRIVER, &dev_priv->mmio);
-	if (ret) {
-		NV_ERROR(dev, "Unable to initialize the mmio mapping (%d). "
-			      "Please report your setup to " DRIVER_EMAIL "\n",
-			 ret);
+	mmio_start_offs = pci_resource_start(dev->pdev, 0);
+	dev_priv->mmio = ioremap(mmio_start_offs, 0x00800000);
+	if (!dev_priv->mmio) {
+		NV_ERROR(dev, "Unable to initialize the mmio mapping. "
+			 "Please report your setup to " DRIVER_EMAIL "\n");
 		return -EINVAL;
 	}
-	NV_DEBUG(dev, "regs mapped ok at 0x%lx\n", (unsigned long)dev_priv->mmio->offset);
+	NV_DEBUG(dev, "regs mapped ok at 0x%llx\n",
+					(unsigned long long)mmio_start_offs);
 
 #if defined(__powerpc__)
 	/* Put the card in BE mode if it's not */
@@ -538,7 +538,8 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 		dev_priv->card_type = NV_UNKNOWN;
 	}
 
-	NV_INFO(dev, "Detected an NV%d generation card (0x%08x)\n", dev_priv->card_type,reg0);
+	NV_INFO(dev, "Detected an NV%d generation card (0x%08x)\n",
+						dev_priv->card_type, reg0);
 
 	if (dev_priv->card_type == NV_UNKNOWN) {
 		return -EINVAL;
@@ -653,7 +654,7 @@ int nouveau_unload(struct drm_device *dev)
 		nouveau_close(dev);
 	}
 
-	drm_rmmap(dev, dev_priv->mmio);
+	iounmap(dev_priv->mmio);
 	drm_rmmap(dev, dev_priv->ramin);
 	drm_rmmap(dev, dev_priv->fb);
 
