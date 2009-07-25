@@ -1116,4 +1116,14 @@ nv_two_reg_pll(struct drm_device *dev)
 	return false;
 }
 
+#define NV50_NVSW                                                    0x0000506e
+#define NV50_NVSW_DMA_SEMAPHORE                                      0x00000060
+#define NV50_NVSW_SEMAPHORE_OFFSET                                   0x00000064
+#define NV50_NVSW_SEMAPHORE_ACQUIRE                                  0x00000068
+#define NV50_NVSW_SEMAPHORE_RELEASE                                  0x0000006c
+#define NV50_NVSW_DMA_VBLSEM                                         0x0000018c
+#define NV50_NVSW_VBLSEM_OFFSET                                      0x00000400
+#define NV50_NVSW_VBLSEM_RELEASE_VALUE                               0x00000404
+#define NV50_NVSW_VBLSEM_RELEASE                                     0x00000408
+
 #endif /* __NOUVEAU_DRV_H__ */
