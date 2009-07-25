@@ -485,7 +485,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	NV_DEBUG(dev, "regs mapped ok at 0x%llx\n",
 					(unsigned long long)mmio_start_offs);
 
-#if defined(__powerpc__)
+#ifdef __BIG_ENDIAN
 	/* Put the card in BE mode if it's not */
 	if (nv_rd32(dev, NV03_PMC_BOOT_1))
 		nv_wr32(dev, NV03_PMC_BOOT_1, 0x00000001);

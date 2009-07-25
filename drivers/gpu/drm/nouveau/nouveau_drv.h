@@ -948,40 +948,45 @@ extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 				  struct drm_file *);
 
 #define NVDEV ((struct drm_nouveau_private *)dev->dev_private)
-#if defined(__powerpc__)
-#define nv_out32(map,reg,val) out_be32((void __iomem *)NVDEV->map->handle + (reg), (val))
-#define nv_out16(map,reg,val) out_be16((void __iomem *)NVDEV->map->handle + (reg), (val))
-#define nv_in32(map,reg) in_be32((void __iomem *)NVDEV->map->handle + (reg))
-#define nv_in16(map,reg) in_be16((void __iomem *)NVDEV->map->handle + (reg))
+#ifdef __BIG_ENDIAN
+#define nv_out32(map, reg, val) \
+	iowrite32be((val), (void __iomem *)NVDEV->map->handle + (reg))
+#define nv_out16(map, reg, val) \
+	iowrite16be((val), (void __iomem *)NVDEV->map->handle + (reg))
+#define nv_in32(map, reg) \
+	ioread32be((void __iomem *)NVDEV->map->handle + (reg))
+#define nv_in16(map, reg) \
+	ioread16be((void __iomem *)NVDEV->map->handle + (reg))
 #else
-#define nv_out32(map,reg,val) DRM_WRITE32(NVDEV->map, (reg), (val))
-#define nv_out16(map,reg,val) DRM_WRITE16(NVDEV->map, (reg), (val))
-#define nv_in32(map,reg) DRM_READ32(NVDEV->map, (reg))
-#define nv_in16(map,reg) DRM_READ16(NVDEV->map, (reg))
+#define nv_out32(map, reg, val) DRM_WRITE32(NVDEV->map, (reg), (val))
+#define nv_out16(map, reg, val) DRM_WRITE16(NVDEV->map, (reg), (val))
+#define nv_in32(map, reg) DRM_READ32(NVDEV->map, (reg))
+#define nv_in16(map, reg) DRM_READ16(NVDEV->map, (reg))
 #endif
 
 /* channel control reg access */
-#if defined(__powerpc__)
-#define nvchan_wr32(reg,val) out_be32((void __iomem *)chan->user->handle + (reg), (val))
-#define nvchan_rd32(reg) in_be32((void __iomem *)chan->user->handle + (reg))
+#ifdef __BIG_ENDIAN
+#define nvchan_wr32(reg, val) \
+	iowrite32be((val), (void __iomem *)chan->user->handle + (reg))
+#define nvchan_rd32(reg) ioread32be((void __iomem *)chan->user->handle + (reg))
 #else
-#define nvchan_wr32(reg,val) DRM_WRITE32(chan->user, (reg), (val))
+#define nvchan_wr32(reg, val) DRM_WRITE32(chan->user, (reg), (val))
 #define nvchan_rd32(reg) DRM_READ32(chan->user, (reg))
 #endif
 
 
 /* register access */
-#if defined(__powerpc__)
+#ifdef __BIG_ENDIAN
 static inline u32 nv_rd32(struct drm_device *dev, unsigned reg)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	return in_be32(dev_priv->mmio + reg);
+	return ioread32be(dev_priv->mmio + reg);
 }
 
 static inline void nv_wr32(struct drm_device *dev, unsigned reg, u32 val)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	out_be32(dev_priv->mmio + reg, val);
+	iowrite32be(val, dev_priv->mmio + reg);
 }
 #else
 static inline u32 nv_rd32(struct drm_device *dev, unsigned reg)
@@ -995,7 +1000,7 @@ static inline void nv_wr32(struct drm_device *dev, unsigned reg, u32 val)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	writel(val, dev_priv->mmio + reg);
 }
-#endif /* not __powerpc__ */
+#endif /* not __BIG_ENDIAN */
 
 static inline u8 nv_rd08(struct drm_device *dev, unsigned reg)
 {
