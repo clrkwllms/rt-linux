@@ -443,19 +443,38 @@ int nouveau_firstopen(struct drm_device *dev)
 	return 0;
 }
 
+/* if we have an OF card, copy vbios to RAMIN */
+static void nouveau_OF_copy_vbios_to_ramin(struct drm_device *dev)
+{
+#if defined(__powerpc__)
+	int size, i;
+	const uint32_t *bios;
+	struct device_node *dn = pci_device_to_OF_node(dev->pdev);
+	if (!dn) {
+		NV_INFO(dev, "Unable to get the OF node\n");
+		return;
+	}
+
+	bios = of_get_property(dn, "NVDA,BMP", &size);
+	if (bios) {
+		for (i = 0; i < size; i += 4)
+			nv_wi32(dev, i, bios[i/4]);
+		NV_INFO(dev, "OF bios successfully copied (%d bytes)\n", size);
+	} else {
+		NV_INFO(dev, "Unable to get the OF bios\n");
+	}
+#endif
+}
+
 #define NV40_CHIPSET_MASK 0x00000baf
 #define NV44_CHIPSET_MASK 0x00005450
 
 int nouveau_load(struct drm_device *dev, unsigned long flags)
 {
 	struct drm_nouveau_private *dev_priv;
-#if defined(__powerpc__)
-	struct device_node *dn;
-#endif
 	uint32_t reg0;
 	uint8_t architecture = 0;
 	resource_size_t mmio_start_offs;
-	int ret;
 
 	dev_priv = kzalloc(sizeof(*dev_priv), GFP_KERNEL);
 	if (!dev_priv)
@@ -581,23 +600,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 		return -ENOMEM;
 	}
 
-#if defined(__powerpc__)
-	/* if we have an OF card, copy vbios to RAMIN */
-	dn = pci_device_to_OF_node(dev->pdev);
-	if (dn)
-	{
-		int size, i;
-		const uint32_t *bios = of_get_property(dn, "NVDA,BMP", &size);
-		if (bios) {
-			for (i = 0; i < size; i+=4)
-				nv_wi32(dev, i, bios[i/4]);
-			NV_INFO(dev, "OF bios successfully copied (%d bytes)\n",size);
-		} else
-			NV_INFO(dev, "Unable to get the OF bios\n");
-	}
-	else
-		NV_INFO(dev, "Unable to get the OF node\n");
-#endif
+	nouveau_OF_copy_vbios_to_ramin(dev);
 
 	/* Special flags */
 	if (dev->pci_device == 0x01a0) {
@@ -606,11 +609,9 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 		dev_priv->flags |= NV_NFORCE2;
 	}
 
-	dev->dev_private = (void *)dev_priv;
-
 	/* For kernel modesetting, init card now and bring up fbcon */
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		ret = nouveau_card_init(dev);
+		int ret = nouveau_card_init(dev);
 		if (ret)
 			return ret;
 	}
