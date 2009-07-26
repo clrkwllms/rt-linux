@@ -449,7 +449,8 @@ struct drm_nouveau_private {
 
 	void __iomem *mmio;
 	void __iomem *fb;
-	struct drm_local_map *ramin;
+	void __iomem *ramin;
+	uint32_t ramin_size;
 
 	struct work_struct irq_work;
 	struct list_head vbl_waiting;
@@ -1011,15 +1012,13 @@ static inline void nv_wf32(struct drm_device *dev, unsigned offset, u32 val)
 static inline u32 nv_ri32(struct drm_device *dev, unsigned offset)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	return ioread32_native(
-		(void __force __iomem *)dev_priv->ramin->handle + offset);
+	return ioread32_native(dev_priv->ramin + offset);
 }
 
 static inline void nv_wi32(struct drm_device *dev, unsigned offset, u32 val)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	iowrite32_native(val,
-		(void __force __iomem *)dev_priv->ramin->handle + offset);
+	iowrite32_native(val, dev_priv->ramin + offset);
 }
 
 /* object access */

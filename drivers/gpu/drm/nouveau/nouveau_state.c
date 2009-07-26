@@ -548,33 +548,29 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	/* map larger RAMIN aperture on NV40 cards */
 	dev_priv->ramin  = NULL;
 	if (dev_priv->card_type >= NV_40) {
-		int ramin_resource = 2;
-		if (drm_get_resource_len(dev, ramin_resource) == 0)
-			ramin_resource = 3;
+		int ramin_bar = 2;
+		if (pci_resource_len(dev->pdev, ramin_bar) == 0)
+			ramin_bar = 3;
 
-		ret = drm_addmap(dev,
-				 drm_get_resource_start(dev, ramin_resource),
-				 drm_get_resource_len(dev, ramin_resource),
-				 _DRM_REGISTERS, _DRM_READ_ONLY |
-				 _DRM_DRIVER, &dev_priv->ramin);
-		if (ret) {
+		dev_priv->ramin_size = pci_resource_len(dev->pdev, ramin_bar);
+		dev_priv->ramin = ioremap(
+				pci_resource_start(dev->pdev, ramin_bar),
+				dev_priv->ramin_size);
+		if (!dev_priv->ramin) {
 			NV_ERROR(dev, "Failed to init RAMIN mapping, "
 				      "limited instance memory available\n");
-			dev_priv->ramin = NULL;
 		}
 	}
 
 	/* On older cards (or if the above failed), create a map covering
 	 * the BAR0 PRAMIN aperture */
 	if (!dev_priv->ramin) {
-		ret = drm_addmap(dev,
-				 drm_get_resource_start(dev, 0) + NV_RAMIN,
-				 (1*1024*1024),
-				 _DRM_REGISTERS, _DRM_READ_ONLY | _DRM_DRIVER,
-				 &dev_priv->ramin);
-		if (ret) {
-			NV_ERROR(dev, "Failed to map BAR0 PRAMIN: %d\n", ret);
-			return ret;
+		dev_priv->ramin_size = 1 * 1024 * 1024;
+		dev_priv->ramin = ioremap(mmio_start_offs + NV_RAMIN,
+							dev_priv->ramin_size);
+		if (!dev_priv->ramin) {
+			NV_ERROR(dev, "Failed to map BAR0 PRAMIN.\n");
+			return -ENOMEM;
 		}
 	}
 
@@ -653,7 +649,7 @@ int nouveau_unload(struct drm_device *dev)
 	}
 
 	iounmap(dev_priv->mmio);
-	drm_rmmap(dev, dev_priv->ramin);
+	iounmap(dev_priv->ramin);
 	iounmap(dev_priv->fb);
 
 	kfree(dev_priv);

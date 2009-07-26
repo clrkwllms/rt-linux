@@ -86,13 +86,12 @@ nv50_instmem_init(struct drm_device *dev)
 	c_vmpd   = ((dev_priv->chipset & 0xf0) == 0x50) ? 0x1400 : 0x200;
 	c_ramfc  = ((dev_priv->chipset & 0xf0) == 0x50) ? 0x0 : 0x20;
 	c_base   = c_vmpd + 0x4000;
-	pt_size  = NV50_INSTMEM_PT_SIZE(dev_priv->ramin->size);
+	pt_size  = NV50_INSTMEM_PT_SIZE(dev_priv->ramin_size);
 
 	NV_DEBUG(dev, " Rsvd VRAM base: 0x%08x\n", c_offset);
 	NV_DEBUG(dev, "    VBIOS image: 0x%08x\n",
 				(nv_rd32(dev, 0x619f04) & ~0xff) << 8);
-	NV_DEBUG(dev, "  Aperture size: %d MiB\n",
-		 (uint32_t)dev_priv->ramin->size >> 20);
+	NV_DEBUG(dev, "  Aperture size: %d MiB\n", dev_priv->ramin_size >> 20);
 	NV_DEBUG(dev, "        PT size: %d KiB\n", pt_size >> 10);
 
 	/* Determine VM layout, we need to do this first to make sure
@@ -209,7 +208,7 @@ nv50_instmem_init(struct drm_device *dev)
 					  &priv->pramin_bar)))
 		return ret;
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x00, 0x7fc00000);
-	BAR0_WI32(priv->pramin_bar->gpuobj, 0x04, dev_priv->ramin->size - 1);
+	BAR0_WI32(priv->pramin_bar->gpuobj, 0x04, dev_priv->ramin_size - 1);
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x08, 0x00000000);
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x0c, 0x00000000);
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x10, 0x00000000);
@@ -256,7 +255,7 @@ nv50_instmem_init(struct drm_device *dev)
 
 	/* Global PRAMIN heap */
 	if (nouveau_mem_init_heap(&dev_priv->ramin_heap,
-				  c_size, dev_priv->ramin->size - c_size)) {
+				  c_size, dev_priv->ramin_size - c_size)) {
 		dev_priv->ramin_heap = NULL;
 		NV_ERROR(dev, "Failed to init RAMIN heap\n");
 	}
