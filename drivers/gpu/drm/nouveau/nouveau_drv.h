@@ -991,32 +991,35 @@ static inline void nv_wr08(struct drm_device *dev, unsigned reg, u8 val)
 #define nv_wait(reg,mask,val) nouveau_wait_until(dev, 2000000000ULL, (reg),    \
 						 (mask), (val))
 
-/* VRAM access */
-static inline u32 nv_rf32(struct drm_device *dev, unsigned reg)
+/*
+ * VRAM access for the first 64kB
+ * see nouveau_state.c
+ */
+static inline u32 nv_rf32(struct drm_device *dev, unsigned offset)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	return ioread32_native(dev_priv->fb + reg);
+	return ioread32_native(dev_priv->fb + offset);
 }
 
-static inline void nv_wf32(struct drm_device *dev, unsigned reg, u32 val)
+static inline void nv_wf32(struct drm_device *dev, unsigned offset, u32 val)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	iowrite32_native(val, dev_priv->fb + reg);
+	iowrite32_native(val, dev_priv->fb + offset);
 }
 
 /* PRAMIN access */
-static inline u32 nv_ri32(struct drm_device *dev, unsigned reg)
+static inline u32 nv_ri32(struct drm_device *dev, unsigned offset)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	return ioread32_native(
-		(void __force __iomem *)dev_priv->ramin->handle + reg);
+		(void __force __iomem *)dev_priv->ramin->handle + offset);
 }
 
-static inline void nv_wi32(struct drm_device *dev, unsigned reg, u32 val)
+static inline void nv_wi32(struct drm_device *dev, unsigned offset, u32 val)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	iowrite32_native(val,
-		(void __force __iomem *)dev_priv->ramin->handle + reg);
+		(void __force __iomem *)dev_priv->ramin->handle + offset);
 }
 
 /* object access */
