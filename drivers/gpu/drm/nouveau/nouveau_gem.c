@@ -271,7 +271,8 @@ nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
 	struct nouveau_fence *prev_fence;
 	struct nouveau_bo *nvbo;
 	struct list_head *entry, *tmp;
-	int ret, i;
+	int ret = -EINVAL;
+	int i;
 
 	if (nr_buffers == 0)
 		return 0;

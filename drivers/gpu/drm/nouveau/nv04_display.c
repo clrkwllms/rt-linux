@@ -48,17 +48,22 @@ nv04_display_store_initial_head_owner(struct drm_device *dev)
 		dev_priv->crtc_owner = 0x4;
 	else {
 		uint8_t slaved_on_A, slaved_on_B;
-		bool tvA, tvB = false;
+		bool tvA = false;
+		bool tvB = false;
 
 		NVLockVgaCrtcs(dev, false);
 
-		slaved_on_B = NVReadVgaCrtc(dev, 1, NV_CIO_CRE_PIXEL_INDEX) & 0x80;
+		slaved_on_B = NVReadVgaCrtc(dev, 1, NV_CIO_CRE_PIXEL_INDEX) &
+									0x80;
 		if (slaved_on_B)
-			tvB = !(NVReadVgaCrtc(dev, 1, NV_CIO_CRE_LCD__INDEX) & MASK(NV_CIO_CRE_LCD_LCD_SELECT));
+			tvB = !(NVReadVgaCrtc(dev, 1, NV_CIO_CRE_LCD__INDEX) &
+					MASK(NV_CIO_CRE_LCD_LCD_SELECT));
 
-		slaved_on_A = NVReadVgaCrtc(dev, 0, NV_CIO_CRE_PIXEL_INDEX) & 0x80;
+		slaved_on_A = NVReadVgaCrtc(dev, 0, NV_CIO_CRE_PIXEL_INDEX) &
+									0x80;
 		if (slaved_on_A)
-			tvA = !(NVReadVgaCrtc(dev, 0, NV_CIO_CRE_LCD__INDEX) & MASK(NV_CIO_CRE_LCD_LCD_SELECT));
+			tvA = !(NVReadVgaCrtc(dev, 0, NV_CIO_CRE_LCD__INDEX) &
+					MASK(NV_CIO_CRE_LCD_LCD_SELECT));
 
 		NVLockVgaCrtcs(dev, true);
 
