@@ -146,7 +146,7 @@ nv50_i2c_setsda(void *data, int state)
 	i2c->data = state;
 }
 
-const uint32_t nv50_i2c_port[] = {
+static const uint32_t nv50_i2c_port[] = {
 	0x00e138, 0x00e150, 0x00e168, 0x00e180,
 	0x00e254, 0x00e274, 0x00e764, 0x00e780,
 	0x00e79c, 0x00e7b8

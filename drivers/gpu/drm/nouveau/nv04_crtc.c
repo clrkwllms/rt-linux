@@ -46,7 +46,7 @@ crtc_wr_cio_state(struct drm_crtc *crtc, struct nv04_crtc_reg *crtcstate, int in
 		       crtcstate->CRTC[index]);
 }
 
-void nv_crtc_set_digital_vibrance(struct drm_crtc *crtc, int level)
+static void nv_crtc_set_digital_vibrance(struct drm_crtc *crtc, int level)
 {
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
@@ -61,7 +61,7 @@ void nv_crtc_set_digital_vibrance(struct drm_crtc *crtc, int level)
 	crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_CSB);
 }
 
-void nv_crtc_set_image_sharpening(struct drm_crtc *crtc, int level)
+static void nv_crtc_set_image_sharpening(struct drm_crtc *crtc, int level)
 {
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;

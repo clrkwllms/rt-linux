@@ -2605,7 +2605,7 @@ static struct init_tbl_entry itbl_entry[] = {
 	{ "INIT_RESERVED"                     , 0x92, 1       , 0       , 0       , init_reserved                   },
 	{ "INIT_96"                           , 0x96, 17      , 0       , 0       , init_96                         },
 	{ "INIT_97"                           , 0x97, 13      , 0       , 0       , init_97                         },
-	{ 0                                   , 0   , 0       , 0       , 0       , 0                               }
+	{ NULL                                , 0   , 0       , 0       , 0       , NULL                            }
 };
 
 static unsigned int get_init_table_entry_length(struct nvbios *bios, unsigned int offset, int i)
@@ -4666,6 +4666,7 @@ static bool parse_dcb_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb
 	return true;
 }
 
+static
 void merge_like_dcb_entries(struct drm_device *dev, struct parsed_dcb *dcb)
 {
 	/* DCB v2.0 lists each output combination separately.
@@ -4947,7 +4948,7 @@ uint8_t * nouveau_bios_embedded_edid(struct drm_device *dev)
 	return (bios->fp.edid = &bios->data[offset]);
 }
 
-bool NVInitVBIOS(struct drm_device *dev)
+static bool NVInitVBIOS(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;
@@ -4964,7 +4965,7 @@ bool NVInitVBIOS(struct drm_device *dev)
 	return true;
 }
 
-int nouveau_parse_vbios_struct(struct drm_device *dev)
+static int nouveau_parse_vbios_struct(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;

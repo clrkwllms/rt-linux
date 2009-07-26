@@ -559,7 +559,7 @@ static struct nouveau_pgraph_object_method nv04_graph_mthds_m2mf[] = {
 	{}
 };
 
-struct nouveau_pgraph_object_method nv04_graph_mthds_set_operation[] = {
+static struct nouveau_pgraph_object_method nv04_graph_mthds_set_operation[] = {
 	{ 0x02fc, nv04_graph_mthd_set_operation },
 	{},
 };

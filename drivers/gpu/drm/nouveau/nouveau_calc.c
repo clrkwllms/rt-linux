@@ -334,7 +334,7 @@ nv10CalcArbitration(struct nv_fifo_info *fifo, struct nv_sim_state *arb)
 	}
 }
 
-void
+static void
 nv4_10UpdateArbitrationSettings(struct drm_device *dev, int VClk, int bpp,
 				int *burst, int *lwm)
 {
@@ -382,7 +382,7 @@ nv4_10UpdateArbitrationSettings(struct drm_device *dev, int VClk, int bpp,
 	}
 }
 
-void
+static void
 nv30UpdateArbitrationSettings(int *burst, int *lwm)
 {
 	unsigned int fifo_size, burst_size, graphics_lwm;

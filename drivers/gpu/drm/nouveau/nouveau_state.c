@@ -619,7 +619,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	return 0;
 }
 
-void nouveau_close(struct drm_device *dev)
+static void nouveau_close(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 

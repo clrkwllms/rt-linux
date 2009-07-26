@@ -292,7 +292,7 @@ nv50_instmem_takedown(struct drm_device *dev)
 	if (chan) {
 		for (i = 0; i < dev_priv->vm_vram_pt_nr; i++) {
 			nouveau_gpuobj_ref_del(dev, &chan->vm_vram_pt[i]);
-			dev_priv->vm_vram_pt[i] = 0;
+			dev_priv->vm_vram_pt[i] = NULL;
 		}
 		dev_priv->vm_vram_pt_nr = 0;
 

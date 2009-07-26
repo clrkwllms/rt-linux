@@ -423,7 +423,7 @@ nv50_crtc_cursor_move(struct drm_crtc *drm_crtc, int x, int y)
 	return 0;
 }
 
-void
+static void
 nv50_crtc_gamma_set(struct drm_crtc *drm_crtc, u16 *r, u16 *g, u16 *b,
 		    uint32_t size)
 {

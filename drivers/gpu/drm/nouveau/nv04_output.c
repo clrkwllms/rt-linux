@@ -584,8 +584,6 @@ nv_output_mode_valid(struct drm_connector *connector,
 	return MODE_OK;
 }
 
-struct nouveau_connector *
-nouveau_encoder_connector_get(struct nouveau_encoder *encoder);
 static bool
 nv_output_mode_fixup(struct drm_encoder *encoder, struct drm_display_mode *mode,
 		     struct drm_display_mode *adjusted_mode)

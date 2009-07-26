@@ -896,6 +896,10 @@ extern int nv04_connector_create(struct drm_device *, int i2c_index,
 /* nv04_crtc.c */
 extern int nv04_crtc_create(struct drm_device *, int index);
 
+/* nv50_sor.c */
+extern struct nouveau_connector *nouveau_encoder_connector_get(
+				struct nouveau_encoder *encoder);
+
 /* nouveau_bo.c */
 extern struct ttm_bo_driver nouveau_bo_driver;
 extern int nouveau_bo_new(struct drm_device *, struct nouveau_channel *,
@@ -960,9 +964,10 @@ extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 
 /* channel control reg access */
 #define nvchan_wr32(reg, val) \
-	iowrite32_native((val), (void __iomem *)chan->user->handle + (reg))
+	iowrite32_native((val), \
+			(void __force __iomem *)chan->user->handle + (reg))
 #define nvchan_rd32(reg) \
-	ioread32_native((void __iomem *)chan->user->handle + (reg))
+	ioread32_native((void __force __iomem *)chan->user->handle + (reg))
 
 /* register access */
 static inline u32 nv_rd32(struct drm_device *dev, unsigned reg)

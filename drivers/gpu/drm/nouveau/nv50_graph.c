@@ -412,7 +412,7 @@ nv50_graph_nvsw_vblsem_release(struct nouveau_channel *chan, int grclass,
 	return 0;
 }
 
-struct nouveau_pgraph_object_method nv50_graph_nvsw_methods[] = {
+static struct nouveau_pgraph_object_method nv50_graph_nvsw_methods[] = {
 	{ 0x018c, nv50_graph_nvsw_dma_vblsem },
 	{ 0x0400, nv50_graph_nvsw_vblsem_offset },
 	{ 0x0404, nv50_graph_nvsw_vblsem_release_val },
