@@ -956,9 +956,8 @@ nv04_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 		return ret;
 
 	if (old_fb) {
-		struct nouveau_framebuffer *fb = nouveau_framebuffer(old_fb);
-
-		nouveau_bo_unpin(fb->nvbo);
+		struct nouveau_framebuffer *ofb = nouveau_framebuffer(old_fb);
+		nouveau_bo_unpin(ofb->nvbo);
 	}
 
 	nv_crtc->fb.offset = fb->nvbo->bo.offset;
