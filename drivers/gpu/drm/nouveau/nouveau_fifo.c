@@ -452,7 +452,7 @@ nouveau_channel_idle(struct nouveau_channel *chan)
 		}
 
 		engine->instmem.prepare_access(dev, false);
-		if (INSTANCE_RD(ramfc, 0) != INSTANCE_RD(ramfc, 1))
+		if (nv_ro32(dev, ramfc, 0) != nv_ro32(dev, ramfc, 1))
 			idle = 0;
 		else
 			idle = 1;

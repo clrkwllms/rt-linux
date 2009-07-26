@@ -193,13 +193,13 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 
 	hdr = IS_G80 ? 0x200 : 0x20;
 	dev_priv->engine.instmem.prepare_access(dev, true);
-	INSTANCE_WR(ramin, (hdr + 0x00)/4, 0x00190002);
-	INSTANCE_WR(ramin, (hdr + 0x04)/4, chan->ramin_grctx->instance +
+	nv_wo32(dev, ramin, (hdr + 0x00)/4, 0x00190002);
+	nv_wo32(dev, ramin, (hdr + 0x04)/4, chan->ramin_grctx->instance +
 					   grctx_size - 1);
-	INSTANCE_WR(ramin, (hdr + 0x08)/4, chan->ramin_grctx->instance);
-	INSTANCE_WR(ramin, (hdr + 0x0c)/4, 0);
-	INSTANCE_WR(ramin, (hdr + 0x10)/4, 0);
-	INSTANCE_WR(ramin, (hdr + 0x14)/4, 0x00010000);
+	nv_wo32(dev, ramin, (hdr + 0x08)/4, chan->ramin_grctx->instance);
+	nv_wo32(dev, ramin, (hdr + 0x0c)/4, 0);
+	nv_wo32(dev, ramin, (hdr + 0x10)/4, 0);
+	nv_wo32(dev, ramin, (hdr + 0x14)/4, 0x00010000);
 	dev_priv->engine.instmem.finish_access(dev);
 
 	switch (dev_priv->chipset) {
@@ -244,15 +244,15 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 		int cnt = *ctxvals++;
 
 		while (cnt--)
-			INSTANCE_WR(ctx, pos++, *ctxvals);
+			nv_wo32(dev, ctx, pos++, *ctxvals);
 		ctxvals++;
 	}
 
-	INSTANCE_WR(ctx, 0x00000/4, chan->ramin->instance >> 12);
+	nv_wo32(dev, ctx, 0x00000/4, chan->ramin->instance >> 12);
 	if ((dev_priv->chipset & 0xf0) == 0xa0)
-		INSTANCE_WR(ctx, 0x00004/4, 0x00000000);
+		nv_wo32(dev, ctx, 0x00004/4, 0x00000000);
 	else
-		INSTANCE_WR(ctx, 0x0011c/4, 0x00000000);
+		nv_wo32(dev, ctx, 0x0011c/4, 0x00000000);
 	dev_priv->engine.instmem.finish_access(dev);
 
 	return 0;
@@ -272,7 +272,7 @@ nv50_graph_destroy_context(struct nouveau_channel *chan)
 		hdr = IS_G80 ? 0x200 : 0x20;
 		dev_priv->engine.instmem.prepare_access(dev, true);
 		for (i=hdr; i<hdr+24; i+=4)
-			INSTANCE_WR(chan->ramin->gpuobj, i/4, 0);
+			nv_wo32(dev, chan->ramin->gpuobj, i/4, 0);
 		dev_priv->engine.instmem.finish_access(dev);
 
 		nouveau_gpuobj_ref_del(dev, &chan->ramin_grctx);

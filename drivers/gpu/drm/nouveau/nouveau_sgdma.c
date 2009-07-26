@@ -102,10 +102,10 @@ nouveau_sgdma_bind(struct ttm_backend *be, struct ttm_mem_reg *mem)
 
 		for (j = 0; j < PAGE_SIZE / NV_CTXDMA_PAGE_SIZE; j++) {
 			if (dev_priv->card_type < NV_50)
-				INSTANCE_WR(gpuobj, pte++, offset_l | 3);
+				nv_wo32(dev, gpuobj, pte++, offset_l | 3);
 			else {
-				INSTANCE_WR(gpuobj, pte++, offset_l | 0x21);
-				INSTANCE_WR(gpuobj, pte++, offset_h & 0xff);
+				nv_wo32(dev, gpuobj, pte++, offset_l | 0x21);
+				nv_wo32(dev, gpuobj, pte++, offset_h & 0xff);
 			}
 
 			dma_offset += NV_CTXDMA_PAGE_SIZE;
@@ -156,10 +156,10 @@ nouveau_sgdma_unbind(struct ttm_backend *be)
 
 		for (j = 0; j < PAGE_SIZE / NV_CTXDMA_PAGE_SIZE; j++) {
 			if (dev_priv->card_type < NV_50)
-				INSTANCE_WR(gpuobj, pte++, dma_offset | 3);
+				nv_wo32(dev, gpuobj, pte++, dma_offset | 3);
 			else {
-				INSTANCE_WR(gpuobj, pte++, dma_offset | 0x21);
-				INSTANCE_WR(gpuobj, pte++, 0x00000000);
+				nv_wo32(dev, gpuobj, pte++, dma_offset | 0x21);
+				nv_wo32(dev, gpuobj, pte++, 0x00000000);
 			}
 
 			dma_offset += NV_CTXDMA_PAGE_SIZE;
@@ -267,21 +267,21 @@ nouveau_sgdma_init(struct drm_device *dev)
 		/* Maybe use NV_DMA_TARGET_AGP for PCIE? NVIDIA do this, and
 		 * confirmed to work on c51.  Perhaps means NV_DMA_TARGET_PCIE
 		 * on those cards? */
-		INSTANCE_WR(gpuobj, 0, NV_CLASS_DMA_IN_MEMORY |
+		nv_wo32(dev, gpuobj, 0, NV_CLASS_DMA_IN_MEMORY |
 				       (1 << 12) /* PT present */ |
 				       (0 << 13) /* PT *not* linear */ |
 				       (NV_DMA_ACCESS_RW  << 14) |
 				       (NV_DMA_TARGET_PCI << 16));
-		INSTANCE_WR(gpuobj, 1, aper_size - 1);
+		nv_wo32(dev, gpuobj, 1, aper_size - 1);
 		for (i=2; i<2+(aper_size>>12); i++) {
-			INSTANCE_WR(gpuobj, i,
+			nv_wo32(dev, gpuobj, i,
 				    dev_priv->gart_info.sg_dummy_bus | 3);
 		}
 	} else {
 		for (i=0; i<obj_size; i+=8) {
-			INSTANCE_WR(gpuobj, (i+0)/4,
+			nv_wo32(dev, gpuobj, (i+0)/4,
 				    dev_priv->gart_info.sg_dummy_bus | 0x21);
-			INSTANCE_WR(gpuobj, (i+4)/4, 0);
+			nv_wo32(dev, gpuobj, (i+4)/4, 0);
 		}
 	}
 	dev_priv->engine.instmem.finish_access(dev);
@@ -321,7 +321,7 @@ nouveau_sgdma_get_page(struct drm_device *dev, uint32_t offset, uint32_t *page)
 	pte = (offset >> NV_CTXDMA_PAGE_SHIFT);
 	if (dev_priv->card_type < NV_50) {
 		instmem->prepare_access(dev, false);
-		*page = INSTANCE_RD(gpuobj, (pte + 2)) & ~NV_CTXDMA_PAGE_MASK;
+		*page = nv_ro32(dev, gpuobj, (pte + 2)) & ~NV_CTXDMA_PAGE_MASK;
 		instmem->finish_access(dev);
 		return 0;
 	}

@@ -594,7 +594,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 		const uint32_t *bios = of_get_property(dn, "NVDA,BMP", &size);
 		if (bios) {
 			for (i = 0; i < size; i+=4)
-				nv_out32(ramin, i, bios[i/4]);
+				nv_wi32(dev, i, bios[i/4]);
 			NV_INFO(dev, "OF bios successfully copied (%d bytes)\n",size);
 		} else
 			NV_INFO(dev, "Unable to get the OF bios\n");
@@ -854,7 +854,7 @@ static int nouveau_suspend(struct drm_device *dev)
 
 	engine->instmem.prepare_access(dev, false);
 	for (i = 0; i < susres->ramin_size / 4; i++)
-		susres->ramin_copy[i] = nv_ri32(i << 2);
+		susres->ramin_copy[i] = nv_ri32(dev, i << 2);
 	engine->instmem.finish_access(dev);
 
 	/* reenable the fifo caches */
@@ -898,7 +898,7 @@ static int nouveau_resume(struct drm_device *dev)
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
 	for (i = 0; i < susres->ramin_size / 4; i++)
-		nv_wi32(i << 2, susres->ramin_copy[i]);
+		nv_wi32(dev, i << 2, susres->ramin_copy[i]);
 	dev_priv->engine.instmem.finish_access(dev);
 
 	engine->mc.init(dev);
@@ -920,7 +920,7 @@ static int nouveau_resume(struct drm_device *dev)
 	 */
 	dev_priv->engine.instmem.prepare_access(dev, true);
 	for (i = 0; i < susres->ramin_size / 4; i++)
-		nv_wi32(i << 2, susres->ramin_copy[i]);
+		nv_wi32(dev, i << 2, susres->ramin_copy[i]);
 	dev_priv->engine.instmem.finish_access(dev);
 
 	engine->fifo.load_context(dev_priv->fifos[0]);

@@ -544,11 +544,11 @@ nv04_graph_mthd_set_operation(struct nouveau_channel *chan, int grclass,
 	int subc = (nv_rd32(dev, NV04_PGRAPH_TRAPPED_ADDR) >> 13) & 0x7;
 	uint32_t tmp;
 
-	tmp  = nv_ri32(instance);
+	tmp  = nv_ri32(dev, instance);
 	tmp &= ~0x00038000;
 	tmp |= ((data & 7) << 15);
 
-	nv_wi32(instance, tmp);
+	nv_wi32(dev, instance, tmp);
 	nv_wr32(dev, NV04_PGRAPH_CTX_SWITCH1, tmp);
 	nv_wr32(dev, NV04_PGRAPH_CTX_CACHE1 + subc, tmp);
 	return 0;

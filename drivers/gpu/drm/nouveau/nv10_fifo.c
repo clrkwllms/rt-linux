@@ -29,9 +29,9 @@
 #include "nouveau_drv.h"
 
 
-#define RAMFC_WR(offset,val) INSTANCE_WR(chan->ramfc->gpuobj, \
+#define RAMFC_WR(offset, val) nv_wo32(dev, chan->ramfc->gpuobj, \
 					 NV10_RAMFC_##offset/4, (val))
-#define RAMFC_RD(offset)     INSTANCE_RD(chan->ramfc->gpuobj, \
+#define RAMFC_RD(offset)      nv_ro32(dev, chan->ramfc->gpuobj, \
 					 NV10_RAMFC_##offset/4)
 #define NV10_RAMFC(c) (dev_priv->ramfc_offset + ((c) * NV10_RAMFC__SIZE))
 #define NV10_RAMFC__SIZE ((dev_priv->chipset) >= 0x17 ? 64 : 32)

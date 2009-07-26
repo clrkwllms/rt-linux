@@ -28,9 +28,9 @@
 #include "drm.h"
 #include "nouveau_drv.h"
 
-#define RAMFC_WR(offset,val) INSTANCE_WR(chan->ramfc->gpuobj, \
+#define RAMFC_WR(offset, val) nv_wo32(dev, chan->ramfc->gpuobj, \
 					 NV04_RAMFC_##offset/4, (val))
-#define RAMFC_RD(offset)     INSTANCE_RD(chan->ramfc->gpuobj, \
+#define RAMFC_RD(offset)      nv_ro32(dev, chan->ramfc->gpuobj, \
 					 NV04_RAMFC_##offset/4)
 #define NV04_RAMFC(c) (dev_priv->ramfc_offset + ((c) * NV04_RAMFC__SIZE))
 #define NV04_RAMFC__SIZE 32

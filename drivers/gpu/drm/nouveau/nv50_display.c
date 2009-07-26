@@ -109,12 +109,12 @@ nv50_evo_channel_new(struct drm_device *dev, struct nouveau_channel **pchan)
 		}
 
 		dev_priv->engine.instmem.prepare_access(dev, true);
-		INSTANCE_WR(dma_vm, 0, 0x1e99003d);
-		INSTANCE_WR(dma_vm, 1, 0xffffffff);
-		INSTANCE_WR(dma_vm, 2, 0x00000000);
-		INSTANCE_WR(dma_vm, 3, 0x00000000);
-		INSTANCE_WR(dma_vm, 4, 0x00000000);
-		INSTANCE_WR(dma_vm, 5, 0x00010000);
+		nv_wo32(dev, dma_vm, 0, 0x1e99003d);
+		nv_wo32(dev, dma_vm, 1, 0xffffffff);
+		nv_wo32(dev, dma_vm, 2, 0x00000000);
+		nv_wo32(dev, dma_vm, 3, 0x00000000);
+		nv_wo32(dev, dma_vm, 4, 0x00000000);
+		nv_wo32(dev, dma_vm, 5, 0x00010000);
 		dev_priv->engine.instmem.finish_access(dev);
 	}
 
@@ -133,12 +133,12 @@ nv50_evo_channel_new(struct drm_device *dev, struct nouveau_channel **pchan)
 	}
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
-	INSTANCE_WR(dma_vram, 0, 0x0019003d);
-	INSTANCE_WR(dma_vram, 1, nouveau_mem_fb_amount(dev) - 1);
-	INSTANCE_WR(dma_vram, 2, 0x00000000);
-	INSTANCE_WR(dma_vram, 3, 0x00000000);
-	INSTANCE_WR(dma_vram, 4, 0x00000000);
-	INSTANCE_WR(dma_vram, 5, 0x00010000);
+	nv_wo32(dev, dma_vram, 0, 0x0019003d);
+	nv_wo32(dev, dma_vram, 1, nouveau_mem_fb_amount(dev) - 1);
+	nv_wo32(dev, dma_vram, 2, 0x00000000);
+	nv_wo32(dev, dma_vram, 3, 0x00000000);
+	nv_wo32(dev, dma_vram, 4, 0x00000000);
+	nv_wo32(dev, dma_vram, 5, 0x00010000);
 	dev_priv->engine.instmem.finish_access(dev);
 
 	ret = nouveau_bo_new(dev, NULL, 4096, 0, TTM_PL_FLAG_VRAM, 0, 0,

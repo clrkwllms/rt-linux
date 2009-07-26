@@ -957,12 +957,6 @@ extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 #endif /* def __BIG_ENDIAN else */
 #endif /* !ioread32_native */
 
-#define NVDEV ((struct drm_nouveau_private *)dev->dev_private)
-#define nv_out32(map, reg, val) \
-	iowrite32_native((val), (void __iomem *)NVDEV->map->handle + (reg))
-#define nv_in32(map, reg) \
-	ioread32_native((void __iomem *)NVDEV->map->handle + (reg))
-
 /* channel control reg access */
 #define nvchan_wr32(reg, val) \
 	iowrite32_native((val), (void __iomem *)chan->user->handle + (reg))
@@ -1011,11 +1005,32 @@ static inline void nv_wf32(struct drm_device *dev, unsigned reg, u32 val)
 }
 
 /* PRAMIN access */
-#define nv_ri32(reg) nv_in32(ramin, (reg))
-#define nv_wi32(reg,val) nv_out32(ramin, (reg), (val))
+static inline u32 nv_ri32(struct drm_device *dev, unsigned reg)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	return ioread32_native(
+		(void __force __iomem *)dev_priv->ramin->handle + reg);
+}
+
+static inline void nv_wi32(struct drm_device *dev, unsigned reg, u32 val)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	iowrite32_native(val,
+		(void __force __iomem *)dev_priv->ramin->handle + reg);
+}
+
 /* object access */
-#define INSTANCE_RD(o,i) nv_ri32((o)->im_pramin->start + ((i)<<2))
-#define INSTANCE_WR(o,i,v) nv_wi32((o)->im_pramin->start + ((i)<<2), (v))
+static inline u32 nv_ro32(struct drm_device *dev, struct nouveau_gpuobj *obj,
+				unsigned index)
+{
+	return nv_ri32(dev, obj->im_pramin->start + index * 4);
+}
+
+static inline void nv_wo32(struct drm_device *dev, struct nouveau_gpuobj *obj,
+				unsigned index, u32 val)
+{
+	nv_wi32(dev, obj->im_pramin->start + index * 4, val);
+}
 
 /* logging */
 #define NV_PRINTK(level, d, fmt, arg...) \
