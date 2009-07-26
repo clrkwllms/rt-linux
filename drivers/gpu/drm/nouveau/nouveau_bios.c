@@ -171,7 +171,7 @@ static void load_vbios_pci(struct drm_device *dev, uint8_t *data)
 	rom = pci_map_rom(dev->pdev, &rom_len);
 	if (!rom)
 		goto out;
-	memcpy(data, rom, rom_len);
+	memcpy_fromio(data, rom, rom_len);
 	pci_unmap_rom(dev->pdev, rom);
 
 out:
