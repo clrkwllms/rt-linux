@@ -27,6 +27,13 @@
 #ifndef __NOUVEAU_DMA_H__
 #define __NOUVEAU_DMA_H__
 
+/* This is needed to avoid a race condition.
+ * Otherwise you may be writing in the fetch area.
+ * Is this large enough, as it's only 32 bytes, and the maximum
+ * fetch size is 256 bytes?
+ */
+#define NOUVEAU_DMA_SKIPS 8
+
 typedef enum {
 	NvSubM2MF	= 0,
 	NvSub2D		= 1,

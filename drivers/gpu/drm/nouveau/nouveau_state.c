@@ -713,9 +713,6 @@ int nouveau_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *
 	case NOUVEAU_GETPARAM_AGP_SIZE:
 		getparam->value=dev_priv->gart_info.aper_size;
 		break;
-	case NOUVEAU_GETPARAM_MM_ENABLED:
-		getparam->value = 1;
-		break;
 	case NOUVEAU_GETPARAM_VM_VRAM_BASE:
 		getparam->value = dev_priv->vm_vram_base;
 		break;
@@ -731,31 +728,11 @@ int
 nouveau_ioctl_setparam(struct drm_device *dev, void *data,
 		       struct drm_file *file_priv)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_setparam *setparam = data;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 
 	switch (setparam->param) {
-	case NOUVEAU_SETPARAM_CMDBUF_LOCATION:
-		switch (setparam->value) {
-		case NOUVEAU_MEM_AGP:
-		case NOUVEAU_MEM_PCI:
-		case NOUVEAU_MEM_AGP | NOUVEAU_MEM_PCI_ACCEPTABLE:
-			dev_priv->config.cmdbuf.location = TTM_PL_FLAG_TT;
-			break;
-		case NOUVEAU_MEM_FB:
-			dev_priv->config.cmdbuf.location = TTM_PL_FLAG_VRAM;
-			break;
-		default:
-			NV_ERROR(dev, "invalid CMDBUF_LOCATION value=%lld\n",
-				 setparam->value);
-			return -EINVAL;
-		}
-		break;
-	case NOUVEAU_SETPARAM_CMDBUF_SIZE:
-		dev_priv->config.cmdbuf.size = setparam->value;
-		break;
 	default:
 		NV_ERROR(dev, "unknown parameter %lld\n", setparam->param);
 		return -EINVAL;
@@ -792,181 +769,3 @@ bool nouveau_wait_for_idle(struct drm_device *dev)
 	return true;
 }
 
-static int nouveau_suspend(struct drm_device *dev)
-{
-	struct mem_block *p;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_suspend_resume *susres = &dev_priv->susres;
-	struct nouveau_engine *engine = &dev_priv->engine;
-	int i;
-
-	kfree(susres->ramin_copy);
-	susres->ramin_size = 0;
-	list_for_each(p, dev_priv->ramin_heap)
-		if (p->file_priv && (p->start + p->size) > susres->ramin_size)
-			susres->ramin_size = p->start + p->size;
-	if (!(susres->ramin_copy = kmalloc(susres->ramin_size, GFP_KERNEL))) {
-		NV_ERROR(dev, "Couldn't alloc RAMIN backing for suspend\n");
-		return -ENOMEM;
-	}
-
-	for (i = 0; i < engine->fifo.channels; i++) {
-		uint64_t t_start = engine->timer.read(dev);
-
-		if (dev_priv->fifos[i] == NULL)
-			continue;
-
-		/* Give the channel a chance to idle, wait 2s (hopefully) */
-		while (!nouveau_channel_idle(dev_priv->fifos[i]))
-			if (engine->timer.read(dev) - t_start > 2000000000ULL) {
-				NV_ERROR(dev, "Failed to idle channel %d before"
-					  "suspend.", dev_priv->fifos[i]->id);
-				return -EBUSY;
-			}
-	}
-	nouveau_wait_for_idle(dev);
-
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 0);
-	/* disable the fifo caches */
-	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000000);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
-		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) & ~1);
-	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000000);
-
-	susres->fifo_mode = nv_rd32(dev, NV04_PFIFO_MODE);
-
-	if (dev_priv->card_type >= NV_10) {
-		susres->graph_state = nv_rd32(dev, NV10_PGRAPH_STATE);
-		susres->graph_ctx_control = nv_rd32(dev,
-						NV10_PGRAPH_CTX_CONTROL);
-	} else {
-		susres->graph_state = nv_rd32(dev, NV04_PGRAPH_STATE);
-		susres->graph_ctx_control = nv_rd32(dev,
-						NV04_PGRAPH_CTX_CONTROL);
-	}
-
-	engine->fifo.save_context(dev_priv->fifos[engine->fifo.channel_id(dev)]);
-	engine->graph.save_context(dev_priv->fifos[engine->fifo.channel_id(dev)]);
-	nouveau_wait_for_idle(dev);
-
-	engine->instmem.prepare_access(dev, false);
-	for (i = 0; i < susres->ramin_size / 4; i++)
-		susres->ramin_copy[i] = nv_ri32(dev, i << 2);
-	engine->instmem.finish_access(dev);
-
-	/* reenable the fifo caches */
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
-		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000001);
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 1);
-
-	return 0;
-}
-
-static int nouveau_resume(struct drm_device *dev)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_suspend_resume *susres = &dev_priv->susres;
-	struct nouveau_engine *engine = &dev_priv->engine;
-	int i;
-
-	if (!susres->ramin_copy)
-		return -EINVAL;
-
-	NV_DEBUG(dev, "Doing resume\n");
-
-	if (dev_priv->gart_info.type == NOUVEAU_GART_AGP) {
-		struct drm_agp_info info;
-		struct drm_agp_mode mode;
-
-		/* agp bridge drivers don't re-enable agp on resume. lame. */
-		if ((i = drm_agp_info(dev, &info))) {
-			NV_ERROR(dev, "Unable to get AGP info: %d\n", i);
-			return i;
-		}
-		mode.mode = info.mode;
-		if ((i = drm_agp_enable(dev, mode))) {
-			NV_ERROR(dev, "Unable to enable AGP: %d\n", i);
-			return i;
-		}
-	}
-
-	dev_priv->engine.instmem.prepare_access(dev, true);
-	for (i = 0; i < susres->ramin_size / 4; i++)
-		nv_wi32(dev, i << 2, susres->ramin_copy[i]);
-	dev_priv->engine.instmem.finish_access(dev);
-
-	engine->mc.init(dev);
-	engine->timer.init(dev);
-	engine->fb.init(dev);
-	engine->graph.init(dev);
-	engine->fifo.init(dev);
-
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 0);
-	/* disable the fifo caches */
-	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000000);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
-		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) & ~1);
-	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000000);
-
-	/* PMC power cycling PFIFO in init clobbers some of the stuff stored in
-	 * PRAMIN (such as NV04_PFIFO_CACHE1_DMA_INSTANCE). this is unhelpful
-	 */
-	dev_priv->engine.instmem.prepare_access(dev, true);
-	for (i = 0; i < susres->ramin_size / 4; i++)
-		nv_wi32(dev, i << 2, susres->ramin_copy[i]);
-	dev_priv->engine.instmem.finish_access(dev);
-
-	engine->fifo.load_context(dev_priv->fifos[0]);
-	nv_wr32(dev, NV04_PFIFO_MODE, susres->fifo_mode);
-
-	engine->graph.load_context(dev_priv->fifos[0]);
-	nouveau_wait_for_idle(dev);
-
-	if (dev_priv->card_type >= NV_10) {
-		nv_wr32(dev, NV10_PGRAPH_STATE, susres->graph_state);
-		nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL,
-						susres->graph_ctx_control);
-	} else {
-		nv_wr32(dev, NV04_PGRAPH_STATE, susres->graph_state);
-		nv_wr32(dev, NV04_PGRAPH_CTX_CONTROL,
-						susres->graph_ctx_control);
-	}
-
-	/* reenable the fifo caches */
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
-		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000001);
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x1);
-
-	if (dev->irq_enabled)
-		nouveau_irq_postinstall(dev);
-
-	kfree(susres->ramin_copy);
-	susres->ramin_copy = NULL;
-	susres->ramin_size = 0;
-
-	return 0;
-}
-
-int nouveau_ioctl_suspend(struct drm_device *dev, void *data,
-				 struct drm_file *file_priv)
-{
-	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
-
-	return nouveau_suspend(dev);
-}
-
-int nouveau_ioctl_resume(struct drm_device *dev, void *data,
-				struct drm_file *file_priv)
-{
-	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
-
-	return nouveau_resume(dev);
-}

@@ -46,7 +46,8 @@ int nouveau_fifo_ctx_size(struct drm_device *dev)
  * functions doing the actual work
  ***********************************/
 
-static int nouveau_fifo_instmem_configure(struct drm_device *dev)
+static int
+nouveau_fifo_instmem_configure(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
@@ -58,39 +59,42 @@ static int nouveau_fifo_instmem_configure(struct drm_device *dev)
 
 	nv_wr32(dev, NV03_PFIFO_RAMRO, dev_priv->ramro_offset>>8);
 
-	switch(dev_priv->card_type)
-	{
-		case NV_40:
-			switch (dev_priv->chipset) {
-			case 0x47:
-			case 0x49:
-			case 0x4b:
-				nv_wr32(dev, 0x2230, 1);
-				break;
-			default:
-				break;
-			}
-			nv_wr32(dev, NV40_PFIFO_RAMFC, 0x30002);
+	switch (dev_priv->card_type) {
+	case NV_40:
+		switch (dev_priv->chipset) {
+		case 0x47:
+		case 0x49:
+		case 0x4b:
+			nv_wr32(dev, 0x2230, 1);
 			break;
-		case NV_44:
-			nv_wr32(dev, NV40_PFIFO_RAMFC,
-				((nouveau_mem_fb_amount(dev) - 512 * 1024 +
-				 dev_priv->ramfc_offset) >> 16) | (2 << 16));
+		default:
 			break;
-		case NV_30:
-		case NV_20:
-		case NV_17:
-			nv_wr32(dev, NV03_PFIFO_RAMFC,
-				(dev_priv->ramfc_offset >> 8) |
-				(1 << 16) /* 64 Bytes entry*/);
-			/* XXX nvidia blob set bit 18, 21,23 for nv20 & nv30 */
-			break;
-		case NV_11:
-		case NV_10:
-		case NV_04:
-			nv_wr32(dev, NV03_PFIFO_RAMFC,
-				dev_priv->ramfc_offset>>8);
-			break;
+		}
+
+		nv_wr32(dev, NV40_PFIFO_RAMFC, 0x30002);
+		break;
+	case NV_44:
+		nv_wr32(dev, NV40_PFIFO_RAMFC,
+			((nouveau_mem_fb_amount(dev) - 512 * 1024 +
+			  dev_priv->ramfc_offset) >> 16) | (2 << 16));
+		break;
+	case NV_30:
+	case NV_20:
+	case NV_17:
+		nv_wr32(dev, NV03_PFIFO_RAMFC,
+			     (dev_priv->ramfc_offset >> 8) |
+			     (1 << 16) /* 64 Bytes entry*/);
+		/* XXX nvidia blob set bit 18, 21,23 for nv20 & nv30 */
+		break;
+	case NV_11:
+	case NV_10:
+	case NV_04:
+	case NV_05:
+		nv_wr32(dev, NV03_PFIFO_RAMFC, dev_priv->ramfc_offset >> 8);
+		break;
+	default:
+		NV_ERROR(dev, "unknown card type %d\n", dev_priv->card_type);
+		return -EINVAL;
 	}
 
 	return 0;
@@ -592,20 +596,19 @@ static int nouveau_ioctl_fifo_alloc(struct drm_device *dev, void *data,
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_channel_alloc *init = data;
-	struct drm_map_list *entry;
 	struct nouveau_channel *chan;
-	int res;
+	int ret;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 
 	if (init->fb_ctxdma_handle == ~0 || init->tt_ctxdma_handle == ~0)
 		return -EINVAL;
 
-	res = nouveau_fifo_alloc(dev, &chan, file_priv,
+	ret = nouveau_fifo_alloc(dev, &chan, file_priv,
 				 init->fb_ctxdma_handle,
 				 init->tt_ctxdma_handle);
-	if (res)
-		return res;
+	if (ret)
+		return ret;
 	init->channel  = chan->id;
 
 	init->subchan[0].handle = NvM2MF;
@@ -615,15 +618,13 @@ static int nouveau_ioctl_fifo_alloc(struct drm_device *dev, void *data,
 		init->subchan[0].grclass = 0x0039;
 	init->nr_subchan = 1;
 
-	/* and the notifier block */
-	entry = drm_find_matching_map(dev, chan->notifier_map);
-	if (!entry) {
+	/* Named memory object area */
+	ret = drm_gem_handle_create(file_priv, chan->notifier_bo->gem,
+				    &init->notifier_handle);
+	if (ret) {
 		nouveau_fifo_free(chan);
-		return -EFAULT;
+		return ret;
 	}
-
-	init->notifier = entry->user_token;
-	init->notifier_size = chan->notifier_bo->bo.mem.size;
 
 	return 0;
 }
@@ -654,8 +655,6 @@ struct drm_ioctl_desc nouveau_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GROBJ_ALLOC, nouveau_ioctl_grobj_alloc, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_NOUVEAU_NOTIFIEROBJ_ALLOC, nouveau_ioctl_notifier_alloc, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GPUOBJ_FREE, nouveau_ioctl_gpuobj_free, DRM_AUTH),
-	DRM_IOCTL_DEF(DRM_NOUVEAU_SUSPEND, nouveau_ioctl_suspend, DRM_AUTH),
-	DRM_IOCTL_DEF(DRM_NOUVEAU_RESUME, nouveau_ioctl_resume, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GEM_NEW, nouveau_gem_ioctl_new, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GEM_PUSHBUF, nouveau_gem_ioctl_pushbuf, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GEM_PUSHBUF_CALL, nouveau_gem_ioctl_pushbuf_call, DRM_AUTH),
@@ -663,7 +662,6 @@ struct drm_ioctl_desc nouveau_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GEM_UNPIN, nouveau_gem_ioctl_unpin, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GEM_CPU_PREP, nouveau_gem_ioctl_cpu_prep, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GEM_CPU_FINI, nouveau_gem_ioctl_cpu_fini, DRM_AUTH),
-	DRM_IOCTL_DEF(DRM_NOUVEAU_GEM_TILE, nouveau_gem_ioctl_tile, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GEM_INFO, nouveau_gem_ioctl_info, DRM_AUTH),
 };
 

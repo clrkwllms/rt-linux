@@ -103,6 +103,26 @@ nouveau_gem_info(struct drm_gem_object *gem, struct drm_nouveau_gem_info *rep)
 	return 0;
 }
 
+static bool
+nouveau_gem_tile_mode_valid(struct drm_device *dev, uint32_t tile_flags) {
+	switch (tile_flags) {
+	case 0x0000:
+	case 0x1800:
+	case 0x2800:
+	case 0x4800:
+	case 0x7000:
+	case 0x7400:
+	case 0x7a00:
+	case 0xe000:
+		break;
+	default:
+		NV_ERROR(dev, "bad page flags: 0x%08x\n", tile_flags);
+		return false;
+	}
+
+	return true;
+}
+
 int
 nouveau_gem_ioctl_new(struct drm_device *dev, void *data,
 		      struct drm_file *file_priv)
@@ -136,20 +156,8 @@ nouveau_gem_ioctl_new(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 
-	switch (req->info.tile_flags) {
-	case 0x0000:
-	case 0x1800:
-	case 0x2800:
-	case 0x4800:
-	case 0x7000:
-	case 0x7400:
-	case 0x7a00:
-	case 0xe000:
-		break;
-	default:
-		NV_ERROR(dev, "bad page flags: 0x%08x\n", req->info.tile_flags);
+	if (!nouveau_gem_tile_mode_valid(dev, req->info.tile_flags))
 		return -EINVAL;
-	}
 
 	ret = nouveau_gem_new(dev, chan, req->info.size, req->align, flags,
 			      req->info.tile_mode, req->info.tile_flags, false,
@@ -587,6 +595,11 @@ nouveau_gem_ioctl_pin(struct drm_device *dev, void *data,
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 
+	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
+		NV_ERROR(dev, "pin only allowed without kernel modesetting\n");
+		return -EINVAL;
+	}
+
 	if (!DRM_SUSER(DRM_CURPROC))
 		return -EPERM;
 
@@ -623,6 +636,9 @@ nouveau_gem_ioctl_unpin(struct drm_device *dev, void *data,
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 
+	if (drm_core_check_feature(dev, DRIVER_MODESET))
+		return -EINVAL;
+
 	gem = drm_gem_object_lookup(dev, file_priv, req->handle);
 	if (!gem)
 		return -EINVAL;
@@ -643,6 +659,7 @@ nouveau_gem_ioctl_cpu_prep(struct drm_device *dev, void *data,
 	struct drm_nouveau_gem_cpu_prep *req = data;
 	struct drm_gem_object *gem;
 	struct nouveau_bo *nvbo;
+	bool no_wait = !!(req->flags & NOUVEAU_GEM_CPU_PREP_NOWAIT);
 	int ret = -EINVAL;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
@@ -656,19 +673,23 @@ nouveau_gem_ioctl_cpu_prep(struct drm_device *dev, void *data,
 		if (nvbo->cpu_filp == file_priv)
 			goto out;
 
-		ret = ttm_bo_wait_cpu(&nvbo->bo, false);
+		ret = ttm_bo_wait_cpu(&nvbo->bo, no_wait);
 		if (ret == -ERESTART)
 			ret = -EAGAIN;
 		if (ret)
 			goto out;
 	}
 
-	ret = ttm_bo_synccpu_write_grab(&nvbo->bo, false);
-	if (ret == -ERESTART)
-		ret = -EAGAIN;
-	else
-	if (ret == 0)
-		nvbo->cpu_filp = file_priv;
+	if (req->flags & NOUVEAU_GEM_CPU_PREP_NOBLOCK) {
+		ret = ttm_bo_wait(&nvbo->bo, false, false, no_wait);
+	} else {
+		ret = ttm_bo_synccpu_write_grab(&nvbo->bo, no_wait);
+		if (ret == -ERESTART)
+			ret = -EAGAIN;
+		else
+		if (ret == 0)
+			nvbo->cpu_filp = file_priv;
+	}
 
 out:
 	mutex_lock(&dev->struct_mutex);
@@ -705,46 +726,6 @@ out:
 	drm_gem_object_unreference(gem);
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
-}
-
-int
-nouveau_gem_ioctl_tile(struct drm_device *dev, void *data,
-		       struct drm_file *file_priv)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct drm_nouveau_gem_tile *req = data;
-	struct drm_gem_object *gem;
-	struct nouveau_bo *nvbo;
-	unsigned offset, tile = 0;
-	int ret;
-
-	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
-
-	gem = drm_gem_object_lookup(dev, file_priv, req->handle);
-	if (!gem)
-		return -EINVAL;
-	nvbo = nouveau_gem_object(gem);
-
-	offset  = nvbo->bo.offset + req->delta;
-	offset -= dev_priv->vm_vram_base;
-
-	if (req->flags & NOUVEAU_MEM_TILE) {
-		if (req->flags & NOUVEAU_MEM_TILE_ZETA)
-			tile = 0x00002800;
-		else
-			tile = 0x00007000;
-	}
-
-	ret = nv50_mem_vm_bind_linear(dev, nvbo->bo.offset + req->delta,
-				      req->size, tile, offset);
-	if (ret)
-		return ret;
-
-	mutex_lock(&dev->struct_mutex);
-	drm_gem_object_unreference(gem);
-	mutex_unlock(&dev->struct_mutex);
-
-	return 0;
 }
 
 int

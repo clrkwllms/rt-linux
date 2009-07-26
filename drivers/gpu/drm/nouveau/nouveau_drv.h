@@ -34,7 +34,7 @@
 
 #define DRIVER_MAJOR		0
 #define DRIVER_MINOR		0
-#define DRIVER_PATCHLEVEL	14
+#define DRIVER_PATCHLEVEL	15
 
 #define NOUVEAU_FAMILY   0x0000FFFF
 #define NOUVEAU_FLAGS    0xFFFF0000
@@ -192,7 +192,6 @@ struct nouveau_channel
 	/* Notifier memory */
 	struct nouveau_bo *notifier_bo;
 	struct mem_block *notifier_heap;
-	struct drm_local_map *notifier_map;
 
 	/* PFIFO context */
 	struct nouveau_gpuobj_ref *ramfc;
@@ -433,6 +432,20 @@ struct nv04_mode_state {
 	struct nv04_crtc_reg crtc_reg[2];
 };
 
+enum nouveau_card_type {
+	NV_UNKNOWN = 0,
+	NV_04      = 4,
+	NV_05      = 5,
+	NV_10      = 10,
+	NV_11      = 11,
+	NV_17      = 17,
+	NV_20      = 20,
+	NV_30      = 30,
+	NV_40      = 40,
+	NV_44      = 44,
+	NV_50      = 50,
+};
+
 struct drm_nouveau_private {
 	struct drm_device *dev;
 	enum {
@@ -442,7 +455,7 @@ struct drm_nouveau_private {
 	} init_state;
 
 	/* the card type, takes NV_* as values */
-	int card_type;
+	enum nouveau_card_type card_type;
 	/* exact chipset, derived from NV_PMC_BOOT_0 */
 	int chipset;
 	int flags;

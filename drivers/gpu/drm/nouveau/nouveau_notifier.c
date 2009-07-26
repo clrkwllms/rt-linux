@@ -33,38 +33,35 @@ int
 nouveau_notifier_init_channel(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_bo *ntfy = NULL;
 	int ret;
 
-	ret = nouveau_bo_new(dev, NULL, PAGE_SIZE, 0, TTM_PL_FLAG_VRAM,
-			     0, 0x0000, false, true, &ntfy);
+	ret = nouveau_gem_new(dev, NULL, PAGE_SIZE, 0, TTM_PL_FLAG_VRAM,
+			      0, 0x0000, false, true, &ntfy);
 	if (ret)
 		return ret;
 
 	ret = nouveau_bo_pin(ntfy, TTM_PL_FLAG_VRAM);
-	if (ret) {
-		nouveau_bo_ref(NULL, &ntfy);
-		return ret;
-	}
+	if (ret)
+		goto out_err;
 
-	ret = drm_addmap(dev, (ntfy->bo.mem.mm_node->start << PAGE_SHIFT) +
-			 dev_priv->fb_phys, ntfy->bo.mem.size,
-			 _DRM_FRAME_BUFFER, 0, &chan->notifier_map);
-	if (ret) {
-		nouveau_bo_ref(NULL, &ntfy);
-		return ret;
-	}
+	ret = nouveau_bo_map(ntfy);
+	if (ret)
+		goto out_err;
 
 	ret = nouveau_mem_init_heap(&chan->notifier_heap, 0, ntfy->bo.mem.size);
-	if (ret) {
-		drm_rmmap(dev, chan->notifier_map);
-		nouveau_bo_ref(NULL, &ntfy);
-		return ret;
-	}
+	if (ret)
+		goto out_err;
 
 	chan->notifier_bo = ntfy;
-	return 0;
+out_err:
+	if (ret) {
+		mutex_lock(&dev->struct_mutex);
+		drm_gem_object_unreference(ntfy->gem);
+		mutex_unlock(&dev->struct_mutex);
+	}
+
+	return ret;
 }
 
 void
@@ -72,11 +69,13 @@ nouveau_notifier_takedown_channel(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 
-	if (chan->notifier_map)
-		drm_rmmap(dev, chan->notifier_map);
+	if (!chan->notifier_bo)
+		return;
 
-	nouveau_bo_ref(NULL, &chan->notifier_bo);
-
+	nouveau_bo_unmap(chan->notifier_bo);
+	mutex_lock(&dev->struct_mutex);
+	drm_gem_object_unreference(chan->notifier_bo->gem);
+	mutex_unlock(&dev->struct_mutex);
 	nouveau_mem_takedown(&chan->notifier_heap);
 }
 
@@ -92,7 +91,7 @@ nouveau_notifier_gpuobj_dtor(struct drm_device *dev,
 
 int
 nouveau_notifier_alloc(struct nouveau_channel *chan, uint32_t handle,
-		       int count, uint32_t *b_offset)
+		       int size, uint32_t *b_offset)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -107,13 +106,12 @@ nouveau_notifier_alloc(struct nouveau_channel *chan, uint32_t handle,
 		return -EINVAL;
 	}
 
-	mem = nouveau_mem_alloc_block(chan->notifier_heap, count*32, 0,
+	mem = nouveau_mem_alloc_block(chan->notifier_heap, size, 0,
 				      (struct drm_file *)-2, 0);
 	if (!mem) {
 		NV_ERROR(dev, "Channel %d notifier block full\n", chan->id);
 		return -ENOMEM;
 	}
-	mem->flags = NOUVEAU_MEM_NOTIFIER;
 
 	offset = chan->notifier_bo->bo.mem.mm_node->start << PAGE_SHIFT;
 	if (chan->notifier_bo->bo.mem.mem_type == TTM_PL_VRAM) {
@@ -186,7 +184,7 @@ nouveau_ioctl_notifier_alloc(struct drm_device *dev, void *data,
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 	NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(na->channel, file_priv, chan);
 
-	ret = nouveau_notifier_alloc(chan, na->handle, na->count, &na->offset);
+	ret = nouveau_notifier_alloc(chan, na->handle, na->size, &na->offset);
 	if (ret)
 		return ret;
 

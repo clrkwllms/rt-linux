@@ -264,7 +264,6 @@ nouveau_gpuobj_new(struct drm_device *dev, struct nouveau_channel *chan,
 		nouveau_gpuobj_del(dev, &gpuobj);
 		return -ENOMEM;
 	}
-	gpuobj->im_pramin->flags = NOUVEAU_MEM_INSTANCE;
 
 	if (!chan && (ret = engine->instmem.bind(dev, gpuobj))) {
 		nouveau_gpuobj_del(dev, &gpuobj);

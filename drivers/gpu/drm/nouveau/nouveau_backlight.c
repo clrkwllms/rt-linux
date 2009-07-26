@@ -136,11 +136,12 @@ int nouveau_backlight_init(struct drm_device *dev)
 	case NV_40:
 	case NV_44:
 		return nouveau_nv40_backlight_init(dev);
-		break;
 	case NV_50:
 		return nouveau_nv50_backlight_init(dev);
+	default:
 		break;
 	}
+
 	return 0;
 }
 
