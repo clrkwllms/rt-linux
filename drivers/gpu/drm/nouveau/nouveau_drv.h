@@ -725,7 +725,8 @@ static inline void nouveau_backlight_exit(struct drm_device *dev) { }
 #endif
 
 /* nouveau_bios.c */
-extern int nouveau_parse_bios(struct drm_device *);
+extern int nouveau_bios_init(struct drm_device *);
+extern void nouveau_bios_takedown(struct drm_device *dev);
 extern int nouveau_run_vbios_init(struct drm_device *);
 extern int get_pll_limits(struct drm_device *, uint32_t limit_match,
 			  struct pll_lims *);

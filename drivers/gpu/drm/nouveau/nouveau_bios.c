@@ -5022,7 +5022,8 @@ int nouveau_run_vbios_init(struct drm_device *dev)
 	return ret;
 }
 
-int nouveau_parse_bios(struct drm_device *dev)
+int
+nouveau_bios_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;
@@ -5031,10 +5032,15 @@ int nouveau_parse_bios(struct drm_device *dev)
 
 	if (!NVInitVBIOS(dev))
 		return -ENODEV;
-	if ((ret = nouveau_parse_vbios_struct(dev)))
+
+	ret = nouveau_parse_vbios_struct(dev);
+	if (ret)
 		return ret;
-	if ((ret = parse_dcb_table(dev, bios, nv_two_heads(dev))))
+
+	ret = parse_dcb_table(dev, bios, nv_two_heads(dev));
+	if (ret)
 		return ret;
+
 	fixup_legacy_i2c(bios);
 
 	if (!bios->major_version)	/* we don't run version 0 bios */
@@ -5061,7 +5067,8 @@ int nouveau_parse_bios(struct drm_device *dev)
 
 	dev_priv->vbios = &bios->pub;
 
-	if ((ret = nouveau_run_vbios_init(dev))) {
+	ret = nouveau_run_vbios_init(dev);
+	if (ret) {
 		dev_priv->vbios = NULL;
 		return ret;
 	}
@@ -5078,4 +5085,9 @@ int nouveau_parse_bios(struct drm_device *dev)
 	bios->execute = true;
 
 	return 0;
+}
+
+void
+nouveau_bios_takedown(struct drm_device *dev)
+{
 }

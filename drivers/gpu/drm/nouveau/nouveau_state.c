@@ -282,7 +282,7 @@ nouveau_card_init(struct drm_device *dev)
 
 	/* Parse BIOS tables / Run init tables if card not POSTed */
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		ret = nouveau_parse_bios(dev);
+		ret = nouveau_bios_init(dev);
 		if (ret)
 			return ret;
 	}
@@ -424,6 +424,7 @@ static void nouveau_card_takedown(struct drm_device *dev)
 			drm_irq_uninstall(dev);
 
 		nouveau_gpuobj_late_takedown(dev);
+		nouveau_bios_takedown(dev);
 
 		dev_priv->init_state = NOUVEAU_CARD_INIT_DOWN;
 	}
