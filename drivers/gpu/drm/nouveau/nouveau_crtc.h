@@ -44,6 +44,7 @@ struct nouveau_crtc {
 	int last_dpms;
 
 	struct {
+		int cpp;
 		bool blanked;
 		uint32_t offset;
 		bool tiled;

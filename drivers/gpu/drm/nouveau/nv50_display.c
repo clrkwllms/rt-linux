@@ -53,7 +53,8 @@ static int
 nv50_evo_channel_new(struct drm_device *dev, struct nouveau_channel **pchan)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_gpuobj *dma_vm = NULL, *dma_vram = NULL;
+	struct nouveau_gpuobj *dma_fb32 = NULL, *dma_fb16 = NULL;
+	struct nouveau_gpuobj *dma_vram = NULL;
 	struct nouveau_channel *chan;
 	int ret;
 
@@ -94,27 +95,52 @@ nv50_evo_channel_new(struct drm_device *dev, struct nouveau_channel **pchan)
 	}
 
 	if (dev_priv->chipset != 0x50) {
-		ret = nouveau_gpuobj_new(dev, chan, 6*4, 32, 0, &dma_vm);
+		ret = nouveau_gpuobj_new(dev, chan, 6*4, 32, 0, &dma_fb32);
 		if (ret) {
 			nv50_evo_channel_del(pchan);
 			return ret;
 		}
-		dma_vm->engine = NVOBJ_ENGINE_DISPLAY;
+		dma_fb32->engine = NVOBJ_ENGINE_DISPLAY;
 
-		ret = nouveau_gpuobj_ref_add(dev, chan, NvEvoVM, dma_vm, NULL);
+		ret = nouveau_gpuobj_ref_add(dev, chan, NvEvoFB32, dma_fb32,
+					     NULL);
 		if (ret) {
-			nouveau_gpuobj_del(dev, &dma_vm);
+			nouveau_gpuobj_del(dev, &dma_fb32);
 			nv50_evo_channel_del(pchan);
 			return ret;
 		}
 
 		dev_priv->engine.instmem.prepare_access(dev, true);
-		nv_wo32(dev, dma_vm, 0, 0x1e99003d);
-		nv_wo32(dev, dma_vm, 1, 0xffffffff);
-		nv_wo32(dev, dma_vm, 2, 0x00000000);
-		nv_wo32(dev, dma_vm, 3, 0x00000000);
-		nv_wo32(dev, dma_vm, 4, 0x00000000);
-		nv_wo32(dev, dma_vm, 5, 0x00010000);
+		nv_wo32(dev, dma_fb32, 0, 0x1e99003d);
+		nv_wo32(dev, dma_fb32, 1, 0xffffffff);
+		nv_wo32(dev, dma_fb32, 2, 0x00000000);
+		nv_wo32(dev, dma_fb32, 3, 0x00000000);
+		nv_wo32(dev, dma_fb32, 4, 0x00000000);
+		nv_wo32(dev, dma_fb32, 5, 0x00010000);
+		dev_priv->engine.instmem.finish_access(dev);
+
+		ret = nouveau_gpuobj_new(dev, chan, 6*4, 32, 0, &dma_fb16);
+		if (ret) {
+			nv50_evo_channel_del(pchan);
+			return ret;
+		}
+		dma_fb16->engine = NVOBJ_ENGINE_DISPLAY;
+
+		ret = nouveau_gpuobj_ref_add(dev, chan, NvEvoFB16, dma_fb16,
+					     NULL);
+		if (ret) {
+			nouveau_gpuobj_del(dev, &dma_fb16);
+			nv50_evo_channel_del(pchan);
+			return ret;
+		}
+
+		dev_priv->engine.instmem.prepare_access(dev, true);
+		nv_wo32(dev, dma_fb16, 0, 0x1c19003d);
+		nv_wo32(dev, dma_fb16, 1, 0xffffffff);
+		nv_wo32(dev, dma_fb16, 2, 0x00000000);
+		nv_wo32(dev, dma_fb16, 3, 0x00000000);
+		nv_wo32(dev, dma_fb16, 4, 0x00000000);
+		nv_wo32(dev, dma_fb16, 5, 0x00010000);
 		dev_priv->engine.instmem.finish_access(dev);
 	}
 

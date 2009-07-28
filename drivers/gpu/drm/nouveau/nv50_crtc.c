@@ -141,7 +141,10 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 		OUT_RING  (evo, 0);
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, FB_DMA), 1);
 		if (dev_priv->chipset != 0x50 && crtc->fb.tiled)
-			OUT_RING(evo, NvEvoVM);
+			if (crtc->fb.cpp == 2)
+				OUT_RING(evo, NvEvoFB16);
+			else
+				OUT_RING(evo, NvEvoFB32);
 		else
 			OUT_RING(evo, NvEvoVRAM);
 	}
@@ -563,12 +566,20 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	if (!crtc->fb.tiled || dev_priv->chipset == 0x50)
 		crtc->fb.offset -= dev_priv->vm_vram_base;
 
+	crtc->fb.cpp = drm_fb->bits_per_pixel / 8;
 	if (!crtc->fb.blanked && dev_priv->chipset != 0x50) {
 		ret = RING_SPACE(evo, 2);
 		if (ret)
 			return ret;
+
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, FB_DMA), 1);
-		OUT_RING  (evo, crtc->fb.tiled ? NvEvoVM : NvEvoVRAM);
+		if (crtc->fb.tiled) {
+			if (crtc->fb.cpp == 4)
+				OUT_RING  (evo, NvEvoFB32);
+			else
+				OUT_RING  (evo, NvEvoFB16);
+		} else
+			OUT_RING  (evo, NvEvoVRAM);
 	}
 
 	ret = RING_SPACE(evo, 10);

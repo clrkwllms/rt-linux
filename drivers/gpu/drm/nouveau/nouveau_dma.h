@@ -52,7 +52,8 @@ typedef enum {
 
 	/* G80+ display objects */
 	NvEvoVRAM	= 0x01000000,
-	NvEvoVM		= 0x01000001
+	NvEvoFB16	= 0x01000001,
+	NvEvoFB32	= 0x01000002
 } nouveau_object_handle_t;
 
 #define NV_MEMORY_TO_MEMORY_FORMAT                                    0x00000039
