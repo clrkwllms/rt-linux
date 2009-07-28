@@ -50,11 +50,42 @@ nv50_evo_channel_del(struct nouveau_channel **pchan)
 }
 
 static int
+nv50_evo_dmaobj_new(struct nouveau_channel *evo, uint32_t class, uint32_t name,
+		    uint32_t tile_flags, uint32_t magic_flags,
+		    uint32_t offset, uint32_t limit)
+{
+	struct drm_nouveau_private *dev_priv = evo->dev->dev_private;
+	struct drm_device *dev = evo->dev;
+	struct nouveau_gpuobj *obj = NULL;
+	int ret;
+
+	ret = nouveau_gpuobj_new(dev, evo, 6*4, 32, 0, &obj);
+	if (ret)
+		return ret;
+	obj->engine = NVOBJ_ENGINE_DISPLAY;
+
+	ret = nouveau_gpuobj_ref_add(dev, evo, name, obj, NULL);
+	if (ret) {
+		nouveau_gpuobj_del(dev, &obj);
+		return ret;
+	}
+
+	dev_priv->engine.instmem.prepare_access(dev, true);
+	nv_wo32(dev, obj, 0, (tile_flags << 22) | (magic_flags << 16) | class);
+	nv_wo32(dev, obj, 1, limit);
+	nv_wo32(dev, obj, 2, offset);
+	nv_wo32(dev, obj, 3, 0x00000000);
+	nv_wo32(dev, obj, 4, 0x00000000);
+	nv_wo32(dev, obj, 5, 0x00010000);
+	dev_priv->engine.instmem.finish_access(dev);
+
+	return 0;
+}
+
+static int
 nv50_evo_channel_new(struct drm_device *dev, struct nouveau_channel **pchan)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_gpuobj *dma_fb32 = NULL, *dma_fb16 = NULL;
-	struct nouveau_gpuobj *dma_vram = NULL;
 	struct nouveau_channel *chan;
 	int ret;
 
@@ -95,77 +126,28 @@ nv50_evo_channel_new(struct drm_device *dev, struct nouveau_channel **pchan)
 	}
 
 	if (dev_priv->chipset != 0x50) {
-		ret = nouveau_gpuobj_new(dev, chan, 6*4, 32, 0, &dma_fb32);
+		ret = nv50_evo_dmaobj_new(chan, 0x3d, NvEvoFB16, 0x70, 0x19,
+					  0, 0xffffffff);
 		if (ret) {
 			nv50_evo_channel_del(pchan);
 			return ret;
 		}
-		dma_fb32->engine = NVOBJ_ENGINE_DISPLAY;
 
-		ret = nouveau_gpuobj_ref_add(dev, chan, NvEvoFB32, dma_fb32,
-					     NULL);
-		if (ret) {
-			nouveau_gpuobj_del(dev, &dma_fb32);
-			nv50_evo_channel_del(pchan);
-			return ret;
-		}
 
-		dev_priv->engine.instmem.prepare_access(dev, true);
-		nv_wo32(dev, dma_fb32, 0, 0x1e99003d);
-		nv_wo32(dev, dma_fb32, 1, 0xffffffff);
-		nv_wo32(dev, dma_fb32, 2, 0x00000000);
-		nv_wo32(dev, dma_fb32, 3, 0x00000000);
-		nv_wo32(dev, dma_fb32, 4, 0x00000000);
-		nv_wo32(dev, dma_fb32, 5, 0x00010000);
-		dev_priv->engine.instmem.finish_access(dev);
-
-		ret = nouveau_gpuobj_new(dev, chan, 6*4, 32, 0, &dma_fb16);
+		ret = nv50_evo_dmaobj_new(chan, 0x3d, NvEvoFB32, 0x7a, 0x19,
+					  0, 0xffffffff);
 		if (ret) {
 			nv50_evo_channel_del(pchan);
 			return ret;
 		}
-		dma_fb16->engine = NVOBJ_ENGINE_DISPLAY;
-
-		ret = nouveau_gpuobj_ref_add(dev, chan, NvEvoFB16, dma_fb16,
-					     NULL);
-		if (ret) {
-			nouveau_gpuobj_del(dev, &dma_fb16);
-			nv50_evo_channel_del(pchan);
-			return ret;
-		}
-
-		dev_priv->engine.instmem.prepare_access(dev, true);
-		nv_wo32(dev, dma_fb16, 0, 0x1c19003d);
-		nv_wo32(dev, dma_fb16, 1, 0xffffffff);
-		nv_wo32(dev, dma_fb16, 2, 0x00000000);
-		nv_wo32(dev, dma_fb16, 3, 0x00000000);
-		nv_wo32(dev, dma_fb16, 4, 0x00000000);
-		nv_wo32(dev, dma_fb16, 5, 0x00010000);
-		dev_priv->engine.instmem.finish_access(dev);
 	}
 
-	ret = nouveau_gpuobj_new(dev, chan, 6*4, 32, 0, &dma_vram);
+	ret = nv50_evo_dmaobj_new(chan, 0x3d, NvEvoVRAM, 0, 0x19,
+				  0, nouveau_mem_fb_amount(dev));
 	if (ret) {
 		nv50_evo_channel_del(pchan);
 		return ret;
 	}
-	dma_vram->engine = NVOBJ_ENGINE_DISPLAY;
-
-	ret = nouveau_gpuobj_ref_add(dev, chan, NvEvoVRAM, dma_vram, NULL);
-	if (ret) {
-		nouveau_gpuobj_del(dev, &dma_vram);
-		nv50_evo_channel_del(pchan);
-		return ret;
-	}
-
-	dev_priv->engine.instmem.prepare_access(dev, true);
-	nv_wo32(dev, dma_vram, 0, 0x0019003d);
-	nv_wo32(dev, dma_vram, 1, nouveau_mem_fb_amount(dev) - 1);
-	nv_wo32(dev, dma_vram, 2, 0x00000000);
-	nv_wo32(dev, dma_vram, 3, 0x00000000);
-	nv_wo32(dev, dma_vram, 4, 0x00000000);
-	nv_wo32(dev, dma_vram, 5, 0x00010000);
-	dev_priv->engine.instmem.finish_access(dev);
 
 	ret = nouveau_bo_new(dev, NULL, 4096, 0, TTM_PL_FLAG_VRAM, 0, 0,
 			     false, true, &chan->pushbuf_bo);
