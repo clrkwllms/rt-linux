@@ -983,7 +983,8 @@ static int
 nv04_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
 		     uint32_t buffer_handle, uint32_t width, uint32_t height)
 {
-	struct drm_device *dev = crtc->dev;
+	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_device *dev = dev_priv->dev;
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 	struct nouveau_bo *cursor = NULL;
 	struct drm_gem_object *gem;
@@ -1028,8 +1029,12 @@ nv04_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
 			pixel = (pixel & 0x00ffffff) | ((alpha + 1) << 24);
 
 #ifdef __BIG_ENDIAN
-		if (dev_priv->chipset == 0x11)
-			pixel = lswapl(tmp);
+		if (dev_priv->chipset == 0x11) {
+			pixel = ((pixel & 0x000000ff) << 24) |
+				((pixel & 0x0000ff00) << 8) |
+				((pixel & 0x00ff0000) >> 8) |
+				((pixel & 0xff000000) >> 24);
+		}
 #endif
 
 		*dst++ = pixel;
