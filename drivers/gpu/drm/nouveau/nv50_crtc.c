@@ -561,11 +561,8 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 		nouveau_bo_unpin(ofb->nvbo);
 	}
 
-	crtc->fb.offset = fb->nvbo->bo.offset;
+	crtc->fb.offset = fb->nvbo->bo.offset - dev_priv->vm_vram_base;
 	crtc->fb.tiled = fb->nvbo->tile_flags ? true : false;
-	if (!crtc->fb.tiled || dev_priv->chipset == 0x50)
-		crtc->fb.offset -= dev_priv->vm_vram_base;
-
 	crtc->fb.cpp = drm_fb->bits_per_pixel / 8;
 	if (!crtc->fb.blanked && dev_priv->chipset != 0x50) {
 		ret = RING_SPACE(evo, 2);
