@@ -227,11 +227,9 @@ static inline uint8_t NVReadVgaCrtc5758(struct drm_device *dev, int head, uint8_
 
 static inline uint8_t NVReadPRMVIO(struct drm_device *dev, int head, uint32_t reg)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-
 	/* Only NV4x have two pvio ranges; other twoHeads cards MUST call
 	 * NVSetOwner for the relevant head to be programmed */
-	if (head && dev_priv->card_type == NV_40)
+	if (head && nv_arch(dev) == NV_40)
 		reg += NV_PRMVIO_SIZE;
 
 	NV_DEBUG(dev, "NVReadPRMVIO: head %d reg %08x val %02x\n", head, reg,
@@ -242,11 +240,9 @@ static inline uint8_t NVReadPRMVIO(struct drm_device *dev, int head, uint32_t re
 static inline void
 NVWritePRMVIO(struct drm_device *dev, int head, uint32_t reg, uint8_t value)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-
 	/* Only NV4x have two pvio ranges; other twoHeads cards MUST call
 	 * NVSetOwner for the relevant head to be programmed */
-	if (head && dev_priv->card_type == NV_40)
+	if (head && nv_arch(dev) == NV_40)
 		reg += NV_PRMVIO_SIZE;
 
 	NV_DEBUG(dev, "NVWritePRMVIO: head %d reg %08x val %02x\n", head, reg, value);
@@ -409,14 +405,13 @@ nv_show_cursor(struct drm_device *dev, int head, bool show)
 		*curctl1 &= ~MASK(NV_CIO_CRE_HCUR_ADDR1_ENABLE);
 	NVWriteVgaCrtc(dev, head, NV_CIO_CRE_HCUR_ADDR1_INDEX, *curctl1);
 
-	if (dev_priv->card_type == NV_40)
+	if (nv_arch(dev) == NV_40)
 		nv_fix_nv40_hw_cursor(dev, head);
 }
 
 static inline uint32_t
 nv_pitch_align(struct drm_device *dev, uint32_t width, int bpp)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	int mask;
 
 	if (bpp == 15)
@@ -425,7 +420,7 @@ nv_pitch_align(struct drm_device *dev, uint32_t width, int bpp)
 		bpp = 8;
 
 	/* Alignment requirements taken from the Haiku driver */
-	if (dev_priv->card_type == NV_04)
+	if (nv_arch(dev) == NV_04)
 		mask = 128 / bpp - 1;
 	else
 		mask = 512 / bpp - 1;
