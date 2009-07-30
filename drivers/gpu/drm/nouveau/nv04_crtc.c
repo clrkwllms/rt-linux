@@ -967,6 +967,15 @@ nv04_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 		nv_crtc_gamma_load(nv_crtc);
 	}
 
+	regp->CRTC[NV_CIO_CRE_PIXEL_INDEX] &= ~3;
+	regp->CRTC[NV_CIO_CRE_PIXEL_INDEX] |= (crtc->fb->depth + 1) / 8;
+	regp->ramdac_gen_ctrl &= ~NV_PRAMDAC_GENERAL_CONTROL_ALT_MODE_SEL;
+	if (crtc->fb->depth == 16)
+		regp->ramdac_gen_ctrl |= NV_PRAMDAC_GENERAL_CONTROL_ALT_MODE_SEL;
+	crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_PIXEL_INDEX);
+	NVWriteRAMDAC(crtc->dev, nv_crtc->index, NV_PRAMDAC_GENERAL_CONTROL,
+		      regp->ramdac_gen_ctrl);
+
 	regp->CRTC[NV_CIO_CR_OFFSET_INDEX] = drm_fb->pitch >> 3;
 	regp->CRTC[NV_CIO_CRE_RPC0_INDEX] =
 		XLATE(drm_fb->pitch >> 3, 8, NV_CIO_CRE_RPC0_OFFSET_10_8);
