@@ -497,7 +497,8 @@ nouveau_mem_init(struct drm_device *dev)
 
 	ret = ttm_bo_device_init(&dev_priv->ttm.bdev,
 				 dev_priv->ttm.mem_global_ref.object,
-				 &nouveau_bo_driver, DRM_FILE_PAGE_OFFSET);
+				 &nouveau_bo_driver, DRM_FILE_PAGE_OFFSET,
+				 dev_priv->card_type < NV_50);
 	if (ret) {
 		NV_ERROR(dev, "Error initialising bo driver: %d\n", ret);
 		return ret;
