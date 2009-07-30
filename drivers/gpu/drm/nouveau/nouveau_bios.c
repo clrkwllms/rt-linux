@@ -4595,10 +4595,12 @@ static bool
 parse_dcb15_entry(struct drm_device *dev, struct parsed_dcb *dcb,
 		  uint32_t conn, uint32_t conf, struct dcb_entry *entry)
 {
-	if (conn != 0xf0003f00 && conn != 0xf2247f10 &&
-	    conn != 0xf2204001 && conn != 0xf2204301 && conn != 0xf2204311 && conn != 0xf2208001 && conn != 0xf2244001 && conn != 0xf2244301 && conn != 0xf2244311 && conn != 0xf4204011 && conn != 0xf4208011 && conn != 0xf4248011 &&
-	    conn != 0xf2045ff2 &&
-	    conn != 0xf2045f14 && conn != 0xf207df14 && conn != 0xf2205004) {
+	if (conn != 0xf0003f00 && conn != 0xf2247f10 && conn != 0xf2204001 &&
+	    conn != 0xf2204301 && conn != 0xf2204311 && conn != 0xf2208001 &&
+	    conn != 0xf2244001 && conn != 0xf2244301 && conn != 0xf2244311 &&
+	    conn != 0xf4204011 && conn != 0xf4208011 && conn != 0xf4248011 &&
+	    conn != 0xf2045ff2 && conn != 0xf2045f14 && conn != 0xf207df14 &&
+	    conn != 0xf2205004 && conn != 0xf2209004) {
 		NV_ERROR(dev, "Unknown DCB 1.5 entry, please report\n");
 
 		/* cause output setting to fail for !TV, so message is seen */
