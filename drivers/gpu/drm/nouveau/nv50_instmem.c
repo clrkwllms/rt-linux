@@ -317,7 +317,7 @@ nv50_instmem_suspend(struct drm_device *dev)
 	struct nouveau_gpuobj *ramin = chan->ramin->gpuobj;
 	int i;
 
-	ramin->im_backing_suspend = kmalloc(ramin->im_pramin->size, GFP_KERNEL);
+	ramin->im_backing_suspend = vmalloc(ramin->im_pramin->size);
 	if (!ramin->im_backing_suspend)
 		return -ENOMEM;
 
@@ -338,7 +338,7 @@ nv50_instmem_resume(struct drm_device *dev)
 	nv_wr32(dev, NV50_PUNK_BAR0_PRAMIN, (ramin->im_backing_start >> 16));
 	for (i = 0; i < ramin->im_pramin->size; i += 4)
 		BAR0_WI32(ramin, i, ramin->im_backing_suspend[i/4]);
-	kfree(ramin->im_backing_suspend);
+	vfree(ramin->im_backing_suspend);
 	ramin->im_backing_suspend = NULL;
 
 	/* Poke the relevant regs, and pray it works :) */
