@@ -134,7 +134,6 @@ int nouveau_backlight_init(struct drm_device *dev)
 
 	switch (dev_priv->card_type) {
 	case NV_40:
-	case NV_44:
 		return nouveau_nv40_backlight_init(dev);
 	case NV_50:
 		return nouveau_nv50_backlight_init(dev);

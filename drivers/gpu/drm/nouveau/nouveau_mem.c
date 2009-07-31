@@ -393,7 +393,6 @@ uint64_t nouveau_mem_fb_amount(struct drm_device *dev)
 		case NV_20:
 		case NV_30:
 		case NV_40:
-		case NV_44:
 		case NV_50:
 		default:
 			if (dev_priv->flags & (NV_NFORCE | NV_NFORCE2)) {

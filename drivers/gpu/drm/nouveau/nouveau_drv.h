@@ -442,7 +442,6 @@ enum nouveau_card_type {
 	NV_20      = 20,
 	NV_30      = 30,
 	NV_40      = 40,
-	NV_44      = 44,
 	NV_50      = 50,
 };
 

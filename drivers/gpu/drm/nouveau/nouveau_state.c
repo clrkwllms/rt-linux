@@ -467,9 +467,6 @@ static void nouveau_OF_copy_vbios_to_ramin(struct drm_device *dev)
 #endif
 }
 
-#define NV40_CHIPSET_MASK 0x00000baf
-#define NV44_CHIPSET_MASK 0x00005450
-
 int nouveau_load(struct drm_device *dev, unsigned long flags)
 {
 	struct drm_nouveau_private *dev_priv;
@@ -525,45 +522,34 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 		architecture = 0x04;
 	}
 
-	if (architecture >= 0x80) {
+	if (architecture >= 0x80)
 		dev_priv->card_type = NV_50;
-	} else if (architecture >= 0x60) {
-		/* FIXME we need to figure out who's who for NV6x */
-		dev_priv->card_type = NV_44;
-	} else if (architecture >= 0x50) {
+	else if (architecture >= 0x60)
+		dev_priv->card_type = NV_40;
+	else if (architecture >= 0x50)
 		dev_priv->card_type = NV_50;
-	} else if (architecture >= 0x40) {
-		uint8_t subarch = architecture & 0xf;
-		/* Selection criteria borrowed from NV40EXA */
-		if (NV40_CHIPSET_MASK & (1 << subarch)) {
-			dev_priv->card_type = NV_40;
-		} else if (NV44_CHIPSET_MASK & (1 << subarch)) {
-			dev_priv->card_type = NV_44;
-		} else {
-			dev_priv->card_type = NV_UNKNOWN;
-		}
-	} else if (architecture >= 0x30) {
+	else if (architecture >= 0x40)
+		dev_priv->card_type = NV_40;
+	else if (architecture >= 0x30)
 		dev_priv->card_type = NV_30;
-	} else if (architecture >= 0x20) {
+	else if (architecture >= 0x20)
 		dev_priv->card_type = NV_20;
-	} else if (architecture >= 0x17) {
+	else if (architecture >= 0x17)
 		dev_priv->card_type = NV_17;
-	} else if (architecture >= 0x11) {
+	else if (architecture >= 0x11)
 		dev_priv->card_type = NV_11;
-	} else if (architecture >= 0x10) {
+	else if (architecture >= 0x10)
 		dev_priv->card_type = NV_10;
-	} else if (architecture >= 0x04) {
+	else if (architecture >= 0x04)
 		dev_priv->card_type = NV_04;
-	} else {
+	else
 		dev_priv->card_type = NV_UNKNOWN;
-	}
 
 	NV_INFO(dev, "Detected an NV%d generation card (0x%08x)\n",
-						dev_priv->card_type, reg0);
+		dev_priv->card_type, reg0);
 
-	if (dev_priv->card_type == NV_UNKNOWN) {
+	if (dev_priv->card_type == NV_UNKNOWN)
 		return -EINVAL;
-	}
 
 	/* map larger RAMIN aperture on NV40 cards */
 	dev_priv->ramin  = NULL;

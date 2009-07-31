@@ -71,12 +71,25 @@ nouveau_fifo_instmem_configure(struct drm_device *dev)
 			break;
 		}
 
-		nv_wr32(dev, NV40_PFIFO_RAMFC, 0x30002);
-		break;
-	case NV_44:
-		nv_wr32(dev, NV40_PFIFO_RAMFC,
-			((nouveau_mem_fb_amount(dev) - 512 * 1024 +
-			  dev_priv->ramfc_offset) >> 16) | (2 << 16));
+		switch (dev_priv->chipset) {
+		case 0x40:
+		case 0x41:
+		case 0x42:
+		case 0x43:
+		case 0x45:
+		case 0x47:
+		case 0x48:
+		case 0x49:
+		case 0x4b:
+			nv_wr32(dev, NV40_PFIFO_RAMFC, 0x30002);
+			break;
+		default:
+			nv_wr32(dev, 0x2230, 0);
+			nv_wr32(dev, NV40_PFIFO_RAMFC,
+				((nouveau_mem_fb_amount(dev) - 512 * 1024 +
+				  dev_priv->ramfc_offset) >> 16) | (2 << 16));
+			break;
+		}
 		break;
 	case NV_30:
 	case NV_20:

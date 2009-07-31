@@ -72,7 +72,6 @@ nv04_instmem_configure_fixed_tables(struct drm_device *dev)
 	switch(dev_priv->card_type)
 	{
 		case NV_40:
-		case NV_44:
 			dev_priv->ramfc_offset = 0x20000;
 			dev_priv->ramfc_size   = engine->fifo.channels *
 						 nouveau_fifo_ctx_size(dev);
