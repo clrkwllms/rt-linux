@@ -614,6 +614,9 @@ static int nouveau_ioctl_fifo_alloc(struct drm_device *dev, void *data,
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 
+	if (dev_priv->engine.graph.accel_blocked)
+		return -ENODEV;
+
 	if (init->fb_ctxdma_handle == ~0 || init->tt_ctxdma_handle == ~0)
 		return -EINVAL;
 

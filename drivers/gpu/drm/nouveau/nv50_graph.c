@@ -119,13 +119,16 @@ nv50_graph_init_ctxctl(struct drm_device *dev)
 		break;
 	default:
 		NV_ERROR(dev, "no ctxprog for chipset NV%02x\n", dev_priv->chipset);
-		return -EINVAL;
+		dev_priv->engine.graph.accel_blocked = true;
+		break;
 	}
 
-	nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
-	while (*voodoo != ~0) {
-		nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_DATA, *voodoo);
-		voodoo++;
+	if (voodoo) {
+		nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
+		while (*voodoo != ~0) {
+			nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_DATA, *voodoo);
+			voodoo++;
+		}
 	}
 
 	nv_wr32(dev, 0x400320, 4);
@@ -239,13 +242,15 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
 
-	pos = 0;
-	while (*ctxvals) {
-		int cnt = *ctxvals++;
+	if (ctxvals) {
+		pos = 0;
+		while (*ctxvals) {
+			int cnt = *ctxvals++;
 
-		while (cnt--)
-			nv_wo32(dev, ctx, pos++, *ctxvals);
-		ctxvals++;
+			while (cnt--)
+				nv_wo32(dev, ctx, pos++, *ctxvals);
+			ctxvals++;
+		}
 	}
 
 	nv_wo32(dev, ctx, 0x00000/4, chan->ramin->instance >> 12);

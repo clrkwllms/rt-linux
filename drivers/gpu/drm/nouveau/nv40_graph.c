@@ -1946,7 +1946,7 @@ nv40_graph_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv =
 		(struct drm_nouveau_private *)dev->dev_private;
-	uint32_t *ctx_prog;
+	uint32_t *ctx_prog = NULL;
 	uint32_t vramsz, tmp;
 	int i, j;
 
@@ -1972,17 +1972,20 @@ nv40_graph_init(struct drm_device *dev)
 	default:
 		NV_ERROR(dev, "Context program for 0x%02x unavailable\n",
 			 dev_priv->chipset);
-		return -EINVAL;
+		dev_priv->engine.graph.accel_blocked = true;
+		break;
 	}
 
 	/* Load the context program onto the card */
-	NV_DEBUG(dev, "Loading context program\n");
+	if (ctx_prog) {
+		NV_DEBUG(dev, "Loading context program\n");
 
-	i = 0;
-	nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
-	while (ctx_prog[i] != ~0) {
-		nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_DATA, ctx_prog[i]);
-		i++;
+		i = 0;
+		nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
+		while (ctx_prog[i] != ~0) {
+			nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_DATA, ctx_prog[i]);
+			i++;
+		}
 	}
 
 	/* No context present currently */

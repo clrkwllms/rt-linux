@@ -310,6 +310,7 @@ struct nouveau_pgraph_object_class {
 
 struct nouveau_pgraph_engine {
 	struct nouveau_pgraph_object_class *grclass;
+	bool accel_blocked;
 
 	int  (*init)(struct drm_device *);
 	void (*takedown)(struct drm_device *);
