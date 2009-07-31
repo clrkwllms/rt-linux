@@ -1155,6 +1155,27 @@ nouveau_gpuobj_suspend(struct drm_device *dev)
 }
 
 void
+nouveau_gpuobj_suspend_cleanup(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_gpuobj *gpuobj;
+
+	if (dev_priv->card_type < NV_50) {
+		vfree(dev_priv->susres.ramin_copy);
+		dev_priv->susres.ramin_copy = NULL;
+		return;
+	}
+
+	list_for_each_entry(gpuobj, &dev_priv->gpuobj_list, list) {
+		if (!gpuobj->im_backing_suspend)
+			continue;
+
+		vfree(gpuobj->im_backing_suspend);
+		gpuobj->im_backing_suspend = NULL;
+	}
+}
+
+void
 nouveau_gpuobj_resume(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -1164,8 +1185,7 @@ nouveau_gpuobj_resume(struct drm_device *dev)
 	if (dev_priv->card_type < NV_50) {
 		for (i = 0; i < dev_priv->ramin_rsvd_vram; i += 4)
 			nv_wi32(dev, i, dev_priv->susres.ramin_copy[i/4]);
-		vfree(dev_priv->susres.ramin_copy);
-		dev_priv->susres.ramin_copy = NULL;
+		nouveau_gpuobj_suspend_cleanup(dev);
 		return;
 	}
 
@@ -1177,10 +1197,9 @@ nouveau_gpuobj_resume(struct drm_device *dev)
 		for (i = 0; i < gpuobj->im_pramin->size / 4; i++)
 			nv_wo32(dev, gpuobj, i, gpuobj->im_backing_suspend[i]);
 		dev_priv->engine.instmem.finish_access(dev);
-
-		vfree(gpuobj->im_backing_suspend);
-		gpuobj->im_backing_suspend = NULL;
 	}
+
+	nouveau_gpuobj_suspend_cleanup(dev);
 }
 
 int nouveau_ioctl_grobj_alloc(struct drm_device *dev, void *data,

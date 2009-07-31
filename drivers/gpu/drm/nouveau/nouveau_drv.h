@@ -667,6 +667,7 @@ extern int  nouveau_gpuobj_init(struct drm_device *);
 extern void nouveau_gpuobj_takedown(struct drm_device *);
 extern void nouveau_gpuobj_late_takedown(struct drm_device *);
 extern int  nouveau_gpuobj_suspend(struct drm_device *dev);
+extern void nouveau_gpuobj_suspend_cleanup(struct drm_device *dev);
 extern void nouveau_gpuobj_resume(struct drm_device *dev);
 extern int nouveau_gpuobj_channel_init(struct nouveau_channel *,
 				       uint32_t vram_h, uint32_t tt_h);
@@ -855,6 +856,8 @@ extern void nv50_graph_context_switch(struct drm_device *);
 /* nv04_instmem.c */
 extern int  nv04_instmem_init(struct drm_device *);
 extern void nv04_instmem_takedown(struct drm_device *);
+extern int  nv04_instmem_suspend(struct drm_device *);
+extern void nv04_instmem_resume(struct drm_device *);
 extern int  nv04_instmem_populate(struct drm_device *, struct nouveau_gpuobj *,
 				  uint32_t *size);
 extern void nv04_instmem_clear(struct drm_device *, struct nouveau_gpuobj *);

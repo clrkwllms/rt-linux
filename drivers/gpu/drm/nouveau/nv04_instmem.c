@@ -179,3 +179,14 @@ nv04_instmem_finish_access(struct drm_device *dev)
 {
 }
 
+int
+nv04_instmem_suspend(struct drm_device *dev)
+{
+	return 0;
+}
+
+void
+nv04_instmem_resume(struct drm_device *dev)
+{
+}
+

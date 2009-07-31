@@ -45,6 +45,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 	case 0x00:
 		engine->instmem.init	= nv04_instmem_init;
 		engine->instmem.takedown= nv04_instmem_takedown;
+		engine->instmem.suspend	= nv04_instmem_suspend;
+		engine->instmem.resume	= nv04_instmem_resume;
 		engine->instmem.populate	= nv04_instmem_populate;
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
@@ -78,6 +80,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 	case 0x10:
 		engine->instmem.init	= nv04_instmem_init;
 		engine->instmem.takedown= nv04_instmem_takedown;
+		engine->instmem.suspend	= nv04_instmem_suspend;
+		engine->instmem.resume	= nv04_instmem_resume;
 		engine->instmem.populate	= nv04_instmem_populate;
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
@@ -111,6 +115,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 	case 0x20:
 		engine->instmem.init	= nv04_instmem_init;
 		engine->instmem.takedown= nv04_instmem_takedown;
+		engine->instmem.suspend	= nv04_instmem_suspend;
+		engine->instmem.resume	= nv04_instmem_resume;
 		engine->instmem.populate	= nv04_instmem_populate;
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
@@ -144,6 +150,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 	case 0x30:
 		engine->instmem.init	= nv04_instmem_init;
 		engine->instmem.takedown= nv04_instmem_takedown;
+		engine->instmem.suspend	= nv04_instmem_suspend;
+		engine->instmem.resume	= nv04_instmem_resume;
 		engine->instmem.populate	= nv04_instmem_populate;
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
@@ -178,6 +186,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 	case 0x60:
 		engine->instmem.init	= nv04_instmem_init;
 		engine->instmem.takedown= nv04_instmem_takedown;
+		engine->instmem.suspend	= nv04_instmem_suspend;
+		engine->instmem.resume	= nv04_instmem_resume;
 		engine->instmem.populate	= nv04_instmem_populate;
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;

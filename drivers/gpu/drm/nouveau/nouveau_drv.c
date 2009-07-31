@@ -155,15 +155,14 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	ret = nouveau_gpuobj_suspend(dev);
 	if (ret) {
 		NV_ERROR(dev, "... failed: %d\n", ret);
-		return ret;
+		goto out_abort;
 	}
 
-	if (engine->instmem.suspend) {
-		ret = engine->instmem.suspend(dev);
-		if (ret) {
-			NV_ERROR(dev, "... failed: %d\n", ret);
-			return ret;
-		}
+	ret = engine->instmem.suspend(dev);
+	if (ret) {
+		NV_ERROR(dev, "... failed: %d\n", ret);
+		nouveau_gpuobj_suspend_cleanup(dev);
+		goto out_abort;
 	}
 
 	NV_INFO(dev, "And we're gone!\n");
@@ -178,6 +177,18 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	release_console_sem();
 	dev_priv->fbdev_info->flags = fbdev_flags;
 	return 0;
+
+out_abort:
+	NV_INFO(dev, "Re-enabling acceleration..\n");
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
+		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000001);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL1, 0x00000001);
+	nv_wr32(dev, NV03_PFIFO_CACHES, 1);
+
+	engine->graph.fifo_access(dev, true);
+	return ret;
 }
 
 static int
@@ -217,8 +228,7 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	}
 
 	NV_INFO(dev, "Reinitialising engines...\n");
-	if (engine->instmem.resume)
-		engine->instmem.resume(dev);
+	engine->instmem.resume(dev);
 	engine->mc.init(dev);
 	engine->timer.init(dev);
 	engine->fb.init(dev);
