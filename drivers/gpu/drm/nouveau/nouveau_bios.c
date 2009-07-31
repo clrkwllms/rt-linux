@@ -2510,7 +2510,7 @@ init_96(struct drm_device *dev, struct nvbios *bios, uint16_t offset,
 		val <<= (0x100 - bios->data[offset + 5]);
 	val &= bios->data[offset + 6];
 
-	val   = bios->data[xlatptr + val];
+	val   = bios->data[ROM16(bios->data[xlatptr]) + val];
 	val <<= bios->data[offset + 16];
 
 	if (!iexec->execute)
