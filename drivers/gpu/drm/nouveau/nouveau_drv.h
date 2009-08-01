@@ -461,7 +461,6 @@ struct drm_nouveau_private {
 	int flags;
 
 	void __iomem *mmio;
-	void __iomem *fb;
 	void __iomem *ramin;
 	uint32_t ramin_size;
 
@@ -1013,22 +1012,6 @@ static inline void nv_wr08(struct drm_device *dev, unsigned reg, u8 val)
 
 #define nv_wait(reg,mask,val) nouveau_wait_until(dev, 2000000000ULL, (reg),    \
 						 (mask), (val))
-
-/*
- * VRAM access for the first 64kB
- * see nouveau_state.c
- */
-static inline u32 nv_rf32(struct drm_device *dev, unsigned offset)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	return ioread32_native(dev_priv->fb + offset);
-}
-
-static inline void nv_wf32(struct drm_device *dev, unsigned offset, u32 val)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	iowrite32_native(val, dev_priv->fb + offset);
-}
 
 /* PRAMIN access */
 static inline u32 nv_ri32(struct drm_device *dev, unsigned offset)

@@ -590,13 +590,6 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 		}
 	}
 
-	/* map first 64KiB of VRAM, holds VGA fonts etc */
-	dev_priv->fb = ioremap(pci_resource_start(dev->pdev, 1), 65536);
-	if (!dev_priv->fb) {
-		NV_ERROR(dev, "Failed to map FB BAR\n");
-		return -ENOMEM;
-	}
-
 	nouveau_OF_copy_vbios_to_ramin(dev);
 
 	/* Special flags */
@@ -648,7 +641,6 @@ int nouveau_unload(struct drm_device *dev)
 
 	iounmap(dev_priv->mmio);
 	iounmap(dev_priv->ramin);
-	iounmap(dev_priv->fb);
 
 	kfree(dev_priv);
 	dev->dev_private = NULL;

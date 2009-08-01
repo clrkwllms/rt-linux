@@ -537,13 +537,33 @@ nouveau_hw_fix_bad_vpll(struct drm_device *dev, int head)
  * vga font save/restore
  */
 
+static void nouveau_vga_font_io(struct drm_device *dev,
+				void __iomem *iovram,
+				bool save, unsigned plane)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	unsigned i;
+
+	NVWriteVgaSeq(dev, 0, NV_VIO_SR_PLANE_MASK_INDEX, 1 << plane);
+	NVWriteVgaGr(dev, 0, NV_VIO_GX_READ_MAP_INDEX, plane);
+	for (i = 0; i < 16384; i++) {
+		if (save) {
+			dev_priv->saved_vga_font[plane][i] =
+					ioread32_native(iovram + i * 4);
+		} else {
+			iowrite32_native(dev_priv->saved_vga_font[plane][i],
+							iovram + i * 4);
+		}
+	}
+}
+
 void
 nouveau_hw_save_vga_fonts(struct drm_device *dev, bool save)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint8_t misc, gr4, gr5, gr6, seq2, seq4;
 	bool graphicsmode;
-	int i;
+	unsigned plane;
+	void __iomem *iovram;
 
 	if (nv_two_heads(dev))
 		NVSetOwner(dev, 0);
@@ -552,10 +572,19 @@ nouveau_hw_save_vga_fonts(struct drm_device *dev, bool save)
 	graphicsmode = NVReadVgaAttr(dev, 0, NV_CIO_AR_MODE_INDEX) & 1;
 	NVSetEnablePalette(dev, 0, false);
 
-	if (graphicsmode)	/* graphics mode => framebuffer => no need to save */
+	if (graphicsmode) /* graphics mode => framebuffer => no need to save */
 		return;
 
 	NV_INFO(dev, "%sing VGA fonts\n", save ? "Sav" : "Restor");
+
+	/* map first 64KiB of VRAM, holds VGA fonts etc */
+	iovram = ioremap(pci_resource_start(dev->pdev, 1), 65536);
+	if (!iovram) {
+		NV_ERROR(dev, "Failed to map VRAM, "
+					"cannot save/restore VGA fonts.\n");
+		return;
+	}
+
 	if (nv_two_heads(dev))
 		NVBlankScreen(dev, 1, true);
 	NVBlankScreen(dev, 0, true);
@@ -573,41 +602,9 @@ nouveau_hw_save_vga_fonts(struct drm_device *dev, bool save)
 	NVWriteVgaGr(dev, 0, NV_VIO_GX_MODE_INDEX, 0x0);
 	NVWriteVgaGr(dev, 0, NV_VIO_GX_MISC_INDEX, 0x5);
 
-	/* store font in plane 0 */
-	NVWriteVgaSeq(dev, 0, NV_VIO_SR_PLANE_MASK_INDEX, 0x1);
-	NVWriteVgaGr(dev, 0, NV_VIO_GX_READ_MAP_INDEX, 0x0);
-	for (i = 0; i < 16384; i++)
-		if (save)
-			dev_priv->saved_vga_font[0][i] = nv_rf32(dev, i * 4);
-		else
-			nv_wf32(dev, i * 4, dev_priv->saved_vga_font[0][i]);
-
-	/* store font in plane 1 */
-	NVWriteVgaSeq(dev, 0, NV_VIO_SR_PLANE_MASK_INDEX, 0x2);
-	NVWriteVgaGr(dev, 0, NV_VIO_GX_READ_MAP_INDEX, 0x1);
-	for (i = 0; i < 16384; i++)
-		if (save)
-			dev_priv->saved_vga_font[1][i] = nv_rf32(dev, i * 4);
-		else
-			nv_wf32(dev, i * 4, dev_priv->saved_vga_font[1][i]);
-
-	/* store font in plane 2 */
-	NVWriteVgaSeq(dev, 0, NV_VIO_SR_PLANE_MASK_INDEX, 0x4);
-	NVWriteVgaGr(dev, 0, NV_VIO_GX_READ_MAP_INDEX, 0x2);
-	for (i = 0; i < 16384; i++)
-		if (save)
-			dev_priv->saved_vga_font[2][i] = nv_rf32(dev, i * 4);
-		else
-			nv_wf32(dev, i * 4, dev_priv->saved_vga_font[2][i]);
-
-	/* store font in plane 3 */
-	NVWriteVgaSeq(dev, 0, NV_VIO_SR_PLANE_MASK_INDEX, 0x8);
-	NVWriteVgaGr(dev, 0, NV_VIO_GX_READ_MAP_INDEX, 0x3);
-	for (i = 0; i < 16384; i++)
-		if (save)
-			dev_priv->saved_vga_font[3][i] = nv_rf32(dev, i * 4);
-		else
-			nv_wf32(dev, i * 4, dev_priv->saved_vga_font[3][i]);
+	/* store font in planes 0..3 */
+	for (plane = 0; plane < 4; plane++)
+		nouveau_vga_font_io(dev, iovram, save, plane);
 
 	/* restore control regs */
 	NVWritePRMVIO(dev, 0, NV_PRMVIO_MISC__WRITE, misc);
@@ -620,6 +617,8 @@ nouveau_hw_save_vga_fonts(struct drm_device *dev, bool save)
 	if (nv_two_heads(dev))
 		NVBlankScreen(dev, 1, false);
 	NVBlankScreen(dev, 0, false);
+
+	iounmap(iovram);
 }
 
 /*
