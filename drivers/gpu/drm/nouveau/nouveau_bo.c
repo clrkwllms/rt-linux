@@ -169,10 +169,7 @@ nouveau_bo_map(struct nouveau_bo *nvbo)
 void
 nouveau_bo_unmap(struct nouveau_bo *nvbo)
 {
-	if (nvbo->kmap.virtual) {
-		ttm_bo_kunmap(&nvbo->kmap);
-		nvbo->kmap.virtual = NULL;
-	}
+	ttm_bo_kunmap(&nvbo->kmap);
 }
 
 static struct ttm_backend *
