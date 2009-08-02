@@ -118,6 +118,34 @@ nouveau_connector_ddc_detect(struct drm_connector *connector)
 }
 
 static enum drm_connector_status
+nouveau_connector_lvds_detect(struct drm_connector *connector)
+{
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
+	struct nouveau_encoder *nv_encoder;
+	struct drm_device *dev = connector->dev;
+
+	if (nv_connector->native_mode)
+		return connector_status_connected;
+
+	nv_connector->edid =
+		drm_get_edid(connector, &nv_connector->i2c_chan->adapter);
+	drm_mode_connector_update_edid_property(connector, nv_connector->edid);
+	if (!nv_connector->edid) {
+		NV_ERROR(dev, "LVDS but no modes!\n");
+		return connector_status_disconnected;
+	}
+
+	nv_encoder = nouveau_connector_encoder_get(connector, OUTPUT_LVDS);
+	if (!nv_encoder) {
+		NV_ERROR(dev, "LVDS but no encoder!\n");
+		return connector_status_disconnected;
+	}
+
+	nv_connector->detected_encoder = nv_encoder;
+	return connector_status_connected;
+}
+
+static enum drm_connector_status
 nouveau_connector_detect(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
@@ -126,19 +154,8 @@ nouveau_connector_detect(struct drm_connector *connector)
 	struct nouveau_encoder *nv_encoder = NULL;
 	int type;
 
-	if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
-		if (!nv_connector->native_mode &&
-		    !nouveau_connector_ddc_detect(connector)) {
-			NV_ERROR(dev, "No native mode for LVDS.\n");
-			return connector_status_disconnected;
-		}
-
-		nv_connector->detected_encoder =
-			nouveau_connector_encoder_get(connector, OUTPUT_LVDS);
-		if (!nv_connector->detected_encoder)
-			return connector_status_disconnected;
-		return connector_status_connected;
-	}
+	if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS)
+		return nouveau_connector_lvds_detect(connector);
 
 	nv_connector->detected_encoder = NULL;
 
@@ -286,42 +303,37 @@ nv50_connector_native_mode(struct nouveau_connector *connector)
 	return NULL;
 }
 
-static int nv50_connector_get_modes(struct drm_connector *drm_connector)
+static int
+nouveau_connector_get_modes(struct drm_connector *connector)
 {
-	struct drm_device *dev = drm_connector->dev;
-	struct nouveau_connector *connector = nouveau_connector(drm_connector);
-	struct edid *edid = NULL;
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
+	struct drm_device *dev = connector->dev;
 	int ret = 0;
 
 	/* If we're not LVDS, destroy the previous native mode, the attached
 	 * monitor could have changed.
 	 */
-	if (drm_connector->connector_type != DRM_MODE_CONNECTOR_LVDS &&
-	    connector->native_mode) {
-		drm_mode_destroy(dev, connector->native_mode);
-		connector->native_mode = NULL;
+	if (connector->connector_type != DRM_MODE_CONNECTOR_LVDS &&
+	    nv_connector->native_mode) {
+		drm_mode_destroy(dev, nv_connector->native_mode);
+		nv_connector->native_mode = NULL;
 	}
 
-	if (connector->i2c_chan)
-		edid = drm_get_edid(drm_connector, &connector->i2c_chan->adapter);
-	drm_mode_connector_update_edid_property(drm_connector, edid);
-
-	if (edid) {
-		ret = drm_add_edid_modes(drm_connector, edid);
-		kfree(edid);
-	}
+	if (nv_connector->edid)
+		ret = drm_add_edid_modes(connector, nv_connector->edid);
 
 	/* Find the native mode if this is a digital panel, if we didn't
 	 * find any modes through DDC previously add the native mode to
 	 * the list of modes.
 	 */
-	if (!connector->native_mode)
-		connector->native_mode = nv50_connector_native_mode(connector);
-	if (ret == 0 && connector->native_mode) {
+	if (!nv_connector->native_mode)
+		nv_connector->native_mode =
+			nv50_connector_native_mode(nv_connector);
+	if (ret == 0 && nv_connector->native_mode) {
 		struct drm_display_mode *mode;
 
-		mode = drm_mode_duplicate(dev, connector->native_mode);
-		drm_mode_probed_add(drm_connector, mode);
+		mode = drm_mode_duplicate(dev, nv_connector->native_mode);
+		drm_mode_probed_add(connector, mode);
 		ret = 1;
 	}
 
@@ -383,7 +395,7 @@ nouveau_connector_best_encoder(struct drm_connector *connector)
 }
 
 static const struct drm_connector_helper_funcs nv50_connector_helper_funcs = {
-	.get_modes = nv50_connector_get_modes,
+	.get_modes = nouveau_connector_get_modes,
 	.mode_valid = nv50_connector_mode_valid,
 	.best_encoder = nouveau_connector_best_encoder,
 };
