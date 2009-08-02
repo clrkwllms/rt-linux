@@ -41,6 +41,5 @@ struct nouveau_i2c_chan {
 int nouveau_i2c_new(struct drm_device *, const char *, unsigned,
 		    struct nouveau_i2c_chan **);
 void nouveau_i2c_del(struct nouveau_i2c_chan **);
-bool nouveau_i2c_detect(struct nouveau_connector *connector);
 
 #endif /* __NOUVEAU_I2C_H__ */

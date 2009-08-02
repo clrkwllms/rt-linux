@@ -120,36 +120,69 @@ void nv50_connector_detect_all(struct drm_device *dev)
 	}
 }
 
-static enum drm_connector_status
-nv50_connector_detect(struct drm_connector *drm_connector)
+static bool
+nouveau_connector_ddc_detect(struct drm_connector *connector)
 {
-	struct drm_device *dev = drm_connector->dev;
-	struct nouveau_connector *connector = nouveau_connector(drm_connector);
-	struct nouveau_encoder *encoder = NULL;
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
+	/* kindly borrrowed from the intel driver, hope it works. */
+	uint8_t out_buf[] = { 0x0, 0x0};
+	uint8_t buf[2];
+	int ret;
+	struct i2c_msg msgs[] = {
+		{
+			.addr = 0x50,
+			.flags = 0,
+			.len = 1,
+			.buf = out_buf,
+		},
+		{
+			.addr = 0x50,
+			.flags = I2C_M_RD,
+			.len = 1,
+			.buf = buf,
+		}
+	};
+
+	if (!nv_connector->i2c_chan)
+		return false;
+
+	ret = i2c_transfer(&nv_connector->i2c_chan->adapter, msgs, 2);
+	if (ret == 2)
+		return true;
+	return false;
+}
+
+static enum drm_connector_status
+nouveau_connector_detect(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
+	struct nouveau_encoder *nv_encoder = NULL;
 	struct drm_encoder_helper_funcs *helper = NULL;
 
-	if (drm_connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
-		if (!connector->native_mode && !nouveau_i2c_detect(connector)) {
+	if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
+		if (!nv_connector->native_mode &&
+		    !nouveau_connector_ddc_detect(connector)) {
 			NV_ERROR(dev, "No native mode for LVDS.\n");
 			return connector_status_disconnected;
 		}
 
-		nv50_connector_set_digital(connector, true);
+		nv50_connector_set_digital(nv_connector, true);
 		return connector_status_connected;
 	}
 
-	encoder = nv50_connector_to_encoder(connector, false);
-	if (encoder)
-		helper = encoder->base.helper_private;
+	nv_encoder = nv50_connector_to_encoder(nv_connector, false);
+	if (nv_encoder)
+		helper = nv_encoder->base.helper_private;
 
-	if (helper && helper->detect(&encoder->base, &connector->base) ==
+	if (helper && helper->detect(&nv_encoder->base, connector) ==
 			connector_status_connected) {
-		nv50_connector_set_digital(connector, false);
+		nv50_connector_set_digital(nv_connector, false);
 		return connector_status_connected;
 	}
 
-	if (nouveau_i2c_detect(connector)) {
-		nv50_connector_set_digital(connector, true);
+	if (nouveau_connector_ddc_detect(connector)) {
+		nv50_connector_set_digital(nv_connector, true);
 		return connector_status_connected;
 	}
 
@@ -386,7 +419,7 @@ static const struct drm_connector_funcs nv50_connector_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.save = NULL,
 	.restore = NULL,
-	.detect = nv50_connector_detect,
+	.detect = nouveau_connector_detect,
 	.destroy = nv50_connector_destroy,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = nv50_connector_set_property
