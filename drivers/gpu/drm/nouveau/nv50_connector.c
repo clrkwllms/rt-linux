@@ -35,39 +35,25 @@
 #include "nv50_display.h"
 
 static struct nouveau_encoder *
-nv50_connector_to_encoder(struct nouveau_connector *connector, bool digital)
+nouveau_connector_encoder_get(struct drm_connector *connector, int type)
 {
-	struct drm_device *dev = connector->base.dev;
-	struct nouveau_encoder *encoder;
+	struct drm_device *dev = connector->dev;
+	struct nouveau_encoder *nv_encoder;
 	struct drm_mode_object *obj;
 	int i, id;
 
 	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-		id = connector->base.encoder_ids[i];
+		id = connector->encoder_ids[i];
 		if (!id)
 			break;
 
 		obj = drm_mode_object_find(dev, id, DRM_MODE_OBJECT_ENCODER);
 		if (!obj)
 			continue;
-		encoder = nouveau_encoder(obj_to_encoder(obj));
+		nv_encoder = nouveau_encoder(obj_to_encoder(obj));
 
-		if (digital) {
-			switch (encoder->dcb->type) {
-			case OUTPUT_TMDS:
-			case OUTPUT_LVDS:
-				return encoder;
-			default:
-				break;
-			}
-		} else {
-			switch (encoder->dcb->type) {
-			case OUTPUT_ANALOG:
-				return encoder;
-			default:
-				break;
-			}
-		}
+		if (nv_encoder->dcb->type == type)
+			return nv_encoder;
 	}
 
 	return NULL;
@@ -88,27 +74,6 @@ static void nv50_connector_destroy(struct drm_connector *drm_connector)
 	drm_sysfs_connector_remove(drm_connector);
 	drm_connector_cleanup(drm_connector);
 	kfree(drm_connector);
-}
-
-static void
-nv50_connector_set_digital(struct nouveau_connector *connector, bool digital)
-{
-	struct drm_device *dev = connector->base.dev;
-
-	if (connector->base.connector_type == DRM_MODE_CONNECTOR_DVII) {
-		struct drm_property *prop =
-			dev->mode_config.dvi_i_subconnector_property;
-		uint64_t val;
-
-		if (digital)
-			val = DRM_MODE_SUBCONNECTOR_DVID;
-		else
-			val = DRM_MODE_SUBCONNECTOR_DVIA;
-
-		drm_connector_property_set_value(&connector->base, prop, val);
-	}
-
-	connector->digital = digital;
 }
 
 void nv50_connector_detect_all(struct drm_device *dev)
@@ -157,8 +122,8 @@ nouveau_connector_detect(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
 	struct nouveau_connector *nv_connector = nouveau_connector(connector);
-	struct nouveau_encoder *nv_encoder = NULL;
 	struct drm_encoder_helper_funcs *helper = NULL;
+	struct nouveau_encoder *nv_encoder = NULL;
 
 	if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
 		if (!nv_connector->native_mode &&
@@ -167,22 +132,26 @@ nouveau_connector_detect(struct drm_connector *connector)
 			return connector_status_disconnected;
 		}
 
-		nv50_connector_set_digital(nv_connector, true);
+		nv_connector->detected_encoder =
+			nouveau_connector_encoder_get(connector, OUTPUT_LVDS);
+		if (!nv_connector->detected_encoder)
+			return connector_status_disconnected;
 		return connector_status_connected;
 	}
 
-	nv_encoder = nv50_connector_to_encoder(nv_connector, false);
-	if (nv_encoder)
+	nv_encoder = nouveau_connector_encoder_get(connector, OUTPUT_ANALOG);
+	if (nv_encoder && nv_encoder->base.helper_private) {
 		helper = nv_encoder->base.helper_private;
-
-	if (helper && helper->detect(&nv_encoder->base, connector) ==
-			connector_status_connected) {
-		nv50_connector_set_digital(nv_connector, false);
-		return connector_status_connected;
+		if (helper->detect && helper->detect(&nv_encoder->base,
+						     connector)) {
+			nv_connector->detected_encoder = nv_encoder;
+			return connector_status_connected;
+		}
 	}
 
+	nv_encoder = nouveau_connector_encoder_get(connector, OUTPUT_TMDS);
 	if (nouveau_connector_ddc_detect(connector)) {
-		nv50_connector_set_digital(nv_connector, true);
+		nv_connector->detected_encoder = nv_encoder;
 		return connector_status_connected;
 	}
 
@@ -280,7 +249,7 @@ nv50_connector_native_mode(struct nouveau_connector *connector)
 	struct drm_device *dev = connector->base.dev;
 	struct drm_display_mode *mode;
 
-	if (!connector->digital)
+	if (connector->detected_encoder->dcb->type == OUTPUT_ANALOG)
 		return NULL;
 
 	list_for_each_entry(mode, &connector->base.probed_modes, head) {
@@ -338,33 +307,8 @@ static int nv50_connector_mode_valid(struct drm_connector *drm_connector,
 {
 	struct drm_device *dev = drm_connector->dev;
 	struct nouveau_connector *connector = nouveau_connector(drm_connector);
-	struct nouveau_encoder *encoder =
-		nv50_connector_to_encoder(connector, connector->digital);
+	struct nouveau_encoder *encoder = connector->detected_encoder;
 	unsigned min_clock, max_clock;
-
-	/* This really should not happen, but it appears it might do
-	 * somehow, debug!
-	 */
-	if (!encoder) {
-		int i;
-
-		NV_ERROR(dev, "no encoder for connector: %s %d\n",
-			 drm_get_connector_name(drm_connector),
-			 connector->digital);
-		for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-			struct drm_mode_object *obj;
-			if (!drm_connector->encoder_ids[i])
-				break;
-
-			obj = drm_mode_object_find(dev, drm_connector->encoder_ids[i], DRM_MODE_OBJECT_ENCODER);
-			if (!obj)
-				continue;
-			encoder = nouveau_encoder(obj_to_encoder(obj));
-			NV_ERROR(dev, " %d: %d\n", i, encoder->dcb->type);
-		}
-
-		return MODE_BAD;
-	}
 
 	min_clock = 25000;
 
@@ -402,17 +346,20 @@ static int nv50_connector_mode_valid(struct drm_connector *drm_connector,
 }
 
 static struct drm_encoder *
-nv50_connector_best_encoder(struct drm_connector *drm_connector)
+nouveau_connector_best_encoder(struct drm_connector *connector)
 {
-	struct nouveau_connector *connector = nouveau_connector(drm_connector);
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 
-	return &nv50_connector_to_encoder(connector, connector->digital)->base;
+	if (nv_connector->detected_encoder)
+		return &nv_connector->detected_encoder->base;
+
+	return NULL;
 }
 
 static const struct drm_connector_helper_funcs nv50_connector_helper_funcs = {
 	.get_modes = nv50_connector_get_modes,
 	.mode_valid = nv50_connector_mode_valid,
-	.best_encoder = nv50_connector_best_encoder,
+	.best_encoder = nouveau_connector_best_encoder,
 };
 
 static const struct drm_connector_funcs nv50_connector_funcs = {

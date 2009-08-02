@@ -34,7 +34,6 @@ struct nouveau_connector {
 	struct drm_connector base;
 
 	struct drm_display_mode *native_mode;
-	bool digital;
 
 	struct nouveau_i2c_chan *i2c_chan;
 
