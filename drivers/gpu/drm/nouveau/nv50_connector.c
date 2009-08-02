@@ -124,6 +124,7 @@ nouveau_connector_detect(struct drm_connector *connector)
 	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct drm_encoder_helper_funcs *helper = NULL;
 	struct nouveau_encoder *nv_encoder = NULL;
+	int type;
 
 	if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
 		if (!nv_connector->native_mode &&
@@ -139,23 +140,48 @@ nouveau_connector_detect(struct drm_connector *connector)
 		return connector_status_connected;
 	}
 
+	nv_connector->detected_encoder = NULL;
+
 	nv_encoder = nouveau_connector_encoder_get(connector, OUTPUT_ANALOG);
-	if (nv_encoder && nv_encoder->base.helper_private) {
+	if (!nouveau_connector_ddc_detect(connector)) {
+		if (!nv_encoder || !nv_encoder->base.helper_private)
+			return connector_status_disconnected;
+
 		helper = nv_encoder->base.helper_private;
-		if (helper->detect && helper->detect(&nv_encoder->base,
-						     connector)) {
+		if (!helper || !helper->detect)
+			return connector_status_disconnected;
+
+		if (helper->detect(&nv_encoder->base, connector)) {
 			nv_connector->detected_encoder = nv_encoder;
 			return connector_status_connected;
 		}
+
+		return connector_status_disconnected;
 	}
 
-	nv_encoder = nouveau_connector_encoder_get(connector, OUTPUT_TMDS);
-	if (nouveau_connector_ddc_detect(connector)) {
-		nv_connector->detected_encoder = nv_encoder;
-		return connector_status_connected;
+	nv_connector->edid =
+		drm_get_edid(connector, &nv_connector->i2c_chan->adapter);
+	drm_mode_connector_update_edid_property(connector, nv_connector->edid);
+	if (!nv_connector->edid) {
+		NV_ERROR(dev, "DDC responded, but no EDID for %s\n",
+			      drm_get_connector_name(connector));
+		return connector_status_disconnected;
 	}
 
-	return connector_status_disconnected;
+	if (nv_connector->edid->input & DRM_EDID_INPUT_DIGITAL)
+		type = OUTPUT_TMDS;
+	else
+		type = OUTPUT_ANALOG;
+
+	nv_encoder = nouveau_connector_encoder_get(connector, type);
+	if (!nv_encoder) {
+		NV_ERROR(dev, "Detected %d encoder on %s, but no object!\n",
+			      type, drm_get_connector_name(connector));
+		return connector_status_disconnected;
+	}
+
+	nv_connector->detected_encoder = nv_encoder;
+	return connector_status_connected;
 }
 
 static int nv50_connector_set_property(struct drm_connector *drm_connector,
