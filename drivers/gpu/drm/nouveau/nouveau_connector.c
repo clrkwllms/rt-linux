@@ -427,7 +427,9 @@ nouveau_connector_mode_valid(struct drm_connector *connector,
 			max_clock = 330000;
 		break;
 	default:
-		max_clock = 400000;
+		max_clock = nv_encoder->dcb->crtconf.maxfreq;
+		if (!max_clock)
+			max_clock = 350000;
 		break;
 	}
 
