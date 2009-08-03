@@ -213,8 +213,8 @@ nouveau_i2c_new(struct drm_device *dev, const char *name, unsigned index,
 		kfree(i2c);
 		return -EINVAL;
 	}
-	i2c->algo.udelay = 20;
-	i2c->algo.timeout = usecs_to_jiffies(2200);
+	i2c->algo.udelay = 40;
+	i2c->algo.timeout = usecs_to_jiffies(5000);
 	i2c->algo.data = i2c;
 
 	i2c_set_adapdata(&i2c->adapter, i2c);
