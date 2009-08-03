@@ -129,8 +129,11 @@ static int sample_load_twice(struct drm_device *dev, bool sense[2])
 	return 0;
 }
 
-static bool nv_legacy_load_detect(struct drm_device *dev)
+static enum drm_connector_status
+nv04_dac_load_detect(struct drm_encoder *encoder,
+		     struct drm_connector *connector)
 {
+	struct drm_device *dev = encoder->dev;
 	uint8_t saved_seq1, saved_pi, saved_rpc1;
 	uint8_t saved_palette0[3], saved_palette_mask;
 	uint32_t saved_rtest_ctrl, saved_rgen_ctrl;
@@ -218,15 +221,18 @@ out:
 
 	if (blue == 0x18) {
 		NV_TRACE(dev, "Load detected on head A\n");
-		return true;
+		return connector_status_connected;
 	}
 
-	return false;
+	return connector_status_disconnected;
 }
 
-static bool
-nv_nv17_load_detect(struct drm_device *dev, struct nouveau_encoder *nv_encoder)
+static enum drm_connector_status
+nv17_dac_load_detect(struct drm_encoder *encoder,
+		     struct drm_connector *connector)
 {
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
+	struct drm_device *dev = encoder->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t testval, regoffset = nv_output_ramdac_offset(nv_encoder);
 	uint32_t saved_powerctrl_2 = 0, saved_powerctrl_4 = 0, saved_routput, saved_rtest_ctrl, temp;
@@ -292,10 +298,10 @@ nv_nv17_load_detect(struct drm_device *dev, struct nouveau_encoder *nv_encoder)
 	if (present) {
 		NV_INFO(dev, "Load detected on output %c\n",
 			     '@' + ffs(nv_encoder->dcb->or));
-		return true;
+		return connector_status_connected;
 	}
 
-	return false;
+	return connector_status_disconnected;
 }
 
 static void
@@ -403,10 +409,9 @@ nv_output_detect(struct drm_connector *connector)
 	} else if ((det_encoder = find_encoder_by_type(connector, DRM_MODE_ENCODER_DAC))) {
 		/* we don't have a load det function for early cards */
 		if (nv_gf4_disp_arch(dev)) {
-			if (nv_nv17_load_detect(dev, det_encoder))
-				ret = connector_status_unknown;
-		} else if (nv_legacy_load_detect(dev))
-			ret = connector_status_connected;
+			ret = nv17_dac_load_detect(&det_encoder->base, connector);
+		} else
+			ret = nv04_dac_load_detect(&det_encoder->base, connector);
 	} else if ((det_encoder = find_encoder_by_type(connector, DRM_MODE_ENCODER_LVDS))) {
 		if (det_encoder->dcb->lvdsconf.use_straps_for_mode) {
 			if (nouveau_bios_fp_mode(dev, NULL))
@@ -982,6 +987,28 @@ nv04_encoder_restore(struct drm_encoder *encoder)
 	nv_encoder->last_dpms = NV_DPMS_CLEARED;
 }
 
+static const struct drm_encoder_helper_funcs nv04_dac_helper_funcs = {
+	.dpms = nv_output_dpms,
+	.save = nv04_encoder_save,
+	.restore = nv04_encoder_restore,
+	.mode_fixup = nv_output_mode_fixup,
+	.prepare = nv_output_prepare,
+	.commit = nv_output_commit,
+	.mode_set = nv_output_mode_set,
+	.detect = nv04_dac_load_detect
+};
+
+static const struct drm_encoder_helper_funcs nv17_dac_helper_funcs = {
+	.dpms = nv_output_dpms,
+	.save = nv04_encoder_save,
+	.restore = nv04_encoder_restore,
+	.mode_fixup = nv_output_mode_fixup,
+	.prepare = nv_output_prepare,
+	.commit = nv_output_commit,
+	.mode_set = nv_output_mode_set,
+	.detect = nv17_dac_load_detect
+};
+
 static const struct drm_encoder_helper_funcs nv04_encoder_helper_funcs = {
 	.dpms = nv_output_dpms,
 	.save = nv04_encoder_save,
@@ -1011,6 +1038,7 @@ static const struct drm_encoder_funcs nv04_encoder_funcs = {
 int
 nv04_encoder_create(struct drm_device *dev, struct dcb_entry *entry)
 {
+	const struct drm_encoder_helper_funcs *helper;
 	struct nouveau_encoder *nv_encoder = NULL;
 	int type;
 
@@ -1035,8 +1063,16 @@ nv04_encoder_create(struct drm_device *dev, struct dcb_entry *entry)
 	nv_encoder->dcb = entry;
 	nv_encoder->or = ffs(entry->or) - 1;
 
+	if (entry->type == OUTPUT_ANALOG) {
+		if (nv_gf4_disp_arch(dev))
+			helper = &nv17_dac_helper_funcs;
+		else
+			helper = &nv04_dac_helper_funcs;
+	} else
+		helper = &nv04_encoder_helper_funcs;
+
 	drm_encoder_init(dev, &nv_encoder->base, &nv04_encoder_funcs, type);
-	drm_encoder_helper_add(&nv_encoder->base, &nv04_encoder_helper_funcs);
+	drm_encoder_helper_add(&nv_encoder->base, helper);
 
 	nv_encoder->base.possible_crtcs = entry->heads;
 	nv_encoder->base.possible_clones = 0;
