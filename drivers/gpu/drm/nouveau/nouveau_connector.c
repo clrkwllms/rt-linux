@@ -32,7 +32,6 @@
 #include "nouveau_encoder.h"
 #include "nouveau_crtc.h"
 #include "nouveau_connector.h"
-#include "nv50_display.h"
 
 static struct nouveau_encoder *
 nouveau_connector_encoder_get(struct drm_connector *connector, int type)
