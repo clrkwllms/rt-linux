@@ -263,18 +263,11 @@ nouveau_connector_set_property(struct drm_connector *connector,
 		if (connector->encoder && connector->encoder->crtc)
 			nv_crtc = nouveau_crtc(connector->encoder->crtc);
 
-		if (!nv_crtc)
+		if (!nv_crtc || !nv_crtc->set_dither)
 			return 0;
 
-		/* update hw state */
-		nv_crtc->use_dithering = nv_connector->use_dithering;
-		if (nv_crtc->set_dither) {
-			ret = nv_crtc->set_dither(nv_crtc, true);
-			if (ret)
-				return ret;
-		}
-
-		return 0;
+		return nv_crtc->set_dither(nv_crtc, nv_connector->use_dithering,
+					   true);
 	}
 
 	return -EINVAL;

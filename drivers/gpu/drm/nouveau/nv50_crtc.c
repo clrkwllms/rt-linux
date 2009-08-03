@@ -153,7 +153,7 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 	return 0;
 }
 
-static int nv50_crtc_set_dither(struct nouveau_crtc *crtc, bool update)
+static int nv50_crtc_set_dither(struct nouveau_crtc *crtc, bool on, bool update)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -169,7 +169,7 @@ static int nv50_crtc_set_dither(struct nouveau_crtc *crtc, bool update)
 	}
 
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, DITHER_CTRL), 1);
-	if (crtc->use_dithering)
+	if (on)
 		OUT_RING(evo, NV50_EVO_CRTC_DITHER_CTRL_ON);
 	else
 		OUT_RING(evo, NV50_EVO_CRTC_DITHER_CTRL_OFF);
@@ -656,7 +656,6 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 	}
 
 	*crtc->mode = *adjusted_mode;
-	crtc->use_dithering = connector->use_dithering;
 
 	NV_DEBUG(dev, "index %d\n", crtc->index);
 
@@ -724,7 +723,7 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, SCALE_CENTER_OFFSET), 1);
 	OUT_RING  (evo, NV50_EVO_CRTC_SCALE_CENTER_OFFSET_VAL(0, 0));
 
-	crtc->set_dither(crtc, false);
+	crtc->set_dither(crtc, connector->use_dithering, false);
 	crtc->set_scale(crtc, connector->scaling_mode, false);
 
 	FIRE_RING (evo);

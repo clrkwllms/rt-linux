@@ -35,7 +35,6 @@ struct nouveau_crtc {
 	struct drm_mode_set mode_set;
 
 	struct drm_display_mode *mode;
-	bool use_dithering;
 
 	uint32_t dpms_saved_fp_control;
 	uint32_t fp_users;
@@ -68,9 +67,8 @@ struct nouveau_crtc {
 		int depth;
 	} lut;
 
-	int (*set_dither) (struct nouveau_crtc *crtc, bool update);
-	int (*set_scale) (struct nouveau_crtc *crtc, int mode, bool update);
-	int (*destroy) (struct nouveau_crtc *crtc);
+	int (*set_dither)(struct nouveau_crtc *crtc, bool on, bool update);
+	int (*set_scale)(struct nouveau_crtc *crtc, int mode, bool update);
 };
 #define nouveau_crtc(x) container_of((x), struct nouveau_crtc, base)
 
