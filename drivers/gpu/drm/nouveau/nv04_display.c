@@ -176,7 +176,7 @@ nv04_display_create(struct drm_device *dev)
 			continue;
 		}
 
-		nv04_connector_create(dev, i2c_index, encoders, type);
+		nouveau_connector_create(dev, i2c_index, type);
 		connectors[i2c_index] = 0; /* avoid connectors being added multiply */
 	}
 
