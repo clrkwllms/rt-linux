@@ -32,6 +32,7 @@
 #include "nouveau_encoder.h"
 #include "nouveau_crtc.h"
 #include "nouveau_connector.h"
+#include "nouveau_hw.h"
 
 static struct nouveau_encoder *
 nouveau_connector_encoder_get(struct drm_connector *connector, int type)
@@ -76,6 +77,38 @@ nouveau_connector_destroy(struct drm_connector *drm_connector)
 	kfree(drm_connector);
 }
 
+static void
+nouveau_connector_ddc_prepare(struct drm_connector *connector, int *flags)
+{
+	struct drm_nouveau_private *dev_priv = connector->dev->dev_private;
+
+	if (dev_priv->card_type >= NV_50)
+		return;
+
+	*flags = 0;
+	if (NVLockVgaCrtcs(dev_priv->dev, false))
+		*flags |= 1;
+	if (nv_heads_tied(dev_priv->dev))
+		*flags |= 2;
+
+	if (*flags & 2)
+		NVSetOwner(dev_priv->dev, 0); /* necessary? */
+}
+
+static void
+nouveau_connector_ddc_finish(struct drm_connector *connector, int flags)
+{
+	struct drm_nouveau_private *dev_priv = connector->dev->dev_private;
+
+	if (dev_priv->card_type >= NV_50)
+		return;
+
+	if (flags & 2)
+		NVSetOwner(dev_priv->dev, 4);
+	if (flags & 1)
+		NVLockVgaCrtcs(dev_priv->dev, true);
+}
+
 static bool
 nouveau_connector_ddc_detect(struct drm_connector *connector)
 {
@@ -83,7 +116,7 @@ nouveau_connector_ddc_detect(struct drm_connector *connector)
 	/* kindly borrrowed from the intel driver, hope it works. */
 	uint8_t out_buf[] = { 0x0, 0x0};
 	uint8_t buf[2];
-	int ret;
+	int ret, flags;
 	struct i2c_msg msgs[] = {
 		{
 			.addr = 0x50,
@@ -102,7 +135,9 @@ nouveau_connector_ddc_detect(struct drm_connector *connector)
 	if (!nv_connector->i2c_chan)
 		return false;
 
+	nouveau_connector_ddc_prepare(connector, &flags);
 	ret = i2c_transfer(&nv_connector->i2c_chan->adapter, msgs, 2);
+	nouveau_connector_ddc_finish(connector, flags);
 	if (ret == 2)
 		return true;
 	return false;
@@ -143,6 +178,7 @@ nouveau_connector_lvds_detect(struct drm_connector *connector)
 	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct nouveau_encoder *nv_encoder;
 	struct drm_device *dev = connector->dev;
+	int flags;
 
 	nv_encoder = nouveau_connector_encoder_get(connector, OUTPUT_LVDS);
 	if (!nv_encoder) {
@@ -155,8 +191,10 @@ nouveau_connector_lvds_detect(struct drm_connector *connector)
 		return connector_status_connected;
 	}
 
+	nouveau_connector_ddc_prepare(connector, &flags);
 	nv_connector->edid =
 		drm_get_edid(connector, &nv_connector->i2c_chan->adapter);
+	nouveau_connector_ddc_finish(connector, flags);
 	drm_mode_connector_update_edid_property(connector, nv_connector->edid);
 	if (!nv_connector->edid) {
 		NV_ERROR(dev, "LVDS but no modes!\n");
@@ -174,7 +212,7 @@ nouveau_connector_detect(struct drm_connector *connector)
 	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct drm_encoder_helper_funcs *helper = NULL;
 	struct nouveau_encoder *nv_encoder = NULL;
-	int type;
+	int type, flags;
 
 	nv_connector->detected_encoder = NULL;
 
@@ -198,8 +236,10 @@ nouveau_connector_detect(struct drm_connector *connector)
 		return connector_status_disconnected;
 	}
 
+	nouveau_connector_ddc_prepare(connector, &flags);
 	nv_connector->edid =
 		drm_get_edid(connector, &nv_connector->i2c_chan->adapter);
+	nouveau_connector_ddc_finish(connector, flags);
 	drm_mode_connector_update_edid_property(connector, nv_connector->edid);
 	if (!nv_connector->edid) {
 		NV_ERROR(dev, "DDC responded, but no EDID for %s\n",
