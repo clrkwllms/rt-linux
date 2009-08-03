@@ -284,12 +284,10 @@ nouveau_bo_evict_flags(struct ttm_buffer_object *bo)
  * TTM_PL_{VRAM,PRIV0,TT} directly.
  */
 static int
-nouveau_bo_move_accel_cleanup(struct nouveau_bo *nvbo, bool evict, bool no_wait,
+nouveau_bo_move_accel_cleanup(struct nouveau_channel *chan,
+			      struct nouveau_bo *nvbo, bool evict, bool no_wait,
 			      struct ttm_mem_reg *new_mem)
 {
-	struct drm_nouveau_private *dev_priv = nouveau_bdev(nvbo->bo.bdev);
-	struct nouveau_channel *chan =
-		nvbo->channel ? nvbo->channel : dev_priv->channel;
 	struct nouveau_fence *fence = NULL;
 	int ret;
 
@@ -307,8 +305,7 @@ static inline uint32_t
 nouveau_bo_mem_ctxdma(struct nouveau_bo *nvbo, struct nouveau_channel *chan,
 		      struct ttm_mem_reg *mem)
 {
-	if (unlikely(nvbo->no_vm)) {
-		BUG_ON(chan != nouveau_bdev(nvbo->bo.bdev)->channel);
+	if (chan == nouveau_bdev(nvbo->bo.bdev)->channel) {
 		if (mem->mem_type == TTM_PL_TT)
 			return NvDmaGART;
 		return NvDmaVRAM;
@@ -331,7 +328,7 @@ nouveau_bo_move_m2mf(struct ttm_buffer_object *bo, int evict, int no_wait,
 	int ret;
 
 	chan = nvbo->channel;
-	if (!chan) {
+	if (!chan || nvbo->tile_flags || nvbo->no_vm) {
 		chan = dev_priv->channel;
 		if (!chan)
 			return -EINVAL;
@@ -339,7 +336,7 @@ nouveau_bo_move_m2mf(struct ttm_buffer_object *bo, int evict, int no_wait,
 
 	src_offset = old_mem->mm_node->start << PAGE_SHIFT;
 	dst_offset = new_mem->mm_node->start << PAGE_SHIFT;
-	if (likely(!nvbo->no_vm)) {
+	if (chan != dev_priv->channel) {
 		if (old_mem->mem_type == TTM_PL_TT)
 			src_offset += dev_priv->vm_gart_base;
 		else
@@ -401,7 +398,7 @@ nouveau_bo_move_m2mf(struct ttm_buffer_object *bo, int evict, int no_wait,
 		dst_offset += (PAGE_SIZE * line_count);
 	}
 
-	return nouveau_bo_move_accel_cleanup(nvbo, evict, no_wait, new_mem);
+	return nouveau_bo_move_accel_cleanup(chan, nvbo, evict, no_wait, new_mem);
 }
 
 static int
@@ -473,8 +470,8 @@ static int
 nouveau_bo_move(struct ttm_buffer_object *bo, bool evict, bool intr,
 		bool no_wait, struct ttm_mem_reg *new_mem)
 {
-	struct nouveau_bo *nvbo = nouveau_bo(bo);
 	struct drm_nouveau_private *dev_priv = nouveau_bdev(bo->bdev);
+	struct nouveau_bo *nvbo = nouveau_bo(bo);
 	struct drm_device *dev = dev_priv->dev;
 	struct ttm_mem_reg *old_mem = &bo->mem;
 	int ret;
@@ -501,9 +498,6 @@ nouveau_bo_move(struct ttm_buffer_object *bo, bool evict, bool intr,
 		new_mem->mm_node = NULL;
 		return 0;
 	}
-
-	if (dev_priv->card_type == NV_50 && nvbo->tile_flags)
-		return ttm_bo_move_memcpy(bo, evict, no_wait, new_mem);
 
 	if (new_mem->mem_type == TTM_PL_SYSTEM) {
 		if (old_mem->mem_type == TTM_PL_SYSTEM)
