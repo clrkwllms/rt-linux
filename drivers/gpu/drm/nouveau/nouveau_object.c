@@ -745,8 +745,9 @@ nouveau_gpuobj_gart_dma_new(struct nouveau_channel *chan,
 	    (dev_priv->card_type >= NV_50 &&
 	     dev_priv->gart_info.type == NOUVEAU_GART_SGDMA)) {
 		ret = nouveau_gpuobj_dma_new(chan, NV_CLASS_DMA_IN_MEMORY,
-					     offset, size, access,
-					     NV_DMA_TARGET_AGP, gpuobj);
+					     offset + dev_priv->vm_gart_base,
+					     size, access, NV_DMA_TARGET_AGP,
+					     gpuobj);
 		if (o_ret)
 			*o_ret = 0;
 	} else

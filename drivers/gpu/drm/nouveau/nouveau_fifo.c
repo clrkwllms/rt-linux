@@ -206,8 +206,7 @@ nouveau_fifo_pushbuf_ctxdma_init(struct nouveau_channel *chan)
 	int ret;
 
 	if (pb->bo.mem.mem_type == TTM_PL_TT) {
-		ret = nouveau_gpuobj_gart_dma_new(chan, start +
-						  dev_priv->vm_gart_base, size,
+		ret = nouveau_gpuobj_gart_dma_new(chan, start, size,
 						  NV_DMA_ACCESS_RO,
 						  &pushbuf,
 						  &chan->pushbuf_base);
