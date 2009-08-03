@@ -524,9 +524,17 @@ static int nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 		goto out;
 	}
 
+	ret = nouveau_bo_pin(nvbo, TTM_PL_FLAG_VRAM);
+	if (ret) {
+		NV_ERROR(dev, "failed to pin fb: %d\n", ret);
+		nouveau_bo_ref(NULL, &nvbo);
+		goto out;
+	}
+
 	ret = nouveau_bo_map(nvbo);
 	if (ret) {
 		NV_ERROR(dev, "failed to map fb: %d\n", ret);
+		nouveau_bo_unpin(nvbo);
 		nouveau_bo_ref(NULL, &nvbo);
 		goto out;
 	}
