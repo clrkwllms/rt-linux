@@ -230,7 +230,8 @@ nouveau_connector_detect(struct drm_connector *connector)
 		if (!helper || !helper->detect)
 			return connector_status_disconnected;
 
-		if (helper->detect(&nv_encoder->base, connector)) {
+		if (helper->detect(&nv_encoder->base, connector) ==
+				connector_status_connected) {
 			nouveau_connector_set_encoder(connector, nv_encoder);
 			return connector_status_connected;
 		}
