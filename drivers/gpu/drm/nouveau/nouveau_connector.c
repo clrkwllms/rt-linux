@@ -108,6 +108,35 @@ nouveau_connector_ddc_detect(struct drm_connector *connector)
 	return false;
 }
 
+static void
+nouveau_connector_set_encoder(struct drm_connector *connector,
+			      struct nouveau_encoder *nv_encoder)
+{
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
+	struct drm_nouveau_private *dev_priv = connector->dev->dev_private;
+	struct drm_device *dev = connector->dev;
+
+	if (nv_connector->detected_encoder == nv_encoder)
+		return;
+	nv_connector->detected_encoder = nv_encoder;
+
+	if (nv_encoder->dcb->type == OUTPUT_LVDS ||
+	    nv_encoder->dcb->type == OUTPUT_TMDS) {
+		connector->doublescan_allowed = false;
+		connector->interlace_allowed = false;
+	} else {
+		connector->doublescan_allowed = true;
+		if (dev_priv->card_type == NV_20 ||
+		   (dev_priv->card_type == NV_10 &&
+		    (dev->pci_device & 0x0ff0) != 0x0100 &&
+		    (dev->pci_device & 0x0ff0) != 0x0150))
+			/* HW is broken */
+			connector->interlace_allowed = false;
+		else
+			connector->interlace_allowed = true;
+	}
+}
+
 static enum drm_connector_status
 nouveau_connector_lvds_detect(struct drm_connector *connector)
 {
@@ -122,7 +151,7 @@ nouveau_connector_lvds_detect(struct drm_connector *connector)
 	}
 
 	if (nv_connector->native_mode) {
-		nv_connector->detected_encoder = nv_encoder;
+		nouveau_connector_set_encoder(connector, nv_encoder);
 		return connector_status_connected;
 	}
 
@@ -134,7 +163,7 @@ nouveau_connector_lvds_detect(struct drm_connector *connector)
 		return connector_status_disconnected;
 	}
 
-	nv_connector->detected_encoder = nv_encoder;
+	nouveau_connector_set_encoder(connector, nv_encoder);
 	return connector_status_connected;
 }
 
@@ -162,7 +191,7 @@ nouveau_connector_detect(struct drm_connector *connector)
 			return connector_status_disconnected;
 
 		if (helper->detect(&nv_encoder->base, connector)) {
-			nv_connector->detected_encoder = nv_encoder;
+			nouveau_connector_set_encoder(connector, nv_encoder);
 			return connector_status_connected;
 		}
 
@@ -190,7 +219,7 @@ nouveau_connector_detect(struct drm_connector *connector)
 		return connector_status_disconnected;
 	}
 
-	nv_connector->detected_encoder = nv_encoder;
+	nouveau_connector_set_encoder(connector, nv_encoder);
 	return connector_status_connected;
 }
 
