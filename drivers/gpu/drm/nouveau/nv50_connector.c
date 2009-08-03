@@ -342,31 +342,27 @@ nouveau_connector_get_modes(struct drm_connector *connector)
 	return ret;
 }
 
-static int nv50_connector_mode_valid(struct drm_connector *drm_connector,
-				     struct drm_display_mode *mode)
+static int
+nouveau_connector_mode_valid(struct drm_connector *connector,
+			     struct drm_display_mode *mode)
 {
-	struct drm_device *dev = drm_connector->dev;
-	struct nouveau_connector *connector = nouveau_connector(drm_connector);
-	struct nouveau_encoder *encoder = connector->detected_encoder;
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
+	struct nouveau_encoder *nv_encoder = nv_connector->detected_encoder;
 	unsigned min_clock, max_clock;
 
 	min_clock = 25000;
 
-	switch (encoder->base.encoder_type) {
-	case DRM_MODE_ENCODER_LVDS:
-		if (!connector->native_mode) {
-			NV_ERROR(dev, "AIIII no native mode\n");
-			return MODE_PANEL;
-		}
-
-		if (mode->hdisplay > connector->native_mode->hdisplay ||
-		    mode->vdisplay > connector->native_mode->vdisplay)
+	switch (nv_encoder->dcb->type) {
+	case OUTPUT_LVDS:
+		BUG_ON(!nv_connector->native_mode);
+		if (mode->hdisplay > nv_connector->native_mode->hdisplay ||
+		    mode->vdisplay > nv_connector->native_mode->vdisplay)
 			return MODE_PANEL;
 
 		max_clock = 400000;
 		break;
-	case DRM_MODE_ENCODER_TMDS:
-		if (!encoder->dual_link)
+	case OUTPUT_TMDS:
+		if (!nv_encoder->dual_link)
 			max_clock = 165000;
 		else
 			max_clock = 330000;
@@ -398,7 +394,7 @@ nouveau_connector_best_encoder(struct drm_connector *connector)
 
 static const struct drm_connector_helper_funcs nv50_connector_helper_funcs = {
 	.get_modes = nouveau_connector_get_modes,
-	.mode_valid = nv50_connector_mode_valid,
+	.mode_valid = nouveau_connector_mode_valid,
 	.best_encoder = nouveau_connector_best_encoder,
 };
 
