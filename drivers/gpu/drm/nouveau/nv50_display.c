@@ -517,7 +517,7 @@ int nv50_display_create(struct drm_device *dev)
 		if (type == DRM_MODE_CONNECTOR_Unknown)
 			continue;
 
-		nv50_connector_create(dev, entry->i2c_index, type);
+		nouveau_connector_create(dev, entry->i2c_index, type);
 	}
 
 	ret = nv50_display_init(dev);

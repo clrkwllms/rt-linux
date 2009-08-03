@@ -59,7 +59,8 @@ nouveau_connector_encoder_get(struct drm_connector *connector, int type)
 	return NULL;
 }
 
-static void nv50_connector_destroy(struct drm_connector *drm_connector)
+static void
+nouveau_connector_destroy(struct drm_connector *drm_connector)
 {
 	struct nouveau_connector *connector = nouveau_connector(drm_connector);
 	struct drm_device *dev = connector->base.dev;
@@ -74,15 +75,6 @@ static void nv50_connector_destroy(struct drm_connector *drm_connector)
 	drm_sysfs_connector_remove(drm_connector);
 	drm_connector_cleanup(drm_connector);
 	kfree(drm_connector);
-}
-
-void nv50_connector_detect_all(struct drm_device *dev)
-{
-	struct drm_connector *drm_connector = NULL;
-
-	list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
-		drm_connector->funcs->detect(drm_connector);
-	}
 }
 
 static bool
@@ -289,7 +281,7 @@ static int nv50_connector_set_property(struct drm_connector *drm_connector,
 }
 
 static struct drm_display_mode *
-nv50_connector_native_mode(struct nouveau_connector *connector)
+nouveau_connector_native_mode(struct nouveau_connector *connector)
 {
 	struct drm_device *dev = connector->base.dev;
 	struct drm_display_mode *mode;
@@ -330,7 +322,7 @@ nouveau_connector_get_modes(struct drm_connector *connector)
 	 */
 	if (!nv_connector->native_mode)
 		nv_connector->native_mode =
-			nv50_connector_native_mode(nv_connector);
+			nouveau_connector_native_mode(nv_connector);
 	if (ret == 0 && nv_connector->native_mode) {
 		struct drm_display_mode *mode;
 
@@ -392,23 +384,26 @@ nouveau_connector_best_encoder(struct drm_connector *connector)
 	return NULL;
 }
 
-static const struct drm_connector_helper_funcs nv50_connector_helper_funcs = {
+static const struct drm_connector_helper_funcs
+nouveau_connector_helper_funcs = {
 	.get_modes = nouveau_connector_get_modes,
 	.mode_valid = nouveau_connector_mode_valid,
 	.best_encoder = nouveau_connector_best_encoder,
 };
 
-static const struct drm_connector_funcs nv50_connector_funcs = {
+static const struct drm_connector_funcs
+nouveau_connector_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.save = NULL,
 	.restore = NULL,
 	.detect = nouveau_connector_detect,
-	.destroy = nv50_connector_destroy,
+	.destroy = nouveau_connector_destroy,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = nv50_connector_set_property
 };
 
-int nv50_connector_create(struct drm_device *dev, int i2c_index, int type)
+int
+nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 {
 	struct nouveau_connector *connector = NULL;
 	struct drm_encoder *drm_encoder;
@@ -466,8 +461,8 @@ int nv50_connector_create(struct drm_device *dev, int i2c_index, int type)
 	connector->base.interlace_allowed = false;
 	connector->base.doublescan_allowed = false;
 
-	drm_connector_init(dev, &connector->base, &nv50_connector_funcs, type);
-	drm_connector_helper_add(&connector->base, &nv50_connector_helper_funcs);
+	drm_connector_init(dev, &connector->base, &nouveau_connector_funcs, type);
+	drm_connector_helper_add(&connector->base, &nouveau_connector_helper_funcs);
 
 	if (i2c_index < 0xf) {
 		ret = nouveau_i2c_new(dev,
