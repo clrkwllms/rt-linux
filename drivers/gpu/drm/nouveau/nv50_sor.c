@@ -34,8 +34,6 @@
 #include "nouveau_crtc.h"
 #include "nv50_display.h"
 
-extern int nouveau_duallink;
-
 static void
 nv50_sor_disconnect(struct nouveau_encoder *encoder)
 {
@@ -255,8 +253,6 @@ int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 
 	encoder->dcb = entry;
 	encoder->or = ffs(entry->or) - 1;
-
-	encoder->dual_link = nouveau_duallink;
 
 	drm_encoder_init(dev, &encoder->base, &nv50_sor_encoder_funcs, type);
 	drm_encoder_helper_add(&encoder->base, &nv50_sor_helper_funcs);

@@ -37,8 +37,6 @@ struct nouveau_encoder {
 	struct dcb_entry *dcb;
 	int or;
 
-	bool dual_link;
-
 	int last_dpms;
 
 	struct nv04_output_reg restore;

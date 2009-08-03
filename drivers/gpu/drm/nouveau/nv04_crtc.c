@@ -661,7 +661,15 @@ nv_crtc_mode_set_fp_regs(struct drm_crtc *crtc, struct drm_display_mode *mode,
 	if (nv_encoder->dcb->location != DCB_LOC_ON_CHIP &&
 	    nv_connector->native_mode->clock > 165000)
 		regp->fp_control |= (2 << 24);
-	if (nv_encoder->dual_link)
+	if (nv_encoder->dcb->type == OUTPUT_LVDS) {
+		bool duallink, dummy;
+
+		nouveau_bios_parse_lvds_table(dev, nv_connector->native_mode->
+					      clock, &duallink, &dummy);
+		if (duallink)
+			regp->fp_control |= (8 << 28);
+	} else
+	if (nv_connector->native_mode->clock > 165000)
 		regp->fp_control |= (8 << 28);
 
 	regp->fp_debug_0 = NV_PRAMDAC_FP_DEBUG_0_YWEIGHT_ROUND |

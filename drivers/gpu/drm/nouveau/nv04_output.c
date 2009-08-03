@@ -483,9 +483,6 @@ nv_output_get_edid_modes(struct drm_connector *connector)
 		}
 	}
 
-	if (enctype == OUTPUT_TMDS)
-		nv_encoder->dual_link = nv_connector->native_mode->clock >= 165000;
-
 	if (ret == 0 && nv_connector->native_mode) {
 		struct drm_display_mode *mode;
 
@@ -505,7 +502,6 @@ nv_output_get_modes(struct drm_connector *connector)
 	struct drm_display_mode mode;
 	struct drm_device *dev = connector->dev;
 	int clock = 0;	/* needs to be zero for straps case */
-	bool dl, if_is_24bit = false;
 	int ret;
 
 	if (connector->connector_type != DRM_MODE_CONNECTOR_LVDS)
@@ -532,16 +528,6 @@ nv_output_get_modes(struct drm_connector *connector)
 		ret = nv_output_get_edid_modes(connector);
 		clock = nv_connector->native_mode->clock;
 	}
-
-	if (nouveau_bios_parse_lvds_table(dev, clock, &dl, &if_is_24bit))
-		return 0;
-
-	/* because of the pre-existing native mode exit above, this will only
-	 * get run at startup (and before create_resources is called in
-	 * mode_fixup), so subsequent user dither settings are not overridden
-	 */
-	nv_connector->use_dithering |= !if_is_24bit;
-	nv_encoder->dual_link = dl;
 
 	return ret;
 }

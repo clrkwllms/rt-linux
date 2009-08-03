@@ -34,6 +34,8 @@
 #include "nouveau_connector.h"
 #include "nouveau_hw.h"
 
+extern int nouveau_duallink;
+
 static struct nouveau_encoder *
 nouveau_connector_encoder_get(struct drm_connector *connector, int type)
 {
@@ -400,6 +402,7 @@ static int
 nouveau_connector_mode_valid(struct drm_connector *connector,
 			     struct drm_display_mode *mode)
 {
+	struct drm_nouveau_private *dev_priv = connector->dev->dev_private;
 	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct nouveau_encoder *nv_encoder = nv_connector->detected_encoder;
 	unsigned min_clock, max_clock;
@@ -416,7 +419,9 @@ nouveau_connector_mode_valid(struct drm_connector *connector,
 		max_clock = 400000;
 		break;
 	case OUTPUT_TMDS:
-		if (!nv_encoder->dual_link)
+		if ((dev_priv->card_type >= NV_50 && !nouveau_duallink) ||
+		    (dev_priv->card_type < NV_50 &&
+		     !nv_encoder->dcb->duallink_possible))
 			max_clock = 165000;
 		else
 			max_clock = 330000;
@@ -464,12 +469,30 @@ nouveau_connector_funcs = {
 	.set_property = nouveau_connector_set_property
 };
 
+static int
+nouveau_connector_create_lvds(struct drm_device *dev,
+			      struct nouveau_connector *nv_connector)
+{
+	struct drm_display_mode native;
+	bool dummy, if_is_24bit = false;
+	int ret;
+
+	ret = nouveau_bios_parse_lvds_table(dev, 0, &dummy, &if_is_24bit);
+	if (ret)
+		return ret;
+
+	if (nouveau_bios_fp_mode(dev, &native))
+		nv_connector->native_mode = drm_mode_duplicate(dev, &native);
+
+	nv_connector->use_dithering = !if_is_24bit;
+	return 0;
+}
+
 int
 nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 {
 	struct nouveau_connector *connector = NULL;
 	struct drm_encoder *drm_encoder;
-	struct drm_display_mode native;
 	int ret;
 
 	NV_DEBUG(dev, "\n");
@@ -491,8 +514,11 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 	case DRM_MODE_CONNECTOR_LVDS:
 		NV_INFO(dev, "Detected a LVDS connector\n");
 
-		if (nouveau_bios_fp_mode(dev, &native))
-			connector->native_mode = drm_mode_duplicate(dev, &native);
+		ret = nouveau_connector_create_lvds(dev, connector);
+		if (ret) {
+			kfree(connector);
+			return ret;
+		}
 		break;
 	case DRM_MODE_CONNECTOR_SVIDEO:
 		NV_INFO(dev, "Detected a TV connector\n");
@@ -514,12 +540,10 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 		break;
 	}
 
-	if (type == DRM_MODE_CONNECTOR_LVDS)
-		connector->use_dithering = true;
-	else
+	if (type != DRM_MODE_CONNECTOR_LVDS)
 		connector->use_dithering = false;
 
-	/* It should be allowed sometimes, but let's be safe for the moment. */
+	/* defaults, will get overridden in detect() */
 	connector->base.interlace_allowed = false;
 	connector->base.doublescan_allowed = false;
 
