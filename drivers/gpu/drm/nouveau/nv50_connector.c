@@ -195,17 +195,17 @@ nouveau_connector_detect(struct drm_connector *connector)
 	return connector_status_connected;
 }
 
-static int nv50_connector_set_property(struct drm_connector *drm_connector,
-				       struct drm_property *property,
-				       uint64_t value)
+static int
+nouveau_connector_set_property(struct drm_connector *connector,
+			       struct drm_property *property, uint64_t value)
 {
-	struct drm_device *dev = drm_connector->dev;
-	struct nouveau_connector *connector = nouveau_connector(drm_connector);
-	int rval;
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
+	struct drm_device *dev = connector->dev;
+	int ret;
 
 	/* Scaling mode */
 	if (property == dev->mode_config.scaling_mode_property) {
-		struct nouveau_crtc *crtc = NULL;
+		struct nouveau_crtc *nv_crtc = NULL;
 		bool modeset = false;
 
 		switch (value) {
@@ -219,35 +219,34 @@ static int nv50_connector_set_property(struct drm_connector *drm_connector,
 		}
 
 		/* LVDS always needs gpu scaling */
-		if (connector->base.connector_type == DRM_MODE_CONNECTOR_LVDS &&
+		if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS &&
 		    value == DRM_MODE_SCALE_NON_GPU)
 			return -EINVAL;
 
 		/* Changing between GPU and panel scaling requires a full
 		 * modeset
 		 */
-		if ((connector->scaling_mode == DRM_MODE_SCALE_NON_GPU) ||
+		if ((nv_connector->scaling_mode == DRM_MODE_SCALE_NON_GPU) ||
 		    (value == DRM_MODE_SCALE_NON_GPU))
 			modeset = true;
-		connector->scaling_mode = value;
+		nv_connector->scaling_mode = value;
 
-		if (drm_connector->encoder && drm_connector->encoder->crtc)
-			crtc = nouveau_crtc(drm_connector->encoder->crtc);
-
-		if (!crtc)
+		if (connector->encoder && connector->encoder->crtc)
+			nv_crtc = nouveau_crtc(connector->encoder->crtc);
+		if (!nv_crtc)
 			return 0;
 
-		if (modeset) {
-			rval = drm_crtc_helper_set_mode(&crtc->base,
-							&crtc->base.mode,
-							crtc->base.x,
-							crtc->base.y, NULL);
-			if (rval)
-				return rval;
+		if (modeset || !nv_crtc->set_scale) {
+			ret = drm_crtc_helper_set_mode(&nv_crtc->base,
+							&nv_crtc->base.mode,
+							nv_crtc->base.x,
+							nv_crtc->base.y, NULL);
+			if (ret)
+				return ret;
 		} else {
-			rval = crtc->set_scale(crtc, value, true);
-			if (rval)
-				return rval;
+			ret = nv_crtc->set_scale(nv_crtc, value, true);
+			if (ret)
+				return ret;
 		}
 
 		return 0;
@@ -255,24 +254,26 @@ static int nv50_connector_set_property(struct drm_connector *drm_connector,
 
 	/* Dithering */
 	if (property == dev->mode_config.dithering_mode_property) {
-		struct nouveau_crtc *crtc = NULL;
+		struct nouveau_crtc *nv_crtc = NULL;
 
 		if (value == DRM_MODE_DITHERING_ON)
-			connector->use_dithering = true;
+			nv_connector->use_dithering = true;
 		else
-			connector->use_dithering = false;
+			nv_connector->use_dithering = false;
 
-		if (drm_connector->encoder && drm_connector->encoder->crtc)
-			crtc = nouveau_crtc(drm_connector->encoder->crtc);
+		if (connector->encoder && connector->encoder->crtc)
+			nv_crtc = nouveau_crtc(connector->encoder->crtc);
 
-		if (!crtc)
+		if (!nv_crtc)
 			return 0;
 
 		/* update hw state */
-		crtc->use_dithering = connector->use_dithering;
-		rval = crtc->set_dither(crtc, true);
-		if (rval)
-			return rval;
+		nv_crtc->use_dithering = nv_connector->use_dithering;
+		if (nv_crtc->set_dither) {
+			ret = nv_crtc->set_dither(nv_crtc, true);
+			if (ret)
+				return ret;
+		}
 
 		return 0;
 	}
@@ -399,7 +400,7 @@ nouveau_connector_funcs = {
 	.detect = nouveau_connector_detect,
 	.destroy = nouveau_connector_destroy,
 	.fill_modes = drm_helper_probe_single_connector_modes,
-	.set_property = nv50_connector_set_property
+	.set_property = nouveau_connector_set_property
 };
 
 int
