@@ -124,20 +124,22 @@ nouveau_connector_lvds_detect(struct drm_connector *connector)
 	struct nouveau_encoder *nv_encoder;
 	struct drm_device *dev = connector->dev;
 
-	if (nv_connector->native_mode)
+	nv_encoder = nouveau_connector_encoder_get(connector, OUTPUT_LVDS);
+	if (!nv_encoder) {
+		NV_ERROR(dev, "LVDS but no encoder!\n");
+		return connector_status_disconnected;
+	}
+
+	if (nv_connector->native_mode) {
+		nv_connector->detected_encoder = nv_encoder;
 		return connector_status_connected;
+	}
 
 	nv_connector->edid =
 		drm_get_edid(connector, &nv_connector->i2c_chan->adapter);
 	drm_mode_connector_update_edid_property(connector, nv_connector->edid);
 	if (!nv_connector->edid) {
 		NV_ERROR(dev, "LVDS but no modes!\n");
-		return connector_status_disconnected;
-	}
-
-	nv_encoder = nouveau_connector_encoder_get(connector, OUTPUT_LVDS);
-	if (!nv_encoder) {
-		NV_ERROR(dev, "LVDS but no encoder!\n");
 		return connector_status_disconnected;
 	}
 
@@ -154,10 +156,10 @@ nouveau_connector_detect(struct drm_connector *connector)
 	struct nouveau_encoder *nv_encoder = NULL;
 	int type;
 
+	nv_connector->detected_encoder = NULL;
+
 	if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS)
 		return nouveau_connector_lvds_detect(connector);
-
-	nv_connector->detected_encoder = NULL;
 
 	nv_encoder = nouveau_connector_encoder_get(connector, OUTPUT_ANALOG);
 	if (!nouveau_connector_ddc_detect(connector)) {
