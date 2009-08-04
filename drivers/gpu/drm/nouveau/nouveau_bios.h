@@ -37,6 +37,7 @@ struct dcb_entry {
 	uint8_t type;
 	uint8_t i2c_index;
 	uint8_t heads;
+	uint8_t connector;
 	uint8_t bus;
 	uint8_t location;
 	uint8_t or;

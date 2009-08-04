@@ -4525,6 +4525,10 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 	entry->type = conn & 0xf;
 	entry->i2c_index = (conn >> 4) & 0xf;
 	entry->heads = (conn >> 8) & 0xf;
+	if (bdcb->version >= 0x30)
+		entry->connector = (conn >> 12) & 0xf;
+	else
+		entry->connector = entry->i2c_index; /* sorta */
 	entry->bus = (conn >> 16) & 0xf;
 	entry->location = (conn >> 20) & 0x3;
 	entry->or = (conn >> 24) & 0xf;
