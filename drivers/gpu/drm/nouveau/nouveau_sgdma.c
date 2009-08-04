@@ -221,30 +221,16 @@ nouveau_sgdma_init(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gpuobj *gpuobj = NULL;
 	uint32_t aper_size, obj_size;
-	int i, ret, dma_bits;
+	int i, ret;
 
 	if (dev_priv->card_type < NV_50) {
 		aper_size = (64 * 1024 * 1024);
 		obj_size  = (aper_size >> NV_CTXDMA_PAGE_SHIFT) * 4;
 		obj_size += 8; /* ctxdma header */
-		dma_bits  = 32;
 	} else {
 		/* 1 entire VM page table */
 		aper_size = (512 * 1024 * 1024);
 		obj_size  = (aper_size >> NV_CTXDMA_PAGE_SHIFT) * 8;
-		dma_bits  = 40;
-	}
-
-	ret = pci_set_dma_mask(dev->pdev, (1ULL << dma_bits) - 1);
-	if (ret) {
-		NV_ERROR(dev, "Error setting DMA mask: %d\n", ret);
-		return ret;
-	}
-
-	ret = pci_set_consistent_dma_mask(dev->pdev, (1ULL << dma_bits) - 1);
-	if (ret) {
-		NV_ERROR(dev, "Error setting consistent DMA mask: %d\n", ret);
-		return ret;
 	}
 
 	if ((ret = nouveau_gpuobj_new(dev, NULL, obj_size, 16,

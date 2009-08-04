@@ -485,10 +485,20 @@ nouveau_mem_init(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct ttm_bo_device *bdev = &dev_priv->ttm.bdev;
 	uint32_t vram_size, bar1_size, text_size;
-	int ret;
+	int ret, dma_bits = 32;
 
 	dev_priv->fb_phys = drm_get_resource_start(dev, 1);
 	dev_priv->gart_info.type = NOUVEAU_GART_NONE;
+
+	if (dev_priv->card_type >= NV_50 &&
+	    pci_dma_supported(dev->pdev, DMA_BIT_MASK(40)))
+		dma_bits = 40;
+
+	ret = pci_set_dma_mask(dev->pdev, DMA_BIT_MASK(dma_bits));
+	if (ret) {
+		NV_ERROR(dev, "Error setting DMA mask: %d\n", ret);
+		return ret;
+	}
 
 	ret = nouveau_ttm_global_init(dev_priv);
 	if (ret)
@@ -497,7 +507,7 @@ nouveau_mem_init(struct drm_device *dev)
 	ret = ttm_bo_device_init(&dev_priv->ttm.bdev,
 				 dev_priv->ttm.mem_global_ref.object,
 				 &nouveau_bo_driver, DRM_FILE_PAGE_OFFSET,
-				 dev_priv->card_type < NV_50);
+				 dma_bits <= 32 ? true : false);
 	if (ret) {
 		NV_ERROR(dev, "Error initialising bo driver: %d\n", ret);
 		return ret;
