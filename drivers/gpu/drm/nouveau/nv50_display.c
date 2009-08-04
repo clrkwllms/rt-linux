@@ -482,19 +482,21 @@ int nv50_display_create(struct drm_device *dev)
 			continue;
 		}
 
-		connector[entry->i2c_index] |= (1 << entry->type);
+		connector[entry->connector] |= (1 << entry->type);
 	}
 
-	/* Look at which encoders are attached to each i2c bus to
-	 * determine which connectors are present.
+	/* It appears that DCB 3.0+ VBIOS has a connector table, however,
+	 * I'm not 100% certain how to decode it correctly yet so just
+	 * look at what encoders are present on each connector index and
+	 * attempt to derive the connector type from that.
 	 */
 	for (i = 0 ; i < dcb->entries; i++) {
 		struct dcb_entry *entry = &dcb->entry[i];
 		uint16_t encoders;
 		int type;
 
-		encoders = connector[entry->i2c_index];
-		connector[entry->i2c_index] = 0;
+		encoders = connector[entry->connector];
+		connector[entry->connector] = 0;
 
 		/* already done? */
 		if (!encoders)
