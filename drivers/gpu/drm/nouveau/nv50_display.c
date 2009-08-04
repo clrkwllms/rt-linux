@@ -654,14 +654,17 @@ nv50_display_vblank_crtc_handler(struct drm_device *dev, int crtc)
 static void
 nv50_display_vblank_handler(struct drm_device *dev, uint32_t intr)
 {
+	intr &= NV50_PDISPLAY_INTR_1_VBLANK_CRTC;
+
 	if (intr & NV50_PDISPLAY_INTR_1_VBLANK_CRTC_0)
 		nv50_display_vblank_crtc_handler(dev, 0);
 
 	if (intr & NV50_PDISPLAY_INTR_1_VBLANK_CRTC_1)
 		nv50_display_vblank_crtc_handler(dev, 1);
 
-	nv_wr32(dev, NV50_PDISPLAY_INTR_1,
-		     intr & NV50_PDISPLAY_INTR_1_VBLANK_CRTC);
+	nv_wr32(dev, NV50_PDISPLAY_INTR_EN, nv_rd32(dev,
+		     NV50_PDISPLAY_INTR_EN) & ~intr);
+	nv_wr32(dev, NV50_PDISPLAY_INTR_1, intr);
 }
 
 static void
