@@ -494,15 +494,17 @@ nouveau_connector_create_lvds(struct drm_device *dev,
 int
 nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 {
-	struct nouveau_connector *connector = NULL;
-	struct drm_encoder *drm_encoder;
+	struct nouveau_connector *nv_connector = NULL;
+	struct drm_connector *connector;
+	struct drm_encoder *encoder;
 	int ret;
 
 	NV_DEBUG(dev, "\n");
 
-	connector = kzalloc(sizeof(*connector), GFP_KERNEL);
-	if (!connector)
+	nv_connector = kzalloc(sizeof(*nv_connector), GFP_KERNEL);
+	if (!nv_connector)
 		return -ENOMEM;
+	connector = &nv_connector->base;
 
 	switch (type) {
 	case DRM_MODE_CONNECTOR_VGA:
@@ -517,9 +519,9 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 	case DRM_MODE_CONNECTOR_LVDS:
 		NV_INFO(dev, "Detected a LVDS connector\n");
 
-		ret = nouveau_connector_create_lvds(dev, connector);
+		ret = nouveau_connector_create_lvds(dev, nv_connector);
 		if (ret) {
-			kfree(connector);
+			kfree(nv_connector);
 			return ret;
 		}
 		break;
@@ -536,60 +538,58 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 	case DRM_MODE_CONNECTOR_DVII:
 	case DRM_MODE_CONNECTOR_DVID:
 	case DRM_MODE_CONNECTOR_LVDS:
-		connector->scaling_mode = DRM_MODE_SCALE_FULLSCREEN;
+		nv_connector->scaling_mode = DRM_MODE_SCALE_FULLSCREEN;
 		break;
 	default:
-		connector->scaling_mode = DRM_MODE_SCALE_NON_GPU;
+		nv_connector->scaling_mode = DRM_MODE_SCALE_NON_GPU;
 		break;
 	}
 
 	if (type != DRM_MODE_CONNECTOR_LVDS)
-		connector->use_dithering = false;
+		nv_connector->use_dithering = false;
 
 	/* defaults, will get overridden in detect() */
-	connector->base.interlace_allowed = false;
-	connector->base.doublescan_allowed = false;
+	connector->interlace_allowed = false;
+	connector->doublescan_allowed = false;
 
-	drm_connector_init(dev, &connector->base, &nouveau_connector_funcs, type);
-	drm_connector_helper_add(&connector->base, &nouveau_connector_helper_funcs);
+	drm_connector_init(dev, connector, &nouveau_connector_funcs, type);
+	drm_connector_helper_add(connector, &nouveau_connector_helper_funcs);
 
 	if (i2c_index < 0xf) {
-		ret = nouveau_i2c_new(dev,
-				      drm_get_connector_name(&connector->base),
-				      i2c_index, &connector->i2c_chan);
+		ret = nouveau_i2c_new(dev, drm_get_connector_name(connector),
+				      i2c_index, &nv_connector->i2c_chan);
 		if (ret) {
 			NV_ERROR(dev, "Error initialising I2C on %s: %d\n",
-				 drm_get_connector_name(&connector->base), ret);
+				 drm_get_connector_name(connector), ret);
 		}
 	}
 
 	/* Init DVI-I specific properties */
 	if (type == DRM_MODE_CONNECTOR_DVII) {
 		drm_mode_create_dvi_i_properties(dev);
-		drm_connector_attach_property(&connector->base, dev->mode_config.dvi_i_subconnector_property, 0);
-		drm_connector_attach_property(&connector->base, dev->mode_config.dvi_i_select_subconnector_property, 0);
+		drm_connector_attach_property(connector, dev->mode_config.dvi_i_subconnector_property, 0);
+		drm_connector_attach_property(connector, dev->mode_config.dvi_i_select_subconnector_property, 0);
 	}
 
 	/* If supported in the future, it will have to use the scalers
 	 * internally and not expose them.
 	 */
 	if (type != DRM_MODE_CONNECTOR_SVIDEO) {
-		drm_connector_attach_property(&connector->base, dev->mode_config.scaling_mode_property, connector->scaling_mode);
+		drm_connector_attach_property(connector, dev->mode_config.scaling_mode_property, nv_connector->scaling_mode);
 	}
 
-	drm_connector_attach_property(&connector->base, dev->mode_config.dithering_mode_property, connector->use_dithering ? DRM_MODE_DITHERING_ON : DRM_MODE_DITHERING_OFF);
+	drm_connector_attach_property(connector, dev->mode_config.dithering_mode_property, nv_connector->use_dithering ? DRM_MODE_DITHERING_ON : DRM_MODE_DITHERING_OFF);
 
 	/* attach encoders */
-	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
-		struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
+	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
+		struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 
-		if (encoder->dcb->i2c_index != i2c_index)
+		if (nv_encoder->dcb->i2c_index != i2c_index)
 			continue;
 
-		drm_mode_connector_attach_encoder(&connector->base, drm_encoder);
+		drm_mode_connector_attach_encoder(connector, encoder);
 	}
 
-	drm_sysfs_connector_add(&connector->base);
-
+	drm_sysfs_connector_add(connector);
 	return 0;
 }
