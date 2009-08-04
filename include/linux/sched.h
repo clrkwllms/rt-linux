@@ -1437,6 +1437,11 @@ struct task_struct {
 
 #define MAX_PREEMPT_TRACE 25
 #define MAX_LOCK_STACK	MAX_PREEMPT_TRACE
+#ifdef CONFIG_PREEMPT_TRACE
+	unsigned long preempt_trace_eip[MAX_PREEMPT_TRACE];
+	unsigned long preempt_trace_parent_eip[MAX_PREEMPT_TRACE];
+#endif
+
 #ifdef CONFIG_DEBUG_PREEMPT
 	atomic_t lock_count;
 # ifdef CONFIG_PREEMPT_RT
@@ -2603,6 +2608,12 @@ static inline int task_is_current(struct task_struct *task)
 {
 	return task->oncpu;
 }
+#endif
+
+#ifdef CONFIG_PREEMPT_TRACE
+void print_preempt_trace(struct task_struct *tsk);
+#else
+static inline void print_preempt_trace(struct task_struct *tsk) { }
 #endif
 
 #endif /* __KERNEL__ */

@@ -154,6 +154,7 @@ show_trace_log_lvl(struct task_struct *task, struct pt_regs *regs,
 {
 	printk("%sCall Trace:\n", log_lvl);
 	dump_trace(task, regs, stack, bp, &print_trace_ops, log_lvl);
+	print_preempt_trace(task);
 }
 
 void show_trace(struct task_struct *task, struct pt_regs *regs,
