@@ -105,7 +105,7 @@ struct data;					/* Global state */
 /* Sampling functions */
 static int __buffer_add_sample(struct sample *sample);
 static struct sample *buffer_get_sample(struct sample *sample);
-static int get_sample(void *unused);
+static int get_sample(void *has_data);
 
 /* Threading and state */
 static int kthread_fn(void *unused);
@@ -216,18 +216,19 @@ static struct sample *buffer_get_sample(struct sample *sample)
 
 /**
  * get_sample - sample the CPU TSC and look for likely hardware latencies
- * @unused: This is not used but is a part of the stop_machine API
+ * @has_data: will be set to 1 case we have new data to read. Otherwise, 0.
  *
  * Used to repeatedly capture the CPU TSC (or similar), looking for potential
  * hardware-induced latency. Called under stop_machine, with data.lock held.
  */
-static int get_sample(void *unused)
+static int get_sample(void *has_data)
 {
 	ktime_t start, t1, t2;
 	s64 diff, total = 0;
 	u64 sample = 0;
 	int ret = 1;
 
+	has_data = 0;
 	start = ktime_get(); /* start timestamp */
 
 	do {
@@ -263,7 +264,7 @@ static int get_sample(void *unused)
 		if (sample > data.max_sample)
 			data.max_sample = sample;
 
-		wake_up(&data.wq); /* wake up reader(s) */
+		has_data = (void *) 1; /* needs to wake up reader(s) */
 	}
 
 	ret = 0;
@@ -288,18 +289,22 @@ out:
 static int kthread_fn(void *unused)
 {
 	int err = 0;
+	void * has_data = 0;
 	u64 interval = 0;
 
 	while (!kthread_should_stop()) {
 
 		mutex_lock(&data.lock);
 
-		err = stop_machine(get_sample, unused, 0);
+		err = stop_machine(get_sample, has_data, 0);
 		if (err) {
 			/* Houston, we have a problem */
 			mutex_unlock(&data.lock);
 			goto err_out;
 		}
+
+		if (has_data)
+			wake_up(&data.wq); /* wake up reader(s) */
 
 		interval = data.sample_window - data.sample_width;
 		do_div(interval, USEC_PER_MSEC); /* modifies interval value */
