@@ -152,46 +152,15 @@ static int nouveau_fbcon_setcolreg(unsigned regno, unsigned red, unsigned green,
 	return 0;
 }
 
-static int nouveau_fbcon_check_var(struct fb_var_screeninfo *var,
-				   struct fb_info *info)
+static int nouveau_fbcon_set_color_fields(int depth,
+					  struct fb_var_screeninfo *var)
 {
-	struct nouveau_fbcon_par *par = info->par;
-	struct nouveau_framebuffer *nouveau_fb = par->nouveau_fb;
-	struct drm_device *dev = par->dev;
-	struct drm_framebuffer *fb = &nouveau_fb->base;
-	int depth;
-
-	/* Need to resize the fb object !!! */
-	if (var->xres > fb->width || var->yres > fb->height) {
-		NV_ERROR(dev, "Requested width/height is greater than current fb object %dx%d > %dx%d\n",var->xres,var->yres,fb->width,fb->height);
-		NV_ERROR(dev, "Need resizing code.\n");
-		return -EINVAL;
-	}
-
-	switch (var->bits_per_pixel) {
-	case 16:
-		depth = (var->green.length == 6) ? 16 : 15;
-		break;
-	case 32:
-		if (var->transp.length == 2)
-			depth = 30;
-		else
-		if (var->transp.length > 0)
-			depth = 32;
-		else
-			depth = 24;
-		break;
-	default:
-		depth = var->bits_per_pixel;
-		break;
-	}
-
 	switch (depth) {
 	case 8:
 		var->red.offset = 0;
 		var->green.offset = 0;
 		var->blue.offset = 0;
-		var->red.length = 8;
+		var->red.length = 8; /* 8-bit DAC */
 		var->green.length = 8;
 		var->blue.length = 8;
 		var->transp.length = 0;
@@ -228,14 +197,14 @@ static int nouveau_fbcon_check_var(struct fb_var_screeninfo *var,
 		var->transp.offset = 0;
 		break;
 	case 30:
-		info->var.red.offset = 0;
-		info->var.green.offset = 10;
-		info->var.blue.offset = 20;
-		info->var.red.length = 10;
-		info->var.green.length = 10;
-		info->var.blue.length = 10;
-		info->var.transp.offset = 30;
-		info->var.transp.length = 2;
+		var->red.offset = 0;
+		var->green.offset = 10;
+		var->blue.offset = 20;
+		var->red.length = 10;
+		var->green.length = 10;
+		var->blue.length = 10;
+		var->transp.offset = 30;
+		var->transp.length = 2;
 		break;
 	case 32:
 		var->red.offset = 16;
@@ -250,6 +219,45 @@ static int nouveau_fbcon_check_var(struct fb_var_screeninfo *var,
 	default:
 		return -EINVAL;
 	}
+	return 0;
+}
+
+static int nouveau_fbcon_check_var(struct fb_var_screeninfo *var,
+				   struct fb_info *info)
+{
+	struct nouveau_fbcon_par *par = info->par;
+	struct nouveau_framebuffer *nouveau_fb = par->nouveau_fb;
+	struct drm_device *dev = par->dev;
+	struct drm_framebuffer *fb = &nouveau_fb->base;
+	int depth;
+
+	/* Need to resize the fb object !!! */
+	if (var->xres > fb->width || var->yres > fb->height) {
+		NV_ERROR(dev, "Requested width/height is greater than current fb object %dx%d > %dx%d\n",var->xres,var->yres,fb->width,fb->height);
+		NV_ERROR(dev, "Need resizing code.\n");
+		return -EINVAL;
+	}
+
+	switch (var->bits_per_pixel) {
+	case 16:
+		depth = (var->green.length == 6) ? 16 : 15;
+		break;
+	case 32:
+		if (var->transp.length == 2)
+			depth = 30;
+		else
+		if (var->transp.length > 0)
+			depth = 32;
+		else
+			depth = 24;
+		break;
+	default:
+		depth = var->bits_per_pixel;
+		break;
+	}
+
+	if (nouveau_fbcon_set_color_fields(depth, var))
+		return -EINVAL;
 
 	return 0;
 }
@@ -605,69 +613,7 @@ static int nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	info->pixmap.flags = FB_PIXMAP_SYSTEM;
 	info->pixmap.scan_align = 1;
 
-	switch(fb->depth) {
-	case 8:
-		info->var.red.offset = 0;
-		info->var.green.offset = 0;
-		info->var.blue.offset = 0;
-		info->var.red.length = 8; /* 8bit DAC */
-		info->var.green.length = 8;
-		info->var.blue.length = 8;
-		info->var.transp.offset = 0;
-		info->var.transp.length = 0;
-		break;
-	case 15:
-		info->var.red.offset = 10;
-		info->var.green.offset = 5;
-		info->var.blue.offset = 0;
-		info->var.red.length = 5;
-		info->var.green.length = 5;
-		info->var.blue.length = 5;
-		info->var.transp.offset = 15;
-		info->var.transp.length = 1;
-		break;
-	case 16:
-		info->var.red.offset = 11;
-		info->var.green.offset = 5;
-		info->var.blue.offset = 0;
-		info->var.red.length = 5;
-		info->var.green.length = 6;
-		info->var.blue.length = 5;
-		info->var.transp.offset = 0;
-		break;
-	case 24:
-		info->var.red.offset = 16;
-		info->var.green.offset = 8;
-		info->var.blue.offset = 0;
-		info->var.red.length = 8;
-		info->var.green.length = 8;
-		info->var.blue.length = 8;
-		info->var.transp.offset = 0;
-		info->var.transp.length = 0;
-		break;
-	case 30:
-		info->var.red.offset = 0;
-		info->var.green.offset = 10;
-		info->var.blue.offset = 20;
-		info->var.red.length = 10;
-		info->var.green.length = 10;
-		info->var.blue.length = 10;
-		info->var.transp.offset = 30;
-		info->var.transp.length = 2;
-		break;
-	case 32:
-		info->var.red.offset = 16;
-		info->var.green.offset = 8;
-		info->var.blue.offset = 0;
-		info->var.red.length = 8;
-		info->var.green.length = 8;
-		info->var.blue.length = 8;
-		info->var.transp.offset = 24;
-		info->var.transp.length = 8;
-		break;
-	default:
-		break;
-	}
+	nouveau_fbcon_set_color_fields(fb->depth, &info->var);
 
 	fb->fbdev = info;
 
