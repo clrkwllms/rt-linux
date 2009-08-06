@@ -36,7 +36,7 @@
 #include "drmP.h"
 #include "drm.h"
 
-#include "nouveau_drm.h"
+#include "nouveau_drv.h"
 
 /**
  * Called whenever a 32-bit process running under a 64-bit kernel

@@ -35,8 +35,6 @@
 #include "drm_sarea.h"
 #include "nouveau_drv.h"
 
-extern int nouveau_noagp;
-
 static struct mem_block *
 split_block(struct mem_block *p, uint64_t start, uint64_t size,
 	    struct drm_file *file_priv)

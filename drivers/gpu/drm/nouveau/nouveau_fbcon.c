@@ -47,8 +47,6 @@
 #include "nouveau_fbcon.h"
 #include "nouveau_dma.h"
 
-extern int nouveau_fbpercrtc;
-
 static int
 nouveau_fbcon_sync(struct fb_info *info)
 {

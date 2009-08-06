@@ -3249,9 +3249,6 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 	return 0;
 }
 
-extern int nouveau_uscript_lvds;
-extern int nouveau_uscript_tmds;
-
 int
 nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 			       int pxclk)

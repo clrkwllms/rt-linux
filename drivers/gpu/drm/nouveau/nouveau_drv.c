@@ -277,9 +277,6 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	return 0;
 }
 
-extern struct drm_ioctl_desc nouveau_ioctls[];
-extern int nouveau_max_ioctl;
-
 static struct drm_driver driver = {
 	.driver_features =
 		DRIVER_USE_AGP | DRIVER_PCI_DMA | DRIVER_SG |

@@ -34,8 +34,6 @@
 #include "nouveau_connector.h"
 #include "nouveau_hw.h"
 
-extern int nouveau_duallink;
-
 static struct nouveau_encoder *
 nouveau_connector_encoder_get(struct drm_connector *connector, int type)
 {
