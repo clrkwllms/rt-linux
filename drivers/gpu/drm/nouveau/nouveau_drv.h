@@ -51,12 +51,6 @@ struct nouveau_fpriv {
 
 #define DRM_FILE_PAGE_OFFSET (0x100000000ULL >> PAGE_SHIFT)
 
-#define nouveau_bdev(_bd) \
-	container_of(_bd, struct drm_nouveau_private, ttm.bdev)
-
-#define nouveau_fdev(_fd) \
-	container_of(_fd, struct drm_nouveau_private, ttm.fdev)
-
 #include "nouveau_drm.h"
 #include "nouveau_reg.h"
 #include "nouveau_bios.h"
@@ -559,6 +553,12 @@ struct drm_nouveau_private {
 
 	struct nouveau_channel *evo;
 };
+
+static inline struct drm_nouveau_private *
+nouveau_bdev(struct ttm_bo_device *bd)
+{
+	return container_of(bd, struct drm_nouveau_private, ttm.bdev);
+}
 
 static inline int
 nouveau_bo_ref(struct nouveau_bo *ref, struct nouveau_bo **pnvbo)

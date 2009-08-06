@@ -45,7 +45,12 @@ struct nouveau_connector {
 
 	struct edid *edid;
 };
-#define nouveau_connector(x) container_of((x), struct nouveau_connector, base)
+
+static inline struct nouveau_connector *nouveau_connector(
+						struct drm_connector *con)
+{
+	return container_of(con, struct nouveau_connector, base);
+}
 
 int nouveau_connector_create(struct drm_device *dev, int i2c_index, int type);
 

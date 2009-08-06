@@ -103,8 +103,8 @@ static int nouveau_fbcon_setcolreg(unsigned regno, unsigned red, unsigned green,
 	int i;
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-		struct nouveau_crtc *nouveau_crtc = nouveau_crtc(crtc);
-		struct drm_mode_set *modeset = &nouveau_crtc->mode_set;
+		struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
+		struct drm_mode_set *modeset = &nv_crtc->mode_set;
 		struct drm_framebuffer *fb = modeset->fb;
 
 		for (i = 0; i < par->crtc_count; i++)
@@ -282,7 +282,7 @@ static int nouveau_fbcon_set_par(struct fb_info *info)
 		int ret;
 
 		list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-			struct nouveau_crtc *nouveau_crtc = nouveau_crtc(crtc);
+			struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 
 			for (i = 0; i < par->crtc_count; i++)
 				if (crtc->base.id == par->crtc_ids[i])
@@ -291,9 +291,9 @@ static int nouveau_fbcon_set_par(struct fb_info *info)
 			if (i == par->crtc_count)
 				continue;
 
-			if (crtc->fb == nouveau_crtc->mode_set.fb) {
+			if (crtc->fb == nv_crtc->mode_set.fb) {
 				mutex_lock(&dev->mode_config.mutex);
-				ret = crtc->funcs->set_config(&nouveau_crtc->mode_set);
+				ret = crtc->funcs->set_config(&nv_crtc->mode_set);
 				mutex_unlock(&dev->mode_config.mutex);
 				if (ret)
 					return ret;
@@ -310,7 +310,7 @@ static int nouveau_fbcon_pan_display(struct fb_var_screeninfo *var,
 	struct drm_device *dev = par->dev;
 	struct drm_mode_set *modeset;
 	struct drm_crtc *crtc;
-	struct nouveau_crtc *nouveau_crtc;
+	struct nouveau_crtc *nv_crtc;
 	int ret = 0;
 	int i;
 
@@ -322,8 +322,8 @@ static int nouveau_fbcon_pan_display(struct fb_var_screeninfo *var,
 		if (i == par->crtc_count)
 			continue;
 
-		nouveau_crtc = nouveau_crtc(crtc);
-		modeset = &nouveau_crtc->mode_set;
+		nv_crtc = nouveau_crtc(crtc);
+		modeset = &nv_crtc->mode_set;
 
 		modeset->x = var->xoffset;
 		modeset->y = var->yoffset;
@@ -656,7 +656,7 @@ out:
 static int nouveau_fbcon_multi_fb_probe_crtc(struct drm_device *dev,
 					     struct drm_crtc *crtc)
 {
-	struct nouveau_crtc *nouveau_crtc = nouveau_crtc(crtc);
+	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 	struct nouveau_framebuffer *nouveau_fb;
 	struct drm_framebuffer *fb;
 	struct drm_connector *connector;
@@ -677,13 +677,13 @@ static int nouveau_fbcon_multi_fb_probe_crtc(struct drm_device *dev,
 	height = crtc->desired_mode->vdisplay;
 
 	/* is there an fb bound to this crtc already */
-	if (!nouveau_crtc->mode_set.fb) {
+	if (!nv_crtc->mode_set.fb) {
 		ret = nouveau_fbcon_create(dev, width, height, width, height, &nouveau_fb);
 		if (ret)
 			return -EINVAL;
 		new_fb = 1;
 	} else {
-		fb = nouveau_crtc->mode_set.fb;
+		fb = nv_crtc->mode_set.fb;
 		nouveau_fb = nouveau_framebuffer(fb);
 		if ((nouveau_fb->base.width < width) || (nouveau_fb->base.height < height))
 			return -EINVAL;
@@ -692,7 +692,7 @@ static int nouveau_fbcon_multi_fb_probe_crtc(struct drm_device *dev,
 	info = nouveau_fb->base.fbdev;
 	par = info->par;
 
-	modeset = &nouveau_crtc->mode_set;
+	modeset = &nv_crtc->mode_set;
 	modeset->fb = &nouveau_fb->base;
 	conn_count = 0;
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
@@ -840,9 +840,9 @@ static int nouveau_fbcon_single_fb_probe(struct drm_device *dev)
 	 * set configuration.
 	 */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-		struct nouveau_crtc *nouveau_crtc = nouveau_crtc(crtc);
+		struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 
-		modeset = &nouveau_crtc->mode_set;
+		modeset = &nv_crtc->mode_set;
 		modeset->fb = &nouveau_fb->base;
 		conn_count = 0;
 		list_for_each_entry(connector, &dev->mode_config.connector_list,

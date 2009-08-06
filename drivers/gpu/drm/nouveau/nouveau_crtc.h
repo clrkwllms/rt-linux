@@ -70,7 +70,11 @@ struct nouveau_crtc {
 	int (*set_dither)(struct nouveau_crtc *crtc, bool on, bool update);
 	int (*set_scale)(struct nouveau_crtc *crtc, int mode, bool update);
 };
-#define nouveau_crtc(x) container_of((x), struct nouveau_crtc, base)
+
+static inline struct nouveau_crtc *nouveau_crtc(struct drm_crtc *crtc)
+{
+	return container_of(crtc, struct nouveau_crtc, base);
+}
 
 int nv50_crtc_create(struct drm_device *dev, int index);
 int nv50_cursor_init(struct nouveau_crtc *);
