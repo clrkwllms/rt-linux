@@ -574,7 +574,7 @@ static int nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	info->fix.xpanstep = 1; /* doing it in hw */
 	info->fix.ypanstep = 1; /* doing it in hw */
 	info->fix.ywrapstep = 0;
-	info->fix.accel = FB_ACCEL_I830;
+	info->fix.accel = FB_ACCEL_NONE;
 	info->fix.type_aux = 0;
 
 	info->fbops = &nouveau_fbcon_ops;
