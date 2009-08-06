@@ -482,19 +482,19 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 
 	pushbuf = u_memcpya(req->dwords, req->nr_dwords, sizeof(uint32_t));
 	if (IS_ERR(pushbuf))
-		return (unsigned long)pushbuf;
+		return PTR_ERR(pushbuf);
 
 	bo = u_memcpya(req->buffers, req->nr_buffers, sizeof(*bo));
 	if (IS_ERR(bo)) {
 		kfree(pushbuf);
-		return (unsigned long)bo;
+		return PTR_ERR(bo);
 	}
 
 	reloc = u_memcpya(req->relocs, req->nr_relocs, sizeof(*reloc));
 	if (IS_ERR(reloc)) {
 		kfree(bo);
 		kfree(pushbuf);
-		return (unsigned long)reloc;
+		return PTR_ERR(reloc);
 	}
 
 	mutex_lock(&dev->struct_mutex);
