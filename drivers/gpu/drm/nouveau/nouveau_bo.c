@@ -72,6 +72,16 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 	if (!nvbo->mappable && (flags & TTM_PL_FLAG_VRAM))
 		flags |= TTM_PL_FLAG_PRIV0;
 
+	/* 0x7a00 has a periodic structure of 24*4096 bytes, align to to that
+	 * as well as the page size. Overallocate memory to avoid corruption of
+	 * other buffer objects. Additional constraints for other formats will be
+	 * added as information becomes available.
+	 */
+	if (tile_flags == 0x7a00) { /* valid for all tiled modes */
+		size += 6*4096;
+		align = 2*24*4096;
+	}
+
 	align >>= PAGE_SHIFT;
 
 	size = (size + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1);
