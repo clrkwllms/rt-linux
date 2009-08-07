@@ -271,11 +271,13 @@ static int
 nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
 			     struct drm_file *file_priv,
 			     struct drm_nouveau_gem_pushbuf_bo *pbbo,
-			     uint64_t user_bo, int nr_buffers,
+			     uint64_t user_buffers, int nr_buffers,
 			     struct list_head *list, int *apply_relocs)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_gem_pushbuf_bo *b;
+	struct drm_nouveau_gem_pushbuf_bo __user *user_pbbos =
+				(void __force __user *)(uintptr_t)user_buffers;
 	struct nouveau_fence *prev_fence;
 	struct nouveau_bo *nvbo;
 	struct list_head *entry, *tmp;
@@ -358,7 +360,7 @@ retry:
 		     (nvbo->bo.mem.mem_type == TTM_PL_TT &&
 		      b->presumed_domain & NOUVEAU_GEM_DOMAIN_GART))) {
 			b++;
-			user_bo += sizeof(*b);
+			user_pbbos++;
 			continue;
 		}
 
@@ -371,13 +373,13 @@ retry:
 		if (apply_relocs)
 			(*apply_relocs)++;
 
-		if (DRM_COPY_TO_USER((void __user *)user_bo, b, sizeof(*b))) {
+		if (DRM_COPY_TO_USER(user_pbbos, b, sizeof(*b))) {
 			ret = -EFAULT;
 			goto out_unref;
 		}
 
 		b++;
-		user_bo += sizeof(*b);
+		user_pbbos++;
 	}
 
 out_unref:
@@ -438,12 +440,13 @@ static inline void *
 u_memcpya(uint64_t user, unsigned nmemb, unsigned size)
 {
 	void *mem;
+	void __user *userptr = (void __force __user *)(uintptr_t)user;
 
 	mem = kmalloc(nmemb * size, GFP_KERNEL);
 	if (!mem)
 		return ERR_PTR(-ENOMEM);
 
-	if (DRM_COPY_FROM_USER(mem, (void __user *)user, nmemb * size)) {
+	if (DRM_COPY_FROM_USER(mem, userptr, nmemb * size)) {
 		kfree(mem);
 		return ERR_PTR(-EFAULT);
 	}
