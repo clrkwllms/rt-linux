@@ -214,7 +214,8 @@ nv40_fifo_init(struct drm_device *dev)
 {
 	int ret;
 
-	if ((ret = nouveau_fifo_init(dev)))
+	ret = nv04_fifo_init(dev);
+	if (ret)
 		return ret;
 
 	nv_wr32(dev, NV04_PFIFO_DMA_TIMESLICE, 0x2101ffff);

@@ -2,6 +2,21 @@
 #include "drm.h"
 #include "nouveau_drv.h"
 
+/* returns the size of fifo context */
+static int
+nouveau_fifo_ctx_size(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	if (dev_priv->card_type >= NV_40)
+		return 128;
+	else
+	if (dev_priv->card_type >= NV_17)
+		return 64;
+
+	return 32;
+}
+
 static void
 nv04_instmem_determine_amount(struct drm_device *dev)
 {

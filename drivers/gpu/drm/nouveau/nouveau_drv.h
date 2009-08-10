@@ -659,7 +659,6 @@ extern int  nouveau_ioctl_notifier_free(struct drm_device *, void *data,
 extern struct drm_ioctl_desc nouveau_ioctls[];
 extern int nouveau_max_ioctl;
 extern int  nouveau_fifo_init(struct drm_device *);
-extern int  nouveau_fifo_ctx_size(struct drm_device *);
 extern void nouveau_fifo_cleanup(struct drm_device *, struct drm_file *);
 extern int  nouveau_fifo_owner(struct drm_device *, struct drm_file *,
 			       int channel);
@@ -781,6 +780,7 @@ extern int  nv40_fb_init(struct drm_device *);
 extern void nv40_fb_takedown(struct drm_device *);
 
 /* nv04_fifo.c */
+extern int  nv04_fifo_init(struct drm_device *);
 extern int  nv04_fifo_channel_id(struct drm_device *);
 extern int  nv04_fifo_create_context(struct nouveau_channel *);
 extern void nv04_fifo_destroy_context(struct nouveau_channel *);

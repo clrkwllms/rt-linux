@@ -35,6 +35,155 @@
 #define NV04_RAMFC(c) (dev_priv->ramfc_offset + ((c) * NV04_RAMFC__SIZE))
 #define NV04_RAMFC__SIZE 32
 
+static int
+nouveau_fifo_instmem_configure(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	nv_wr32(dev, NV03_PFIFO_RAMHT,
+			(0x03 << 24) /* search 128 */ |
+			((dev_priv->ramht_bits - 9) << 16) |
+			(dev_priv->ramht_offset >> 8)
+			);
+
+	nv_wr32(dev, NV03_PFIFO_RAMRO, dev_priv->ramro_offset>>8);
+
+	switch (dev_priv->card_type) {
+	case NV_40:
+		switch (dev_priv->chipset) {
+		case 0x47:
+		case 0x49:
+		case 0x4b:
+			nv_wr32(dev, 0x2230, 1);
+			break;
+		default:
+			break;
+		}
+
+		switch (dev_priv->chipset) {
+		case 0x40:
+		case 0x41:
+		case 0x42:
+		case 0x43:
+		case 0x45:
+		case 0x47:
+		case 0x48:
+		case 0x49:
+		case 0x4b:
+			nv_wr32(dev, NV40_PFIFO_RAMFC, 0x30002);
+			break;
+		default:
+			nv_wr32(dev, 0x2230, 0);
+			nv_wr32(dev, NV40_PFIFO_RAMFC,
+				((nouveau_mem_fb_amount(dev) - 512 * 1024 +
+				  dev_priv->ramfc_offset) >> 16) | (2 << 16));
+			break;
+		}
+		break;
+	case NV_30:
+	case NV_20:
+	case NV_17:
+		nv_wr32(dev, NV03_PFIFO_RAMFC,
+			     (dev_priv->ramfc_offset >> 8) |
+			     (1 << 16) /* 64 Bytes entry*/);
+		/* XXX nvidia blob set bit 18, 21,23 for nv20 & nv30 */
+		break;
+	case NV_11:
+	case NV_10:
+	case NV_04:
+	case NV_05:
+		nv_wr32(dev, NV03_PFIFO_RAMFC, dev_priv->ramfc_offset >> 8);
+		break;
+	default:
+		NV_ERROR(dev, "unknown card type %d\n", dev_priv->card_type);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+int
+nv04_fifo_init(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t mode = 0;
+	int ret, i;
+
+	for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+		if (dev_priv->fifos[i])
+			mode |= (1 << i);
+	}
+
+	nv_wr32(dev, NV03_PMC_ENABLE,
+		nv_rd32(dev, NV03_PMC_ENABLE) & ~NV_PMC_ENABLE_PFIFO);
+	nv_wr32(dev, NV03_PMC_ENABLE,
+		nv_rd32(dev, NV03_PMC_ENABLE) | NV_PMC_ENABLE_PFIFO);
+
+	/* Enable PFIFO error reporting */
+	nv_wr32(dev, NV03_PFIFO_INTR_0, 0xFFFFFFFF);
+	nv_wr32(dev, NV03_PFIFO_INTR_EN_0, 0xFFFFFFFF);
+
+	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000000);
+
+	ret = nouveau_fifo_instmem_configure(dev);
+	if (ret) {
+		NV_ERROR(dev, "Failed to configure instance memory\n");
+		return ret;
+	}
+
+	/* FIXME remove all the stuff that's done in nouveau_fifo_alloc */
+
+	NV_DEBUG(dev, "Setting defaults for remaining PFIFO regs\n");
+
+	/* All channels into PIO mode */
+	nv_wr32(dev, NV04_PFIFO_MODE, 0x00000000);
+
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000000);
+	/* Channel 0 active, PIO mode */
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1, 0x00000000);
+	/* PUT and GET to 0 */
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUT, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_GET, 0x00000000);
+	/* No cmdbuf object */
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_INSTANCE, 0x00000000);
+	nv_wr32(dev, NV03_PFIFO_CACHE0_PUSH0, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_CACHE0_PULL0, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_SIZE, 0x0000FFFF);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_HASH, 0x0000FFFF);
+	nv_wr32(dev, NV04_PFIFO_CACHE0_PULL1, 0x00000001);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_CTL, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_STATE, 0x00000000);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_ENGINE, 0x00000000);
+
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_FETCH,
+			NV_PFIFO_CACHE1_DMA_FETCH_TRIG_112_BYTES |
+			NV_PFIFO_CACHE1_DMA_FETCH_SIZE_128_BYTES |
+			NV_PFIFO_CACHE1_DMA_FETCH_MAX_REQS_4 |
+#ifdef __BIG_ENDIAN
+			NV_PFIFO_CACHE1_BIG_ENDIAN |
+#endif
+			0x00000000);
+
+	/* FIXME on NV04 */
+	if (dev_priv->card_type >= NV_10) {
+		nv_wr32(dev, NV10_PGRAPH_CTX_USER, 0x0);
+		nv_wr32(dev, NV04_PFIFO_DELAY_0, 0xff /* retrycount */);
+		if (dev_priv->card_type >= NV_40)
+			nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x00002001);
+		else
+			nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10110000);
+	} else {
+		nv_wr32(dev, NV04_PGRAPH_CTX_USER, 0x0);
+		nv_wr32(dev, NV04_PFIFO_DELAY_0, 0xff /* retrycount */);
+		nv_wr32(dev, NV04_PGRAPH_CTX_CONTROL, 0x10110000);
+	}
+
+	nv_wr32(dev, NV04_PFIFO_DMA_TIMESLICE, 0x001fffff);
+	nv_wr32(dev, NV04_PFIFO_MODE, mode);
+	return 0;
+}
+
 int
 nv04_fifo_channel_id(struct drm_device *dev)
 {
