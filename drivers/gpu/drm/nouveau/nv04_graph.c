@@ -386,9 +386,6 @@ void nv04_graph_context_switch(struct drm_device *dev)
 	if (!last) {
 		NV_DEBUG(dev, "WARNING: Invalid last channel, switch to %x\n",
 			 next->id);
-	} else {
-		NV_INFO(dev, "NV: PGRAPH context switch interrupt channel %x -> %x\n",
-			last->id, next->id);
 	}
 
 /*	nv_wr32(dev, NV03_PFIFO_CACHES, 0x0);
