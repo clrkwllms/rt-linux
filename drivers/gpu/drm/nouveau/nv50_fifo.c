@@ -276,7 +276,7 @@ nv50_fifo_create_context(struct nouveau_channel *chan)
 	nv_wo32(dev, ramfc, 0x10/4, chan->pushbuf_base);
 	nv_wo32(dev, ramfc, 0x48/4, chan->pushbuf->instance >> 4);
 	nv_wo32(dev, ramfc, 0x80/4, (0xc << 24) | (chan->ramht->instance >> 4));
-	nv_wo32(dev, ramfc, 0x3c/4, 0x000f0078); /* fetch? */
+	nv_wo32(dev, ramfc, 0x3c/4, 0x00086078);
 	nv_wo32(dev, ramfc, 0x44/4, 0x2101ffff);
 	nv_wo32(dev, ramfc, 0x60/4, 0x7fffffff);
 	nv_wo32(dev, ramfc, 0x40/4, 0x00000000);
