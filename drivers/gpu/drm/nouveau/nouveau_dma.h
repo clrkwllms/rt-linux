@@ -27,12 +27,16 @@
 #ifndef __NOUVEAU_DMA_H__
 #define __NOUVEAU_DMA_H__
 
-/* This is needed to avoid a race condition.
- * Otherwise you may be writing in the fetch area.
- * Is this large enough, as it's only 32 bytes, and the maximum
- * fetch size is 256 bytes?
+/* There's a hw race condition where you can't jump to your PUT offset,
+ * to avoid this we jump to offset + SKIPS and fill the difference with
+ * NOPs.
+ *
+ * xf86-video-nv configures the DMA fetch size to 32 bytes, and uses
+ * a SKIPS value of 8.  Lets assume that the race condition is to do
+ * with writing into the fetch area, we configure a fetch size of 128
+ * bytes so we need a larger SKIPS value.
  */
-#define NOUVEAU_DMA_SKIPS 8
+#define NOUVEAU_DMA_SKIPS (128 / 4)
 
 typedef enum {
 	NvSubM2MF	= 0,
