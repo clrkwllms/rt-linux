@@ -98,7 +98,7 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *evo = dev_priv->evo;
-	int index = crtc->index;
+	int index = crtc->index, ret;
 
 	NV_DEBUG(dev, "index %d\n", crtc->index);
 	NV_DEBUG(dev, "%s\n", blanked ? "blanked" : "unblanked");
@@ -106,7 +106,11 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 	if (blanked) {
 		crtc->cursor.hide(crtc, false);
 
-		RING_SPACE(evo, dev_priv->chipset != 0x50 ? 7 : 5);
+		ret = RING_SPACE(evo, dev_priv->chipset != 0x50 ? 7 : 5);
+		if (ret) {
+			NV_ERROR(dev, "no space while blanking crtc\n");
+			return ret;
+		}
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, CLUT_MODE), 2);
 		OUT_RING  (evo, NV50_EVO_CRTC_CLUT_MODE_BLANK);
 		OUT_RING  (evo, 0);
@@ -124,7 +128,11 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 		else
 			crtc->cursor.hide(crtc, false);
 
-		RING_SPACE(evo, dev_priv->chipset != 0x50 ? 10 : 8);
+		ret = RING_SPACE(evo, dev_priv->chipset != 0x50 ? 10 : 8);
+		if (ret) {
+			NV_ERROR(dev, "no space while unblanking crtc\n");
+			return ret;
+		}
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, CLUT_MODE), 2);
 		OUT_RING  (evo, crtc->lut.depth == 8 ?
 				NV50_EVO_CRTC_CLUT_MODE_OFF :
