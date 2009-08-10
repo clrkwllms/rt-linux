@@ -91,14 +91,32 @@ nouveau_dma_init(struct nouveau_channel *chan)
 	return 0;
 }
 
+static inline bool
+READ_GET(struct nouveau_channel *chan, uint32_t *get)
+{
+	uint32_t val;
+
+	val = nvchan_rd32(chan->user_get);
+	if (val < chan->pushbuf_base ||
+	    val >= chan->pushbuf_base + chan->pushbuf_bo->bo.mem.size)
+		return false;
+
+	*get = (val - chan->pushbuf_base) >> 2;
+	return true;
+}
+
 int
 nouveau_dma_wait(struct nouveau_channel *chan, int size)
 {
 	const int us_timeout = 100000;
+	uint32_t get;
 	int ret = -EBUSY, i;
 
 	for (i = 0; i < us_timeout; i++) {
-		uint32_t get = READ_GET();
+		if (!READ_GET(chan, &get)) {
+			DRM_UDELAY(1);
+			continue;
+		}
 
 		if (chan->dma.put >= get) {
 			chan->dma.free = chan->dma.max - chan->dma.cur;
@@ -111,8 +129,8 @@ nouveau_dma_wait(struct nouveau_channel *chan, int size)
 						WRITE_PUT(NOUVEAU_DMA_SKIPS + 1);
 
 					for (; i < us_timeout; i++) {
-						get = READ_GET();
-						if (get > NOUVEAU_DMA_SKIPS)
+						if (READ_GET(chan, &get) &&
+						    get > NOUVEAU_DMA_SKIPS)
 							break;
 
 						DRM_UDELAY(1);

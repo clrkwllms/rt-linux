@@ -115,8 +115,6 @@ BEGIN_RING(struct nouveau_channel *chan, int subc, int mthd, int size)
 	OUT_RING(chan, (subc << 13) | (size << 18) | mthd);
 }
 
-#define READ_GET() ((nvchan_rd32(chan->user_get) - chan->pushbuf_base) >> 2)
-
 #define WRITE_PUT(val) do {                                                    \
 	volatile uint32_t tmp;                                                 \
 	DRM_MEMORYBARRIER();                                                   \
