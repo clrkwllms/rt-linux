@@ -41,7 +41,7 @@ nv50_cursor_show(struct nouveau_crtc *crtc, bool update)
 
 	NV_DEBUG(dev, "\n");
 
-	ret = RING_SPACE(evo, dev_priv->chipset != 0x50 ? 4 : 2);
+	ret = RING_SPACE(evo, (dev_priv->chipset != 0x50 ? 4 : 2) + update * 2);
 	if (ret) {
 		NV_ERROR(dev, "no space while unhiding cursor\n");
 		return;
@@ -55,7 +55,6 @@ nv50_cursor_show(struct nouveau_crtc *crtc, bool update)
 	OUT_RING  (evo, NV50_EVO_CRTC_CURSOR_CTRL_SHOW);
 
 	if (update) {
-		RING_SPACE(evo, 2);
 		BEGIN_RING(evo, 0, NV50_EVO_UPDATE, 1);
 		OUT_RING  (evo, 0);
 		FIRE_RING (evo);
@@ -73,7 +72,7 @@ nv50_cursor_hide(struct nouveau_crtc *crtc, bool update)
 
 	NV_DEBUG(dev, "\n");
 
-	ret = RING_SPACE(evo, dev_priv->chipset != 0x50 ? 4 : 2);
+	ret = RING_SPACE(evo, (dev_priv->chipset != 0x50 ? 4 : 2) + update * 2);
 	if (ret) {
 		NV_ERROR(dev, "no space while hiding cursor\n");
 		return;
@@ -86,7 +85,6 @@ nv50_cursor_hide(struct nouveau_crtc *crtc, bool update)
 	}
 
 	if (update) {
-		RING_SPACE(evo, 2);
 		BEGIN_RING(evo, 0, NV50_EVO_UPDATE, 1);
 		OUT_RING  (evo, 0);
 		FIRE_RING (evo);
