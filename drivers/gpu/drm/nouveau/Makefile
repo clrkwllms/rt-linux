@@ -3,7 +3,7 @@
 # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
 
 ccflags-y := -Iinclude/drm
-nouveau-y := nouveau_drv.o nouveau_state.o nouveau_fifo.o nouveau_mem.o \
+nouveau-y := nouveau_drv.o nouveau_state.o nouveau_channel.o nouveau_mem.o \
              nouveau_object.o nouveau_irq.o nouveau_notifier.o \
              nouveau_sgdma.o nouveau_dma.o \
              nouveau_bo.o nouveau_fence.o nouveau_gem.o nouveau_ttm.o \

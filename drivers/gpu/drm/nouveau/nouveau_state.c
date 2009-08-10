@@ -345,8 +345,9 @@ nouveau_card_init(struct drm_device *dev)
 
 	/* what about PVIDEO/PCRTC/PRAMDAC etc? */
 
-	ret = nouveau_fifo_alloc(dev, &dev_priv->channel, (struct drm_file *)-2,
-				 NvDmaFB, NvDmaTT);
+	ret = nouveau_channel_alloc(dev, &dev_priv->channel,
+				    (struct drm_file *)-2,
+				    NvDmaFB, NvDmaTT);
 	if (ret) return ret;
 
 	gpuobj = NULL;
@@ -411,7 +412,7 @@ static void nouveau_card_takedown(struct drm_device *dev)
 		nouveau_backlight_exit(dev);
 
 		if (dev_priv->channel) {
-			nouveau_fifo_free(dev_priv->channel);
+			nouveau_channel_free(dev_priv->channel);
 			dev_priv->channel = NULL;
 		}
 
@@ -444,7 +445,7 @@ static void nouveau_card_takedown(struct drm_device *dev)
  * file_priv */
 void nouveau_preclose(struct drm_device *dev, struct drm_file *file_priv)
 {
-	nouveau_fifo_cleanup(dev, file_priv);
+	nouveau_channel_cleanup(dev, file_priv);
 }
 
 /* first module load, setup the mmio/fb mapping */

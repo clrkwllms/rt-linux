@@ -589,7 +589,7 @@ nouveau_bo_ref(struct nouveau_bo *ref, struct nouveau_bo **pnvbo)
 
 #define NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(id,cl,ch) do {      \
 	struct drm_nouveau_private *nv = dev->dev_private;       \
-	if (!nouveau_fifo_owner(dev, (cl), (id))) {              \
+	if (!nouveau_channel_owner(dev, (cl), (id))) {           \
 		NV_ERROR(dev, "pid %d doesn't own channel %d\n", \
 			 DRM_CURRENTPID, (id));                  \
 		return -EPERM;                                   \
@@ -655,18 +655,17 @@ extern int  nouveau_ioctl_notifier_alloc(struct drm_device *, void *data,
 extern int  nouveau_ioctl_notifier_free(struct drm_device *, void *data,
 					struct drm_file *);
 
-/* nouveau_fifo.c */
+/* nouveau_channel.c */
 extern struct drm_ioctl_desc nouveau_ioctls[];
 extern int nouveau_max_ioctl;
-extern int  nouveau_fifo_init(struct drm_device *);
-extern void nouveau_fifo_cleanup(struct drm_device *, struct drm_file *);
-extern int  nouveau_fifo_owner(struct drm_device *, struct drm_file *,
-			       int channel);
-extern int  nouveau_fifo_alloc(struct drm_device *dev,
-			       struct nouveau_channel **chan,
-			       struct drm_file *file_priv,
-			       uint32_t fb_ctxdma, uint32_t tt_ctxdma);
-extern void nouveau_fifo_free(struct nouveau_channel *);
+extern void nouveau_channel_cleanup(struct drm_device *, struct drm_file *);
+extern int  nouveau_channel_owner(struct drm_device *, struct drm_file *,
+				  int channel);
+extern int  nouveau_channel_alloc(struct drm_device *dev,
+				  struct nouveau_channel **chan,
+				  struct drm_file *file_priv,
+				  uint32_t fb_ctxdma, uint32_t tt_ctxdma);
+extern void nouveau_channel_free(struct nouveau_channel *);
 extern int  nouveau_channel_idle(struct nouveau_channel *chan);
 
 /* nouveau_object.c */
