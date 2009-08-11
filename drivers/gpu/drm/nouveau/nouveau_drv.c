@@ -41,6 +41,10 @@ MODULE_PARM_DESC(modeset, "Enable kernel modesetting");
 static int nouveau_modeset = -1; /* kms */
 module_param_named(modeset, nouveau_modeset, int, 0400);
 
+MODULE_PARM_DESC(vram_pushbuf, "Force DMA push buffers to be in VRAM");
+int nouveau_vram_pushbuf = 0;
+module_param_named(vram_pushbuf, nouveau_vram_pushbuf, int, 0400);
+
 MODULE_PARM_DESC(duallink, "Allow dual-link TMDS (>=GeForce 8)");
 int nouveau_duallink = 1;
 module_param_named(duallink, nouveau_duallink, int, 0400);

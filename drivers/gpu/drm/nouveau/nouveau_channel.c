@@ -77,27 +77,22 @@ nouveau_channel_pushbuf_ctxdma_init(struct nouveau_channel *chan)
 static struct nouveau_bo *
 nouveau_channel_user_pushbuf_alloc(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_config *config = &dev_priv->config;
 	struct nouveau_bo *pushbuf = NULL;
-	int pb_min_size = max(NV03_FIFO_SIZE, PAGE_SIZE);
-	int ret;
+	int location, ret;
 
-	/* Defaults for unconfigured values */
-	if (!config->cmdbuf.location)
-		config->cmdbuf.location = TTM_PL_FLAG_TT;
-	if (!config->cmdbuf.size || config->cmdbuf.size < pb_min_size)
-		config->cmdbuf.size = 65536;
+	if (nouveau_vram_pushbuf)
+		location = TTM_PL_FLAG_VRAM;
+	else
+		location = TTM_PL_FLAG_TT;
 
-	ret = nouveau_bo_new(dev, NULL, config->cmdbuf.size, 0,
-			     config->cmdbuf.location, 0, 0x0000,
-			     false, true, &pushbuf);
+	ret = nouveau_bo_new(dev, NULL, 65536, 0, location, 0, 0x0000, false,
+			     true, &pushbuf);
 	if (ret) {
 		NV_ERROR(dev, "error allocating DMA push buffer: %d\n", ret);
 		return NULL;
 	}
 
-	ret = nouveau_bo_pin(pushbuf, config->cmdbuf.location);
+	ret = nouveau_bo_pin(pushbuf, location);
 	if (ret) {
 		NV_ERROR(dev, "error pinning DMA push buffer: %d\n", ret);
 		nouveau_bo_ref(NULL, &pushbuf);

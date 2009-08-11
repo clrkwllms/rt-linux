@@ -234,13 +234,6 @@ struct nouveau_channel
 	} nvsw;
 };
 
-struct nouveau_config {
-	struct {
-		int location;
-		int size;
-	} cmdbuf;
-};
-
 struct nouveau_instmem_engine {
 	void	*priv;
 
@@ -527,8 +520,6 @@ struct drm_nouveau_private {
         uint32_t ctx_table_size;
 	struct nouveau_gpuobj_ref *ctx_table;
 
-	struct nouveau_config config;
-
 	struct list_head gpuobj_list;
 
 	bool in_modeset;
@@ -602,6 +593,7 @@ extern int nouveau_noagp;
 extern int nouveau_duallink;
 extern int nouveau_uscript_lvds;
 extern int nouveau_uscript_tmds;
+extern int nouveau_vram_pushbuf;
 extern int nouveau_fbpercrtc;
 
 /* nouveau_state.c */
