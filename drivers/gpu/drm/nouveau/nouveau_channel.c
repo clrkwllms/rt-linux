@@ -63,9 +63,9 @@ nouveau_channel_pushbuf_ctxdma_init(struct nouveau_channel *chan)
 		chan->pushbuf_base = 0;
 	}
 
-	if ((ret = nouveau_gpuobj_ref_add(dev, chan, 0, pushbuf,
-					  &chan->pushbuf))) {
-		NV_ERROR(dev, "Error referencing push buffer ctxdma: %d\n", ret);
+	ret = nouveau_gpuobj_ref_add(dev, chan, 0, pushbuf, &chan->pushbuf);
+	if (ret) {
+		NV_ERROR(dev, "Error referencing pushbuf ctxdma: %d\n", ret);
 		if (pushbuf != dev_priv->gart_info.sg_ctxdma)
 			nouveau_gpuobj_del(dev, &pushbuf);
 		return ret;
@@ -123,8 +123,8 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	 * Alright, here is the full story
 	 * Nvidia cards have multiple hw fifo contexts (praise them for that,
 	 * no complicated crash-prone context switches)
-	 * We allocate a new context for each app and let it write to it directly
-	 * (woo, full userspace command submission !)
+	 * We allocate a new context for each app and let it write to it
+	 * directly (woo, full userspace command submission !)
 	 * When there are no more contexts, you lost
 	 */
 	for (channel = 0; channel < engine->fifo.channels; channel++) {
@@ -317,7 +317,8 @@ nouveau_channel_idle(struct nouveau_channel *chan)
 }
 
 /* stops a fifo */
-void nouveau_channel_free(struct nouveau_channel *chan)
+void
+nouveau_channel_free(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -372,8 +373,6 @@ void nouveau_channel_free(struct nouveau_channel *chan)
 	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
 	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000000);
 
-	// FIXME XXX needs more code
-
 	engine->fifo.destroy_context(chan);
 
 	/* Cleanup PGRAPH state */
@@ -403,8 +402,9 @@ void nouveau_channel_free(struct nouveau_channel *chan)
 	kfree(chan);
 }
 
-/* cleanups all the fifos from file_priv */
-void nouveau_channel_cleanup(struct drm_device *dev, struct drm_file *file_priv)
+/* cleans up all the fifos from file_priv */
+void
+nouveau_channel_cleanup(struct drm_device *dev, struct drm_file *file_priv)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
@@ -421,7 +421,7 @@ void nouveau_channel_cleanup(struct drm_device *dev, struct drm_file *file_priv)
 
 int
 nouveau_channel_owner(struct drm_device *dev, struct drm_file *file_priv,
-		   int channel)
+		      int channel)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
@@ -430,6 +430,7 @@ nouveau_channel_owner(struct drm_device *dev, struct drm_file *file_priv,
 		return 0;
 	if (dev_priv->fifos[channel] == NULL)
 		return 0;
+
 	return (dev_priv->fifos[channel]->file_priv == file_priv);
 }
 
@@ -437,8 +438,9 @@ nouveau_channel_owner(struct drm_device *dev, struct drm_file *file_priv,
  * ioctls wrapping the functions
  ***********************************/
 
-static int nouveau_ioctl_fifo_alloc(struct drm_device *dev, void *data,
-				    struct drm_file *file_priv)
+static int
+nouveau_ioctl_fifo_alloc(struct drm_device *dev, void *data,
+			 struct drm_file *file_priv)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_channel_alloc *init = data;
@@ -478,8 +480,9 @@ static int nouveau_ioctl_fifo_alloc(struct drm_device *dev, void *data,
 	return 0;
 }
 
-static int nouveau_ioctl_fifo_free(struct drm_device *dev, void *data,
-				   struct drm_file *file_priv)
+static int
+nouveau_ioctl_fifo_free(struct drm_device *dev, void *data,
+			struct drm_file *file_priv)
 {
 	struct drm_nouveau_channel_free *cfree = data;
 	struct nouveau_channel *chan;
