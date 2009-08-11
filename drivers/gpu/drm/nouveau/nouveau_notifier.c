@@ -134,9 +134,10 @@ nouveau_notifier_alloc(struct nouveau_channel *chan, uint32_t handle,
 	}
 	offset += mem->start;
 
-	if ((ret = nouveau_gpuobj_dma_new(chan, NV_CLASS_DMA_IN_MEMORY,
-					  offset, mem->size,
-					  NV_DMA_ACCESS_RW, target, &nobj))) {
+	ret = nouveau_gpuobj_dma_new(chan, NV_CLASS_DMA_IN_MEMORY, offset,
+				     mem->size, NV_DMA_ACCESS_RW, target,
+				     &nobj);
+	if (ret) {
 		nouveau_mem_free_block(mem);
 		NV_ERROR(dev, "Error creating notifier ctxdma: %d\n", ret);
 		return ret;
@@ -144,7 +145,8 @@ nouveau_notifier_alloc(struct nouveau_channel *chan, uint32_t handle,
 	nobj->dtor   = nouveau_notifier_gpuobj_dtor;
 	nobj->priv   = mem;
 
-	if ((ret = nouveau_gpuobj_ref_add(dev, chan, handle, nobj, NULL))) {
+	ret = nouveau_gpuobj_ref_add(dev, chan, handle, nobj, NULL);
+	if (ret) {
 		nouveau_gpuobj_del(dev, &nobj);
 		nouveau_mem_free_block(mem);
 		NV_ERROR(dev, "Error referencing notifier ctxdma: %d\n", ret);
