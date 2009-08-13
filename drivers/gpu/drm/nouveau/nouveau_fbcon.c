@@ -282,7 +282,7 @@ static int nouveau_fbcon_set_par(struct fb_info *info)
 		int ret;
 
 		list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-			struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
+			struct drm_mode_set *modeset = &nouveau_crtc(crtc)->mode_set;
 
 			for (i = 0; i < par->crtc_count; i++)
 				if (crtc->base.id == par->crtc_ids[i])
@@ -291,9 +291,9 @@ static int nouveau_fbcon_set_par(struct fb_info *info)
 			if (i == par->crtc_count)
 				continue;
 
-			if (crtc->fb == nv_crtc->mode_set.fb) {
+			if (modeset->num_connectors) {
 				mutex_lock(&dev->mode_config.mutex);
-				ret = crtc->funcs->set_config(&nv_crtc->mode_set);
+				ret = crtc->funcs->set_config(modeset);
 				mutex_unlock(&dev->mode_config.mutex);
 				if (ret)
 					return ret;
@@ -310,7 +310,7 @@ static int nouveau_fbcon_pan_display(struct fb_var_screeninfo *var,
 	struct drm_device *dev = par->dev;
 	struct drm_mode_set *modeset;
 	struct drm_crtc *crtc;
-	struct nouveau_crtc *nv_crtc;
+	struct drm_crtc_helper_funcs *helper_funcs;
 	int ret = 0;
 	int i;
 
@@ -322,16 +322,16 @@ static int nouveau_fbcon_pan_display(struct fb_var_screeninfo *var,
 		if (i == par->crtc_count)
 			continue;
 
-		nv_crtc = nouveau_crtc(crtc);
-		modeset = &nv_crtc->mode_set;
+		helper_funcs = crtc->helper_private;
+		modeset = &nouveau_crtc(crtc)->mode_set;
 
 		modeset->x = var->xoffset;
 		modeset->y = var->yoffset;
 
 		if (modeset->num_connectors) {
-			mutex_lock(&dev->mode_config.mutex);
-			ret = crtc->funcs->set_config(modeset);
-			mutex_unlock(&dev->mode_config.mutex);
+			ret = helper_funcs->mode_set_base(crtc,
+				modeset->x, modeset->y, modeset->fb);
+
 			if (!ret) {
 				info->var.xoffset = var->xoffset;
 				info->var.yoffset = var->yoffset;
