@@ -331,6 +331,16 @@ struct nouveau_pll_vals {
 	int refclk;
 };
 
+enum nv04_fp_display_regs {
+	FP_DISPLAY_END,
+	FP_TOTAL,
+	FP_CRTC,
+	FP_SYNC_START,
+	FP_SYNC_END,
+	FP_VALID_START,
+	FP_VALID_END
+};
+
 struct nv04_crtc_reg {
 	unsigned char MiscOutReg;     /* */
 	uint8_t CRTC[0x9f];
@@ -364,6 +374,8 @@ struct nv04_crtc_reg {
 	uint32_t fp_debug_0;
 	uint32_t fp_debug_1;
 	uint32_t fp_debug_2;
+	uint32_t fp_margin_color;
+	uint32_t ramdac_8c0;
 	uint32_t ramdac_a20;
 	uint32_t ramdac_a24;
 	uint32_t ramdac_a34;
@@ -525,6 +537,7 @@ struct drm_nouveau_private {
 	struct nv04_mode_state saved_reg;
 	uint32_t saved_vga_font[4][16384];
 	uint32_t crtc_owner;
+	uint32_t dac_users[4];
 
 	struct nouveau_suspend_resume {
 		uint32_t fifo_mode;
@@ -893,15 +906,25 @@ extern void nv04_timer_takedown(struct drm_device *);
 extern long nouveau_compat_ioctl(struct file *file, unsigned int cmd,
 				 unsigned long arg);
 
+/* nv04_dac.c */
+extern int nv04_dac_create(struct drm_device *dev, struct dcb_entry *entry);
+extern enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
+						 struct drm_connector *connector);
+extern int nv04_dac_output_offset(struct drm_encoder *encoder);
+extern void nv04_dac_update_dacclk(struct drm_encoder *encoder, bool enable);
+
+/* nv04_dfp.c */
+extern int nv04_dfp_create(struct drm_device *dev, struct dcb_entry *entry);
+extern int nv04_dfp_get_bound_head(struct drm_device *dev, struct dcb_entry *dcbent);
+extern void nv04_dfp_bind_head(struct drm_device *dev, struct dcb_entry *dcbent,
+			       int head, bool dl);
+extern void nv04_dfp_disable(struct drm_device *dev, int head);
+extern void nv04_dfp_update_fp_control(struct drm_encoder *encoder, int mode);
+
 /* nv04_display.c */
 extern int nv04_display_create(struct drm_device *);
 extern void nv04_display_destroy(struct drm_device *);
 extern void nv04_display_restore(struct drm_device *);
-
-/* nv04_output.c */
-extern int nv04_encoder_create(struct drm_device *, struct dcb_entry *);
-extern int nv04_connector_create(struct drm_device *, int i2c_index,
-				 uint16_t encoders, int type);
 
 /* nv04_crtc.c */
 extern int nv04_crtc_create(struct drm_device *, int index);

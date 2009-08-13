@@ -74,6 +74,18 @@ static void nv_crtc_set_image_sharpening(struct drm_crtc *crtc, int level)
 	NVWriteRAMDAC(crtc->dev, nv_crtc->index, NV_PRAMDAC_634, regp->ramdac_634);
 }
 
+#define PLLSEL_VPLL1_MASK				\
+	(NV_PRAMDAC_PLL_COEFF_SELECT_SOURCE_PROG_VPLL	\
+	 | NV_PRAMDAC_PLL_COEFF_SELECT_VCLK_RATIO_DB2)
+#define PLLSEL_VPLL2_MASK				\
+	(NV_PRAMDAC_PLL_COEFF_SELECT_PLL_SOURCE_VPLL2		\
+	 | NV_PRAMDAC_PLL_COEFF_SELECT_VCLK2_RATIO_DB2)
+#define PLLSEL_TV_MASK					\
+	(NV_PRAMDAC_PLL_COEFF_SELECT_TV_VSCLK1		\
+	 | NV_PRAMDAC_PLL_COEFF_SELECT_TV_PCLK1		\
+	 | NV_PRAMDAC_PLL_COEFF_SELECT_TV_VSCLK2	\
+	 | NV_PRAMDAC_PLL_COEFF_SELECT_TV_PCLK2)
+
 /* NV4x 0x40.. pll notes:
  * gpu pll: 0x4000 + 0x4004
  * ?gpu? pll: 0x4008 + 0x400c
@@ -122,17 +134,16 @@ static void nv_crtc_calc_state_ext(struct drm_crtc *crtc, struct drm_display_mod
 	if (!(vclk = nouveau_calc_pll_mnp(dev, &pll_lim, dot_clock, pv)))
 		return;
 
+	state->pllsel &= PLLSEL_VPLL1_MASK | PLLSEL_VPLL2_MASK | PLLSEL_TV_MASK;
+
 	/* The blob uses this always, so let's do the same */
 	if (nv_arch(dev) == NV_40)
-		state->pllsel |= NV_RAMDAC_PLL_SELECT_USE_VPLL2_TRUE;
+		state->pllsel |= NV_PRAMDAC_PLL_COEFF_SELECT_USE_VPLL2_TRUE;
 	/* again nv40 and some nv43 act more like nv3x as described above */
 	if (dev_priv->chipset < 0x41)
 		state->pllsel |= NV_PRAMDAC_PLL_COEFF_SELECT_SOURCE_PROG_MPLL |
 				 NV_PRAMDAC_PLL_COEFF_SELECT_SOURCE_PROG_NVPLL;
-	state->pllsel |= (nv_crtc->index ? NV_RAMDAC_PLL_SELECT_PLL_SOURCE_VPLL2 |
-					  NV_RAMDAC_PLL_SELECT_VCLK2_RATIO_DB2 :
-					  NV_PRAMDAC_PLL_COEFF_SELECT_SOURCE_PROG_VPLL |
-					  NV_PRAMDAC_PLL_COEFF_SELECT_VCLK_RATIO_DB2);
+	state->pllsel |= nv_crtc->index ? PLLSEL_VPLL2_MASK : PLLSEL_VPLL1_MASK;
 
 	if (pv->NM2)
 		NV_TRACE(dev, "vpll: n1 %d n2 %d m1 %d m2 %d log2p %d\n",
@@ -218,8 +229,7 @@ nv_crtc_mode_fixup(struct drm_crtc *crtc, struct drm_display_mode * mode,
 }
 
 static void
-nv_crtc_mode_set_vga(struct drm_crtc *crtc, struct drm_display_mode *mode,
-		     struct drm_display_mode *adjusted_mode)
+nv_crtc_mode_set_vga(struct drm_crtc *crtc, struct drm_display_mode *mode)
 {
 	struct drm_device *dev = crtc->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -449,7 +459,8 @@ nv_crtc_mode_set_regs(struct drm_crtc *crtc, struct drm_display_mode * mode)
 	struct nv04_crtc_reg *regp = &dev_priv->mode_reg.crtc_reg[nv_crtc->index];
 	struct nv04_crtc_reg *savep = &dev_priv->saved_reg.crtc_reg[nv_crtc->index];
 	struct drm_encoder *encoder;
-	bool lvds_output = false, tmds_output = false, off_chip_digital = false;
+	bool lvds_output = false, tmds_output = false, tv_output = false,
+		off_chip_digital = false;
 
 	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
 		struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
@@ -460,6 +471,8 @@ nv_crtc_mode_set_regs(struct drm_crtc *crtc, struct drm_display_mode * mode)
 
 		if (nv_encoder->dcb->type == OUTPUT_LVDS)
 			digital = lvds_output = true;
+		if (nv_encoder->dcb->type == OUTPUT_TV)
+			tv_output = true;
 		if (nv_encoder->dcb->type == OUTPUT_TMDS)
 			digital = tmds_output = true;
 		if (nv_encoder->dcb->location != DCB_LOC_ON_CHIP && digital)
@@ -550,7 +563,7 @@ nv_crtc_mode_set_regs(struct drm_crtc *crtc, struct drm_display_mode * mode)
 
 	regp->CRTC[NV_CIO_CRE_PIXEL_INDEX] = (crtc->fb->depth + 1) / 8;
 	/* Enable slaved mode (called MODE_TV in nv4ref.h) */
-	if (lvds_output || tmds_output)
+	if (lvds_output || tmds_output || tv_output)
 		regp->CRTC[NV_CIO_CRE_PIXEL_INDEX] |= (1 << 7);
 
 	/* Generic PRAMDAC regs */
@@ -572,185 +585,10 @@ nv_crtc_mode_set_regs(struct drm_crtc *crtc, struct drm_display_mode * mode)
 	nv_crtc_set_image_sharpening(crtc, nv_crtc->sharpness);
 
 	/* Some values the blob sets */
+	regp->ramdac_8c0 = 0x100;
 	regp->ramdac_a20 = 0x0;
 	regp->ramdac_a24 = 0xfffff;
 	regp->ramdac_a34 = 0x1;
-}
-
-enum fp_display_regs {
-	FP_DISPLAY_END,
-	FP_TOTAL,
-	FP_CRTC,
-	FP_SYNC_START,
-	FP_SYNC_END,
-	FP_VALID_START,
-	FP_VALID_END
-};
-
-/* this could be set in nv_output, but would require some rework of load/save */
-static void
-nv_crtc_mode_set_fp_regs(struct drm_crtc *crtc, struct drm_display_mode *mode,
-			 struct drm_display_mode * adjusted_mode)
-{
-	struct drm_device *dev = crtc->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
-	struct nv04_crtc_reg *regp = &dev_priv->mode_reg.crtc_reg[nv_crtc->index];
-	struct nv04_crtc_reg *savep = &dev_priv->saved_reg.crtc_reg[nv_crtc->index];
-	struct nouveau_connector *nv_connector = nouveau_crtc_connector_get(nv_crtc);
-	struct nouveau_encoder *nv_encoder = NULL;
-	struct drm_encoder *encoder;
-	uint32_t mode_ratio, panel_ratio;
-
-	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
-		/* assuming one fp output per crtc seems ok */
-		if (encoder->crtc != crtc)
-			continue;
-		nv_encoder = nouveau_encoder(encoder);
-
-		if (nv_encoder->dcb->type == OUTPUT_LVDS ||
-		    nv_encoder->dcb->type == OUTPUT_TMDS)
-			break;
-		nv_encoder = NULL;
-	}
-
-	if (!nv_encoder)
-		return;
-
-	regp->fp_horiz_regs[FP_DISPLAY_END] = adjusted_mode->hdisplay - 1;
-	regp->fp_horiz_regs[FP_TOTAL] = adjusted_mode->htotal - 1;
-	if (!nv_gf4_disp_arch(dev) ||
-	    (adjusted_mode->hsync_start - adjusted_mode->hdisplay) >=
-					dev_priv->vbios->digital_min_front_porch)
-		regp->fp_horiz_regs[FP_CRTC] = adjusted_mode->hdisplay;
-	else
-		regp->fp_horiz_regs[FP_CRTC] = adjusted_mode->hsync_start - dev_priv->vbios->digital_min_front_porch - 1;
-	regp->fp_horiz_regs[FP_SYNC_START] = adjusted_mode->hsync_start - 1;
-	regp->fp_horiz_regs[FP_SYNC_END] = adjusted_mode->hsync_end - 1;
-	regp->fp_horiz_regs[FP_VALID_START] = adjusted_mode->hskew;
-	regp->fp_horiz_regs[FP_VALID_END] = adjusted_mode->hdisplay - 1;
-
-	regp->fp_vert_regs[FP_DISPLAY_END] = adjusted_mode->vdisplay - 1;
-	regp->fp_vert_regs[FP_TOTAL] = adjusted_mode->vtotal - 1;
-	regp->fp_vert_regs[FP_CRTC] = adjusted_mode->vtotal - 5 - 1;
-	regp->fp_vert_regs[FP_SYNC_START] = adjusted_mode->vsync_start - 1;
-	regp->fp_vert_regs[FP_SYNC_END] = adjusted_mode->vsync_end - 1;
-	regp->fp_vert_regs[FP_VALID_START] = 0;
-	regp->fp_vert_regs[FP_VALID_END] = adjusted_mode->vdisplay - 1;
-
-	/* bit26: a bit seen on some g7x, no as yet discernable purpose */
-	regp->fp_control = NV_PRAMDAC_FP_TG_CONTROL_DISPEN_POS |
-			   (savep->fp_control & (1 << 26 | NV_PRAMDAC_FP_TG_CONTROL_READ_PROG));
-	/* Deal with vsync/hsync polarity */
-	/* LVDS screens do set this, but modes with +ve syncs are very rare */
-	if (adjusted_mode->flags & DRM_MODE_FLAG_PVSYNC)
-		regp->fp_control |= NV_PRAMDAC_FP_TG_CONTROL_VSYNC_POS;
-	if (adjusted_mode->flags & DRM_MODE_FLAG_PHSYNC)
-		regp->fp_control |= NV_PRAMDAC_FP_TG_CONTROL_HSYNC_POS;
-	/* panel scaling first, as native would get set otherwise */
-	if (nv_connector->scaling_mode == DRM_MODE_SCALE_NON_GPU ||
-	    nv_connector->scaling_mode == DRM_MODE_SCALE_NO_SCALE)	/* panel handles it */
-		regp->fp_control |= NV_PRAMDAC_FP_TG_CONTROL_MODE_CENTER;
-	else if (mode->hdisplay == adjusted_mode->hdisplay &&
-		 mode->vdisplay == adjusted_mode->vdisplay) /* native mode */
-		regp->fp_control |= NV_PRAMDAC_FP_TG_CONTROL_MODE_NATIVE;
-	else /* gpu needs to scale */
-		regp->fp_control |= NV_PRAMDAC_FP_TG_CONTROL_MODE_SCALE;
-	if (nvReadEXTDEV(dev, NV_PEXTDEV_BOOT_0) & NV_PEXTDEV_BOOT_0_STRAP_FP_IFACE_12BIT)
-		regp->fp_control |= NV_PRAMDAC_FP_TG_CONTROL_WIDTH_12;
-	if (nv_encoder->dcb->location != DCB_LOC_ON_CHIP &&
-	    nv_connector->native_mode->clock > 165000)
-		regp->fp_control |= (2 << 24);
-	if (nv_encoder->dcb->type == OUTPUT_LVDS) {
-		bool duallink, dummy;
-
-		nouveau_bios_parse_lvds_table(dev, nv_connector->native_mode->
-					      clock, &duallink, &dummy);
-		if (duallink)
-			regp->fp_control |= (8 << 28);
-	} else
-	if (nv_connector->native_mode->clock > 165000)
-		regp->fp_control |= (8 << 28);
-
-	regp->fp_debug_0 = NV_PRAMDAC_FP_DEBUG_0_YWEIGHT_ROUND |
-			   NV_PRAMDAC_FP_DEBUG_0_XWEIGHT_ROUND |
-			   NV_PRAMDAC_FP_DEBUG_0_YINTERP_BILINEAR |
-			   NV_PRAMDAC_FP_DEBUG_0_XINTERP_BILINEAR |
-			   NV_RAMDAC_FP_DEBUG_0_TMDS_ENABLED |
-			   NV_PRAMDAC_FP_DEBUG_0_YSCALE_ENABLE |
-			   NV_PRAMDAC_FP_DEBUG_0_XSCALE_ENABLE;
-
-	/* We want automatic scaling */
-	regp->fp_debug_1 = 0;
-	/* This can override HTOTAL and VTOTAL */
-	regp->fp_debug_2 = 0;
-
-	/* Use 20.12 fixed point format to avoid floats */
-	mode_ratio = (1 << 12) * mode->hdisplay / mode->vdisplay;
-	panel_ratio = (1 << 12) * adjusted_mode->hdisplay / adjusted_mode->vdisplay;
-	/* if ratios are equal, SCALE_ASPECT will automatically (and correctly)
-	 * get treated the same as SCALE_FULLSCREEN */
-	if (nv_connector->scaling_mode == DRM_MODE_SCALE_ASPECT &&
-	    mode_ratio != panel_ratio) {
-		uint32_t diff, scale;
-		bool divide_by_2 = nv_gf4_disp_arch(dev);
-
-		if (mode_ratio < panel_ratio) {
-			/* vertical needs to expand to glass size (automatic)
-			 * horizontal needs to be scaled at vertical scale factor
-			 * to maintain aspect */
-
-			scale = (1 << 12) * mode->vdisplay / adjusted_mode->vdisplay;
-			regp->fp_debug_1 = NV_PRAMDAC_FP_DEBUG_1_XSCALE_TESTMODE_ENABLE |
-					   XLATE(scale, divide_by_2, NV_PRAMDAC_FP_DEBUG_1_XSCALE_VALUE);
-
-			/* restrict area of screen used, horizontally */
-			diff = adjusted_mode->hdisplay -
-			       adjusted_mode->vdisplay * mode_ratio / (1 << 12);
-			regp->fp_horiz_regs[FP_VALID_START] += diff / 2;
-			regp->fp_horiz_regs[FP_VALID_END] -= diff / 2;
-		}
-
-		if (mode_ratio > panel_ratio) {
-			/* horizontal needs to expand to glass size (automatic)
-			 * vertical needs to be scaled at horizontal scale factor
-			 * to maintain aspect */
-
-			scale = (1 << 12) * mode->hdisplay / adjusted_mode->hdisplay;
-			regp->fp_debug_1 = NV_PRAMDAC_FP_DEBUG_1_YSCALE_TESTMODE_ENABLE |
-					   XLATE(scale, divide_by_2, NV_PRAMDAC_FP_DEBUG_1_YSCALE_VALUE);
-
-			/* restrict area of screen used, vertically */
-			diff = adjusted_mode->vdisplay -
-			       (1 << 12) * adjusted_mode->hdisplay / mode_ratio;
-			regp->fp_vert_regs[FP_VALID_START] += diff / 2;
-			regp->fp_vert_regs[FP_VALID_END] -= diff / 2;
-		}
-	}
-
-	/* Output property. */
-	if (nv_connector && nv_connector->use_dithering) {
-		if (dev_priv->chipset == 0x11)
-			regp->dither = savep->dither | 0x00010000;
-		else {
-			int i;
-			regp->dither = savep->dither | 0x00000001;
-			for (i = 0; i < 3; i++) {
-				regp->dither_regs[i] = 0xe4e4e4e4;
-				regp->dither_regs[i + 3] = 0x44444444;
-			}
-		}
-	} else {
-		if (dev_priv->chipset != 0x11) {
-			/* reset them */
-			int i;
-			for (i = 0; i < 3; i++) {
-				regp->dither_regs[i] = savep->dither_regs[i];
-				regp->dither_regs[i + 3] = savep->dither_regs[i + 3];
-			}
-		}
-		regp->dither = savep->dither;
-	}
 }
 
 /**
@@ -770,35 +608,18 @@ nv_crtc_mode_set(struct drm_crtc *crtc, struct drm_display_mode *mode,
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
-	NV_TRACE(dev, "CTRC mode on CRTC %d:\n", nv_crtc->index);
-	drm_mode_debug_printmodeline(mode);
-	NV_TRACE(dev, "Output mode on CRTC %d:\n", nv_crtc->index);
-	drm_mode_debug_printmodeline(mode);
+	NV_DEBUG(dev, "CTRC mode on CRTC %d:\n", nv_crtc->index);
+	drm_mode_debug_printmodeline(adjusted_mode);
 
 	/* unlock must come after turning off FP_TG_CONTROL in output_prepare */
 	nv_lock_vga_crtc_shadow(dev, nv_crtc->index, -1);
 
-	nv_crtc_mode_set_vga(crtc, mode, adjusted_mode);
-	/* calculated in output_prepare, nv40 needs it written before calculating PLLs */
+	nv_crtc_mode_set_vga(crtc, adjusted_mode);
+	/* calculated in nv04_dfp_prepare, nv40 needs it written before calculating PLLs */
 	if (nv_arch(dev) == NV_40)
 		NVWriteRAMDAC(dev, 0, NV_PRAMDAC_SEL_CLK, dev_priv->mode_reg.sel_clk);
-	nv_crtc_mode_set_regs(crtc, mode);
-	nv_crtc_mode_set_fp_regs(crtc, mode, adjusted_mode);
+	nv_crtc_mode_set_regs(crtc, adjusted_mode);
 	nv_crtc_calc_state_ext(crtc, mode, adjusted_mode->clock);
-
-	nouveau_hw_load_state(dev, nv_crtc->index, &dev_priv->mode_reg);
-
-	nv04_crtc_mode_set_base(crtc, x, y, NULL);
-
-#ifdef __BIG_ENDIAN
-	/* turn on LFB swapping */
-	{
-		uint8_t tmp = NVReadVgaCrtc(dev, nv_crtc->index, NV_CIO_CRE_RCR);
-		tmp |= MASK(NV_CIO_CRE_RCR_ENDIAN_BIG);
-		NVWriteVgaCrtc(dev, nv_crtc->index, NV_CIO_CRE_RCR, tmp);
-	}
-#endif
-
 	return 0;
 }
 
@@ -806,15 +627,21 @@ static void nv_crtc_save(struct drm_crtc *crtc)
 {
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct nv04_mode_state *state = &dev_priv->mode_reg;
+	struct nv04_crtc_reg *crtc_state = &state->crtc_reg[nv_crtc->index];
+	struct nv04_mode_state *saved = &dev_priv->saved_reg;
+	struct nv04_crtc_reg *crtc_saved = &saved->crtc_reg[nv_crtc->index];
 
 	if (nv_two_heads(crtc->dev))
 		NVSetOwner(crtc->dev, nv_crtc->index);
 
-	nouveau_hw_save_state(crtc->dev, nv_crtc->index, &dev_priv->saved_reg);
+	nouveau_hw_save_state(crtc->dev, nv_crtc->index, saved);
 
 	/* init some state to saved value */
-	dev_priv->mode_reg.sel_clk = dev_priv->saved_reg.sel_clk & ~(0x5 << 16);
-	dev_priv->mode_reg.crtc_reg[nv_crtc->index].CRTC[NV_CIO_CRE_LCD__INDEX] = dev_priv->saved_reg.crtc_reg[nv_crtc->index].CRTC[NV_CIO_CRE_LCD__INDEX];
+	state->sel_clk = saved->sel_clk & ~(0x5 << 16);
+	crtc_state->CRTC[NV_CIO_CRE_LCD__INDEX] = crtc_saved->CRTC[NV_CIO_CRE_LCD__INDEX];
+	state->pllsel = saved->pllsel & ~(PLLSEL_VPLL1_MASK | PLLSEL_VPLL2_MASK | PLLSEL_TV_MASK);
+	crtc_state->gpio_ext = crtc_saved->gpio_ext;
 }
 
 static void nv_crtc_restore(struct drm_crtc *crtc)
@@ -856,7 +683,22 @@ static void nv_crtc_prepare(struct drm_crtc *crtc)
 
 static void nv_crtc_commit(struct drm_crtc *crtc)
 {
+	struct drm_device *dev = crtc->dev;
 	struct drm_crtc_helper_funcs *funcs = crtc->helper_private;
+	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
+
+	nouveau_hw_load_state(dev, nv_crtc->index, &dev_priv->mode_reg);
+	nv04_crtc_mode_set_base(crtc, crtc->x, crtc->y, NULL);
+
+#ifdef __BIG_ENDIAN
+	/* turn on LFB swapping */
+	{
+		uint8_t tmp = NVReadVgaCrtc(dev, nv_crtc->index, NV_CIO_CRE_RCR);
+		tmp |= MASK(NV_CIO_CRE_RCR_ENDIAN_BIG);
+		NVWriteVgaCrtc(dev, nv_crtc->index, NV_CIO_CRE_RCR, tmp);
+	}
+#endif
 
 	funcs->dpms(crtc, DRM_MODE_DPMS_ON);
 }

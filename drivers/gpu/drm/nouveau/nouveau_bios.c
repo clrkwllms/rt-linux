@@ -2698,30 +2698,6 @@ static void parse_init_tables(struct drm_device *dev, struct nvbios *bios)
 	}
 }
 
-static void link_head_and_output(struct drm_device *dev, struct dcb_entry *dcbent, int head, bool dl)
-{
-	/* The BIOS scripts don't do this for us, sadly
-	 * Luckily we do know the values ;-)
-	 *
-	 * head < 0 indicates we wish to force a setting with the overrideval
-	 * (for VT restore etc.)
-	 */
-
-	int ramdac = (dcbent->or & OUTPUT_C) >> 2;
-	uint8_t tmds04 = 0x80;
-
-	if (head != ramdac)
-		tmds04 = 0x88;
-
-	if (dcbent->type == OUTPUT_LVDS)
-		tmds04 |= 0x01;
-
-	nv_write_tmds(dev, dcbent->or, 0, 0x04, tmds04);
-
-	if (dl)	/* dual link */
-		nv_write_tmds(dev, dcbent->or, 1, 0x04, tmds04 ^ 0x08);
-}
-
 static uint16_t clkcmptable(struct nvbios *bios, uint16_t clktable, int pxclk)
 {
 	int compare_record_len, i = 0;
@@ -2762,7 +2738,7 @@ static void run_digital_op_script(struct drm_device *dev, uint16_t scriptptr, st
 	NVWriteVgaCrtc5758(dev, head, 0, dcbent->index);
 	parse_init_table(dev, bios, scriptptr, &iexec);
 
-	link_head_and_output(dev, dcbent, head, dl);
+	nv04_dfp_bind_head(dev, dcbent, head, dl);
 }
 
 static int call_lvds_manufacturer_script(struct drm_device *dev, struct dcb_entry *dcbent, int head, enum LVDS_script script)
