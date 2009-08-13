@@ -287,9 +287,6 @@ nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
 	if (nr_buffers == 0)
 		return 0;
 
-	if (apply_relocs)
-		*apply_relocs = 0;
-
 retry:
 	for (i = 0, b = pbbo; i < nr_buffers; i++, b++) {
 		struct drm_gem_object *gem;
@@ -394,7 +391,7 @@ nouveau_gem_pushbuf_reloc_apply(struct nouveau_channel *chan,
 				struct drm_nouveau_gem_pushbuf_reloc *reloc,
 				struct drm_nouveau_gem_pushbuf_bo *bo,
 				uint32_t *pushbuf, int nr_relocs,
-				int nr_buffers, int nr_dwords)
+				int nr_buffers, int first_dword, int nr_dwords)
 {
 	struct drm_device *dev = chan->dev;
 	int i;
@@ -404,7 +401,9 @@ nouveau_gem_pushbuf_reloc_apply(struct nouveau_channel *chan,
 		struct drm_nouveau_gem_pushbuf_bo *b;
 		uint32_t data;
 
-		if (r->bo_index >= nr_buffers || r->reloc_index >= nr_dwords) {
+		if (r->bo_index >= nr_buffers ||
+		    r->reloc_index < first_dword ||
+		    r->reloc_index >= first_dword + nr_dwords) {
 			NV_ERROR(dev, "Bad relocation %d\n", i);
 			NV_ERROR(dev, "  bo: %d max %d\n", r->bo_index, nr_buffers);
 			NV_ERROR(dev, "  id: %d max %d\n", r->reloc_index, nr_dwords);
@@ -517,12 +516,11 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 	/* Apply any relocations that are required */
 	ret = nouveau_gem_pushbuf_reloc_apply(chan, reloc, bo, pushbuf,
 					      req->nr_relocs, req->nr_buffers,
-					      req->nr_dwords);
+					      0, req->nr_dwords);
 	if (ret)
 		goto out;
 
 	/* Emit push buffer to the hw
-	 *XXX: OMG ALSO YUCK!!!
 	 */
 	ret = RING_SPACE(chan, req->nr_dwords);
 	if (ret)
@@ -560,11 +558,201 @@ out:
 	return ret;
 }
 
+#define PUSHBUF_CAL 1
+
 int
 nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 			       struct drm_file *file_priv)
 {
-	return -ENODEV;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct drm_nouveau_gem_pushbuf_call *req = data;
+	struct drm_nouveau_gem_pushbuf_bo *bo = NULL;
+	struct drm_nouveau_gem_pushbuf_reloc *reloc = NULL;
+	struct nouveau_fence *fence = NULL;
+	struct nouveau_channel *chan;
+	struct drm_gem_object *gem;
+	struct nouveau_bo *pbbo;
+	struct list_head list;
+	int ret = 0, do_reloc = 0;
+
+	if (unlikely(dev_priv->card_type < NV_50))
+		return -ENODEV;
+
+	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
+	NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(req->channel, file_priv, chan);
+
+	if (unlikely(req->handle == 0))
+		goto out_next;
+
+	if (req->nr_buffers > NOUVEAU_GEM_MAX_BUFFERS ||
+	    req->nr_relocs > NOUVEAU_GEM_MAX_RELOCS) {
+		NV_ERROR(dev, "Pushbuf config exceeds limits:\n");
+		NV_ERROR(dev, "  buffers: %d max %d\n", req->nr_buffers,
+			 NOUVEAU_GEM_MAX_BUFFERS);
+		NV_ERROR(dev, "  relocs : %d max %d\n", req->nr_relocs,
+			 NOUVEAU_GEM_MAX_RELOCS);
+		return -EINVAL;
+	}
+
+	bo = u_memcpya(req->buffers, req->nr_buffers, sizeof(*bo));
+	if (IS_ERR(bo))
+		return (unsigned long)bo;
+
+	reloc = u_memcpya(req->relocs, req->nr_relocs, sizeof(*reloc));
+	if (IS_ERR(reloc)) {
+		kfree(bo);
+		return (unsigned long)reloc;
+	}
+
+	mutex_lock(&dev->struct_mutex);
+
+	INIT_LIST_HEAD(&list);
+
+	/* Validate buffer list */
+	ret = nouveau_fence_new(chan, &fence, false);
+	if (ret) {
+		NV_ERROR(dev, "fence new\n");
+		goto out;
+	}
+
+	ret = nouveau_gem_pushbuf_validate(chan, file_priv, bo, req->buffers,
+					   req->nr_buffers, &list, &do_reloc);
+	if (ret) {
+		NV_ERROR(dev, "validate: %d\n", ret);
+		goto out;
+	}
+
+	/* Validate DMA push buffer */
+	gem = drm_gem_object_lookup(dev, file_priv, req->handle);
+	if (!gem) {
+		NV_ERROR(dev, "Unknown pb handle 0x%08x\n", req->handle);
+		ret = -EINVAL;
+		goto out;
+	}
+	pbbo = gem->driver_private;
+
+	ret = ttm_bo_reserve(&pbbo->bo, false, false, true,
+			     chan->fence.sequence);
+	if (ret) {
+		NV_ERROR(dev, "resv pb: %d\n", ret);
+		drm_gem_object_unreference(gem);
+		goto out;
+	}
+
+	pbbo->bo.proposed_placement &= ~TTM_PL_MASK_MEM;
+	pbbo->bo.proposed_placement |= (1 << chan->pushbuf_bo->bo.mem.mem_type);
+	ret = ttm_buffer_object_validate(&pbbo->bo, pbbo->bo.proposed_placement,
+					 false, false);
+	if (ret) {
+		NV_ERROR(dev, "validate pb: %d\n", ret);
+		ttm_bo_unreserve(&pbbo->bo);
+		drm_gem_object_unreference(gem);
+		goto out;
+	}
+
+	list_add_tail(&pbbo->entry, &list);
+
+	/* If presumed return address doesn't match, we need to map the
+	 * push buffer and fix it..
+	 */
+	if (!PUSHBUF_CAL) {
+		uint32_t retaddy;
+
+		if (chan->dma.free < 4) {
+			ret = nouveau_dma_wait(chan, 4);
+			if (ret) {
+				NV_ERROR(dev, "jmp_space: %d\n", ret);
+				goto out;
+			}
+		}
+
+		retaddy  = chan->pushbuf_base + ((chan->dma.cur + 2) << 2);
+		retaddy |= 0x20000000;
+		if (retaddy != req->suffix0) {
+			req->suffix0 = retaddy;
+			do_reloc = 1;
+		}
+	}
+
+	/* Apply any relocations that are required */
+	if (do_reloc) {
+		ret = ttm_bo_kmap(&pbbo->bo, 0, pbbo->bo.mem.num_pages, &pbbo->kmap);
+		if (ret) {
+			NV_ERROR(dev, "kmap pb: %d\n", ret);
+			goto out;
+		}
+
+		ret = nouveau_gem_pushbuf_reloc_apply(chan, reloc, bo,
+						      pbbo->kmap.virtual,
+						      req->nr_relocs,
+						      req->nr_buffers,
+						      req->offset / 4,
+						      req->nr_dwords);
+
+		if (!PUSHBUF_CAL) {
+			uint32_t *pushbuf = pbbo->kmap.virtual + req->offset;
+
+			pushbuf[req->nr_dwords - 2] = req->suffix0;
+		}
+
+		ttm_bo_kunmap(&pbbo->kmap);
+		if (ret) {
+			NV_ERROR(dev, "reloc apply: %d\n", ret);
+			goto out;
+		}
+	}
+
+	if (PUSHBUF_CAL) {
+		ret = RING_SPACE(chan, 2);
+		if (ret) {
+			NV_ERROR(dev, "cal_space: %d\n", ret);
+			goto out;
+		}
+		OUT_RING  (chan, ((pbbo->bo.mem.mm_node->start << PAGE_SHIFT) +
+				  req->offset) | 2);
+		OUT_RING  (chan, 0);
+	} else {
+		ret = RING_SPACE(chan, 2);
+		if (ret) {
+			NV_ERROR(dev, "jmp_space: %d\n", ret);
+			goto out;
+		}
+		OUT_RING  (chan, ((pbbo->bo.mem.mm_node->start << PAGE_SHIFT) +
+				  req->offset) | 0x20000000);
+		OUT_RING  (chan, 0);
+	}
+
+	ret = nouveau_fence_emit(fence);
+	if (ret) {
+		NV_ERROR(dev, "error fencing pushbuf: %d\n", ret);
+		WIND_RING(chan);
+		goto out;
+	}
+
+	nouveau_gem_pushbuf_fence(&list, fence);
+
+	FIRE_RING(chan);
+out:
+	if (unlikely(ret))
+		nouveau_gem_pushbuf_backoff(&list);
+	nouveau_fence_unref((void *)&fence);
+
+	mutex_unlock(&dev->struct_mutex);
+
+	kfree(bo);
+	kfree(reloc);
+
+out_next:
+	if (PUSHBUF_CAL) {
+		req->suffix0 = 0x00020000;
+		req->suffix1 = 0x00000000;
+	} else {
+		req->suffix0 = 0x20000000 |
+			      (chan->pushbuf_base + ((chan->dma.cur + 2) << 2));
+		req->suffix1 = 0x00000000;
+	}
+
+	return ret;
 }
 
 static inline uint32_t
