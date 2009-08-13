@@ -120,7 +120,6 @@ BEGIN_RING(struct nouveau_channel *chan, int subc, int mthd, int size)
 	DRM_MEMORYBARRIER();                                                   \
 	tmp = chan->dma.pushbuf[0];                                            \
 	nvchan_wr32(chan->user_put, ((val) << 2) + chan->pushbuf_base);        \
-	chan->dma.put = (val);                                                 \
 } while (0)
 
 static inline void
@@ -135,6 +134,7 @@ FIRE_RING(struct nouveau_channel *chan)
 	chan->accel_done = true;
 
 	WRITE_PUT(chan->dma.cur);
+	chan->dma.put = chan->dma.cur;
 }
 
 static inline void
