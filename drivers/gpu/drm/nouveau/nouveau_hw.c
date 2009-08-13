@@ -87,8 +87,17 @@ NVSetOwner(struct drm_device *dev, int owner)
 	if (owner == 1)
 		owner *= 3;
 
+	if (dev_priv->chipset == 0x11) {
+		/* This might seem stupid, but the blob does it and
+		 * omitting it often locks the system up.
+		 */
+		NVReadVgaCrtc(dev, 0, NV_CIO_SR_LOCK_INDEX);
+		NVReadVgaCrtc(dev, 1, NV_CIO_SR_LOCK_INDEX);
+	}
+
 	/* CR44 is always changed on CRTC0 */
 	NVWriteVgaCrtc(dev, 0, NV_CIO_CRE_44, owner);
+
 	if (dev_priv->chipset == 0x11) {	/* set me harder */
 		NVWriteVgaCrtc(dev, 0, NV_CIO_CRE_2E, owner);
 		NVWriteVgaCrtc(dev, 0, NV_CIO_CRE_2E, owner);
