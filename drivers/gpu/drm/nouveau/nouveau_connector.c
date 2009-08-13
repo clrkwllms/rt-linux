@@ -221,14 +221,14 @@ nouveau_connector_detect(struct drm_connector *connector)
 
 	nv_encoder = nouveau_connector_encoder_get(connector, OUTPUT_ANALOG);
 	if (!nouveau_connector_ddc_detect(connector)) {
-		if (!nv_encoder || !nv_encoder->base.helper_private)
+		if (!nv_encoder || !to_drm_encoder(nv_encoder)->helper_private)
 			return connector_status_disconnected;
 
-		helper = nv_encoder->base.helper_private;
+		helper = to_drm_encoder(nv_encoder)->helper_private;
 		if (!helper || !helper->detect)
 			return connector_status_disconnected;
 
-		if (helper->detect(&nv_encoder->base, connector) ==
+		if (helper->detect(to_drm_encoder(nv_encoder), connector) ==
 				connector_status_connected) {
 			nouveau_connector_set_encoder(connector, nv_encoder);
 			return connector_status_connected;
@@ -447,7 +447,7 @@ nouveau_connector_best_encoder(struct drm_connector *connector)
 	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 
 	if (nv_connector->detected_encoder)
-		return &nv_connector->detected_encoder->base;
+		return to_drm_encoder(nv_connector->detected_encoder);
 
 	return NULL;
 }

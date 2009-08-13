@@ -786,11 +786,11 @@ nv04_encoder_create(struct drm_device *dev, struct dcb_entry *entry)
 	} else
 		helper = &nv04_encoder_helper_funcs;
 
-	drm_encoder_init(dev, &nv_encoder->base, &nv04_encoder_funcs, type);
-	drm_encoder_helper_add(&nv_encoder->base, helper);
+	drm_encoder_init(dev, to_drm_encoder(nv_encoder), &nv04_encoder_funcs, type);
+	drm_encoder_helper_add(to_drm_encoder(nv_encoder), helper);
 
-	nv_encoder->base.possible_crtcs = entry->heads;
-	nv_encoder->base.possible_clones = 0;
+	to_drm_encoder(nv_encoder)->possible_crtcs = entry->heads;
+	to_drm_encoder(nv_encoder)->possible_clones = 0;
 
 	return 0;
 }

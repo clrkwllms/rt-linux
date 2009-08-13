@@ -217,7 +217,7 @@ nouveau_crtc_connector_get(struct nouveau_crtc *crtc)
 		return NULL;
 
 	list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
-		if (drm_connector->encoder == &encoder->base)
+		if (drm_connector->encoder == to_drm_encoder(encoder))
 			return nouveau_connector(drm_connector);
 	}
 

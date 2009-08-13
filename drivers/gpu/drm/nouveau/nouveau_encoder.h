@@ -27,16 +27,18 @@
 #ifndef __NOUVEAU_OUTPUT_H__
 #define __NOUVEAU_OUTPUT_H__
 
+#include "drm_encoder_slave.h"
 #include "nouveau_drv.h"
 
 #define NV_DPMS_CLEARED 0x80
 
 struct nouveau_encoder {
-	struct drm_encoder base;
+	struct drm_encoder_slave base;
 
 	struct dcb_entry *dcb;
 	int or;
 
+	struct drm_display_mode mode;
 	int last_dpms;
 
 	struct nv04_output_reg restore;
@@ -44,7 +46,14 @@ struct nouveau_encoder {
 
 static inline struct nouveau_encoder *nouveau_encoder(struct drm_encoder *enc)
 {
-	return container_of(enc, struct nouveau_encoder, base);
+	struct drm_encoder_slave *slave = to_encoder_slave(enc);
+
+	return container_of(slave, struct nouveau_encoder, base);
+}
+
+static inline struct drm_encoder *to_drm_encoder(struct nouveau_encoder *enc)
+{
+	return &enc->base.base;
 }
 
 int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry);
