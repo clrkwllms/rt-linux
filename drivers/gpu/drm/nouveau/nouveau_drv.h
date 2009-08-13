@@ -101,12 +101,6 @@ struct mem_block {
 	uint64_t start;
 	uint64_t size;
 	struct drm_file *file_priv; /* NULL: free, -1: heap, other: real files */
-	int flags;
-	struct drm_local_map *map;
-	drm_handle_t map_handle;
-
-	struct ttm_buffer_object *bo;
-	struct ttm_bo_kmap_obj kmap;
 };
 
 enum nouveau_flags {
