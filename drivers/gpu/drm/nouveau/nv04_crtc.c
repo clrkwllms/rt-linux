@@ -550,7 +550,7 @@ nv_crtc_mode_set_regs(struct drm_crtc *crtc, struct drm_display_mode * mode)
 		/* This is what the blob does */
 		regp->crtc_850 = NVReadCRTC(dev, 0, NV_PCRTC_850);
 
-	if (nv_arch(dev) == NV_40)
+	if (nv_arch(dev) >= NV_30)
 		regp->gpio_ext = NVReadCRTC(dev, 0, NV_PCRTC_GPIO_EXT);
 
 	regp->crtc_cfg = NV_PCRTC_CONFIG_START_ADDRESS_HSYNC;
@@ -581,6 +581,7 @@ nv_crtc_mode_set_regs(struct drm_crtc *crtc, struct drm_display_mode * mode)
 		regp->ramdac_gen_ctrl |= NV_PRAMDAC_GENERAL_CONTROL_PIPE_LONG;
 
 	regp->ramdac_630 = 0; /* turn off green mode (tv test pattern?) */
+	regp->tv_setup = 0;
 
 	nv_crtc_set_image_sharpening(crtc, nv_crtc->sharpness);
 

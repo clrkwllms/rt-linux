@@ -366,6 +366,14 @@ struct nv04_crtc_reg {
 	uint32_t ramdac_gen_ctrl;
 	uint32_t ramdac_630;
 	uint32_t ramdac_634;
+	uint32_t tv_setup;
+	uint32_t tv_vtotal;
+	uint32_t tv_vskew;
+	uint32_t tv_vsync_delay;
+	uint32_t tv_htotal;
+	uint32_t tv_hskew;
+	uint32_t tv_hsync_delay;
+	uint32_t tv_hsync_delay2;
 	uint32_t fp_horiz_regs[7];
 	uint32_t fp_vert_regs[7];
 	uint32_t dither;
@@ -379,6 +387,7 @@ struct nv04_crtc_reg {
 	uint32_t ramdac_a20;
 	uint32_t ramdac_a24;
 	uint32_t ramdac_a34;
+	uint32_t ctv_regs[38];
 };
 
 struct nv04_output_reg {

@@ -673,6 +673,15 @@ nv_save_state_ramdac(struct drm_device *dev, int head,
 	if (dev_priv->chipset >= 0x30)
 		regp->ramdac_634 = NVReadRAMDAC(dev, head, NV_PRAMDAC_634);
 
+	regp->tv_setup = NVReadRAMDAC(dev, head, NV_PRAMDAC_TV_SETUP);
+	regp->tv_vtotal = NVReadRAMDAC(dev, head, NV_PRAMDAC_TV_VTOTAL);
+	regp->tv_vskew = NVReadRAMDAC(dev, head, NV_PRAMDAC_TV_VSKEW);
+	regp->tv_vsync_delay = NVReadRAMDAC(dev, head, NV_PRAMDAC_TV_VSYNC_DELAY);
+	regp->tv_htotal = NVReadRAMDAC(dev, head, NV_PRAMDAC_TV_HTOTAL);
+	regp->tv_hskew = NVReadRAMDAC(dev, head, NV_PRAMDAC_TV_HSKEW);
+	regp->tv_hsync_delay = NVReadRAMDAC(dev, head, NV_PRAMDAC_TV_HSYNC_DELAY);
+	regp->tv_hsync_delay2 = NVReadRAMDAC(dev, head, NV_PRAMDAC_TV_HSYNC_DELAY2);
+
 	for (i = 0; i < 7; i++) {
 		uint32_t ramdac_reg = NV_PRAMDAC_FP_VDISPLAY_END + (i * 4);
 		regp->fp_vert_regs[i] = NVReadRAMDAC(dev, head, ramdac_reg);
@@ -707,6 +716,10 @@ nv_save_state_ramdac(struct drm_device *dev, int head,
 		regp->ramdac_a20 = NVReadRAMDAC(dev, head, NV_PRAMDAC_A20);
 		regp->ramdac_a24 = NVReadRAMDAC(dev, head, NV_PRAMDAC_A24);
 		regp->ramdac_a34 = NVReadRAMDAC(dev, head, NV_PRAMDAC_A34);
+
+		for (i = 0; i < 38; i++)
+			regp->ctv_regs[i] = NVReadRAMDAC(dev, head,
+							 NV_PRAMDAC_CTV + 4*i);
 	}
 }
 
@@ -735,6 +748,15 @@ nv_load_state_ramdac(struct drm_device *dev, int head,
 		NVWriteRAMDAC(dev, head, NV_PRAMDAC_630, regp->ramdac_630);
 	if (dev_priv->chipset >= 0x30)
 		NVWriteRAMDAC(dev, head, NV_PRAMDAC_634, regp->ramdac_634);
+
+	NVWriteRAMDAC(dev, head, NV_PRAMDAC_TV_SETUP, regp->tv_setup);
+	NVWriteRAMDAC(dev, head, NV_PRAMDAC_TV_VTOTAL, regp->tv_vtotal);
+	NVWriteRAMDAC(dev, head, NV_PRAMDAC_TV_VSKEW, regp->tv_vskew);
+	NVWriteRAMDAC(dev, head, NV_PRAMDAC_TV_VSYNC_DELAY, regp->tv_vsync_delay);
+	NVWriteRAMDAC(dev, head, NV_PRAMDAC_TV_HTOTAL, regp->tv_htotal);
+	NVWriteRAMDAC(dev, head, NV_PRAMDAC_TV_HSKEW, regp->tv_hskew);
+	NVWriteRAMDAC(dev, head, NV_PRAMDAC_TV_HSYNC_DELAY, regp->tv_hsync_delay);
+	NVWriteRAMDAC(dev, head, NV_PRAMDAC_TV_HSYNC_DELAY2, regp->tv_hsync_delay2);
 
 	for (i = 0; i < 7; i++) {
 		uint32_t ramdac_reg = NV_PRAMDAC_FP_VDISPLAY_END + (i * 4);
@@ -765,6 +787,10 @@ nv_load_state_ramdac(struct drm_device *dev, int head,
 		NVWriteRAMDAC(dev, head, NV_PRAMDAC_A20, regp->ramdac_a20);
 		NVWriteRAMDAC(dev, head, NV_PRAMDAC_A24, regp->ramdac_a24);
 		NVWriteRAMDAC(dev, head, NV_PRAMDAC_A34, regp->ramdac_a34);
+
+		for (i = 0; i < 38; i++)
+			NVWriteRAMDAC(dev, head,
+				      NV_PRAMDAC_CTV + 4*i, regp->ctv_regs[i]);
 	}
 }
 
@@ -838,6 +864,7 @@ nv_save_state_ext(struct drm_device *dev, int head,
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_21);
 	if (nv_arch(dev) >= NV_30)
 		rd_cio_state(dev, head, regp, NV_CIO_CRE_47);
+	rd_cio_state(dev, head, regp, NV_CIO_CRE_49);
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_HCUR_ADDR0_INDEX);
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_HCUR_ADDR1_INDEX);
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_HCUR_ADDR2_INDEX);
@@ -846,10 +873,13 @@ nv_save_state_ext(struct drm_device *dev, int head,
 	if (nv_arch(dev) >= NV_10) {
 		regp->crtc_830 = NVReadCRTC(dev, head, NV_PCRTC_830);
 		regp->crtc_834 = NVReadCRTC(dev, head, NV_PCRTC_834);
-		if (nv_arch(dev) == NV_40) {
-			regp->crtc_850 = NVReadCRTC(dev, head, NV_PCRTC_850);
+
+		if (nv_arch(dev) >= NV_30)
 			regp->gpio_ext = NVReadCRTC(dev, head, NV_PCRTC_GPIO_EXT);
-		}
+
+		if (nv_arch(dev) == NV_40)
+			regp->crtc_850 = NVReadCRTC(dev, head, NV_PCRTC_850);
+
 		if (nv_two_heads(dev))
 			regp->crtc_eng_ctrl = NVReadCRTC(dev, head, NV_PCRTC_ENGINE_CTRL);
 		regp->cursor_cfg = NVReadCRTC(dev, head, NV_PCRTC_CURSOR_CONFIG);
@@ -888,6 +918,7 @@ nv_load_state_ext(struct drm_device *dev, int head,
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv04_crtc_reg * regp = &state->crtc_reg[head];
+	uint32_t reg900;
 	int i;
 
 	if (nv_arch(dev) >= NV_10) {
@@ -911,13 +942,14 @@ nv_load_state_ext(struct drm_device *dev, int head,
 		NVWriteCRTC(dev, head, NV_PCRTC_CURSOR_CONFIG, regp->cursor_cfg);
 		NVWriteCRTC(dev, head, NV_PCRTC_830, regp->crtc_830);
 		NVWriteCRTC(dev, head, NV_PCRTC_834, regp->crtc_834);
-		if (nv_arch(dev) == NV_40) {
-			NVWriteCRTC(dev, head, NV_PCRTC_850, regp->crtc_850);
+
+		if (nv_arch(dev) >= NV_30)
 			NVWriteCRTC(dev, head, NV_PCRTC_GPIO_EXT, regp->gpio_ext);
-		}
 
 		if (nv_arch(dev) == NV_40) {
-			uint32_t reg900 = NVReadRAMDAC(dev, head, NV_PRAMDAC_900);
+			NVWriteCRTC(dev, head, NV_PCRTC_850, regp->crtc_850);
+
+			reg900 = NVReadRAMDAC(dev, head, NV_PRAMDAC_900);
 			if (regp->crtc_cfg == NV_PCRTC_CONFIG_START_ADDRESS_HSYNC)
 				NVWriteRAMDAC(dev, head, NV_PRAMDAC_900, reg900 | 0x10000);
 			else
@@ -939,6 +971,7 @@ nv_load_state_ext(struct drm_device *dev, int head,
 	if (nv_arch(dev) >= NV_30)
 		wr_cio_state(dev, head, regp, NV_CIO_CRE_47);
 
+	wr_cio_state(dev, head, regp, NV_CIO_CRE_49);
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_HCUR_ADDR0_INDEX);
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_HCUR_ADDR1_INDEX);
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_HCUR_ADDR2_INDEX);
@@ -956,6 +989,13 @@ nv_load_state_ext(struct drm_device *dev, int head,
 	}
 	/* NV11 and NV20 stop at 0x52. */
 	if (nv_gf4_disp_arch(dev)) {
+		if (nv_arch(dev) == NV_10) {
+			/* Not waiting for vertical retrace before modifying
+			   CRE_53/CRE_54 causes lockups. */
+			nouveau_wait_until(dev, 650000000, NV_PRMCIO_INP0__COLOR, 0x8, 0x8);
+			nouveau_wait_until(dev, 650000000, NV_PRMCIO_INP0__COLOR, 0x8, 0x0);
+		}
+
 		wr_cio_state(dev, head, regp, NV_CIO_CRE_53);
 		wr_cio_state(dev, head, regp, NV_CIO_CRE_54);
 

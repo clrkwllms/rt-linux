@@ -50,6 +50,9 @@
 #define NV_PPM_OFFSET               0x0000A000
 #define NV_PPM_SIZE                 0x00001000
 
+#define NV_PTV_OFFSET               0x0000D000
+#define NV_PTV_SIZE                 0x00001000
+
 #define NV_PRMVGA_OFFSET            0x000A0000
 #define NV_PRMVGA_SIZE              0x00020000
 
@@ -116,6 +119,12 @@
 #	define NV_PBUS_PCI_NV_20_ROM_SHADOW_ENABLED	(1 << 0)
 
 #define NV_PFIFO_RAMHT			0x00002210
+
+#define NV_PTV_TV_INDEX			0x0000d220
+#define NV_PTV_TV_DATA			0x0000d224
+#define NV_PTV_HFILTER			0x0000d310
+#define NV_PTV_HFILTER2			0x0000d390
+#define NV_PTV_VFILTER			0x0000d510
 
 #define NV_PRMVIO_MISC__WRITE		0x000c03c2
 #define NV_PRMVIO_SRX			0x000c03c4
@@ -288,11 +297,13 @@
 #		define NV_CIO_CRE_EBR_VDE_11		2:2
 #		define NV_CIO_CRE_EBR_VRS_11		4:4
 #		define NV_CIO_CRE_EBR_VBS_11		6:6
+#	define NV_CIO_CRE_43			0x43
 #	define NV_CIO_CRE_44			0x44	/* head control */
 #	define NV_CIO_CRE_CSB			0x45	/* colour saturation boost */
 #	define NV_CIO_CRE_RCR			0x46
 #		define NV_CIO_CRE_RCR_ENDIAN_BIG	7:7
 #	define NV_CIO_CRE_47			0x47	/* extended fifo lwm, used on nv30+ */
+#	define NV_CIO_CRE_49			0x49
 #	define NV_CIO_CRE_4B			0x4b	/* given patterns in 0x[2-3][a-c] regs, probably scratch 6 */
 #	define NV_CIO_CRE_TVOUT_LATENCY		0x52
 #	define NV_CIO_CRE_53			0x53	/* `fp_htiming' according to Haiku */
@@ -361,6 +372,17 @@
 #define NV_PRAMDAC_630					0x00680630
 #define NV_PRAMDAC_634					0x00680634
 
+#define NV_PRAMDAC_TV_SETUP				0x00680700
+#define NV_PRAMDAC_TV_VTOTAL				0x00680720
+#define NV_PRAMDAC_TV_VSKEW				0x00680724
+#define NV_PRAMDAC_TV_VSYNC_DELAY			0x00680728
+#define NV_PRAMDAC_TV_HTOTAL				0x0068072c
+#define NV_PRAMDAC_TV_HSKEW				0x00680730
+#define NV_PRAMDAC_TV_HSYNC_DELAY			0x00680734
+#define NV_PRAMDAC_TV_HSYNC_DELAY2			0x00680738
+
+#define NV_PRAMDAC_TV_SETUP                             0x00680700
+
 #define NV_PRAMDAC_FP_VDISPLAY_END			0x00680800
 #define NV_PRAMDAC_FP_VTOTAL				0x00680804
 #define NV_PRAMDAC_FP_VCRTC				0x00680808
@@ -422,6 +444,8 @@
 #define NV_PRAMDAC_A20					0x00680A20
 #define NV_PRAMDAC_A24					0x00680A24
 #define NV_PRAMDAC_A34					0x00680A34
+
+#define NV_PRAMDAC_CTV					0x00680c00
 
 /* names fabricated from NV_USER_DAC info */
 #define NV_PRMDIO_PIXEL_MASK		0x006813c6
