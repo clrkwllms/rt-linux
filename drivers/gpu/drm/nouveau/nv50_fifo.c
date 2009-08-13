@@ -284,7 +284,7 @@ nv50_fifo_create_context(struct nouveau_channel *chan)
 	nv_wo32(dev, ramfc, 0x54/4, 0x000f0000);
 	nv_wo32(dev, ramfc, 0x7c/4, 0x30000001);
 	nv_wo32(dev, ramfc, 0x78/4, 0x00000000);
-	nv_wo32(dev, ramfc, 0x4c/4, chan->pushbuf_bo->bo.mem.size - 1);
+	nv_wo32(dev, ramfc, 0x4c/4, 0xffffffff);
 
 	if (!IS_G80) {
 		nv_wo32(dev, chan->ramin->gpuobj, 0, chan->id);

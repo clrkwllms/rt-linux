@@ -36,31 +36,32 @@ nouveau_channel_pushbuf_ctxdma_init(struct nouveau_channel *chan)
 	struct nouveau_bo *pb = chan->pushbuf_bo;
 	struct nouveau_gpuobj *pushbuf = NULL;
 	uint32_t start = pb->bo.mem.mm_node->start << PAGE_SHIFT;
-	uint32_t size = pb->bo.mem.size;
 	int ret;
 
 	if (pb->bo.mem.mem_type == TTM_PL_TT) {
-		ret = nouveau_gpuobj_gart_dma_new(chan, start, size,
-						  NV_DMA_ACCESS_RO,
-						  &pushbuf,
-						  &chan->pushbuf_base);
+		ret = nouveau_gpuobj_gart_dma_new(chan, 0,
+						  dev_priv->gart_info.aper_size,
+						  NV_DMA_ACCESS_RO, &pushbuf,
+						  NULL);
+		chan->pushbuf_base = start;
 	} else
 	if (dev_priv->card_type != NV_04) {
-		ret = nouveau_gpuobj_dma_new(chan, NV_CLASS_DMA_IN_MEMORY,
-					     start, size, NV_DMA_ACCESS_RO,
+		ret = nouveau_gpuobj_dma_new(chan, NV_CLASS_DMA_IN_MEMORY, 0,
+					     dev_priv->fb_available_size,
+					     NV_DMA_ACCESS_RO,
 					     NV_DMA_TARGET_VIDMEM, &pushbuf);
-		chan->pushbuf_base = 0;
+		chan->pushbuf_base = start;
 	} else {
 		/* NV04 cmdbuf hack, from original ddx.. not sure of it's
 		 * exact reason for existing :)  PCI access to cmdbuf in
 		 * VRAM.
 		 */
 		ret = nouveau_gpuobj_dma_new(chan, NV_CLASS_DMA_IN_MEMORY,
-					     start +
-					       drm_get_resource_start(dev, 1),
-					     size, NV_DMA_ACCESS_RO,
+					     drm_get_resource_start(dev, 1),
+					     dev_priv->fb_available_size,
+					     NV_DMA_ACCESS_RO,
 					     NV_DMA_TARGET_PCI, &pushbuf);
-		chan->pushbuf_base = 0;
+		chan->pushbuf_base = start;
 	}
 
 	ret = nouveau_gpuobj_ref_add(dev, chan, 0, pushbuf, &chan->pushbuf);
