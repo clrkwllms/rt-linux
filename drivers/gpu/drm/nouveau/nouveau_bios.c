@@ -3350,8 +3350,13 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 	case OUTPUT_LVDS:
 		if (nouveau_uscript_lvds >= 0)
 			sub = nouveau_uscript_lvds;
-		else
-			sub = 0x0100; /* 0x0000 0x0100 0x0200 0x0300 */
+		else {
+			/* 0x0000 0x0100 0x0200 0x0300 */
+			if (pxclk > bios->fp.duallink_transition_clk)
+				sub = 0x0100;
+			else
+				sub = 0x0000;
+		}
 		break;
 	case OUTPUT_TMDS:
 		if (nouveau_uscript_tmds >= 0)
