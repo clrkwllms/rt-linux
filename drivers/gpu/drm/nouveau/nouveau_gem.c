@@ -90,7 +90,7 @@ nouveau_gem_info(struct drm_gem_object *gem, struct drm_nouveau_gem_info *rep)
 {
 	struct nouveau_bo *nvbo = nouveau_gem_object(gem);
 
-	if (nvbo->bo.mem.mem_type == TTM_PL_FLAG_TT)
+	if (nvbo->bo.mem.mem_type == TTM_PL_TT)
 		rep->domain = NOUVEAU_GEM_DOMAIN_GART;
 	else
 		rep->domain = NOUVEAU_GEM_DOMAIN_VRAM;
