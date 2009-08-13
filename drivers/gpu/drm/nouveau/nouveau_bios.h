@@ -50,6 +50,9 @@ struct dcb_entry {
 			bool use_straps_for_mode;
 			bool use_power_scripts;
 		} lvdsconf;
+		struct {
+			bool has_component_output;
+		} tvconf;
 	};
 	bool i2c_upper_default;
 };
@@ -145,6 +148,7 @@ struct nouveau_bios_info {
 	uint8_t chip_version;
 
 	uint32_t dactestval;
+	uint32_t tvdactestval;
 	uint8_t digital_min_front_porch;
 	bool fp_no_ddc;
 };

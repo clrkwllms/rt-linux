@@ -33,6 +33,7 @@
 #define FEATURE_MOBILE 0x10	/* also FEATURE_QUADRO for BMP */
 #define LEGACY_I2C_CRT 0x80
 #define LEGACY_I2C_PANEL 0x81
+#define LEGACY_I2C_TV 0x82
 
 #define EDID1_LEN 128
 
@@ -3960,8 +3961,8 @@ static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 	if (!daccmpoffset)
 		return 0;
 
-	/* The first value in the table, following the header, is the comparison value
-	 * Purpose of subsequent values unknown -- TV load detection?
+	/* The first value in the table, following the header, is the comparison value,
+	 * the second entry is a comparison value for TV load detection.
 	 */
 
 	dacver = bios->data[daccmpoffset];
@@ -3974,6 +3975,7 @@ static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 	}
 
 	bios->pub.dactestval = ROM32(bios->data[daccmpoffset + dacheaderlen]);
+	bios->pub.tvdactestval = ROM32(bios->data[daccmpoffset + dacheaderlen + 4]);
 
 	return 0;
 }
@@ -4561,6 +4563,15 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 		}
 		break;
 		}
+	case OUTPUT_TV:
+	{
+		if (bdcb->version >= 0x30)
+			entry->tvconf.has_component_output = conf & (0x8 << 4);
+		else
+			entry->tvconf.has_component_output = false;
+
+		break;
+	}
 	case 0xe:
 		/* weird g80 mobile type that "nv" treats as a terminator */
 		bdcb->dcb.entries--;
@@ -4626,6 +4637,10 @@ parse_dcb15_entry(struct drm_device *dev, struct parsed_dcb *dcb,
 		/* invent a DVI-A output, by copying the fields of the DVI-D
 		 * output; reported to work by math_b on an NV20(!) */
 		fabricate_vga_output(dcb, entry->i2c_index, entry->heads);
+		break;
+	case OUTPUT_TV:
+		entry->tvconf.has_component_output = false;
+		break;
 	}
 
 	return true;
@@ -4835,6 +4850,8 @@ static void fixup_legacy_i2c(struct nvbios *bios)
 			dcb->entry[i].i2c_index = bios->legacy.i2c_indices.crt;
 		if (dcb->entry[i].i2c_index == LEGACY_I2C_PANEL)
 			dcb->entry[i].i2c_index = bios->legacy.i2c_indices.panel;
+		if (dcb->entry[i].i2c_index == LEGACY_I2C_TV)
+			dcb->entry[i].i2c_index = bios->legacy.i2c_indices.tv;
 	}
 }
 
