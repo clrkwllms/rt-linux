@@ -33,6 +33,7 @@ struct nouveau_i2c_chan {
 	struct drm_device *dev;
 	struct i2c_adapter adapter;
 	struct i2c_algo_bit_data algo;
+	unsigned index;
 	unsigned rd;
 	unsigned wr;
 	unsigned data;

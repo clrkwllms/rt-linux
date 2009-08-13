@@ -139,7 +139,11 @@ nv04_display_create(struct drm_device *dev)
 			ret = nv04_dfp_create(dev, dcbent);
 			break;
 		case OUTPUT_TV:
-			continue;
+			if (dcbent->location == DCB_LOC_ON_CHIP)
+				continue;
+			else
+				ret = nv04_tv_create(dev, dcbent);
+			break;
 		default:
 			NV_WARN(dev, "DCB type %d not known\n", dcbent->type);
 			continue;

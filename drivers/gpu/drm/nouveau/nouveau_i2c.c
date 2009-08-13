@@ -181,6 +181,7 @@ nouveau_i2c_new(struct drm_device *dev, const char *name, unsigned index,
 	i2c->adapter.owner = THIS_MODULE;
 	i2c->adapter.algo_data = &i2c->algo;
 	i2c->dev = dev;
+	i2c->index = index;
 
 	switch (dcbi2c->port_type) {
 	case 0:
@@ -235,11 +236,14 @@ void
 nouveau_i2c_del(struct nouveau_i2c_chan **pi2c)
 {
 	struct nouveau_i2c_chan *i2c = *pi2c;
+	struct drm_nouveau_private *dev_priv;
 
 	if (!i2c)
 		return;
 
-	*pi2c = NULL;
+	dev_priv = i2c->dev->dev_private;
+
+	dev_priv->vbios->dcb->i2c[i2c->index].chan = *pi2c = NULL;
 	i2c_del_adapter(&i2c->adapter);
 	kfree(i2c);
 }

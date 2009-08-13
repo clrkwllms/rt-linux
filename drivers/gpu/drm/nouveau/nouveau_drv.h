@@ -930,6 +930,10 @@ extern void nv04_dfp_bind_head(struct drm_device *dev, struct dcb_entry *dcbent,
 extern void nv04_dfp_disable(struct drm_device *dev, int head);
 extern void nv04_dfp_update_fp_control(struct drm_encoder *encoder, int mode);
 
+/* nv04_tv.c */
+extern int nv04_tv_identify(struct drm_device *dev, int i2c_index);
+extern int nv04_tv_create(struct drm_device *dev, struct dcb_entry *entry);
+
 /* nv04_display.c */
 extern int nv04_display_create(struct drm_device *);
 extern void nv04_display_destroy(struct drm_device *);

@@ -4498,6 +4498,16 @@ static void fabricate_dvi_i_output(struct parsed_dcb *dcb, bool twoHeads)
 #endif
 }
 
+static void fabricate_tv_output(struct parsed_dcb *dcb, bool twoHeads)
+{
+	struct dcb_entry *entry = new_dcb_entry(dcb);
+
+	entry->type = 1;
+	entry->i2c_index = LEGACY_I2C_TV;
+	entry->heads = twoHeads ? 3 : 1;
+	entry->location = !DCB_LOC_ON_CHIP;	/* ie OFF CHIP */
+}
+
 static bool
 parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 		  uint32_t conn, uint32_t conf, struct dcb_entry *entry)
@@ -4734,6 +4744,11 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 			       "assuming a CRT output exists\n");
 		/* this situation likely means a really old card, pre DCB */
 		fabricate_vga_output(dcb, LEGACY_I2C_CRT, 1);
+
+		if (nv04_tv_identify(dev,
+				     bios->legacy.i2c_indices.tv) >= 0)
+			fabricate_tv_output(dcb, twoHeads);
+
 		return 0;
 	}
 
@@ -4794,9 +4809,19 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 		NV_TRACEWARN(dev, "No useful information in BIOS output table; "
 				  "adding all possible outputs\n");
 		fabricate_vga_output(dcb, LEGACY_I2C_CRT, 1);
-		if (bios->tmds.output0_script_ptr ||
-		    bios->tmds.output1_script_ptr)
+
+		/* Attempt to detect TV before DVI because the test
+		 * for the former is more accurate and it rules the
+		 * latter out.
+		 */
+		if (nv04_tv_identify(dev,
+				     bios->legacy.i2c_indices.tv) >= 0)
+			fabricate_tv_output(dcb, twoHeads);
+
+		else if (bios->tmds.output0_script_ptr ||
+			 bios->tmds.output1_script_ptr)
 			fabricate_dvi_i_output(dcb, twoHeads);
+
 		return 0;
 	}
 
@@ -5031,6 +5056,8 @@ nouveau_bios_init(struct drm_device *dev)
 	uint32_t saved_nv_pextdev_boot_0;
 	int ret;
 
+	dev_priv->vbios = &bios->pub;
+
 	if (!NVInitVBIOS(dev))
 		return -ENODEV;
 
@@ -5065,8 +5092,6 @@ nouveau_bios_init(struct drm_device *dev)
 	}
 
 	bios_wr32(dev, NV_PEXTDEV_BOOT_0, saved_nv_pextdev_boot_0);
-
-	dev_priv->vbios = &bios->pub;
 
 	ret = nouveau_run_vbios_init(dev);
 	if (ret) {
