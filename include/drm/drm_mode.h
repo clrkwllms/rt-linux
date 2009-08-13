@@ -141,6 +141,7 @@ struct drm_mode_get_encoder {
 #define DRM_MODE_SUBCONNECTOR_Composite	5
 #define DRM_MODE_SUBCONNECTOR_SVIDEO	6
 #define DRM_MODE_SUBCONNECTOR_Component	8
+#define DRM_MODE_SUBCONNECTOR_SCART	9
 
 #define DRM_MODE_CONNECTOR_Unknown	0
 #define DRM_MODE_CONNECTOR_VGA		1
@@ -155,6 +156,7 @@ struct drm_mode_get_encoder {
 #define DRM_MODE_CONNECTOR_DisplayPort	10
 #define DRM_MODE_CONNECTOR_HDMIA	11
 #define DRM_MODE_CONNECTOR_HDMIB	12
+#define DRM_MODE_CONNECTOR_TV		13
 
 struct drm_mode_get_connector {
 

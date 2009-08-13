@@ -572,6 +572,12 @@ struct drm_mode_config {
 	struct drm_property *tv_right_margin_property;
 	struct drm_property *tv_top_margin_property;
 	struct drm_property *tv_bottom_margin_property;
+	struct drm_property *tv_brightness_property;
+	struct drm_property *tv_contrast_property;
+	struct drm_property *tv_flicker_reduction_property;
+	struct drm_property *tv_overscan_property;
+	struct drm_property *tv_saturation_property;
+	struct drm_property *tv_hue_property;
 
 	/* Optional properties */
 	struct drm_property *scaling_mode_property;
@@ -736,4 +742,10 @@ extern int drm_mode_gamma_get_ioctl(struct drm_device *dev,
 extern int drm_mode_gamma_set_ioctl(struct drm_device *dev,
 				    void *data, struct drm_file *file_priv);
 extern bool drm_detect_hdmi_monitor(struct edid *edid);
+extern struct drm_display_mode *drm_cvt_mode(struct drm_device *dev,
+				int hdisplay, int vdisplay, int vrefresh,
+				bool reduced, bool interlaced);
+extern struct drm_display_mode *drm_gtf_mode(struct drm_device *dev,
+				int hdisplay, int vdisplay, int vrefresh,
+				bool interlaced, int margins);
 #endif /* __DRM_CRTC_H__ */
