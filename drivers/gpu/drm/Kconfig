@@ -173,3 +173,17 @@ config DRM_NOUVEAU_BACKLIGHT
 	  Say Y here if you want to control the backlight of your display
 	  (e.g. a laptop panel).
 
+menu "I2C encoder or helper chips"
+     depends on DRM
+
+config DRM_I2C_CH7006
+	tristate "Chrontel ch7006 TV encoder"
+	default m if DRM_NOUVEAU
+	help
+	  Support for Chrontel ch7006 and similar TV encoders, found
+	  on some nVidia video cards.
+
+	  This driver is currently only useful if you're also using
+	  the nouveau driver.
+
+endmenu
