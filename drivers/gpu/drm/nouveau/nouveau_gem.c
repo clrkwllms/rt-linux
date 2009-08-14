@@ -548,8 +548,6 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 			NV_ERROR(dev, "^^ above push buffer is fail :(\n");
 		}
 	}
-
-	FIRE_RING(chan);
 out:
 	if (unlikely(ret))
 		nouveau_gem_pushbuf_backoff(&list);
