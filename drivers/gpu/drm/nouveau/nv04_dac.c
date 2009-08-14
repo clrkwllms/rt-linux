@@ -220,14 +220,21 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 	struct dcb_entry *dcb = nouveau_encoder(encoder)->dcb;
 	uint32_t testval, regoffset = nv04_dac_output_offset(encoder);
 	uint32_t saved_powerctrl_2 = 0, saved_powerctrl_4 = 0, saved_routput,
-		saved_rtest_ctrl, temp, routput;
+		saved_rtest_ctrl, temp, saved_gpio_ext = 0, routput;
 	int head, present = 0;
 
 #define RGB_TEST_DATA(r,g,b) (r << 0 | g << 10 | b << 20)
-	testval = RGB_TEST_DATA(0x140, 0x140, 0x140); /* 0x94050140 */
+	if (dcb->type == OUTPUT_TV) {
+		testval = RGB_TEST_DATA(0xa0, 0xa0, 0xa0);
 
-	if (dev_priv->vbios->dactestval)
-		testval = dev_priv->vbios->dactestval;
+		if (dev_priv->vbios->tvdactestval)
+			testval = dev_priv->vbios->tvdactestval;
+	} else {
+		testval = RGB_TEST_DATA(0x140, 0x140, 0x140); /* 0x94050140 */
+
+		if (dev_priv->vbios->dactestval)
+			testval = dev_priv->vbios->dactestval;
+	}
 
 	saved_rtest_ctrl = NVReadRAMDAC(dev, 0, NV_PRAMDAC_TEST_CONTROL + regoffset);
 	NVWriteRAMDAC(dev, 0, NV_PRAMDAC_TEST_CONTROL + regoffset,
@@ -239,6 +246,13 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 	if (regoffset == 0x68) {
 		saved_powerctrl_4 = nvReadMC(dev, NV_PBUS_POWERCTRL_4);
 		nvWriteMC(dev, NV_PBUS_POWERCTRL_4, saved_powerctrl_4 & 0xffffffcf);
+	}
+
+	if (nv_arch(dev) >= NV_30) {
+		saved_gpio_ext = NVReadCRTC(dev, 0, NV_PCRTC_GPIO_EXT);
+
+		NVWriteCRTC(dev, 0, NV_PCRTC_GPIO_EXT, (saved_gpio_ext & ~(3 << 20)) |
+			    (dcb->type == OUTPUT_TV ? (1 << 20) : 0));
 	}
 
 	msleep(4);
@@ -253,6 +267,13 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 #endif
 	/* nv driver and nv31 use 0xfffffeee, nv34 and 6600 use 0xfffffece */
 	routput = (saved_routput & 0xfffffece) | head << 8;
+
+	if (nv_arch(dev) >= NV_40) {
+		if (dcb->type == OUTPUT_TV)
+			routput |= 1 << 20;
+		else
+			routput &= ~(1 << 20);
+	}
 
 	NVWriteRAMDAC(dev, 0, NV_PRAMDAC_DACCLK + regoffset, routput);
 	msleep(1);
@@ -269,7 +290,11 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 
 	temp = NVReadRAMDAC(dev, 0, NV_PRAMDAC_TEST_CONTROL + regoffset);
 
-	present = temp & NV_PRAMDAC_TEST_CONTROL_SENSEB_ALLHI;
+	if (dcb->type == OUTPUT_TV)
+		present = (nv17_tv_detect(encoder, connector, (temp >> 28) & 0xe)
+			   == connector_status_connected);
+	else
+		present = temp & NV_PRAMDAC_TEST_CONTROL_SENSEB_ALLHI;
 
 	temp = NVReadRAMDAC(dev, head, NV_PRAMDAC_TEST_CONTROL);
 	NVWriteRAMDAC(dev, head, NV_PRAMDAC_TEST_CONTROL,
@@ -282,6 +307,9 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 	if (regoffset == 0x68)
 		nvWriteMC(dev, NV_PBUS_POWERCTRL_4, saved_powerctrl_4);
 	nvWriteMC(dev, NV_PBUS_POWERCTRL_2, saved_powerctrl_2);
+
+	if (nv_arch(dev) >= NV_30)
+		NVWriteRAMDAC(dev, 0, NV_PCRTC_GPIO_EXT, saved_gpio_ext);
 
 	if (present) {
 		NV_INFO(dev, "Load detected on output %c\n", '@' + ffs(dcb->or));

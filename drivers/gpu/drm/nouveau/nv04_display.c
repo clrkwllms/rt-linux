@@ -140,7 +140,7 @@ nv04_display_create(struct drm_device *dev)
 			break;
 		case OUTPUT_TV:
 			if (dcbent->location == DCB_LOC_ON_CHIP)
-				continue;
+				ret = nv17_tv_create(dev, dcbent);
 			else
 				ret = nv04_tv_create(dev, dcbent);
 			break;
