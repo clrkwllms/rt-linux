@@ -171,6 +171,20 @@ static bool nv50_dac_mode_fixup(struct drm_encoder *drm_encoder,
 				struct drm_display_mode *mode,
 				struct drm_display_mode *adjusted_mode)
 {
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
+	struct nouveau_connector *connector;
+
+	connector = nouveau_encoder_connector_get(encoder);
+	if (!connector)
+		return false;
+
+	if (connector->scaling_mode != DRM_MODE_SCALE_NON_GPU &&
+	     connector->native_mode) {
+		int id = adjusted_mode->base.id;
+		*adjusted_mode = *connector->native_mode;
+		adjusted_mode->base.id = id;
+	}
+
 	return true;
 }
 

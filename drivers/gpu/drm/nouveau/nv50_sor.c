@@ -114,8 +114,7 @@ static bool nv50_sor_mode_fixup(struct drm_encoder *drm_encoder,
 	if (!connector)
 		return false;
 
-	if ((connector->scaling_mode != DRM_MODE_SCALE_NON_GPU &&
-	     connector->scaling_mode != DRM_MODE_SCALE_NO_SCALE) &&
+	if (connector->scaling_mode != DRM_MODE_SCALE_NON_GPU &&
 	     connector->native_mode) {
 		int id = adjusted_mode->base.id;
 		*adjusted_mode = *connector->native_mode;

@@ -238,11 +238,7 @@ nv50_crtc_set_scale(struct nouveau_crtc *crtc, int scaling_mode, bool update)
 
 	NV_DEBUG(dev, "\n");
 
-	if (connector->detected_encoder->dcb->type == OUTPUT_ANALOG)
-		scaling_mode = DRM_MODE_SCALE_NON_GPU;
-
 	switch (scaling_mode) {
-	case DRM_MODE_SCALE_NO_SCALE:
 	case DRM_MODE_SCALE_NON_GPU:
 		break;
 	default:
