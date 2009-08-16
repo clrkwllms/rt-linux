@@ -191,6 +191,14 @@ nouveau_connector_set_encoder(struct drm_connector *connector,
 		else
 			connector->interlace_allowed = true;
 	}
+
+	if (connector->connector_type == DRM_MODE_CONNECTOR_DVII) {
+		drm_connector_property_set_value(connector,
+			dev->mode_config.dvi_i_subconnector_property,
+			nv_encoder->dcb->type == OUTPUT_TMDS ?
+			DRM_MODE_SUBCONNECTOR_DVID :
+			DRM_MODE_SUBCONNECTOR_DVIA);
+	}
 }
 
 static enum drm_connector_status
