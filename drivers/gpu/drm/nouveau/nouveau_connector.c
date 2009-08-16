@@ -590,6 +590,7 @@ out:
 int
 nouveau_connector_create(struct drm_device *dev, int index, int type)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_connector *nv_connector = NULL;
 	struct drm_connector *connector;
 	struct drm_encoder *encoder;
@@ -657,6 +658,13 @@ nouveau_connector_create(struct drm_device *dev, int index, int type)
 
 	} else {
 		nv_connector->scaling_mode = DRM_MODE_SCALE_NONE;
+
+		if (type == DRM_MODE_CONNECTOR_VGA  &&
+				dev_priv->card_type >= NV_50) {
+			drm_connector_attach_property(connector,
+					dev->mode_config.scaling_mode_property,
+					nv_connector->scaling_mode);
+		}
 	}
 
 	/* attach encoders */
