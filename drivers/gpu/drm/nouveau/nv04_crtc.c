@@ -848,7 +848,6 @@ nv04_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 	struct nouveau_bo *cursor = NULL;
 	struct drm_gem_object *gem;
-	uint32_t *src, *dst, pixel;
 	int ret = 0, alpha, i;
 
 	if (width != 64 || height != 64)
@@ -867,8 +866,6 @@ nv04_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
 	ret = nouveau_bo_map(cursor);
 	if (ret)
 		goto out;
-	src = cursor->kmap.virtual;
-	dst = nv_crtc->cursor.nvbo->kmap.virtual;
 
 	/* nv11+ supports premultiplied (PM), or non-premultiplied (NPM) alpha
 	 * cursors (though NPM in combination with fp dithering may not work on
@@ -877,7 +874,7 @@ nv04_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
 	 * blob uses, however we get given PM cursors so we use PM mode
 	 */
 	for (i = 0; i < 64 * 64; i++) {
-		pixel = *src++;
+		uint32_t pixel = nouveau_bo_rd32(cursor, i);
 
 		/* hw gets unhappy if alpha <= rgb values.  for a PM image "less
 		 * than" shouldn't happen; fix "equal to" case by adding one to
@@ -897,7 +894,7 @@ nv04_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
 		}
 #endif
 
-		*dst++ = pixel;
+		nouveau_bo_wr32(nv_crtc->cursor.nvbo, i, pixel);
 	}
 
 	nouveau_bo_unmap(cursor);

@@ -958,6 +958,8 @@ extern int nouveau_bo_pin(struct nouveau_bo *, uint32_t flags);
 extern int nouveau_bo_unpin(struct nouveau_bo *);
 extern int nouveau_bo_map(struct nouveau_bo *);
 extern void nouveau_bo_unmap(struct nouveau_bo *);
+extern u32 nouveau_bo_rd32(struct nouveau_bo *nvbo, unsigned index);
+extern void nouveau_bo_wr32(struct nouveau_bo *nvbo, unsigned index, u32 val);
 
 /* nouveau_fence.c */
 struct nouveau_fence;
