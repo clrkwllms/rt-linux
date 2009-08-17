@@ -91,8 +91,6 @@ nouveau_connector_destroy(struct drm_connector *drm_connector)
 	if (!connector)
 		return;
 
-	nouveau_i2c_del(&connector->i2c_chan);
-
 	drm_sysfs_connector_remove(drm_connector);
 	drm_connector_cleanup(drm_connector);
 	kfree(drm_connector);
@@ -550,12 +548,9 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 	drm_connector_helper_add(connector, &nouveau_connector_helper_funcs);
 
 	if (i2c_index < 0xf) {
-		ret = nouveau_i2c_new(dev, drm_get_connector_name(connector),
-				      i2c_index, &nv_connector->i2c_chan);
-		if (ret) {
-			NV_ERROR(dev, "Error initialising I2C on %s: %d\n",
-				 drm_get_connector_name(connector), ret);
-		}
+		nv_connector->i2c_chan = nouveau_i2c_find(dev, i2c_index);
+		if (!nv_connector->i2c_chan)
+			NV_ERROR(dev, "No I2C device for connector\n");
 	}
 
 	/* Init DVI-I specific properties */

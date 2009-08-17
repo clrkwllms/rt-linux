@@ -64,15 +64,14 @@ static bool probe_i2c_addr(struct i2c_adapter *adapter, int addr)
 
 int nv04_tv_identify(struct drm_device *dev, int i2c_index)
 {
-	char adaptername[11];
 	struct nouveau_i2c_chan *i2c;
 	bool was_locked;
 	int i, ret;
 
 	NV_TRACE(dev, "Probing TV encoders on I2C bus: %d\n", i2c_index);
 
-	snprintf(adaptername, 11, "DCB-I2C-%d", i2c_index);
-	if (nouveau_i2c_new(dev, adaptername, i2c_index, &i2c))
+	i2c = nouveau_i2c_find(dev, i2c_index);
+	if (!i2c)
 		return -ENODEV;
 
 	was_locked = NVLockVgaCrtcs(dev, false);
@@ -91,8 +90,6 @@ int nv04_tv_identify(struct drm_device *dev, int i2c_index)
 
 	} else {
 		NV_TRACE(dev, "No TV encoders found.\n");
-
-		nouveau_i2c_del(&i2c);
 		i = -ENODEV;
 	}
 

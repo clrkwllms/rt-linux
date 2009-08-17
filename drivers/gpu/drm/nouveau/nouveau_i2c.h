@@ -27,20 +27,19 @@
 #include <linux/i2c-id.h>
 #include <linux/i2c-algo-bit.h>
 
-#include "nouveau_connector.h"
+struct dcb_i2c_entry;
 
 struct nouveau_i2c_chan {
 	struct drm_device *dev;
 	struct i2c_adapter adapter;
 	struct i2c_algo_bit_data algo;
-	unsigned index;
 	unsigned rd;
 	unsigned wr;
 	unsigned data;
 };
 
-int nouveau_i2c_new(struct drm_device *, const char *, unsigned,
-		    struct nouveau_i2c_chan **);
-void nouveau_i2c_del(struct nouveau_i2c_chan **);
+int nouveau_i2c_init(struct drm_device *, struct dcb_i2c_entry *, int index);
+void nouveau_i2c_fini(struct drm_device *, struct dcb_i2c_entry *);
+struct nouveau_i2c_chan *nouveau_i2c_find(struct drm_device *, int index);
 
 #endif /* __NOUVEAU_I2C_H__ */

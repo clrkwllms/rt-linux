@@ -703,14 +703,11 @@ static int dcb_entry_idx_from_crtchead(struct drm_device *dev)
 	return dcb_entry;
 }
 
-static int init_dcb_i2c_entry(struct drm_device *dev, struct nvbios *bios, int index);
-
-static int
-create_i2c_device(struct drm_device *dev, struct nvbios *bios, int i2c_index,
-		  struct nouveau_i2c_chan **chan)
+static struct nouveau_i2c_chan *
+init_i2c_device_find(struct drm_device *dev, int i2c_index)
 {
-	struct bios_parsed_dcb *bdcb = &bios->bdcb;
-	int ret;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct bios_parsed_dcb *bdcb = &dev_priv->VBIOS.bdcb;
 
 	if (i2c_index == 0xff) {
 		/* note: dcb_entry_idx_from_crtchead needs pre-script set-up */
@@ -725,11 +722,7 @@ create_i2c_device(struct drm_device *dev, struct nvbios *bios, int i2c_index,
 	if (i2c_index == 0x80)	/* g80+ */
 		i2c_index = bdcb->i2c_default_indices & 0xf;
 
-	if ((ret = init_dcb_i2c_entry(dev, bios, i2c_index)))
-		return ret;
-
-	*chan = bdcb->dcb.i2c[i2c_index].chan;
-	return 0;
+	return nouveau_i2c_find(dev, i2c_index);
 }
 
 static uint32_t get_tmds_index_reg(struct drm_device *dev, uint8_t mlv)
@@ -1184,7 +1177,8 @@ static bool init_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16_t 
 	BIOSLOG(dev, "0x%04X: DCBI2CIndex: 0x%02X, I2CAddress: 0x%02X, Count: 0x%02X\n",
 		offset, i2c_index, i2c_address, count);
 
-	if (create_i2c_device(dev, bios, i2c_index, &chan))
+	chan = init_i2c_device_find(dev, i2c_index);
+	if (!chan)
 		return false;
 
 	for (i = 0; i < count; i++) {
@@ -1248,7 +1242,8 @@ static bool init_zm_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16
 	BIOSLOG(dev, "0x%04X: DCBI2CIndex: 0x%02X, I2CAddress: 0x%02X, Count: 0x%02X\n",
 		offset, i2c_index, i2c_address, count);
 
-	if (create_i2c_device(dev, bios, i2c_index, &chan))
+	chan = init_i2c_device_find(dev, i2c_index);
+	if (!chan)
 		return false;
 
 	for (i = 0; i < count; i++) {
@@ -1300,7 +1295,8 @@ static bool init_zm_i2c(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	BIOSLOG(dev, "0x%04X: DCBI2CIndex: 0x%02X, I2CAddress: 0x%02X, Count: 0x%02X\n",
 		offset, i2c_index, i2c_address, count);
 
-	if (create_i2c_device(dev, bios, i2c_index, &chan))
+	chan = init_i2c_device_find(dev, i2c_index);
+	if (!chan)
 		return false;
 
 	for (i = 0; i < count; i++) {
@@ -4418,39 +4414,6 @@ read_dcb_i2c_entry(struct drm_device *dev, int dcb_version, uint8_t *i2ctable, i
 	return 0;
 }
 
-static int
-init_dcb_i2c_entry(struct drm_device *dev, struct nvbios *bios, int index)
-{
-	struct dcb_i2c_entry *i2c = &bios->bdcb.dcb.i2c[index];
-	char adaptorname[11];
-	int ret;
-
-	if (i2c->chan)
-		return 0;
-
-	if (bios->bdcb.version < 0x15) {
-		NV_ERROR(dev, "DCB table not version 1.5 or greater\n");
-		return -ENOSYS;
-	}
-
-	if (!bios->bdcb.i2c_table) {
-		NV_ERROR(dev, "No parsed DCB I2C port table\n");
-		return -EINVAL;
-	}
-
-	ret = read_dcb_i2c_entry(dev, bios->bdcb.version, bios->bdcb.i2c_table,
-				 index, i2c);
-	if (ret)
-		return ret;
-
-	snprintf(adaptorname, 11, "DCB-I2C-%d", index);
-	ret = nouveau_i2c_new(dev, adaptorname, index, &i2c->chan);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
 static struct dcb_entry * new_dcb_entry(struct parsed_dcb *dcb)
 {
 	struct dcb_entry *entry = &dcb->entry[dcb->entries];
@@ -5048,6 +5011,19 @@ int nouveau_run_vbios_init(struct drm_device *dev)
 	return ret;
 }
 
+static void
+nouveau_bios_i2c_devices_takedown(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
+	struct dcb_i2c_entry *entry;
+	int i;
+
+	entry = &bios->bdcb.dcb.i2c[0];
+	for (i = 0; i < DCB_MAX_NUM_I2C_ENTRIES; i++, entry++)
+		nouveau_i2c_fini(dev, entry);
+}
+
 int
 nouveau_bios_init(struct drm_device *dev)
 {
@@ -5116,4 +5092,5 @@ nouveau_bios_init(struct drm_device *dev)
 void
 nouveau_bios_takedown(struct drm_device *dev)
 {
+	nouveau_bios_i2c_devices_takedown(dev);
 }

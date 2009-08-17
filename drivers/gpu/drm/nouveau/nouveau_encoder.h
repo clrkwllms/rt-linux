@@ -56,6 +56,8 @@ static inline struct drm_encoder *to_drm_encoder(struct nouveau_encoder *enc)
 	return &enc->base.base;
 }
 
+struct nouveau_connector *
+nouveau_encoder_connector_get(struct nouveau_encoder *encoder);
 int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry);
 int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry);
 

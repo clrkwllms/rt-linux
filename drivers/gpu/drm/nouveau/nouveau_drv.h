@@ -948,10 +948,6 @@ extern void nv04_display_restore(struct drm_device *);
 /* nv04_crtc.c */
 extern int nv04_crtc_create(struct drm_device *, int index);
 
-/* nv50_sor.c */
-extern struct nouveau_connector *nouveau_encoder_connector_get(
-				struct nouveau_encoder *encoder);
-
 /* nouveau_bo.c */
 extern struct ttm_bo_driver nouveau_bo_driver;
 extern int nouveau_bo_new(struct drm_device *, struct nouveau_channel *,
