@@ -30,6 +30,7 @@
 #include "nouveau_drv.h"
 #include "nouveau_dma.h"
 #include "nouveau_encoder.h"
+#include "nouveau_connector.h"
 #include "nouveau_crtc.h"
 #include "nv50_display.h"
 
