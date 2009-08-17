@@ -564,6 +564,9 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 	case DRM_MODE_CONNECTOR_TV:
 		NV_INFO(dev, "Detected a TV connector\n");
 		break;
+	case DRM_MODE_CONNECTOR_DisplayPort:
+		NV_INFO(dev, "Detected a DisplayPort connector\n");
+		break;
 	default:
 		NV_ERROR(dev, "Unknown connector, this is not good.\n");
 		break;
@@ -588,7 +591,8 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 
 	if (type == DRM_MODE_CONNECTOR_DVID ||
 	    type == DRM_MODE_CONNECTOR_DVII ||
-	    type == DRM_MODE_CONNECTOR_LVDS) {
+	    type == DRM_MODE_CONNECTOR_LVDS ||
+	    type == DRM_MODE_CONNECTOR_DisplayPort) {
 		nv_connector->scaling_mode = DRM_MODE_SCALE_FULLSCREEN;
 
 		drm_connector_attach_property(connector, dev->mode_config.scaling_mode_property,

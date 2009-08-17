@@ -228,6 +228,10 @@ int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 			return -EINVAL;
 		}
 		break;
+	case OUTPUT_DP:
+		NV_INFO(dev, "Detected a DP output\n");
+		type = DRM_MODE_ENCODER_TMDS;
+		break;
 	default:
 		return -EINVAL;
 	}
