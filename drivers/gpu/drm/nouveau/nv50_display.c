@@ -328,7 +328,6 @@ nv50_display_init(struct drm_device *dev)
 	evo->dma.put = 0;
 	evo->dma.cur = evo->dma.put;
 	evo->dma.free = evo->dma.max - evo->dma.cur;
-	evo->dma.pushbuf = evo->pushbuf_bo->kmap.virtual;
 
 	RING_SPACE(evo, NOUVEAU_DMA_SKIPS);
 	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)

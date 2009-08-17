@@ -56,7 +56,6 @@ nouveau_dma_init(struct nouveau_channel *chan)
 	ret = nouveau_bo_map(chan->pushbuf_bo);
 	if (ret)
 		return ret;
-	chan->dma.pushbuf = chan->pushbuf_bo->kmap.virtual;
 
 	/* Map M2MF notifier object - fbcon. */
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {

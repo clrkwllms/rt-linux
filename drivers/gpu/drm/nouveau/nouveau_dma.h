@@ -106,7 +106,7 @@ OUT_RING(struct nouveau_channel *chan, int data)
 	NV_INFO(chan->dev, "Ch%d/0x%08x: 0x%08x\n",
 		chan->id, chan->dma.cur << 2, data);
 #endif
-	chan->dma.pushbuf[chan->dma.cur++] = data;
+	nouveau_bo_wr32(chan->pushbuf_bo, chan->dma.cur++, data);
 }
 
 static inline void
@@ -116,9 +116,8 @@ BEGIN_RING(struct nouveau_channel *chan, int subc, int mthd, int size)
 }
 
 #define WRITE_PUT(val) do {                                                    \
-	volatile uint32_t tmp;                                                 \
 	DRM_MEMORYBARRIER();                                                   \
-	tmp = chan->dma.pushbuf[0];                                            \
+	nouveau_bo_rd32(chan->pushbuf_bo, 0);                                  \
 	nvchan_wr32(chan->user_put, ((val) << 2) + chan->pushbuf_base);        \
 } while (0)
 

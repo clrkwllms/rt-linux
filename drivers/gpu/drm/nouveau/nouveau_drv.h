@@ -214,8 +214,7 @@ struct nouveau_channel
 		int free;
 		int cur;
 		int put;
-
-		volatile uint32_t *pushbuf;
+		/* access via pushbuf_bo */
 	} dma;
 
 	uint32_t sw_subchannel[8];
