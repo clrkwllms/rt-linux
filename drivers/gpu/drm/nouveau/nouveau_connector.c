@@ -128,14 +128,14 @@ nouveau_connector_ddc_finish(struct drm_connector *connector, int flags)
 		NVLockVgaCrtcs(dev_priv->dev, true);
 }
 
-static bool
-nouveau_connector_ddc_detect(struct drm_connector *connector)
+static struct nouveau_i2c_chan *
+nouveau_connector_ddc_detect(struct drm_connector *connector,
+			     struct nouveau_encoder **pnv_encoder)
 {
-	struct nouveau_connector *nv_connector = nouveau_connector(connector);
-	/* kindly borrrowed from the intel driver, hope it works. */
-	uint8_t out_buf[] = { 0x0, 0x0};
-	uint8_t buf[2];
-	int ret, flags;
+	struct drm_device *dev = connector->dev;
+	uint8_t out_buf[] = { 0x0, 0x0}, buf[2];
+	int ret, flags, i;
+
 	struct i2c_msg msgs[] = {
 		{
 			.addr = 0x50,
@@ -151,15 +151,37 @@ nouveau_connector_ddc_detect(struct drm_connector *connector)
 		}
 	};
 
-	if (!nv_connector->i2c_chan)
-		return false;
+	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
+		struct nouveau_i2c_chan *i2c = NULL;
+		struct nouveau_encoder *nv_encoder;
+		struct drm_mode_object *obj;
+		int id;
 
-	nouveau_connector_ddc_prepare(connector, &flags);
-	ret = i2c_transfer(&nv_connector->i2c_chan->adapter, msgs, 2);
-	nouveau_connector_ddc_finish(connector, flags);
-	if (ret == 2)
-		return true;
-	return false;
+		id = connector->encoder_ids[i];
+		if (!id)
+			break;
+
+		obj = drm_mode_object_find(dev, id, DRM_MODE_OBJECT_ENCODER);
+		if (!obj)
+			continue;
+		nv_encoder = nouveau_encoder(obj_to_encoder(obj));
+
+		if (nv_encoder->dcb->i2c_index < 0xf)
+			i2c = nouveau_i2c_find(dev, nv_encoder->dcb->i2c_index);
+		if (!i2c)
+			continue;
+
+		nouveau_connector_ddc_prepare(connector, &flags);
+		ret = i2c_transfer(&i2c->adapter, msgs, 2);
+		nouveau_connector_ddc_finish(connector, flags);
+
+		if (ret == 2) {
+			*pnv_encoder = nv_encoder;
+			return i2c;
+		}
+	}
+
+	return NULL;
 }
 
 static void
@@ -214,7 +236,7 @@ nouveau_connector_detect(struct drm_connector *connector)
 		return connector_status_connected;
 	}
 
-	if (nouveau_connector_ddc_detect(connector)) {
+	if (nouveau_connector_ddc_detect(connector, &nv_encoder)) {
 		nouveau_connector_ddc_prepare(connector, &flags);
 		nv_connector->edid =
 			drm_get_edid(connector, &nv_connector->i2c_chan->adapter);
