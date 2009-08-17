@@ -96,7 +96,6 @@ nv04_fbcon_imageblit(struct fb_info *info, const struct fb_image *image)
 	struct nouveau_channel *chan = dev_priv->channel;
 	uint32_t fg;
 	uint32_t bg;
-	uint32_t mask = ~(~0 >> (32 - info->var.bits_per_pixel));
 	uint32_t dsize;
 	uint32_t width;
 	uint32_t *data = (uint32_t *)image->data;
@@ -119,8 +118,8 @@ nv04_fbcon_imageblit(struct fb_info *info, const struct fb_image *image)
 	width = (image->width + 31) & ~31;
 	dsize = (width * image->height) >> 5;
 
-	fg = ((uint32_t *) info->pseudo_palette)[image->fg_color] | mask;
-	bg = ((uint32_t *) info->pseudo_palette)[image->bg_color] | mask;
+	fg = ((uint32_t *) info->pseudo_palette)[image->fg_color];
+	bg = ((uint32_t *) info->pseudo_palette)[image->bg_color];
 
 	BEGIN_RING(chan, NvSubGdiRect, 0x0be4, 7);
 	OUT_RING  (chan, (image->dy << 16) | (image->dx & 0xffff));
