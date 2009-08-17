@@ -322,16 +322,15 @@ static void tv_setup_filter(struct drm_encoder *encoder)
 				       &tv_enc->state.vfilter};
 	int i, j, k;
 	int32_t overscan = calc_overscan(tv_enc->overscan);
-	int64_t flicker = (tv_enc->flicker - 50) * id3;
-	int64_t rs[] = {mode->hdisplay * id3,
-			mode->vdisplay * id3};
+	int64_t flicker = (tv_enc->flicker - 50) * (id3 / 100);
+	uint64_t rs[] = {mode->hdisplay * id3,
+			 mode->vdisplay * id3};
 
-	do_div(flicker, 100);
 	do_div(rs[0], overscan * tv_norm->tv_enc_mode.hdisplay);
 	do_div(rs[1], overscan * tv_norm->tv_enc_mode.vdisplay);
 
 	for (k = 0; k < 2; k++) {
-		rs[k] = max(rs[k], id2);
+		rs[k] = max((int64_t)rs[k], id2);
 
 		for (j = 0; j < 4; j++) {
 			struct filter_params *p = &fparams[k][j];
