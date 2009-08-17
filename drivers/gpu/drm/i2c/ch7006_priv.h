@@ -141,9 +141,8 @@ void ch7006_state_save(struct i2c_client *client,
 #define bitf(bitfield, x) __bitf(bitfield, x)
 #define bitfs(bitfield, s) __bitf(bitfield, bitfield##_##s)
 #define setbitf(state, reg, bitfield, x)				\
-	state->regs[reg] = (state->regs[reg] &				\
-			    (typeof(*state->regs)) ~mask(reg##_##bitfield)) | \
-			    bitf(reg##_##bitfield, x)
+	state->regs[reg] = (state->regs[reg] & ~mask(reg##_##bitfield))	\
+		| bitf(reg##_##bitfield, x)
 
 #define __unbitf(src, bitfield, x) ((x & __mask(src, bitfield)) \
 				    >> (0?bitfield) << (src))

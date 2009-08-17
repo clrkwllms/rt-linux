@@ -330,7 +330,7 @@ void ch7006_setup_properties(struct drm_encoder *encoder)
 	struct drm_display_mode *mode = &ch_mode->mode;
 	uint8_t *regs = state->regs;
 	int flicker, contrast, hpos, vpos;
-	fixed scale, aspect;
+	uint64_t scale, aspect;
 
 	flicker = interpolate(0, 2, 3, priv->flicker);
 	regs[CH7006_FFILTER] = bitf(CH7006_FFILTER_TEXT, flicker) |

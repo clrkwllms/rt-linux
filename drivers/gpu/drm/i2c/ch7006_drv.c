@@ -351,7 +351,7 @@ static int ch7006_encoder_set_property(struct drm_encoder *encoder,
 	return 0;
 }
 
-struct drm_encoder_slave_funcs ch7006_encoder_funcs = {
+static struct drm_encoder_slave_funcs ch7006_encoder_funcs = {
 	.set_config = ch7006_encoder_set_config,
 	.destroy = ch7006_encoder_destroy,
 	.dpms = ch7006_encoder_dpms,
