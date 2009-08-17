@@ -496,11 +496,9 @@ int nv50_display_create(struct drm_device *dev)
 		int type;
 
 		encoders = connector[entry->connector];
-		connector[entry->connector] = 0;
-
-		/* already done? */
-		if (!encoders)
+		if (!(encoders & (1 << entry->type)))
 			continue;
+		connector[entry->connector] = 0;
 
 		if (encoders & (1 << OUTPUT_TMDS)) {
 			if (encoders & (1 << OUTPUT_ANALOG))
