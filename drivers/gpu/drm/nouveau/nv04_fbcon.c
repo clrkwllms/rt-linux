@@ -94,9 +94,12 @@ nv04_fbcon_imageblit(struct fb_info *info, const struct fb_image *image)
 	struct drm_device *dev = par->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *chan = dev_priv->channel;
-	uint32_t fg, bg, mask = ~(~0 >> (32 - info->var.bits_per_pixel));
-	uint32_t dsize, width, *data = (uint32_t *) image->data;
-	int j, k = 0;
+	uint32_t fg;
+	uint32_t bg;
+	uint32_t mask = ~(~0 >> (32 - info->var.bits_per_pixel));
+	uint32_t dsize;
+	uint32_t width;
+	uint32_t *data = (uint32_t *)image->data;
 
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
@@ -140,9 +143,8 @@ nv04_fbcon_imageblit(struct fb_info *info, const struct fb_image *image)
 		}
 
 		BEGIN_RING(chan, NvSubGdiRect, 0x0c00, iter_len);
-		for (j = iter_len; j--;)
-			OUT_RING(chan, data[k++]);
-
+		OUT_RINGp(chan, data, iter_len);
+		data += iter_len;
 		dsize -= iter_len;
 	}
 

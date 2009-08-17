@@ -109,6 +109,9 @@ OUT_RING(struct nouveau_channel *chan, int data)
 	nouveau_bo_wr32(chan->pushbuf_bo, chan->dma.cur++, data);
 }
 
+extern void
+OUT_RINGp(struct nouveau_channel *chan, const void *data, unsigned nr_dwords);
+
 static inline void
 BEGIN_RING(struct nouveau_channel *chan, int subc, int mthd, int size)
 {

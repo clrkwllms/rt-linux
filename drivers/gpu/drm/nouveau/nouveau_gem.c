@@ -528,8 +528,7 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 	if (ret)
 		goto out;
 
-	for (i = 0; i < req->nr_dwords; i++)
-		OUT_RING (chan, pushbuf[i]);
+	OUT_RINGp(chan, pushbuf, req->nr_dwords);
 
 	ret = nouveau_fence_emit(fence);
 	if (ret) {

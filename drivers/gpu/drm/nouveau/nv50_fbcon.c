@@ -139,8 +139,8 @@ nv50_fbcon_imageblit(struct fb_info *info, const struct fb_image *image)
 		dwords -= push;
 
 		BEGIN_RING(chan, NvSub2D, 0x40000860, push);
-		while (push--)
-			OUT_RING(chan, *data++);
+		OUT_RINGp(chan, data, push);
+		data += push;
 	}
 
 	FIRE_RING (chan);
