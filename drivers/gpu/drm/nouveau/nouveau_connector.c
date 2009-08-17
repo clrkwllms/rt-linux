@@ -227,6 +227,7 @@ nouveau_connector_detect(struct drm_connector *connector)
 	struct drm_device *dev = connector->dev;
 	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct nouveau_encoder *nv_encoder = NULL;
+	struct nouveau_i2c_chan *i2c;
 	int type, flags;
 
 	nv_encoder = find_encoder_by_type(connector, OUTPUT_LVDS);
@@ -235,30 +236,37 @@ nouveau_connector_detect(struct drm_connector *connector)
 		return connector_status_connected;
 	}
 
-	if (nouveau_connector_ddc_detect(connector, &nv_encoder)) {
+	i2c = nouveau_connector_ddc_detect(connector, &nv_encoder);
+	if (i2c) {
 		nouveau_connector_ddc_prepare(connector, &flags);
-		nv_connector->edid =
-			drm_get_edid(connector, &nv_connector->i2c_chan->adapter);
+		nv_connector->edid = drm_get_edid(connector, &i2c->adapter);
 		nouveau_connector_ddc_finish(connector, flags);
-		drm_mode_connector_update_edid_property(connector, nv_connector->edid);
+		drm_mode_connector_update_edid_property(connector,
+							nv_connector->edid);
 		if (!nv_connector->edid) {
 			NV_ERROR(dev, "DDC responded, but no EDID for %s\n",
 				 drm_get_connector_name(connector));
 			return connector_status_disconnected;
 		}
 
-		if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS)
-			type = OUTPUT_LVDS;
-		else if (nv_connector->edid->input & DRM_EDID_INPUT_DIGITAL)
-			type = OUTPUT_TMDS;
-		else
-			type = OUTPUT_ANALOG;
+		/* Override encoder type for DVI-I based on whether EDID
+		 * says the display is digital or analog, both use the
+		 * same i2c channel so the value returned from ddc_detect
+		 * isn't necessarily correct.
+		 */
+		if (connector->connector_type == DRM_MODE_CONNECTOR_DVII) {
+			if (nv_connector->edid->input & DRM_EDID_INPUT_DIGITAL)
+				type = OUTPUT_TMDS;
+			else
+				type = OUTPUT_ANALOG;
 
-		nv_encoder = find_encoder_by_type(connector, type);
-		if (!nv_encoder) {
-			NV_ERROR(dev, "Detected %d encoder on %s, but no object!\n",
-				 type, drm_get_connector_name(connector));
-			return connector_status_disconnected;
+			nv_encoder = find_encoder_by_type(connector, type);
+			if (!nv_encoder) {
+				NV_ERROR(dev, "Detected %d encoder on %s, "
+					      "but no object!\n", type,
+					 drm_get_connector_name(connector));
+				return connector_status_disconnected;
+			}
 		}
 
 		nouveau_connector_set_encoder(connector, nv_encoder);
