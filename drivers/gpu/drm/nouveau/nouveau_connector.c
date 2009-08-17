@@ -229,9 +229,8 @@ nouveau_connector_detect(struct drm_connector *connector)
 	struct nouveau_encoder *nv_encoder = NULL;
 	int type, flags;
 
-	if ((nv_encoder = find_encoder_by_type(connector, OUTPUT_LVDS))
-	    && nv_connector->native_mode) {
-
+	nv_encoder = find_encoder_by_type(connector, OUTPUT_LVDS);
+	if (nv_encoder && nv_connector->native_mode) {
 		nouveau_connector_set_encoder(connector, nv_encoder);
 		return connector_status_connected;
 	}
