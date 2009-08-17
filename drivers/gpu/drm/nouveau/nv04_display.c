@@ -30,6 +30,7 @@
 #include "nouveau_fb.h"
 #include "nouveau_hw.h"
 #include "nouveau_encoder.h"
+#include "nouveau_connector.h"
 
 #define MULTIPLE_ENCODERS(e) (e & (e - 1))
 

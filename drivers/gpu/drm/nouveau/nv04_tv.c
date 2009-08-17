@@ -27,6 +27,7 @@
 #include "drmP.h"
 #include "nouveau_drv.h"
 #include "nouveau_encoder.h"
+#include "nouveau_connector.h"
 #include "nouveau_crtc.h"
 #include "nouveau_hw.h"
 #include "drm_crtc_helper.h"
