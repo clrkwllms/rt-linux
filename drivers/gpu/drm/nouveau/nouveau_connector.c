@@ -366,7 +366,6 @@ nouveau_connector_set_property(struct drm_connector *connector,
 					   true);
 	}
 
-
 	if (nv_encoder && nv_encoder->dcb->type == OUTPUT_TV)
 		return get_slave_funcs(nv_encoder)->
 			set_property(to_drm_encoder(nv_encoder), connector, property, value);

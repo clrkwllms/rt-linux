@@ -547,8 +547,6 @@ struct drm_nouveau_private {
 
 	struct list_head gpuobj_list;
 
-	bool in_modeset;
-
 	struct nvbios VBIOS;
 	struct nouveau_bios_info *vbios;
 

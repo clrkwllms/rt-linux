@@ -42,7 +42,7 @@ nv50_dac_disconnect(struct nouveau_encoder *encoder)
 	struct nouveau_channel *evo = dev_priv->evo;
 	int ret;
 
-	NV_DEBUG(dev, "or %d\n", encoder->or);
+	NV_DEBUG(dev, "Disconnecting DAC %d\n", encoder->or);
 
 	ret = RING_SPACE(evo, 2);
 	if (ret) {
@@ -112,17 +112,11 @@ nv50_dac_detect(struct drm_encoder *drm_encoder,
 static void nv50_dac_dpms(struct drm_encoder *drm_encoder, int mode)
 {
 	struct drm_device *dev = drm_encoder->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	uint32_t val;
 	int or = encoder->or;
 
-	NV_DEBUG(dev, "or %d\n", or);
-
-	if (dev_priv->in_modeset) {
-		nv50_dac_disconnect(encoder);
-		return;
-	}
+	NV_DEBUG(dev, "or %d mode %d\n", or, mode);
 
 	/* wait for it to be done */
 	if (!nv_wait(NV50_PDISPLAY_DAC_DPMS_CTRL(or),
@@ -175,9 +169,13 @@ static bool nv50_dac_mode_fixup(struct drm_encoder *drm_encoder,
 	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	struct nouveau_connector *connector;
 
+	NV_DEBUG(drm_encoder->dev, "or %d\n", encoder->or);
+
 	connector = nouveau_encoder_connector_get(encoder);
-	if (!connector)
+	if (!connector) {
+		NV_ERROR(drm_encoder->dev, "Encoder has no connector\n");
 		return false;
+	}
 
 	if (connector->scaling_mode != DRM_MODE_SCALE_NONE &&
 	     connector->native_mode) {
@@ -211,10 +209,7 @@ static void nv50_dac_mode_set(struct drm_encoder *drm_encoder,
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
 
-	ret = dev_priv->in_modeset;
-	dev_priv->in_modeset = false;
 	nv50_dac_dpms(drm_encoder, DRM_MODE_DPMS_ON);
-	dev_priv->in_modeset = ret;
 
 	if (crtc->index == 1)
 		mode_ctl |= NV50_EVO_DAC_MODE_CTRL_CRTC1;
@@ -287,6 +282,8 @@ int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry)
 
 	encoder->dcb = entry;
 	encoder->or = ffs(entry->or) - 1;
+
+	encoder->disconnect = nv50_dac_disconnect;
 
 	drm_encoder_init(dev, to_drm_encoder(encoder), &nv50_dac_encoder_funcs,
 			 DRM_MODE_ENCODER_DAC);

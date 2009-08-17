@@ -42,6 +42,8 @@ struct nouveau_encoder {
 	int last_dpms;
 
 	struct nv04_output_reg restore;
+
+	void (*disconnect)(struct nouveau_encoder *encoder);
 };
 
 static inline struct nouveau_encoder *nouveau_encoder(struct drm_encoder *enc)

@@ -74,6 +74,11 @@ static inline struct nouveau_crtc *nouveau_crtc(struct drm_crtc *crtc)
 	return container_of(crtc, struct nouveau_crtc, base);
 }
 
+static inline struct drm_crtc *to_drm_crtc(struct nouveau_crtc *crtc)
+{
+	return &crtc->base;
+}
+
 int nv50_crtc_create(struct drm_device *dev, int index);
 int nv50_cursor_init(struct nouveau_crtc *);
 void nv50_cursor_fini(struct nouveau_crtc *);
