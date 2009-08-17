@@ -214,7 +214,6 @@ struct nouveau_channel
 
 	/* GPU object info for stuff used in-kernel (mm_enabled) */
 	uint32_t m2mf_ntfy;
-	volatile uint32_t *m2mf_ntfy_map;
 	uint32_t vram_handle;
 	uint32_t gart_handle;
 	bool accel_done;

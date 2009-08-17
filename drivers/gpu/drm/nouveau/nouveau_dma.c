@@ -62,8 +62,6 @@ nouveau_dma_init(struct nouveau_channel *chan)
 		ret = nouveau_bo_map(chan->notifier_bo);
 		if (ret)
 			return ret;
-		chan->m2mf_ntfy_map  = chan->notifier_bo->kmap.virtual;
-		chan->m2mf_ntfy_map += chan->m2mf_ntfy;
 	}
 
 	/* Initialise DMA vars */
