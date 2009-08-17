@@ -508,8 +508,10 @@ static int nv17_tv_set_property(struct drm_encoder *encoder,
 				uint64_t val)
 {
 	struct drm_mode_config *conf = &encoder->dev->mode_config;
+	struct drm_crtc *crtc = encoder->crtc;
 	struct nv17_tv_encoder *tv_enc = to_tv_enc(encoder);
 	struct nv17_tv_norm_params *tv_norm = get_tv_norm(encoder);
+	bool modes_changed = false;
 
 	if (property == conf->tv_overscan_property) {
 		tv_enc->overscan = val;
@@ -543,8 +545,12 @@ static int nv17_tv_set_property(struct drm_encoder *encoder,
 			nv17_tv_update_rescaler(encoder);
 
 	} else if (property == conf->tv_mode_property) {
+		if (connector->dpms != DRM_MODE_DPMS_OFF)
+			return -EINVAL;
+
 		tv_enc->tv_norm = val;
-		drm_helper_probe_single_connector_modes(connector, 0, 0);
+
+		modes_changed = true;
 
 	} else if (property == conf->tv_select_subconnector_property) {
 		if (tv_norm->kind != TV_ENC_MODE)
@@ -555,6 +561,20 @@ static int nv17_tv_set_property(struct drm_encoder *encoder,
 
 	} else {
 		return -EINVAL;
+	}
+
+	if (modes_changed) {
+		drm_helper_probe_single_connector_modes(connector, 0, 0);
+
+		/* Disable the crtc to ensure a full modeset is
+		 * performed whenever it's turned on again. */
+		if (crtc) {
+			struct drm_mode_set modeset = {
+				.crtc = crtc,
+			};
+
+			crtc->funcs->set_config(&modeset);
+		}
 	}
 
 	return 0;
