@@ -750,7 +750,7 @@ bool nouveau_wait_until(struct drm_device *dev, uint64_t timeout,
 bool nouveau_wait_for_idle(struct drm_device *dev)
 {
 	if (!nv_wait(NV04_PGRAPH_STATUS, 0xffffffff, 0x00000000)) {
-		NV_ERROR(dev, "timed out with status 0x%08x\n",
+		NV_ERROR(dev, "PGRAPH idle timed out with status 0x%08x\n",
 			 nv_rd32(dev, NV04_PGRAPH_STATUS));
 		return false;
 	}
