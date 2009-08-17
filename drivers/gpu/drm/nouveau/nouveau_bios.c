@@ -301,15 +301,16 @@ static int valid_reg(struct drm_device *dev, uint32_t reg)
 		NV_WARN(dev, "=== C51 misaligned reg 0x%08X not verified ===\n",
 			reg);
 
+	/* Trust the init scripts on G80 */
+	if (dev_priv->card_type >= NV_50)
+		return 1;
+
 	#define WITHIN(x,y,z) ((x>=y)&&(x<=y+z))
 	if (WITHIN(reg,NV_PMC_OFFSET,NV_PMC_SIZE))
 		return 1;
 	if (WITHIN(reg,NV_PBUS_OFFSET,NV_PBUS_SIZE))
 		return 1;
 	if (WITHIN(reg,NV_PFIFO_OFFSET,NV_PFIFO_SIZE))
-		return 1;
-	/* maybe a little large, but it will do for the moment. */
-	if (nv_arch(dev) >= NV_50 && WITHIN(reg, 0x1000, 0xEFFF))
 		return 1;
 	if (dev_priv->VBIOS.pub.chip_version >= 0x30 && WITHIN(reg,0x4000,0x600))
 		return 1;
@@ -323,20 +324,11 @@ static int valid_reg(struct drm_device *dev, uint32_t reg)
 		if (WITHIN(reg,0x88000,NV_PBUS_SIZE)) /* new PBUS */
 			return 1;
 	}
-	if (nv_arch(dev) >= NV_50) {
-		if (reg >= 0x00020000 && reg < 0x00030000)
-			return 1;
-		if (reg >= 0x00080000 && reg < 0x00090000)
-			return 1;
-	}
 	if (WITHIN(reg,NV_PFB_OFFSET,NV_PFB_SIZE))
 		return 1;
 	if (WITHIN(reg,NV_PEXTDEV_OFFSET,NV_PEXTDEV_SIZE))
 		return 1;
 	if (WITHIN(reg,NV_PCRTC0_OFFSET,NV_PCRTC0_SIZE * 2))
-		return 1;
-	if (nv_arch(dev) >= NV_50 &&
-	    WITHIN(reg, NV50_DISPLAY_OFFSET, NV50_DISPLAY_SIZE))
 		return 1;
 	if (WITHIN(reg,NV_PRAMDAC0_OFFSET,NV_PRAMDAC0_SIZE * 2))
 		return 1;
