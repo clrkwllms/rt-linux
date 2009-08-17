@@ -174,7 +174,7 @@ nv10CalcArbitration(struct nv_fifo_info *fifo, struct nv_sim_state *arb)
 	int us_m, us_m_min, us_n, us_p, crtc_drain_rate;
 	int vus_m;
 	int vpm_us, us_video, cpm_us, us_crt, clwm;
-	int clwm_rnd_down;
+	int clwm_rnd_down, min_clwm;
 	int m2us, us_pipe_min, p1clk, p2;
 	int min_mclk_extra;
 	int us_min_mclk_extra;
@@ -323,8 +323,12 @@ nv10CalcArbitration(struct nv_fifo_info *fifo, struct nv_sim_state *arb)
 				min_mclk_extra--;
 		}
 
-		if (clwm < (1024 - cbs + 8))
-			clwm = 1024 - cbs + 8;
+		/* This correction works around a slight snow effect
+		 * when the TV and VGA outputs are enabled simultaneously. */
+		min_clwm = 1024 - cbs + 128 * pclk_freq / 100000;
+		if (clwm < min_clwm)
+			clwm = min_clwm;
+
 		/*  printf("CRT LWM: prog: 0x%x, bs: 256\n", clwm); */
 		fifo->graphics_lwm = clwm;
 		fifo->graphics_burst_size = cbs;
