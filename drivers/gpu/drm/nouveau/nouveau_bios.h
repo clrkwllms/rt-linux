@@ -79,15 +79,12 @@ struct bios_parsed_dcb {
 	uint8_t i2c_default_indices;
 };
 
-enum nouveau_encoder_type
-{
-	/* 0-3 match DCB types */
-	OUTPUT_NONE = 4,
+enum nouveau_encoder_type {
 	OUTPUT_ANALOG = 0,
+	OUTPUT_TV = 1,
 	OUTPUT_TMDS = 2,
 	OUTPUT_LVDS = 3,
-	OUTPUT_TV = 1,
-	OUTPUT_ANY = 5,
+	OUTPUT_DP = 6,
 };
 
 enum nouveau_or {
