@@ -576,12 +576,6 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 	drm_connector_init(dev, connector, &nouveau_connector_funcs, type);
 	drm_connector_helper_add(connector, &nouveau_connector_helper_funcs);
 
-	if (i2c_index < 0xf) {
-		nv_connector->i2c_chan = nouveau_i2c_find(dev, i2c_index);
-		if (!nv_connector->i2c_chan)
-			NV_ERROR(dev, "No I2C device for connector\n");
-	}
-
 	/* Init DVI-I specific properties */
 	if (type == DRM_MODE_CONNECTOR_DVII) {
 		drm_mode_create_dvi_i_properties(dev);

@@ -35,8 +35,6 @@ struct nouveau_connector {
 
 	struct drm_display_mode *native_mode;
 
-	struct nouveau_i2c_chan *i2c_chan;
-
 	int scaling_mode;
 
 	bool use_dithering;
