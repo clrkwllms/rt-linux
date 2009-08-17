@@ -39,8 +39,7 @@ nouveau_bo_del_ttm(struct ttm_buffer_object *bo)
 	struct drm_nouveau_private *dev_priv = nouveau_bdev(bo->bdev);
 	struct nouveau_bo *nvbo = nouveau_bo(bo);
 
-	if (unlikely(nvbo->kmap.virtual))
-		ttm_bo_kunmap(&nvbo->kmap);
+	ttm_bo_kunmap(&nvbo->kmap);
 
 	if (unlikely(nvbo->gem))
 		DRM_ERROR("bo %p still attached to GEM object\n", bo);
