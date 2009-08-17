@@ -125,8 +125,9 @@ nv04_display_create(struct drm_device *dev)
 
 	dev->mode_config.fb_base = dev_priv->fb_phys;
 
-	for (i = 0; i < 2; i++)
-		nv04_crtc_create(dev, i);
+	nv04_crtc_create(dev, 0);
+	if (nv_two_heads(dev))
+		nv04_crtc_create(dev, 1);
 
 	for (i = 0; i < dcb->entries; i++) {
 		struct dcb_entry *dcbent = &dcb->entry[i];
