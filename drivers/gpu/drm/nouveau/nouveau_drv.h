@@ -95,6 +95,17 @@ nouveau_gem_object(struct drm_gem_object *gem)
 	return gem ? gem->driver_private : NULL;
 }
 
+/* TODO: submit equivalent to TTM generic API upstream? */
+static inline void __iomem *
+nvbo_kmap_obj_iovirtual(struct nouveau_bo *nvbo)
+{
+	bool is_iomem;
+	void __iomem *ioptr = (void __force __iomem *)ttm_kmap_obj_virtual(
+						&nvbo->kmap, &is_iomem);
+	WARN_ON_ONCE(ioptr && !is_iomem);
+	return ioptr;
+}
+
 struct mem_block {
 	struct mem_block *next;
 	struct mem_block *prev;

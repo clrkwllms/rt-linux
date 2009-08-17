@@ -43,7 +43,7 @@ nv50_crtc_lut_load(struct nouveau_crtc *crtc)
 {
 	struct drm_device *dev = crtc->base.dev;
 	uint32_t index = 0, i;
-	void __iomem *lut = crtc->lut.nvbo->kmap.virtual;
+	void __iomem *lut = nvbo_kmap_obj_iovirtual(crtc->lut.nvbo);
 
 	NV_DEBUG(dev, "\n");
 

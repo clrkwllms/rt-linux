@@ -587,7 +587,7 @@ static int nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_COPYAREA |
 		      FBINFO_HWACCEL_FILLRECT | FBINFO_HWACCEL_IMAGEBLIT;
 
-	info->screen_base = nouveau_fb->nvbo->kmap.virtual;
+	info->screen_base = nvbo_kmap_obj_iovirtual(nouveau_fb->nvbo);
 	info->screen_size = size;
 
 	info->pseudo_palette = fb->pseudo_palette;
