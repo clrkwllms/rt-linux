@@ -355,6 +355,7 @@ static void nv50_crtc_destroy(struct drm_crtc *drm_crtc)
 	nv50_cursor_fini(crtc);
 
 	nouveau_bo_ref(NULL, &crtc->lut.nvbo);
+	nouveau_bo_ref(NULL, &crtc->cursor.nvbo);
 	kfree(crtc->mode);
 	kfree(crtc);
 }
@@ -375,6 +376,7 @@ nv50_crtc_cursor_set(struct drm_crtc *drm_crtc, struct drm_file *file_priv,
 		struct drm_nouveau_private *dev_priv = dev->dev_private;
 		struct drm_gem_object *gem;
 		struct nouveau_bo *nvbo;
+		int i;
 
 		gem = drm_gem_object_lookup(dev, file_priv, buffer_handle);
 		if (!gem)
@@ -386,23 +388,24 @@ nv50_crtc_cursor_set(struct drm_crtc *drm_crtc, struct drm_file *file_priv,
 		drm_gem_object_unreference(gem);
 		mutex_unlock(&dev->struct_mutex);
 
-		ret = nouveau_bo_pin(nvbo, TTM_PL_FLAG_VRAM);
+		ret = nouveau_bo_map(nvbo);
 		if (ret)
 			goto out;
 
-		crtc->cursor.offset = nvbo->bo.offset - dev_priv->vm_vram_base;
+		/* The simple will do for now. */
+		for (i = 0; i < 64*64; i++)
+			nouveau_bo_wr32(crtc->cursor.nvbo, i, nouveau_bo_rd32(nvbo, i));
+
+		nouveau_bo_unmap(nvbo);
+
+		crtc->cursor.offset = crtc->cursor.nvbo->bo.offset - dev_priv->vm_vram_base;
 		crtc->cursor.set_offset(crtc, crtc->cursor.offset);
 		crtc->cursor.show(crtc, true);
 	} else {
 		crtc->cursor.hide(crtc, true);
 	}
 
-	if (crtc->cursor.nvbo)
-		nouveau_bo_unpin(crtc->cursor.nvbo);
-	nouveau_bo_ref(cursor, &crtc->cursor.nvbo);
-
 out:
-	nouveau_bo_ref(NULL, &cursor);
 	return ret;
 }
 
@@ -784,6 +787,16 @@ nv50_crtc_create(struct drm_device *dev, int index)
 	drm_crtc_init(dev, &crtc->base, &nv50_crtc_funcs);
 	drm_crtc_helper_add(&crtc->base, &nv50_crtc_helper_funcs);
 	drm_mode_crtc_set_gamma_size(&crtc->base, 256);
+
+	ret = nouveau_bo_new(dev, NULL, 64*64*4, 0x100, TTM_PL_FLAG_VRAM,
+			     0, 0x0000, false, true, &crtc->cursor.nvbo);
+	if (!ret) {
+		ret = nouveau_bo_pin(crtc->cursor.nvbo, TTM_PL_FLAG_VRAM);
+		if (!ret)
+			ret = nouveau_bo_map(crtc->cursor.nvbo);
+		if (ret)
+			nouveau_bo_ref(NULL, &crtc->cursor.nvbo);
+	}
 
 	nv50_cursor_init(crtc);
 	return 0;
