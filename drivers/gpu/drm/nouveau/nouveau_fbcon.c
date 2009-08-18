@@ -442,46 +442,6 @@ static struct fb_ops nouveau_fbcon_ops = {
 	.fb_blank = nouveau_fbcon_blank,
 };
 
-/**
- * Curretly it is assumed that the old framebuffer is reused.
- *
- * LOCKING
- * caller should hold the mode config lock.
- *
- */
-int nouveau_fbcon_resize(struct drm_device *dev, struct drm_crtc *crtc)
-{
-	struct fb_info *info;
-	struct drm_framebuffer *fb;
-	struct drm_display_mode *mode = crtc->desired_mode;
-
-	fb = crtc->fb;
-	if (!fb)
-		return 1;
-
-	info = fb->fbdev;
-	if (!info)
-		return 1;
-
-	if (!mode)
-		return 1;
-
-	info->var.xres = mode->hdisplay;
-	info->var.right_margin = mode->hsync_start - mode->hdisplay;
-	info->var.hsync_len = mode->hsync_end - mode->hsync_start;
-	info->var.left_margin = mode->htotal - mode->hsync_end;
-	info->var.yres = mode->vdisplay;
-	info->var.lower_margin = mode->vsync_start - mode->vdisplay;
-	info->var.vsync_len = mode->vsync_end - mode->vsync_start;
-	info->var.upper_margin = mode->vtotal - mode->vsync_end;
-	info->var.pixclock = 10000000 / mode->htotal * 1000 / mode->vtotal * 100;
-	/* avoid overflow */
-	info->var.pixclock = info->var.pixclock * 1000 / mode->vrefresh;
-
-	return 0;
-}
-EXPORT_SYMBOL(nouveau_fbcon_resize);
-
 static struct drm_mode_set kernelfb_mode;
 
 static int nouveau_fbcon_panic(struct notifier_block *n, unsigned long ununsed,

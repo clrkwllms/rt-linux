@@ -69,12 +69,6 @@ nouveau_ttm_mmap(struct file *filp, struct vm_area_struct *vma)
 	return 0;
 }
 
-int
-nouveau_ttm_verify_access(struct ttm_buffer_object *bo, struct file *filp)
-{
-	return 0;
-}
-
 static int
 nouveau_ttm_mem_global_init(struct ttm_global_reference *ref)
 {
