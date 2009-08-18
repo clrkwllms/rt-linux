@@ -151,6 +151,7 @@ struct nouveau_bios_info {
 };
 
 struct nvbios {
+	struct drm_device *dev;
 	struct nouveau_bios_info pub;
 
 	uint8_t data[NV_PROM_SIZE];

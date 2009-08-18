@@ -4935,6 +4935,7 @@ static bool NVInitVBIOS(struct drm_device *dev)
 	struct nvbios *bios = &dev_priv->VBIOS;
 
 	memset(bios, 0, sizeof(struct nvbios));
+	bios->dev = dev;
 
 	if (!NVShadowVBIOS(dev, bios->data))
 		return false;
