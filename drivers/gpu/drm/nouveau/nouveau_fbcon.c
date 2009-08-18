@@ -903,7 +903,6 @@ int nouveau_fbcon_probe(struct drm_device *dev)
 
 	return ret;
 }
-EXPORT_SYMBOL(nouveau_fbcon_probe);
 
 int nouveau_fbcon_remove(struct drm_device *dev, struct drm_framebuffer *fb)
 {
@@ -928,5 +927,3 @@ int nouveau_fbcon_remove(struct drm_device *dev, struct drm_framebuffer *fb)
 	memset(&kernelfb_mode, 0, sizeof(struct drm_mode_set));
 	return 0;
 }
-EXPORT_SYMBOL(nouveau_fbcon_remove);
-MODULE_LICENSE("GPL and additional rights");
