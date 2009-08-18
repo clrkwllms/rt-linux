@@ -386,28 +386,51 @@ out_unref:
 	return ret;
 }
 
-static int
-nouveau_gem_pushbuf_reloc_apply(struct nouveau_channel *chan,
-				struct drm_nouveau_gem_pushbuf_reloc *reloc,
-				struct drm_nouveau_gem_pushbuf_bo *bo,
-				uint32_t *pushbuf, int nr_relocs,
-				int nr_buffers, int first_dword, int nr_dwords)
+static inline void *
+u_memcpya(uint64_t user, unsigned nmemb, unsigned size)
 {
+	void *mem;
+	void __user *userptr = (void __force __user *)(uintptr_t)user;
+
+	mem = kmalloc(nmemb * size, GFP_KERNEL);
+	if (!mem)
+		return ERR_PTR(-ENOMEM);
+
+	if (DRM_COPY_FROM_USER(mem, userptr, nmemb * size)) {
+		kfree(mem);
+		return ERR_PTR(-EFAULT);
+	}
+
+	return mem;
+}
+
+static int
+nouveau_gem_pushbuf_reloc_apply(struct nouveau_channel *chan, int nr_bo,
+				struct drm_nouveau_gem_pushbuf_bo *bo,
+				int nr_relocs, uint64_t ptr_relocs,
+				int nr_dwords, int first_dword,
+				uint32_t *pushbuf)
+{
+	struct drm_nouveau_gem_pushbuf_reloc *reloc = NULL;
 	struct drm_device *dev = chan->dev;
-	int i;
+	int ret = 0, i;
+
+	reloc = u_memcpya(ptr_relocs, nr_relocs, sizeof(*reloc));
+	if (IS_ERR(reloc))
+		return PTR_ERR(reloc);
 
 	for (i = 0; i < nr_relocs; i++) {
 		struct drm_nouveau_gem_pushbuf_reloc *r = &reloc[i];
 		struct drm_nouveau_gem_pushbuf_bo *b;
 		uint32_t data;
 
-		if (r->bo_index >= nr_buffers ||
-		    r->reloc_index < first_dword ||
+		if (r->bo_index >= nr_bo || r->reloc_index < first_dword ||
 		    r->reloc_index >= first_dword + nr_dwords) {
 			NV_ERROR(dev, "Bad relocation %d\n", i);
-			NV_ERROR(dev, "  bo: %d max %d\n", r->bo_index, nr_buffers);
+			NV_ERROR(dev, "  bo: %d max %d\n", r->bo_index, nr_bo);
 			NV_ERROR(dev, "  id: %d max %d\n", r->reloc_index, nr_dwords);
-			return -EINVAL;
+			ret = -EINVAL;
+			break;
 		}
 
 		b = &bo[r->bo_index];
@@ -432,25 +455,8 @@ nouveau_gem_pushbuf_reloc_apply(struct nouveau_channel *chan,
 		pushbuf[r->reloc_index] = data;
 	}
 
-	return 0;
-}
-
-static inline void *
-u_memcpya(uint64_t user, unsigned nmemb, unsigned size)
-{
-	void *mem;
-	void __user *userptr = (void __force __user *)(uintptr_t)user;
-
-	mem = kmalloc(nmemb * size, GFP_KERNEL);
-	if (!mem)
-		return ERR_PTR(-ENOMEM);
-
-	if (DRM_COPY_FROM_USER(mem, userptr, nmemb * size)) {
-		kfree(mem);
-		return ERR_PTR(-EFAULT);
-	}
-
-	return mem;
+	kfree(reloc);
+	return ret;
 }
 
 int
@@ -459,7 +465,6 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 {
 	struct drm_nouveau_gem_pushbuf *req = data;
 	struct drm_nouveau_gem_pushbuf_bo *bo = NULL;
-	struct drm_nouveau_gem_pushbuf_reloc *reloc = NULL;
 	struct nouveau_fence *fence = NULL;
 	struct nouveau_channel *chan;
 	struct list_head list;
@@ -492,13 +497,6 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 		return PTR_ERR(bo);
 	}
 
-	reloc = u_memcpya(req->relocs, req->nr_relocs, sizeof(*reloc));
-	if (IS_ERR(reloc)) {
-		kfree(bo);
-		kfree(pushbuf);
-		return PTR_ERR(reloc);
-	}
-
 	mutex_lock(&dev->struct_mutex);
 
 	INIT_LIST_HEAD(&list);
@@ -514,9 +512,9 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 		goto out;
 
 	/* Apply any relocations that are required */
-	ret = nouveau_gem_pushbuf_reloc_apply(chan, reloc, bo, pushbuf,
-					      req->nr_relocs, req->nr_buffers,
-					      0, req->nr_dwords);
+	ret = nouveau_gem_pushbuf_reloc_apply(chan, req->nr_buffers, bo,
+					      req->nr_relocs, req->relocs,
+					      req->nr_dwords, 0, pushbuf);
 	if (ret)
 		goto out;
 
@@ -554,7 +552,6 @@ out:
 
 	kfree(pushbuf);
 	kfree(bo);
-	kfree(reloc);
 	return ret;
 }
 
@@ -567,7 +564,6 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_gem_pushbuf_call *req = data;
 	struct drm_nouveau_gem_pushbuf_bo *bo = NULL;
-	struct drm_nouveau_gem_pushbuf_reloc *reloc = NULL;
 	struct nouveau_fence *fence = NULL;
 	struct nouveau_channel *chan;
 	struct drm_gem_object *gem;
@@ -597,12 +593,6 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 	bo = u_memcpya(req->buffers, req->nr_buffers, sizeof(*bo));
 	if (IS_ERR(bo))
 		return (unsigned long)bo;
-
-	reloc = u_memcpya(req->relocs, req->nr_relocs, sizeof(*reloc));
-	if (IS_ERR(reloc)) {
-		kfree(bo);
-		return (unsigned long)reloc;
-	}
 
 	mutex_lock(&dev->struct_mutex);
 
@@ -682,12 +672,12 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 			goto out;
 		}
 
-		ret = nouveau_gem_pushbuf_reloc_apply(chan, reloc, bo,
-						      pbbo->kmap.virtual,
+		ret = nouveau_gem_pushbuf_reloc_apply(chan, req->nr_buffers, bo,
 						      req->nr_relocs,
-						      req->nr_buffers,
+						      req->relocs,
+						      req->nr_dwords,
 						      req->offset / 4,
-						      req->nr_dwords);
+						      pbbo->kmap.virtual);
 
 		if (!PUSHBUF_CAL) {
 			uint32_t *pushbuf = pbbo->kmap.virtual + req->offset;
@@ -740,7 +730,6 @@ out:
 	mutex_unlock(&dev->struct_mutex);
 
 	kfree(bo);
-	kfree(reloc);
 
 out_next:
 	if (PUSHBUF_CAL) {
