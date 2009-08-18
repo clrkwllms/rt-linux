@@ -595,7 +595,7 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 
 	bo = u_memcpya(req->buffers, req->nr_buffers, sizeof(*bo));
 	if (IS_ERR(bo))
-		return (unsigned long)bo;
+		return PTR_ERR(bo);
 
 	mutex_lock(&dev->struct_mutex);
 
@@ -622,7 +622,7 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 		ret = -EINVAL;
 		goto out;
 	}
-	pbbo = gem->driver_private;
+	pbbo = nouveau_gem_object(gem);
 
 	ret = ttm_bo_reserve(&pbbo->bo, false, false, true,
 			     chan->fence.sequence);
@@ -669,7 +669,8 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 
 	/* Apply any relocations that are required */
 	if (do_reloc) {
-		ret = ttm_bo_kmap(&pbbo->bo, 0, pbbo->bo.mem.num_pages, &pbbo->kmap);
+		ret = ttm_bo_kmap(&pbbo->bo, 0, pbbo->bo.mem.num_pages,
+				  &pbbo->kmap);
 		if (ret) {
 			NV_ERROR(dev, "kmap pb: %d\n", ret);
 			goto out;
