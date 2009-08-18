@@ -1055,7 +1055,7 @@ depend dep:
 
 # ---------------------------------------------------------------------------
 # Firmware install
-INSTALL_FW_PATH=$(INSTALL_MOD_PATH)/lib/firmware
+INSTALL_FW_PATH=$(INSTALL_MOD_PATH)/lib/firmware/$(KERNELVERSION)
 export INSTALL_FW_PATH
 
 PHONY += firmware_install
