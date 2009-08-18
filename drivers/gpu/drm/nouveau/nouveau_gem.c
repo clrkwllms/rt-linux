@@ -408,7 +408,7 @@ nouveau_gem_pushbuf_reloc_apply(struct nouveau_channel *chan, int nr_bo,
 				struct drm_nouveau_gem_pushbuf_bo *bo,
 				int nr_relocs, uint64_t ptr_relocs,
 				int nr_dwords, int first_dword,
-				uint32_t *pushbuf)
+				uint32_t *pushbuf, bool is_iomem)
 {
 	struct drm_nouveau_gem_pushbuf_reloc *reloc = NULL;
 	struct drm_device *dev = chan->dev;
@@ -451,7 +451,11 @@ nouveau_gem_pushbuf_reloc_apply(struct nouveau_channel *chan, int nr_bo,
 				data |= r->vor;
 		}
 
-		pushbuf[r->reloc_index] = data;
+		if (is_iomem)
+			iowrite32_native(data, (void __force __iomem *)
+						&pushbuf[r->reloc_index]);
+		else
+			pushbuf[r->reloc_index] = data;
 	}
 
 	kfree(reloc);
@@ -516,7 +520,7 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 						      bo, req->nr_relocs,
 						      req->relocs,
 						      req->nr_dwords, 0,
-						      pushbuf);
+						      pushbuf, false);
 		if (ret)
 			goto out;
 	}
@@ -669,6 +673,8 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 
 	/* Apply any relocations that are required */
 	if (do_reloc) {
+		void *pbvirt;
+		bool is_iomem;
 		ret = ttm_bo_kmap(&pbbo->bo, 0, pbbo->bo.mem.num_pages,
 				  &pbbo->kmap);
 		if (ret) {
@@ -676,17 +682,18 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 			goto out;
 		}
 
+		pbvirt = ttm_kmap_obj_virtual(&pbbo->kmap, &is_iomem);
 		ret = nouveau_gem_pushbuf_reloc_apply(chan, req->nr_buffers, bo,
 						      req->nr_relocs,
 						      req->relocs,
 						      req->nr_dwords,
 						      req->offset / 4,
-						      pbbo->kmap.virtual);
+						      pbvirt, is_iomem);
 
 		if (!PUSHBUF_CAL) {
-			uint32_t *pushbuf = pbbo->kmap.virtual + req->offset;
-
-			pushbuf[req->nr_dwords - 2] = req->suffix0;
+			nouveau_bo_wr32(pbbo,
+					req->offset / 4 + req->nr_dwords - 2,
+					req->suffix0);
 		}
 
 		ttm_bo_kunmap(&pbbo->kmap);
