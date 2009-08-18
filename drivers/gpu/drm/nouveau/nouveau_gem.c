@@ -367,8 +367,7 @@ retry:
 			b->presumed_domain = NOUVEAU_GEM_DOMAIN_VRAM;
 		b->presumed_offset = nvbo->bo.offset;
 		b->presumed_ok = 0;
-		if (apply_relocs)
-			(*apply_relocs)++;
+		(*apply_relocs)++;
 
 		if (DRM_COPY_TO_USER(user_pbbos, b, sizeof(*b))) {
 			ret = -EFAULT;
@@ -469,7 +468,7 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 	struct nouveau_channel *chan;
 	struct list_head list;
 	uint32_t *pushbuf = NULL;
-	int ret = 0, i;
+	int ret = 0, do_reloc = 0, i;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 	NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(req->channel, file_priv, chan);
@@ -507,16 +506,20 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 		goto out;
 
 	ret = nouveau_gem_pushbuf_validate(chan, file_priv, bo, req->buffers,
-					   req->nr_buffers, &list, NULL);
+					   req->nr_buffers, &list, &do_reloc);
 	if (ret)
 		goto out;
 
 	/* Apply any relocations that are required */
-	ret = nouveau_gem_pushbuf_reloc_apply(chan, req->nr_buffers, bo,
-					      req->nr_relocs, req->relocs,
-					      req->nr_dwords, 0, pushbuf);
-	if (ret)
-		goto out;
+	if (do_reloc) {
+		ret = nouveau_gem_pushbuf_reloc_apply(chan, req->nr_buffers,
+						      bo, req->nr_relocs,
+						      req->relocs,
+						      req->nr_dwords, 0,
+						      pushbuf);
+		if (ret)
+			goto out;
+	}
 
 	/* Emit push buffer to the hw
 	 */
