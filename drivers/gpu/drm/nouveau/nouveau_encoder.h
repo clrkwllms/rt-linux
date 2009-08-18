@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef __NOUVEAU_OUTPUT_H__
-#define __NOUVEAU_OUTPUT_H__
+#ifndef __NOUVEAU_ENCODER_H__
+#define __NOUVEAU_ENCODER_H__
 
 #include "drm_encoder_slave.h"
 #include "nouveau_drv.h"
@@ -61,4 +61,4 @@ nouveau_encoder_connector_get(struct nouveau_encoder *encoder);
 int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry);
 int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry);
 
-#endif /* __NOUVEAU_OUTPUT_H__ */
+#endif /* __NOUVEAU_ENCODER_H__ */
