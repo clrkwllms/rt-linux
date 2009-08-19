@@ -271,23 +271,23 @@ static void still_alive(void)
 }
 
 static uint32_t
-munge_reg(struct drm_device *dev, uint32_t reg)
+munge_reg(struct nvbios *bios, uint32_t reg)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-
-	if (nv_arch(dev) < NV_50)
+	if (nv_arch(bios->dev) < NV_50)
 		return reg;
 
 	if (reg & 0x40000000)
-		reg += dev_priv->VBIOS.display.head * 0x800;
+		reg += bios->display.head * 0x800;
 
 	reg &= ~(0x40000000);
 	return reg;
 }
 
-static int valid_reg(struct drm_device *dev, uint32_t reg)
+static int
+valid_reg(struct nvbios *bios, uint32_t reg)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct drm_nouveau_private *dev_priv = bios->dev->dev_private;
+	struct drm_device *dev = bios->dev;
 
 	/* C51 has misaligned regs on purpose. Marvellous */
 	if (reg & 0x2 || (reg & 0x1 && dev_priv->VBIOS.pub.chip_version != 0x51)) {
@@ -381,14 +381,13 @@ static bool valid_port(struct drm_device *dev, uint16_t port)
 	return false;
 }
 
-static uint32_t bios_rd32(struct drm_device *dev, uint32_t reg)
+static uint32_t
+bios_rd32(struct nvbios *bios, uint32_t reg)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nvbios *bios = &dev_priv->VBIOS;
 	uint32_t data;
 
-	reg = munge_reg(dev, reg);
-	if (!valid_reg(dev, reg))
+	reg = munge_reg(bios, reg);
+	if (!valid_reg(bios, reg))
 		return 0;
 
 	/* C51 sometimes uses regs with bit0 set in the address. For these
@@ -405,32 +404,32 @@ static uint32_t bios_rd32(struct drm_device *dev, uint32_t reg)
 	if (reg & 0x1)
 		reg &= ~0x1;
 
-	data = nv_rd32(dev, reg);
+	data = nv_rd32(bios->dev, reg);
 
 	BIOSLOG(bios, "	Read:  Reg: 0x%08X, Data: 0x%08X\n", reg, data);
 
 	return data;
 }
 
-static void bios_wr32(struct drm_device *dev, uint32_t reg, uint32_t data)
+static void
+bios_wr32(struct nvbios *bios, uint32_t reg, uint32_t data)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nvbios *bios = &dev_priv->VBIOS;
+	struct drm_nouveau_private *dev_priv = bios->dev->dev_private;
 
-	reg = munge_reg(dev, reg);
-	if (!valid_reg(dev, reg))
+	reg = munge_reg(bios, reg);
+	if (!valid_reg(bios, reg))
 		return;
 
 	/* see note in bios_rd32 */
 	if (reg & 0x1)
 		reg &= 0xfffffffe;
 
-	LOG_OLD_VALUE(bios_rd32(dev, reg));
+	LOG_OLD_VALUE(bios_rd32(bios, reg));
 	BIOSLOG(bios, "	Write: Reg: 0x%08X, Data: 0x%08X\n", reg, data);
 
 	if (dev_priv->VBIOS.execute) {
 		still_alive();
-		nv_wr32(dev, reg, data);
+		nv_wr32(bios->dev, reg, data);
 	}
 }
 
@@ -452,7 +451,7 @@ bios_idxprt_rd(struct drm_device *dev, uint16_t port, uint8_t index)
 	} else {
 		uint32_t data32;
 
-		data32 = bios_rd32(dev, NV50_PDISPLAY_VGACRTC(index & ~3));
+		data32 = bios_rd32(bios, NV50_PDISPLAY_VGACRTC(index & ~3));
 		data = (data32 >> ((index & 3) << 3)) & 0xff;
 	}
 
@@ -499,10 +498,10 @@ bios_idxprt_wr(struct drm_device *dev, uint16_t port,
 
 		still_alive();
 
-		data32  = bios_rd32(dev, NV50_PDISPLAY_VGACRTC(index & ~3));
+		data32  = bios_rd32(bios, NV50_PDISPLAY_VGACRTC(index & ~3));
 		data32 &= ~(0xff << shift);
 		data32 |= (data << shift);
-		bios_wr32(dev, NV50_PDISPLAY_VGACRTC(index & ~3), data32);
+		bios_wr32(bios, NV50_PDISPLAY_VGACRTC(index & ~3), data32);
 	}
 
 	if (port == NV_CIO_CRX__COLOR &&
@@ -598,7 +597,7 @@ static bool bios_condition_met(struct drm_device *dev, struct nvbios *bios, uint
 	BIOSLOG(bios, "0x%04X: Cond: 0x%02X, Reg: 0x%08X, Mask: 0x%08X\n",
 		offset, cond, reg, mask);
 
-	data = bios_rd32(dev, reg) & mask;
+	data = bios_rd32(bios, reg) & mask;
 
 	BIOSLOG(bios, "0x%04X: Checking if 0x%08X equals 0x%08X\n",
 		offset, data, cmpval);
@@ -808,7 +807,7 @@ static bool init_io_restrict_prog(struct drm_device *dev, struct nvbios *bios, u
 
 	BIOSLOG(bios, "0x%04X: Writing config %02X\n", offset, config);
 
-	bios_wr32(dev, reg, configval);
+	bios_wr32(bios, reg, configval);
 
 	return true;
 }
@@ -968,7 +967,7 @@ static bool init_copy(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 		      "Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X\n",
 		offset, reg, shift, srcmask, crtcport, crtcindex, mask);
 
-	data = bios_rd32(dev, reg);
+	data = bios_rd32(bios, reg);
 
 	if (shift < 0x80)
 		data >>= shift;
@@ -1068,9 +1067,9 @@ static bool init_idx_addr_latched(struct drm_device *dev, struct nvbios *bios, u
 		BIOSLOG(bios, "0x%04X: Address: 0x%02X, Data: 0x%02X\n",
 			offset, instaddress, instdata);
 
-		bios_wr32(dev, datareg, instdata);
-		value = (bios_rd32(dev, controlreg) & mask) | data | instaddress;
-		bios_wr32(dev, controlreg, value);
+		bios_wr32(bios, datareg, instdata);
+		value = (bios_rd32(bios, controlreg) & mask) | data | instaddress;
+		bios_wr32(bios, controlreg, value);
 	}
 
 	return true;
@@ -1366,10 +1365,10 @@ static bool init_tmds(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 	if (!(reg = get_tmds_index_reg(dev, mlv)))
 		return false;
 
-	bios_wr32(dev, reg, tmdsaddr | NV_PRAMDAC_FP_TMDS_CONTROL_WRITE_DISABLE);
-	value = (bios_rd32(dev, reg + 4) & mask) | data;
-	bios_wr32(dev, reg + 4, value);
-	bios_wr32(dev, reg, tmdsaddr);
+	bios_wr32(bios, reg, tmdsaddr | NV_PRAMDAC_FP_TMDS_CONTROL_WRITE_DISABLE);
+	value = (bios_rd32(bios, reg + 4) & mask) | data;
+	bios_wr32(bios, reg + 4, value);
+	bios_wr32(bios, reg, tmdsaddr);
 
 	return true;
 }
@@ -1408,8 +1407,8 @@ static bool init_zm_tmds_group(struct drm_device *dev, struct nvbios *bios, uint
 		uint8_t tmdsaddr = bios->data[offset + 3 + i * 2];
 		uint8_t tmdsdata = bios->data[offset + 4 + i * 2];
 
-		bios_wr32(dev, reg + 4, tmdsdata);
-		bios_wr32(dev, reg, tmdsaddr);
+		bios_wr32(bios, reg + 4, tmdsdata);
+		bios_wr32(bios, reg, tmdsaddr);
 	}
 
 	return true;
@@ -1611,7 +1610,7 @@ static bool init_zm_reg_sequence(struct drm_device *dev, struct nvbios *bios, ui
 		uint32_t reg = basereg + i * 4;
 		uint32_t data = ROM32(bios->data[offset + 6 + i * 4]);
 
-		bios_wr32(dev, reg, data);
+		bios_wr32(bios, reg, data);
 	}
 
 	return true;
@@ -1675,7 +1674,7 @@ static bool init_copy_nv_reg(struct drm_device *dev, struct nvbios *bios, uint16
 		      "Xor: 0x%08X, DstReg: 0x%08X, DstMask: 0x%08X\n",
 		offset, srcreg, shift, srcmask, xor, dstreg, dstmask);
 
-	srcvalue = bios_rd32(dev, srcreg);
+	srcvalue = bios_rd32(bios, srcreg);
 
 	if (shift < 0x80)
 		srcvalue >>= shift;
@@ -1684,9 +1683,9 @@ static bool init_copy_nv_reg(struct drm_device *dev, struct nvbios *bios, uint16
 
 	srcvalue = (srcvalue & srcmask) ^ xor;
 
-	dstvalue = bios_rd32(dev, dstreg) & dstmask;
+	dstvalue = bios_rd32(bios, dstreg) & dstmask;
 
-	bios_wr32(dev, dstreg, dstvalue | srcvalue);
+	bios_wr32(bios, dstreg, dstvalue | srcvalue);
 
 	return true;
 }
@@ -1770,10 +1769,10 @@ static bool init_compute_mem(struct drm_device *dev, struct nvbios *bios, uint16
 	/* this also has probably been done in the scripts, but an mmio trace of
 	 * s3 resume shows nvidia doing it anyway (unlike the NV_VIO_SRX write)
 	 */
-	bios_wr32(dev, NV_PFB_REFCTRL, NV_PFB_REFCTRL_VALID_1);
+	bios_wr32(bios, NV_PFB_REFCTRL, NV_PFB_REFCTRL_VALID_1);
 
 	/* write back the saved configuration value */
-	bios_wr32(dev, NV_PFB_CFG0, saved_nv_pfb_cfg0);
+	bios_wr32(bios, NV_PFB_CFG0, saved_nv_pfb_cfg0);
 
 	return true;
 }
@@ -1797,18 +1796,18 @@ static bool init_reset(struct drm_device *dev, struct nvbios *bios, uint16_t off
 
 	/* no iexec->execute check by design */
 
-	pci_nv_19 = bios_rd32(dev, NV_PBUS_PCI_NV_19);
-	bios_wr32(dev, NV_PBUS_PCI_NV_19, 0);
-	bios_wr32(dev, reg, value1);
+	pci_nv_19 = bios_rd32(bios, NV_PBUS_PCI_NV_19);
+	bios_wr32(bios, NV_PBUS_PCI_NV_19, 0);
+	bios_wr32(bios, reg, value1);
 
 	BIOS_USLEEP(10);
 
-	bios_wr32(dev, reg, value2);
-	bios_wr32(dev, NV_PBUS_PCI_NV_19, pci_nv_19);
+	bios_wr32(bios, reg, value2);
+	bios_wr32(bios, NV_PBUS_PCI_NV_19, pci_nv_19);
 
-	pci_nv_20 = bios_rd32(dev, NV_PBUS_PCI_NV_20);
+	pci_nv_20 = bios_rd32(bios, NV_PBUS_PCI_NV_20);
 	pci_nv_20 &= ~NV_PBUS_PCI_NV_20_ROM_SHADOW_ENABLED;	/* 0xfffffffe */
-	bios_wr32(dev, NV_PBUS_PCI_NV_20, pci_nv_20);
+	bios_wr32(bios, NV_PBUS_PCI_NV_20, pci_nv_20);
 
 	return true;
 }
@@ -1860,7 +1859,7 @@ static bool init_configure_mem(struct drm_device *dev, struct nvbios *bios, uint
 				continue;
 		}
 
-		bios_wr32(dev, reg, data);
+		bios_wr32(bios, reg, data);
 	}
 
 	return true;
@@ -1909,7 +1908,7 @@ static bool init_configure_preinit(struct drm_device *dev, struct nvbios *bios, 
 
 	/* no iexec->execute check by design */
 
-	uint32_t straps = bios_rd32(dev, NV_PEXTDEV_BOOT_0);
+	uint32_t straps = bios_rd32(bios, NV_PEXTDEV_BOOT_0);
 	uint8_t cr3c = ((straps << 2) & 0xf0) | (straps & (1 << 6));
 
 	if (bios->major_version > 2)
@@ -1949,35 +1948,35 @@ static bool init_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 	if (dev_priv->card_type >= NV_50 && crtcport == 0x3c3 && data == 1) {
 		int i;
 
-		bios_wr32(dev, 0x614100,
-			  (bios_rd32(dev, 0x614100) & 0x0fffffff) | 0x00800000);
-		bios_wr32(dev, 0x00e18c, bios_rd32(dev, 0x00e18c) | 0x00020000);
-		bios_wr32(dev, 0x614900,
-			  (bios_rd32(dev, 0x614900) & 0x0fffffff) | 0x00800000);
-		bios_wr32(dev, 0x000200, bios_rd32(dev, 0x000200) &~0x40000000);
+		bios_wr32(bios, 0x614100,
+			  (bios_rd32(bios, 0x614100) & 0x0fffffff) | 0x00800000);
+		bios_wr32(bios, 0x00e18c, bios_rd32(bios, 0x00e18c) | 0x00020000);
+		bios_wr32(bios, 0x614900,
+			  (bios_rd32(bios, 0x614900) & 0x0fffffff) | 0x00800000);
+		bios_wr32(bios, 0x000200, bios_rd32(bios, 0x000200) &~0x40000000);
 		mdelay(10);
-		bios_wr32(dev, 0x00e18c, bios_rd32(dev, 0x00e18c) &~0x00020000);
-		bios_wr32(dev, 0x000200, bios_rd32(dev, 0x000200) | 0x40000000);
-		bios_wr32(dev, 0x614100, 0x00800018);
-		bios_wr32(dev, 0x614900, 0x00800018);
+		bios_wr32(bios, 0x00e18c, bios_rd32(bios, 0x00e18c) &~0x00020000);
+		bios_wr32(bios, 0x000200, bios_rd32(bios, 0x000200) | 0x40000000);
+		bios_wr32(bios, 0x614100, 0x00800018);
+		bios_wr32(bios, 0x614900, 0x00800018);
 		mdelay(10);
-		bios_wr32(dev, 0x614100, 0x10000018);
-		bios_wr32(dev, 0x614900, 0x10000018);
+		bios_wr32(bios, 0x614100, 0x10000018);
+		bios_wr32(bios, 0x614900, 0x10000018);
 		for (i = 0; i < 3; i++)
-		bios_wr32(dev, 0x614280 + (i*0x800), bios_rd32(
-			  dev, 0x614280 + (i*0x800)) & 0xf0f0f0f0);
+		bios_wr32(bios, 0x614280 + (i*0x800), bios_rd32(
+			  bios, 0x614280 + (i*0x800)) & 0xf0f0f0f0);
 		for (i = 0; i < 2; i++)
-		bios_wr32(dev, 0x614300 + (i*0x800), bios_rd32(
-			  dev, 0x614300 + (i*0x800)) & 0xfffff0f0);
+		bios_wr32(bios, 0x614300 + (i*0x800), bios_rd32(
+			  bios, 0x614300 + (i*0x800)) & 0xfffff0f0);
 		for (i = 0; i < 3; i++)
-		bios_wr32(dev, 0x614380 + (i*0x800), bios_rd32(
-			  dev, 0x614380 + (i*0x800)) & 0xfffff0f0);
+		bios_wr32(bios, 0x614380 + (i*0x800), bios_rd32(
+			  bios, 0x614380 + (i*0x800)) & 0xfffff0f0);
 		for (i = 0; i < 2; i++)
-		bios_wr32(dev, 0x614200 + (i*0x800), bios_rd32(
-			  dev, 0x614200 + (i*0x800)) & 0xfffffff0);
+		bios_wr32(bios, 0x614200 + (i*0x800), bios_rd32(
+			  bios, 0x614200 + (i*0x800)) & 0xfffffff0);
 		for (i = 0; i < 2; i++)
-		bios_wr32(dev, 0x614108 + (i*0x800), bios_rd32(
-			  dev, 0x614108 + (i*0x800)) & 0x0fffffff);
+		bios_wr32(bios, 0x614108 + (i*0x800), bios_rd32(
+			  bios, 0x614108 + (i*0x800)) & 0x0fffffff);
 		return true;
 	}
 
@@ -2032,7 +2031,7 @@ static bool init_ram_condition(struct drm_device *dev, struct nvbios *bios, uint
 	if (!iexec->execute)
 		return true;
 
-	data = bios_rd32(dev, NV_PFB_BOOT_0) & mask;
+	data = bios_rd32(bios, NV_PFB_BOOT_0) & mask;
 
 	BIOSLOG(bios, "0x%04X: Checking if 0x%08X equals 0x%08X\n",
 		offset, data, cmpval);
@@ -2069,7 +2068,7 @@ static bool init_nv_reg(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	BIOSLOG(bios, "0x%04X: Reg: 0x%08X, Mask: 0x%08X, Data: 0x%08X\n",
 		offset, reg, mask, data);
 
-	bios_wr32(dev, reg, (bios_rd32(dev, reg) & mask) | data);
+	bios_wr32(bios, reg, (bios_rd32(bios, reg) & mask) | data);
 
 	return true;
 }
@@ -2108,7 +2107,7 @@ static bool init_macro(struct drm_device *dev, struct nvbios *bios, uint16_t off
 		reg = ROM32(bios->data[macroentryptr]);
 		data = ROM32(bios->data[macroentryptr + 4]);
 
-		bios_wr32(dev, reg, data);
+		bios_wr32(bios, reg, data);
 	}
 
 	return true;
@@ -2302,7 +2301,7 @@ static bool init_zm_reg(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	if (reg == 0x000200)
 		value |= 1;
 
-	bios_wr32(dev, reg, value);
+	bios_wr32(bios, reg, value);
 
 	return true;
 }
@@ -2363,7 +2362,7 @@ static bool init_8e(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 			      "Shift: 0x%02X, Mask: 0x%08X, Data: 0x%08X\n",
 			offset, entry, reg, shift, mask, data);
 
-		bios_wr32(dev, reg, (bios_rd32(dev, reg) & mask) | data);
+		bios_wr32(bios, reg, (bios_rd32(bios, reg) & mask) | data);
 
 		reg = 0xe100;
 		shift = entry & 0x1f;
@@ -2381,7 +2380,7 @@ static bool init_8e(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 			      "Shift: 0x%02X, Mask: 0x%08X, Data: 0x%08X\n",
 			offset, entry, reg, shift, mask, data);
 
-		bios_wr32(dev, reg, (bios_rd32(dev, reg) & mask) | data);
+		bios_wr32(bios, reg, (bios_rd32(bios, reg) & mask) | data);
 	}
 
 	return true;
@@ -2429,7 +2428,7 @@ static bool init_ram_restrict_zm_reg_group(struct drm_device *dev, struct nvbios
 		return false;
 	}
 
-	strap_ramcfg = (bios_rd32(dev, NV_PEXTDEV_BOOT_0) >> 2) & 0xf;
+	strap_ramcfg = (bios_rd32(bios, NV_PEXTDEV_BOOT_0) >> 2) & 0xf;
 	index = bios->data[bios->ram_restrict_tbl_ptr + strap_ramcfg];
 
 	BIOSLOG(bios, "0x%04X: Reg: 0x%08X, RegIncrement: 0x%02X, "
@@ -2439,7 +2438,7 @@ static bool init_ram_restrict_zm_reg_group(struct drm_device *dev, struct nvbios
 	for (i = 0; i < count; i++) {
 		data = ROM32(bios->data[offset + 7 + index * 4 + blocklen * i]);
 
-		bios_wr32(dev, reg, data);
+		bios_wr32(bios, reg, data);
 
 		reg += regincrement;
 	}
@@ -2464,7 +2463,7 @@ static bool init_copy_zm_reg(struct drm_device *dev, struct nvbios *bios, uint16
 	if (!iexec->execute)
 		return true;
 
-	bios_wr32(dev, dstreg, bios_rd32(dev, srcreg));
+	bios_wr32(bios, dstreg, bios_rd32(bios, srcreg));
 
 	return true;
 }
@@ -2491,7 +2490,7 @@ static bool init_zm_reg_group_addr_latched(struct drm_device *dev, struct nvbios
 
 	for (i = 0; i < count; i++) {
 		uint32_t data = ROM32(bios->data[offset + 6 + 4 * i]);
-		bios_wr32(dev, reg, data);
+		bios_wr32(bios, reg, data);
 	}
 
 	return true;
@@ -2531,7 +2530,7 @@ init_96(struct drm_device *dev, struct nvbios *bios, uint16_t offset,
 	uint32_t mask = ROM32(bios->data[offset + 12]);
 	uint32_t val;
 
-	val = bios_rd32(dev, ROM32(bios->data[offset + 1]));
+	val = bios_rd32(bios, ROM32(bios->data[offset + 1]));
 	if (bios->data[offset + 5] < 0x80)
 		val >>= bios->data[offset + 5];
 	else
@@ -2544,7 +2543,7 @@ init_96(struct drm_device *dev, struct nvbios *bios, uint16_t offset,
 	if (!iexec->execute)
 		return true;
 
-	bios_wr32(dev, reg, (bios_rd32(dev, reg) & mask) | val);
+	bios_wr32(bios, reg, (bios_rd32(bios, reg) & mask) | val);
 	return true;
 }
 
@@ -2568,13 +2567,13 @@ init_97(struct drm_device *dev, struct nvbios *bios, uint16_t offset,
 	uint32_t add = ROM32(bios->data[offset + 9]);
 	uint32_t val;
 
-	val = bios_rd32(dev, reg);
+	val = bios_rd32(bios, reg);
 	val = (val & mask) | ((val + add) & ~mask);
 
 	if (!iexec->execute)
 		return true;
 
-	bios_wr32(dev, reg, val);
+	bios_wr32(bios, reg, val);
 	return true;
 }
 
@@ -2790,12 +2789,12 @@ static int call_lvds_manufacturer_script(struct drm_device *dev, struct dcb_entr
 		nv_write_tmds(dev, dcbent->or, 0, 0x02, 0x72);
 	if ((dev->pci_device & 0xffff) == 0x0179 || (dev->pci_device & 0xffff) == 0x0189 || (dev->pci_device & 0xffff) == 0x0329) {
 		if (script == LVDS_PANEL_ON) {
-			bios_wr32(dev, NV_PBUS_DEBUG_DUALHEAD_CTL, bios_rd32(dev, NV_PBUS_DEBUG_DUALHEAD_CTL) | (1 << 31));
-			bios_wr32(dev, NV_PCRTC_GPIO_EXT, bios_rd32(dev, NV_PCRTC_GPIO_EXT) | 1);
+			bios_wr32(bios, NV_PBUS_DEBUG_DUALHEAD_CTL, bios_rd32(bios, NV_PBUS_DEBUG_DUALHEAD_CTL) | (1 << 31));
+			bios_wr32(bios, NV_PCRTC_GPIO_EXT, bios_rd32(bios, NV_PCRTC_GPIO_EXT) | 1);
 		}
 		if (script == LVDS_PANEL_OFF) {
-			bios_wr32(dev, NV_PBUS_DEBUG_DUALHEAD_CTL, bios_rd32(dev, NV_PBUS_DEBUG_DUALHEAD_CTL) & ~(1 << 31));
-			bios_wr32(dev, NV_PCRTC_GPIO_EXT, bios_rd32(dev, NV_PCRTC_GPIO_EXT) & ~3);
+			bios_wr32(bios, NV_PBUS_DEBUG_DUALHEAD_CTL, bios_rd32(bios, NV_PBUS_DEBUG_DUALHEAD_CTL) & ~(1 << 31));
+			bios_wr32(bios, NV_PCRTC_GPIO_EXT, bios_rd32(bios, NV_PCRTC_GPIO_EXT) & ~3);
 		}
 	}
 #endif
@@ -2900,7 +2899,7 @@ int call_lvds_script(struct drm_device *dev, struct dcb_entry *dcbent, int head,
 	NV_TRACE(dev, "Calling LVDS script %d:\n", script);
 
 	/* don't let script change pll->head binding */
-	sel_clk_binding = bios_rd32(dev, NV_PRAMDAC_SEL_CLK) & 0x50000;
+	sel_clk_binding = bios_rd32(bios, NV_PRAMDAC_SEL_CLK) & 0x50000;
 
 	if (lvds_ver < 0x30)
 		ret = call_lvds_manufacturer_script(dev, dcbent, head, script);
@@ -2988,9 +2987,9 @@ static int get_fp_strap(struct drm_device *dev, struct nvbios *bios)
 		return (NVReadVgaCrtc5758(dev, 0, 0xf) & 0xf);
 
 	if (nv_arch(dev) >= NV_50)
-		return ((bios_rd32(dev, NV_PEXTDEV_BOOT_0) >> 24) & 0xf);
+		return ((bios_rd32(bios, NV_PEXTDEV_BOOT_0) >> 24) & 0xf);
 	else
-		return ((bios_rd32(dev, NV_PEXTDEV_BOOT_0) >> 16) & 0xf);
+		return ((bios_rd32(bios, NV_PEXTDEV_BOOT_0) >> 16) & 0xf);
 }
 
 static int parse_fp_mode_table(struct drm_device *dev, struct nvbios *bios)
@@ -3492,7 +3491,7 @@ int run_tmds_table(struct drm_device *dev, struct dcb_entry *dcbent, int head, i
 	}
 
 	/* don't let script change pll->head binding */
-	sel_clk_binding = bios_rd32(dev, NV_PRAMDAC_SEL_CLK) & 0x50000;
+	sel_clk_binding = bios_rd32(bios, NV_PRAMDAC_SEL_CLK) & 0x50000;
 	run_digital_op_script(dev, scriptptr, dcbent, head, pxclk >= 165000);
 	sel_clk = NVReadRAMDAC(dev, 0, NV_PRAMDAC_SEL_CLK) & ~0x50000;
 	NVWriteRAMDAC(dev, 0, NV_PRAMDAC_SEL_CLK, sel_clk | sel_clk_binding);
@@ -3684,7 +3683,7 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 
 		/* C51 special not seen elsewhere */
 		if (cv == 0x51 && !pll_lim->refclk) {
-			uint32_t sel_clk = bios_rd32(dev, NV_PRAMDAC_SEL_CLK);
+			uint32_t sel_clk = bios_rd32(bios, NV_PRAMDAC_SEL_CLK);
 
 			if (((limit_match == NV_PRAMDAC_VPLL_COEFF || limit_match == VPLL1) && sel_clk & 0x20) ||
 			    ((limit_match == NV_RAMDAC_VPLL2 || limit_match == VPLL2) && sel_clk & 0x80)) {
@@ -4907,15 +4906,15 @@ static int load_nv17_hwsq_ucode_entry(struct drm_device *dev, struct nvbios *bio
 	hwsq_entry_offset = hwsq_offset + 2 + entry * bytes_to_write;
 
 	/* set sequencer control */
-	bios_wr32(dev, 0x00001304, ROM32(bios->data[hwsq_entry_offset]));
+	bios_wr32(bios, 0x00001304, ROM32(bios->data[hwsq_entry_offset]));
 	bytes_to_write -= 4;
 
 	/* write ucode */
 	for (i = 0; i < bytes_to_write; i += 4)
-		bios_wr32(dev, 0x00001400 + i, ROM32(bios->data[hwsq_entry_offset + i + 4]));
+		bios_wr32(bios, 0x00001400 + i, ROM32(bios->data[hwsq_entry_offset + i + 4]));
 
 	/* twiddle NV_PBUS_DEBUG_4 */
-	bios_wr32(dev, NV_PBUS_DEBUG_4, bios_rd32(dev, NV_PBUS_DEBUG_4) | 0x18);
+	bios_wr32(bios, NV_PBUS_DEBUG_4, bios_rd32(bios, NV_PBUS_DEBUG_4) | 0x18);
 
 	return 0;
 }
@@ -5084,8 +5083,8 @@ nouveau_bios_init(struct drm_device *dev)
 		return 0;
 
 	/* these will need remembering across a suspend */
-	saved_nv_pextdev_boot_0 = bios_rd32(dev, NV_PEXTDEV_BOOT_0);
-	saved_nv_pfb_cfg0 = bios_rd32(dev, NV_PFB_CFG0);
+	saved_nv_pextdev_boot_0 = bios_rd32(bios, NV_PEXTDEV_BOOT_0);
+	saved_nv_pfb_cfg0 = bios_rd32(bios, NV_PFB_CFG0);
 
 	/* init script execution disabled */
 	bios->execute = false;
@@ -5100,7 +5099,7 @@ nouveau_bios_init(struct drm_device *dev)
 		}
 	}
 
-	bios_wr32(dev, NV_PEXTDEV_BOOT_0, saved_nv_pextdev_boot_0);
+	bios_wr32(bios, NV_PEXTDEV_BOOT_0, saved_nv_pextdev_boot_0);
 
 	ret = nouveau_run_vbios_init(dev);
 	if (ret) {
