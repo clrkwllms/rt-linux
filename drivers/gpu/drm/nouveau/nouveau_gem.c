@@ -558,7 +558,7 @@ out:
 	return ret;
 }
 
-#define PUSHBUF_CAL 1
+#define PUSHBUF_CAL (dev_priv->card_type >= NV_20)
 
 int
 nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
