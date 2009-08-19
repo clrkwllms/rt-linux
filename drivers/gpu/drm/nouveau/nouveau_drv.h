@@ -967,6 +967,8 @@ extern int nouveau_bo_pin(struct nouveau_bo *, uint32_t flags);
 extern int nouveau_bo_unpin(struct nouveau_bo *);
 extern int nouveau_bo_map(struct nouveau_bo *);
 extern void nouveau_bo_unmap(struct nouveau_bo *);
+extern u16 nouveau_bo_rd16(struct nouveau_bo *nvbo, unsigned index);
+extern void nouveau_bo_wr16(struct nouveau_bo *nvbo, unsigned index, u16 val);
 extern u32 nouveau_bo_rd32(struct nouveau_bo *nvbo, unsigned index);
 extern void nouveau_bo_wr32(struct nouveau_bo *nvbo, unsigned index, u32 val);
 
@@ -1013,9 +1015,13 @@ extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 
 #ifndef ioread32_native
 #ifdef __BIG_ENDIAN
+#define ioread16_native ioread16be
+#define iowrite16_native iowrite16be
 #define ioread32_native  ioread32be
 #define iowrite32_native iowrite32be
 #else /* def __BIG_ENDIAN */
+#define ioread16_native ioread16
+#define iowrite16_native iowrite16
 #define ioread32_native  ioread32
 #define iowrite32_native iowrite32
 #endif /* def __BIG_ENDIAN else */
