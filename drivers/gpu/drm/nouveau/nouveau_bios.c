@@ -45,9 +45,6 @@
 #define ROM16(x) le16_to_cpu(*(uint16_t *)&(x))
 #define ROM32(x) le32_to_cpu(*(uint32_t *)&(x))
 
-/* this will need remembering across a suspend */
-static uint32_t saved_nv_pfb_cfg0;
-
 struct init_exec {
 	bool execute;
 	bool repeat;
@@ -1825,7 +1822,7 @@ init_compute_mem(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 	bios_wr32(bios, NV_PFB_REFCTRL, NV_PFB_REFCTRL_VALID_1);
 
 	/* write back the saved configuration value */
-	bios_wr32(bios, NV_PFB_CFG0, saved_nv_pfb_cfg0);
+	bios_wr32(bios, NV_PFB_CFG0, bios->state.saved_nv_pfb_cfg0);
 
 	return true;
 }
@@ -5180,7 +5177,7 @@ nouveau_bios_init(struct drm_device *dev)
 
 	/* these will need remembering across a suspend */
 	saved_nv_pextdev_boot_0 = bios_rd32(bios, NV_PEXTDEV_BOOT_0);
-	saved_nv_pfb_cfg0 = bios_rd32(bios, NV_PFB_CFG0);
+	bios->state.saved_nv_pfb_cfg0 = bios_rd32(bios, NV_PFB_CFG0);
 
 	/* init script execution disabled */
 	bios->execute = false;
