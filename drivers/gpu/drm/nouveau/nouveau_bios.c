@@ -37,7 +37,7 @@
 
 #define EDID1_LEN 128
 
-#define BIOSLOG(sip, fmt, arg...) NV_DEBUG(sip, fmt, ##arg)
+#define BIOSLOG(sip, fmt, arg...) NV_DEBUG(sip->dev, fmt, ##arg)
 #define LOG_OLD_VALUE(x) //x
 
 #define BIOS_USLEEP(n) mdelay((n)/1000)
@@ -383,6 +383,8 @@ static bool valid_port(struct drm_device *dev, uint16_t port)
 
 static uint32_t bios_rd32(struct drm_device *dev, uint32_t reg)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
 	uint32_t data;
 
 	reg = munge_reg(dev, reg);
@@ -405,7 +407,7 @@ static uint32_t bios_rd32(struct drm_device *dev, uint32_t reg)
 
 	data = nv_rd32(dev, reg);
 
-	BIOSLOG(dev, "	Read:  Reg: 0x%08X, Data: 0x%08X\n", reg, data);
+	BIOSLOG(bios, "	Read:  Reg: 0x%08X, Data: 0x%08X\n", reg, data);
 
 	return data;
 }
@@ -413,6 +415,7 @@ static uint32_t bios_rd32(struct drm_device *dev, uint32_t reg)
 static void bios_wr32(struct drm_device *dev, uint32_t reg, uint32_t data)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
 
 	reg = munge_reg(dev, reg);
 	if (!valid_reg(dev, reg))
@@ -423,7 +426,7 @@ static void bios_wr32(struct drm_device *dev, uint32_t reg, uint32_t data)
 		reg &= 0xfffffffe;
 
 	LOG_OLD_VALUE(bios_rd32(dev, reg));
-	BIOSLOG(dev, "	Write: Reg: 0x%08X, Data: 0x%08X\n", reg, data);
+	BIOSLOG(bios, "	Write: Reg: 0x%08X, Data: 0x%08X\n", reg, data);
 
 	if (dev_priv->VBIOS.execute) {
 		still_alive();
@@ -435,6 +438,7 @@ static uint8_t
 bios_idxprt_rd(struct drm_device *dev, uint16_t port, uint8_t index)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
 	uint8_t data;
 
 	if (!valid_idx_port(dev, port))
@@ -452,8 +456,8 @@ bios_idxprt_rd(struct drm_device *dev, uint16_t port, uint8_t index)
 		data = (data32 >> ((index & 3) << 3)) & 0xff;
 	}
 
-	BIOSLOG(dev, "	Indexed IO read:  Port: 0x%04X, Index: 0x%02X, "
-		     "Head: 0x%02X, Data: 0x%02X\n",
+	BIOSLOG(bios, "	Indexed IO read:  Port: 0x%04X, Index: 0x%02X, "
+		      "Head: 0x%02X, Data: 0x%02X\n",
 		port, index, crtchead, data);
 	return data;
 }
@@ -463,6 +467,7 @@ bios_idxprt_wr(struct drm_device *dev, uint16_t port,
 	       uint8_t index, uint8_t data)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
 
 	if (!valid_idx_port(dev, port))
 		return;
@@ -478,8 +483,8 @@ bios_idxprt_wr(struct drm_device *dev, uint16_t port,
 		crtchead = 0;
 
 	LOG_OLD_VALUE(bios_idxprt_rd(dev, port, index));
-	BIOSLOG(dev, "	Indexed IO write: Port: 0x%04X, Index: 0x%02X, "
-		     "Head: 0x%02X, Data: 0x%02X\n",
+	BIOSLOG(bios, "	Indexed IO write: Port: 0x%04X, Index: 0x%02X, "
+		      "Head: 0x%02X, Data: 0x%02X\n",
 		port, index, crtchead, data);
 
 	if (dev_priv->VBIOS.execute && dev_priv->card_type < NV_50) {
@@ -507,6 +512,8 @@ bios_idxprt_wr(struct drm_device *dev, uint16_t port,
 
 static uint8_t bios_port_rd(struct drm_device *dev, uint16_t port)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
 	uint8_t data;
 
 	if (!valid_port(dev, port))
@@ -514,7 +521,7 @@ static uint8_t bios_port_rd(struct drm_device *dev, uint16_t port)
 
 	data = NVReadPRMVIO(dev, crtchead, NV_PRMVIO0_OFFSET + port);
 
-	BIOSLOG(dev, "	IO read:  Port: 0x%04X, Head: 0x%02X, Data: 0x%02X\n",
+	BIOSLOG(bios, "	IO read:  Port: 0x%04X, Head: 0x%02X, Data: 0x%02X\n",
 		port, crtchead, data);
 
 	return data;
@@ -523,12 +530,13 @@ static uint8_t bios_port_rd(struct drm_device *dev, uint16_t port)
 static void bios_port_wr(struct drm_device *dev, uint16_t port, uint8_t data)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
 
 	if (!valid_port(dev, port))
 		return;
 
 	LOG_OLD_VALUE(bios_port_rd(dev, port));
-	BIOSLOG(dev, "	IO write: Port: 0x%04X, Head: 0x%02X, Data: 0x%02X\n",
+	BIOSLOG(bios, "	IO write: Port: 0x%04X, Head: 0x%02X, Data: 0x%02X\n",
 		port, crtchead, data);
 
 	if (dev_priv->VBIOS.execute) {
@@ -558,7 +566,9 @@ static bool io_flag_condition_met(struct drm_device *dev, struct nvbios *bios, u
 	uint8_t cmpval = bios->data[condptr + 8];
 	uint8_t data;
 
-	BIOSLOG(dev, "0x%04X: Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X, Shift: 0x%02X, FlagArray: 0x%04X, FAMask: 0x%02X, Cmpval: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X, "
+		      "Shift: 0x%02X, FlagArray: 0x%04X, FAMask: 0x%02X, "
+		      "Cmpval: 0x%02X\n",
 		offset, crtcport, crtcindex, mask, shift, flagarray, flagarraymask, cmpval);
 
 	data = bios_idxprt_rd(dev, crtcport, crtcindex);
@@ -566,7 +576,8 @@ static bool io_flag_condition_met(struct drm_device *dev, struct nvbios *bios, u
 	data = bios->data[flagarray + ((data & mask) >> shift)];
 	data &= flagarraymask;
 
-	BIOSLOG(dev, "0x%04X: Checking if 0x%02X equals 0x%02X\n", offset, data, cmpval);
+	BIOSLOG(bios, "0x%04X: Checking if 0x%02X equals 0x%02X\n",
+		offset, data, cmpval);
 
 	return (data == cmpval);
 }
@@ -584,12 +595,12 @@ static bool bios_condition_met(struct drm_device *dev, struct nvbios *bios, uint
 	uint32_t cmpval = ROM32(bios->data[condptr + 8]);
 	uint32_t data;
 
-	BIOSLOG(dev, "0x%04X: Cond: 0x%02X, Reg: 0x%08X, Mask: 0x%08X\n",
+	BIOSLOG(bios, "0x%04X: Cond: 0x%02X, Reg: 0x%08X, Mask: 0x%08X\n",
 		offset, cond, reg, mask);
 
 	data = bios_rd32(dev, reg) & mask;
 
-	BIOSLOG(dev, "0x%04X: Checking if 0x%08X equals 0x%08X\n",
+	BIOSLOG(bios, "0x%04X: Checking if 0x%08X equals 0x%08X\n",
 		offset, data, cmpval);
 
 	return (data == cmpval);
@@ -611,7 +622,7 @@ static bool io_condition_met(struct drm_device *dev, struct nvbios *bios, uint16
 
 	uint8_t data = bios_idxprt_rd(dev, io_port, port_index) & mask;
 
-	BIOSLOG(dev, "0x%04X: Checking if 0x%02X equals 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: Checking if 0x%02X equals 0x%02X\n",
 		offset, data, cmpval);
 
 	return (data == cmpval);
@@ -781,7 +792,8 @@ static bool init_io_restrict_prog(struct drm_device *dev, struct nvbios *bios, u
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X, Shift: 0x%02X, Count: 0x%02X, Reg: 0x%08X\n",
+	BIOSLOG(bios, "0x%04X: Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X, "
+		      "Shift: 0x%02X, Count: 0x%02X, Reg: 0x%08X\n",
 		offset, crtcport, crtcindex, mask, shift, count, reg);
 
 	config = (bios_idxprt_rd(dev, crtcport, crtcindex) & mask) >> shift;
@@ -794,7 +806,7 @@ static bool init_io_restrict_prog(struct drm_device *dev, struct nvbios *bios, u
 
 	configval = ROM32(bios->data[offset + 11 + config * 4]);
 
-	BIOSLOG(dev, "0x%04X: Writing config %02X\n", offset, config);
+	BIOSLOG(bios, "0x%04X: Writing config %02X\n", offset, config);
 
 	bios_wr32(dev, reg, configval);
 
@@ -817,7 +829,8 @@ static bool init_repeat(struct drm_device *dev, struct nvbios *bios, uint16_t of
 
 	/* no iexec->execute check by design */
 
-	BIOSLOG(dev, "0x%04X: Repeating following segment %d times\n", offset, count);
+	BIOSLOG(bios, "0x%04X: Repeating following segment %d times\n",
+		offset, count);
 
 	iexec->repeat = true;
 
@@ -870,7 +883,9 @@ static bool init_io_restrict_pll(struct drm_device *dev, struct nvbios *bios, ui
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X, Shift: 0x%02X, IO Flag Condition: 0x%02X, Count: 0x%02X, Reg: 0x%08X\n",
+	BIOSLOG(bios, "0x%04X: Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X, "
+		      "Shift: 0x%02X, IO Flag Condition: 0x%02X, "
+		      "Count: 0x%02X, Reg: 0x%08X\n",
 		offset, crtcport, crtcindex, mask, shift, io_flag_condition_idx, count, reg);
 
 	config = (bios_idxprt_rd(dev, crtcport, crtcindex) & mask) >> shift;
@@ -885,13 +900,15 @@ static bool init_io_restrict_pll(struct drm_device *dev, struct nvbios *bios, ui
 
 	if (io_flag_condition_idx > 0) {
 		if (io_flag_condition_met(dev, bios, offset, io_flag_condition_idx)) {
-			BIOSLOG(dev, "0x%04X: Condition fulfilled -- frequency doubled\n", offset);
+			BIOSLOG(bios, "0x%04X: Condition fulfilled -- "
+				      "frequency doubled\n", offset);
 			freq *= 2;
 		} else
-			BIOSLOG(dev, "0x%04X: Condition not fulfilled -- frequency unchanged\n", offset);
+			BIOSLOG(bios, "0x%04X: Condition not fulfilled -- "
+				      "frequency unchanged\n", offset);
 	}
 
-	BIOSLOG(dev, "0x%04X: Reg: 0x%08X, Config: 0x%02X, Freq: %d0kHz\n",
+	BIOSLOG(bios, "0x%04X: Reg: 0x%08X, Config: 0x%02X, Freq: %d0kHz\n",
 		offset, reg, config, freq);
 
 	setPLL(dev, bios, reg, freq * 10);
@@ -947,7 +964,8 @@ static bool init_copy(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Reg: 0x%08X, Shift: 0x%02X, SrcMask: 0x%02X, Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: Reg: 0x%08X, Shift: 0x%02X, SrcMask: 0x%02X, "
+		      "Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X\n",
 		offset, reg, shift, srcmask, crtcport, crtcindex, mask);
 
 	data = bios_rd32(dev, reg);
@@ -974,9 +992,9 @@ static bool init_not(struct drm_device *dev, struct nvbios *bios, uint16_t offse
 	 * Invert the current execute / no-execute condition (i.e. "else")
 	 */
 	if (iexec->execute)
-		BIOSLOG(dev, "0x%04X: ------ Skipping following commands  ------\n", offset);
+		BIOSLOG(bios, "0x%04X: ------ Skipping following commands  ------\n", offset);
 	else
-		BIOSLOG(dev, "0x%04X: ------ Executing following commands ------\n", offset);
+		BIOSLOG(bios, "0x%04X: ------ Executing following commands ------\n", offset);
 
 	iexec->execute = !iexec->execute;
 	return true;
@@ -1000,9 +1018,9 @@ static bool init_io_flag_condition(struct drm_device *dev, struct nvbios *bios, 
 		return true;
 
 	if (io_flag_condition_met(dev, bios, offset, cond))
-		BIOSLOG(dev, "0x%04X: Condition fulfilled -- continuing to execute\n", offset);
+		BIOSLOG(bios, "0x%04X: Condition fulfilled -- continuing to execute\n", offset);
 	else {
-		BIOSLOG(dev, "0x%04X: Condition not fulfilled -- skipping following commands\n", offset);
+		BIOSLOG(bios, "0x%04X: Condition not fulfilled -- skipping following commands\n", offset);
 		iexec->execute = false;
 	}
 
@@ -1039,14 +1057,16 @@ static bool init_idx_addr_latched(struct drm_device *dev, struct nvbios *bios, u
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: ControlReg: 0x%08X, DataReg: 0x%08X, Mask: 0x%08X, Data: 0x%08X, Count: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: ControlReg: 0x%08X, DataReg: 0x%08X, "
+		      "Mask: 0x%08X, Data: 0x%08X, Count: 0x%02X\n",
 		offset, controlreg, datareg, mask, data, count);
 
 	for (i = 0; i < count; i++) {
 		uint8_t instaddress = bios->data[offset + 18 + i * 2];
 		uint8_t instdata = bios->data[offset + 19 + i * 2];
 
-		BIOSLOG(dev, "0x%04X: Address: 0x%02X, Data: 0x%02X\n", offset, instaddress, instdata);
+		BIOSLOG(bios, "0x%04X: Address: 0x%02X, Data: 0x%02X\n",
+			offset, instaddress, instdata);
 
 		bios_wr32(dev, datareg, instdata);
 		value = (bios_rd32(dev, controlreg) & mask) | data | instaddress;
@@ -1088,7 +1108,8 @@ static bool init_io_restrict_pll2(struct drm_device *dev, struct nvbios *bios, u
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X, Shift: 0x%02X, Count: 0x%02X, Reg: 0x%08X\n",
+	BIOSLOG(bios, "0x%04X: Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X, "
+		      "Shift: 0x%02X, Count: 0x%02X, Reg: 0x%08X\n",
 		offset, crtcport, crtcindex, mask, shift, count, reg);
 
 	if (!reg)
@@ -1104,7 +1125,7 @@ static bool init_io_restrict_pll2(struct drm_device *dev, struct nvbios *bios, u
 
 	freq = ROM32(bios->data[offset + 11 + config * 4]);
 
-	BIOSLOG(dev, "0x%04X: Reg: 0x%08X, Config: 0x%02X, Freq: %dkHz\n",
+	BIOSLOG(bios, "0x%04X: Reg: 0x%08X, Config: 0x%02X, Freq: %dkHz\n",
 		offset, reg, config, freq);
 
 	setPLL(dev, bios, reg, freq);
@@ -1129,7 +1150,7 @@ static bool init_pll2(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Reg: 0x%04X, Freq: %dkHz\n",
+	BIOSLOG(bios, "0x%04X: Reg: 0x%04X, Freq: %dkHz\n",
 		offset, reg, freq);
 
 	setPLL(dev, bios, reg, freq);
@@ -1166,7 +1187,8 @@ static bool init_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16_t 
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: DCBI2CIndex: 0x%02X, I2CAddress: 0x%02X, Count: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: DCBI2CIndex: 0x%02X, I2CAddress: 0x%02X, "
+		      "Count: 0x%02X\n",
 		offset, i2c_index, i2c_address, count);
 
 	chan = init_i2c_device_find(dev, i2c_index);
@@ -1186,7 +1208,8 @@ static bool init_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16_t 
 		if (i2c_transfer(&chan->adapter, &msg, 1) != 1)
 			return false;
 
-		BIOSLOG(dev, "0x%04X: I2CReg: 0x%02X, Value: 0x%02X, Mask: 0x%02X, Data: 0x%02X\n",
+		BIOSLOG(bios, "0x%04X: I2CReg: 0x%02X, Value: 0x%02X, "
+			      "Mask: 0x%02X, Data: 0x%02X\n",
 			offset, i2c_reg, value, mask, data);
 
 		value = (value & mask) | data;
@@ -1231,7 +1254,8 @@ static bool init_zm_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: DCBI2CIndex: 0x%02X, I2CAddress: 0x%02X, Count: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: DCBI2CIndex: 0x%02X, I2CAddress: 0x%02X, "
+		      "Count: 0x%02X\n",
 		offset, i2c_index, i2c_address, count);
 
 	chan = init_i2c_device_find(dev, i2c_index);
@@ -1242,7 +1266,7 @@ static bool init_zm_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16
 		uint8_t i2c_reg = bios->data[offset + 4 + i * 2];
 		uint8_t data = bios->data[offset + 5 + i * 2];
 
-		BIOSLOG(dev, "0x%04X: I2CReg: 0x%02X, Data: 0x%02X\n",
+		BIOSLOG(bios, "0x%04X: I2CReg: 0x%02X, Data: 0x%02X\n",
 			offset, i2c_reg, data);
 
 		if (bios->execute) {
@@ -1284,7 +1308,8 @@ static bool init_zm_i2c(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: DCBI2CIndex: 0x%02X, I2CAddress: 0x%02X, Count: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: DCBI2CIndex: 0x%02X, I2CAddress: 0x%02X, "
+		      "Count: 0x%02X\n",
 		offset, i2c_index, i2c_address, count);
 
 	chan = init_i2c_device_find(dev, i2c_index);
@@ -1294,7 +1319,7 @@ static bool init_zm_i2c(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	for (i = 0; i < count; i++) {
 		data[i] = bios->data[offset + 4 + i];
 
-		BIOSLOG(dev, "0x%04X: Data: 0x%02X\n", offset, data[i]);
+		BIOSLOG(bios, "0x%04X: Data: 0x%02X\n", offset, data[i]);
 	}
 
 	if (bios->execute) {
@@ -1334,7 +1359,8 @@ static bool init_tmds(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: MagicLookupValue: 0x%02X, TMDSAddr: 0x%02X, Mask: 0x%02X, Data: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: MagicLookupValue: 0x%02X, TMDSAddr: 0x%02X, "
+		      "Mask: 0x%02X, Data: 0x%02X\n",
 		offset, mlv, tmdsaddr, mask, data);
 
 	if (!(reg = get_tmds_index_reg(dev, mlv)))
@@ -1372,7 +1398,7 @@ static bool init_zm_tmds_group(struct drm_device *dev, struct nvbios *bios, uint
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: MagicLookupValue: 0x%02X, Count: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: MagicLookupValue: 0x%02X, Count: 0x%02X\n",
 		offset, mlv, count);
 
 	if (!(reg = get_tmds_index_reg(dev, mlv)))
@@ -1415,7 +1441,8 @@ static bool init_cr_idx_adr_latch(struct drm_device *dev, struct nvbios *bios, u
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Index1: 0x%02X, Index2: 0x%02X, BaseAddr: 0x%02X, Count: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: Index1: 0x%02X, Index2: 0x%02X, "
+		      "BaseAddr: 0x%02X, Count: 0x%02X\n",
 		offset, crtcindex1, crtcindex2, baseaddr, count);
 
 	oldaddr = bios_idxprt_rd(dev, NV_CIO_CRX__COLOR, crtcindex1);
@@ -1453,7 +1480,7 @@ static bool init_cr(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Index: 0x%02X, Mask: 0x%02X, Data: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: Index: 0x%02X, Mask: 0x%02X, Data: 0x%02X\n",
 		offset, crtcindex, mask, data);
 
 	value = (bios_idxprt_rd(dev, NV_CIO_CRX__COLOR, crtcindex) & mask) | data;
@@ -1534,14 +1561,15 @@ static bool init_condition_time(struct drm_device *dev, struct nvbios *bios, uin
 	if (retries > 100)
 		retries = 100;
 
-	BIOSLOG(dev, "0x%04X: Condition: 0x%02X, Retries: 0x%02X\n", offset, cond, retries);
+	BIOSLOG(bios, "0x%04X: Condition: 0x%02X, Retries: 0x%02X\n",
+		offset, cond, retries);
 
 	for (; retries > 0; retries--)
 		if (bios_condition_met(dev, bios, offset, cond)) {
-			BIOSLOG(dev, "0x%04X: Condition met, continuing\n", offset);
+			BIOSLOG(bios, "0x%04X: Condition met, continuing\n", offset);
 			break;
 		} else {
-			BIOSLOG(dev, "0x%04X: Condition not met, sleeping for 20ms\n", offset);
+			BIOSLOG(bios, "0x%04X: Condition not met, sleeping for 20ms\n", offset);
 			BIOS_USLEEP(20000);
 		}
 
@@ -1576,7 +1604,8 @@ static bool init_zm_reg_sequence(struct drm_device *dev, struct nvbios *bios, ui
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: BaseReg: 0x%08X, Count: 0x%02X\n", offset, basereg, count);
+	BIOSLOG(bios, "0x%04X: BaseReg: 0x%08X, Count: 0x%02X\n",
+		offset, basereg, count);
 
 	for (i = 0; i < count; i++) {
 		uint32_t reg = basereg + i * 4;
@@ -1604,11 +1633,12 @@ static bool init_sub_direct(struct drm_device *dev, struct nvbios *bios, uint16_
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Executing subroutine at 0x%04X\n", offset, sub_offset);
+	BIOSLOG(bios, "0x%04X: Executing subroutine at 0x%04X\n",
+		offset, sub_offset);
 
 	parse_init_table(dev, bios, sub_offset, iexec);
 
-	BIOSLOG(dev, "0x%04X: End of 0x%04X subroutine\n", offset, sub_offset);
+	BIOSLOG(bios, "0x%04X: End of 0x%04X subroutine\n", offset, sub_offset);
 
 	return true;
 }
@@ -1641,7 +1671,8 @@ static bool init_copy_nv_reg(struct drm_device *dev, struct nvbios *bios, uint16
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: SrcReg: 0x%08X, Shift: 0x%02X, SrcMask: 0x%08X, Xor: 0x%08X, DstReg: 0x%08X, DstMask: 0x%08X\n",
+	BIOSLOG(bios, "0x%04X: SrcReg: 0x%08X, Shift: 0x%02X, SrcMask: 0x%08X, "
+		      "Xor: 0x%08X, DstReg: 0x%08X, DstMask: 0x%08X\n",
 		offset, srcreg, shift, srcmask, xor, dstreg, dstmask);
 
 	srcvalue = bios_rd32(dev, srcreg);
@@ -1909,7 +1940,7 @@ static bool init_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Port: 0x%04X, Mask: 0x%02X, Data: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: Port: 0x%04X, Mask: 0x%02X, Data: 0x%02X\n",
 		offset, crtcport, mask, data);
 
 	/* I have no idea what this does, but NVIDIA do this magic sequence
@@ -1970,13 +2001,13 @@ static bool init_sub(struct drm_device *dev, struct nvbios *bios, uint16_t offse
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Calling script %d\n", offset, sub);
+	BIOSLOG(bios, "0x%04X: Calling script %d\n", offset, sub);
 
 	parse_init_table(dev, bios,
 			 ROM16(bios->data[bios->init_script_tbls_ptr + sub * 2]),
 			 iexec);
 
-	BIOSLOG(dev, "0x%04X: End of script %d\n", offset, sub);
+	BIOSLOG(bios, "0x%04X: End of script %d\n", offset, sub);
 
 	return true;
 }
@@ -2003,12 +2034,13 @@ static bool init_ram_condition(struct drm_device *dev, struct nvbios *bios, uint
 
 	data = bios_rd32(dev, NV_PFB_BOOT_0) & mask;
 
-	BIOSLOG(dev, "0x%04X: Checking if 0x%08X equals 0x%08X\n", offset, data, cmpval);
+	BIOSLOG(bios, "0x%04X: Checking if 0x%08X equals 0x%08X\n",
+		offset, data, cmpval);
 
 	if (data == cmpval)
-		BIOSLOG(dev, "0x%04X: Condition fulfilled -- continuing to execute\n", offset);
+		BIOSLOG(bios, "0x%04X: Condition fulfilled -- continuing to execute\n", offset);
 	else {
-		BIOSLOG(dev, "0x%04X: Condition not fulfilled -- skipping following commands\n", offset);
+		BIOSLOG(bios, "0x%04X: Condition not fulfilled -- skipping following commands\n", offset);
 		iexec->execute = false;
 	}
 
@@ -2034,7 +2066,8 @@ static bool init_nv_reg(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Reg: 0x%08X, Mask: 0x%08X, Data: 0x%08X\n", offset, reg, mask, data);
+	BIOSLOG(bios, "0x%04X: Reg: 0x%08X, Mask: 0x%08X, Data: 0x%08X\n",
+		offset, reg, mask, data);
 
 	bios_wr32(dev, reg, (bios_rd32(dev, reg) & mask) | data);
 
@@ -2065,7 +2098,8 @@ static bool init_macro(struct drm_device *dev, struct nvbios *bios, uint16_t off
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Macro: 0x%02X, MacroTableIndex: 0x%02X, Count: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: Macro: 0x%02X, MacroTableIndex: 0x%02X, "
+		      "Count: 0x%02X\n",
 		offset, macro_index_tbl_idx, macro_tbl_idx, count);
 
 	for (i = 0; i < count; i++) {
@@ -2106,7 +2140,7 @@ static bool init_resume(struct drm_device *dev, struct nvbios *bios, uint16_t of
 		return true;
 
 	iexec->execute = true;
-	BIOSLOG(dev, "0x%04X: ---- Executing following commands ----\n", offset);
+	BIOSLOG(bios, "0x%04X: ---- Executing following commands ----\n", offset);
 
 	return true;
 }
@@ -2126,7 +2160,8 @@ static bool init_time(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Sleeping for 0x%04X microseconds\n", offset, time);
+	BIOSLOG(bios, "0x%04X: Sleeping for 0x%04X microseconds\n",
+		offset, time);
 
 	BIOS_USLEEP(time);
 
@@ -2150,12 +2185,12 @@ static bool init_condition(struct drm_device *dev, struct nvbios *bios, uint16_t
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Condition: 0x%02X\n", offset, cond);
+	BIOSLOG(bios, "0x%04X: Condition: 0x%02X\n", offset, cond);
 
 	if (bios_condition_met(dev, bios, offset, cond))
-		BIOSLOG(dev, "0x%04X: Condition fulfilled -- continuing to execute\n", offset);
+		BIOSLOG(bios, "0x%04X: Condition fulfilled -- continuing to execute\n", offset);
 	else {
-		BIOSLOG(dev, "0x%04X: Condition not fulfilled -- skipping following commands\n", offset);
+		BIOSLOG(bios, "0x%04X: Condition not fulfilled -- skipping following commands\n", offset);
 		iexec->execute = false;
 	}
 
@@ -2179,12 +2214,12 @@ static bool init_io_condition(struct drm_device *dev, struct nvbios *bios, uint1
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: IO condition: 0x%02X\n", offset, cond);
+	BIOSLOG(bios, "0x%04X: IO condition: 0x%02X\n", offset, cond);
 
 	if (io_condition_met(dev, bios, offset, cond))
-		BIOSLOG(dev, "0x%04X: Condition fulfilled -- continuing to execute\n", offset);
+		BIOSLOG(bios, "0x%04X: Condition fulfilled -- continuing to execute\n", offset);
 	else {
-		BIOSLOG(dev, "0x%04X: Condition not fulfilled -- skipping following commands\n", offset);
+		BIOSLOG(bios, "0x%04X: Condition not fulfilled -- skipping following commands\n", offset);
 		iexec->execute = false;
 	}
 
@@ -2213,7 +2248,8 @@ static bool init_index_io(struct drm_device *dev, struct nvbios *bios, uint16_t 
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X, Data: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: Port: 0x%04X, Index: 0x%02X, Mask: 0x%02X, "
+		      "Data: 0x%02X\n",
 		offset, crtcport, crtcindex, mask, data);
 
 	value = (bios_idxprt_rd(dev, crtcport, crtcindex) & mask) | data;
@@ -2239,7 +2275,7 @@ static bool init_pll(struct drm_device *dev, struct nvbios *bios, uint16_t offse
 	if (!iexec->execute)
 		return true;
 
-	BIOSLOG(dev, "0x%04X: Reg: 0x%08X, Freq: %d0kHz\n", offset, reg, freq);
+	BIOSLOG(bios, "0x%04X: Reg: 0x%08X, Freq: %d0kHz\n", offset, reg, freq);
 
 	setPLL(dev, bios, reg, freq * 10);
 
@@ -2323,7 +2359,8 @@ static bool init_8e(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 			data = (entry >> 19);
 		data = ((data & 3) ^ 2) << shift;
 
-		BIOSLOG(dev, "0x%04X: Entry: 0x%08X, Reg: 0x%08X, Shift: 0x%02X, Mask: 0x%08X, Data: 0x%08X\n",
+		BIOSLOG(bios, "0x%04X: Entry: 0x%08X, Reg: 0x%08X, "
+			      "Shift: 0x%02X, Mask: 0x%08X, Data: 0x%08X\n",
 			offset, entry, reg, shift, mask, data);
 
 		bios_wr32(dev, reg, (bios_rd32(dev, reg) & mask) | data);
@@ -2340,7 +2377,8 @@ static bool init_8e(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 			data |= 0x10000;
 		data <<= shift;
 
-		BIOSLOG(dev, "0x%04X: Entry: 0x%08X, Reg: 0x%08X, Shift: 0x%02X, Mask: 0x%08X, Data: 0x%08X\n",
+		BIOSLOG(bios, "0x%04X: Entry: 0x%08X, Reg: 0x%08X, "
+			      "Shift: 0x%02X, Mask: 0x%08X, Data: 0x%08X\n",
 			offset, entry, reg, shift, mask, data);
 
 		bios_wr32(dev, reg, (bios_rd32(dev, reg) & mask) | data);
@@ -2394,7 +2432,8 @@ static bool init_ram_restrict_zm_reg_group(struct drm_device *dev, struct nvbios
 	strap_ramcfg = (bios_rd32(dev, NV_PEXTDEV_BOOT_0) >> 2) & 0xf;
 	index = bios->data[bios->ram_restrict_tbl_ptr + strap_ramcfg];
 
-	BIOSLOG(dev, "0x%04X: Reg: 0x%08X, RegIncrement: 0x%02X, Count: 0x%02X, StrapRamCfg: 0x%02X, Index: 0x%02X\n",
+	BIOSLOG(bios, "0x%04X: Reg: 0x%08X, RegIncrement: 0x%02X, "
+		      "Count: 0x%02X, StrapRamCfg: 0x%02X, Index: 0x%02X\n",
 		offset, reg, regincrement, count, strap_ramcfg, index);
 
 	for (i = 0; i < count; i++) {
@@ -2629,7 +2668,7 @@ static int parse_init_table(struct drm_device *dev, struct nvbios *bios, unsigne
 			;
 
 		if (itbl_entry[i].name) {
-			BIOSLOG(dev, "0x%04X: [ (0x%02X) - %s ]\n",
+			BIOSLOG(bios, "0x%04X: [ (0x%02X) - %s ]\n",
 				offset, itbl_entry[i].id, itbl_entry[i].name);
 
 			/* execute eventual command handler */
@@ -2680,7 +2719,7 @@ static void parse_init_tables(struct drm_device *dev, struct nvbios *bios)
 	while ((table = ROM16(bios->data[bios->init_script_tbls_ptr + i]))) {
 		NV_INFO(dev, "Parsing VBIOS init table %d at offset 0x%04X\n",
 			i / 2, table);
-		BIOSLOG(dev, "0x%04X: ------ Executing following commands ------\n", table);
+		BIOSLOG(bios, "0x%04X: ------ Executing following commands ------\n", table);
 
 		parse_init_table(dev, bios, table, &iexec);
 		i += 2;
@@ -3599,7 +3638,8 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 
 		pll_rec = &bios->data[plloffs + recordlen * pllindex];
 
-		BIOSLOG(dev, "Loading PLL limits for reg 0x%08x\n", pllindex ? reg : 0);
+		BIOSLOG(bios, "Loading PLL limits for reg 0x%08x\n",
+			pllindex ? reg : 0);
 
 		/* frequencies are stored in tables in MHz, kHz are more useful, so we convert */
 
@@ -3659,7 +3699,7 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 		uint8_t *record = NULL;
 		int i;
 
-		BIOSLOG(dev, "Loading PLL limits for register 0x%08x\n",
+		BIOSLOG(bios, "Loading PLL limits for register 0x%08x\n",
 			limit_match);
 
 		for (i = 0; i < entries; i++, entry += recordlen) {
