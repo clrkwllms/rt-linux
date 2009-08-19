@@ -183,6 +183,10 @@ struct nvbios {
 	struct bios_parsed_dcb bdcb;
 
 	struct {
+		int crtchead;
+	} state;
+
+	struct {
 		int head;
 		uint16_t script_table_ptr;
 	} display;

@@ -45,8 +45,6 @@
 #define ROM16(x) le16_to_cpu(*(uint16_t *)&(x))
 #define ROM32(x) le32_to_cpu(*(uint32_t *)&(x))
 
-static int crtchead = 0;
-
 /* this will need remembering across a suspend */
 static uint32_t saved_nv_pfb_cfg0;
 
@@ -442,6 +440,7 @@ static uint8_t
 bios_idxprt_rd(struct nvbios *bios, uint16_t port, uint8_t index)
 {
 	struct drm_nouveau_private *dev_priv = bios->dev->dev_private;
+	struct drm_device *dev = bios->dev;
 	uint8_t data;
 
 	if (!valid_idx_port(bios, port))
@@ -449,9 +448,9 @@ bios_idxprt_rd(struct nvbios *bios, uint16_t port, uint8_t index)
 
 	if (dev_priv->card_type < NV_50) {
 		if (port == NV_VIO_SRX)
-			data = NVReadVgaSeq(bios->dev, crtchead, index);
+			data = NVReadVgaSeq(dev, bios->state.crtchead, index);
 		else	/* assume NV_CIO_CRX__COLOR */
-			data = NVReadVgaCrtc(bios->dev, crtchead, index);
+			data = NVReadVgaCrtc(dev, bios->state.crtchead, index);
 	} else {
 		uint32_t data32;
 
@@ -461,7 +460,7 @@ bios_idxprt_rd(struct nvbios *bios, uint16_t port, uint8_t index)
 
 	BIOSLOG(bios, "	Indexed IO read:  Port: 0x%04X, Index: 0x%02X, "
 		      "Head: 0x%02X, Data: 0x%02X\n",
-		port, index, crtchead, data);
+		port, index, bios->state.crtchead, data);
 	return data;
 }
 
@@ -469,11 +468,12 @@ static void
 bios_idxprt_wr(struct nvbios *bios, uint16_t port, uint8_t index, uint8_t data)
 {
 	struct drm_nouveau_private *dev_priv = bios->dev->dev_private;
+	struct drm_device *dev = bios->dev;
 
 	if (!valid_idx_port(bios, port))
 		return;
 
-	/* The current head is maintained in a file scope variable crtchead.
+	/* The current head is maintained in the nvbios member  state.crtchead.
 	 * We trap changes to CR44 and update the head variable and hence the
 	 * register set written.
 	 * As CR44 only exists on CRTC0, we update crtchead to head0 in advance
@@ -481,19 +481,19 @@ bios_idxprt_wr(struct nvbios *bios, uint16_t port, uint8_t index, uint8_t data)
 	 */
 	if (port == NV_CIO_CRX__COLOR && index == NV_CIO_CRE_44 &&
 	    data != NV_CIO_CRE_44_HEADB)
-		crtchead = 0;
+		bios->state.crtchead = 0;
 
 	LOG_OLD_VALUE(bios_idxprt_rd(bios, port, index));
 	BIOSLOG(bios, "	Indexed IO write: Port: 0x%04X, Index: 0x%02X, "
 		      "Head: 0x%02X, Data: 0x%02X\n",
-		port, index, crtchead, data);
+		port, index, bios->state.crtchead, data);
 
 	if (bios->execute && dev_priv->card_type < NV_50) {
 		still_alive();
 		if (port == NV_VIO_SRX)
-			NVWriteVgaSeq(bios->dev, crtchead, index, data);
+			NVWriteVgaSeq(dev, bios->state.crtchead, index, data);
 		else	/* assume NV_CIO_CRX__COLOR */
-			NVWriteVgaCrtc(bios->dev, crtchead, index, data);
+			NVWriteVgaCrtc(dev, bios->state.crtchead, index, data);
 	} else
 	if (bios->execute) {
 		uint32_t data32, shift = (index & 3) << 3;
@@ -508,21 +508,21 @@ bios_idxprt_wr(struct nvbios *bios, uint16_t port, uint8_t index, uint8_t data)
 
 	if (port == NV_CIO_CRX__COLOR &&
 	    index == NV_CIO_CRE_44 && data == NV_CIO_CRE_44_HEADB)
-		crtchead = 1;
+		bios->state.crtchead = 1;
 }
 
 static uint8_t
 bios_port_rd(struct nvbios *bios, uint16_t port)
 {
-	uint8_t data;
+	uint8_t data, head = bios->state.crtchead;
 
 	if (!valid_port(bios, port))
 		return 0;
 
-	data = NVReadPRMVIO(bios->dev, crtchead, NV_PRMVIO0_OFFSET + port);
+	data = NVReadPRMVIO(bios->dev, head, NV_PRMVIO0_OFFSET + port);
 
 	BIOSLOG(bios, "	IO read:  Port: 0x%04X, Head: 0x%02X, Data: 0x%02X\n",
-		port, crtchead, data);
+		port, head, data);
 
 	return data;
 }
@@ -530,17 +530,20 @@ bios_port_rd(struct nvbios *bios, uint16_t port)
 static void
 bios_port_wr(struct nvbios *bios, uint16_t port, uint8_t data)
 {
+	int head = bios->state.crtchead;
+
 	if (!valid_port(bios, port))
 		return;
 
 	LOG_OLD_VALUE(bios_port_rd(bios, port));
 	BIOSLOG(bios, "	IO write: Port: 0x%04X, Head: 0x%02X, Data: 0x%02X\n",
-		port, crtchead, data);
+		port, head, data);
 
-	if (bios->execute) {
-		still_alive();
-		NVWritePRMVIO(bios->dev, crtchead, NV_PRMVIO0_OFFSET + port, data);
-	}
+	if (!bios->execute)
+		return;
+
+	still_alive();
+	NVWritePRMVIO(bios->dev, head, NV_PRMVIO0_OFFSET + port, data);
 }
 
 static bool
@@ -690,6 +693,7 @@ setPLL(struct nvbios *bios, uint32_t reg, uint32_t clk)
 static int dcb_entry_idx_from_crtchead(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
 
 	/* for the results of this function to be correct, CR44 must have been
 	 * set (using bios_idxprt_wr to set crtchead), CR58 set for CR57 = 0,
@@ -697,9 +701,9 @@ static int dcb_entry_idx_from_crtchead(struct drm_device *dev)
 	 * run.  run_digital_op_script is example of how to do such setup
 	 */
 
-	uint8_t dcb_entry = NVReadVgaCrtc5758(dev, crtchead, 0);
+	uint8_t dcb_entry = NVReadVgaCrtc5758(dev, bios->state.crtchead, 0);
 
-	if (dcb_entry > dev_priv->VBIOS.bdcb.dcb.entries) {
+	if (dcb_entry > bios->bdcb.dcb.entries) {
 		NV_ERROR(dev, "CR58 doesn't have a valid DCB entry currently "
 				"(%02X)\n", dcb_entry);
 		dcb_entry = 0x7f;	/* unused / invalid marker */
@@ -5108,7 +5112,7 @@ nouveau_run_vbios_init(struct drm_device *dev)
 
 	NVLockVgaCrtcs(dev, false);
 	if (nv_two_heads(dev))
-		NVSetOwner(dev, crtchead);
+		NVSetOwner(dev, bios->state.crtchead);
 
 	if (bios->major_version < 5)	/* BMP only */
 		load_nv17_hw_sequencer_ucode(dev, bios);
