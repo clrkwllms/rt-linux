@@ -343,9 +343,11 @@ valid_reg(struct nvbios *bios, uint32_t reg)
 	return 0;
 }
 
-static bool valid_idx_port(struct drm_device *dev, uint16_t port)
+static bool
+valid_idx_port(struct nvbios *bios, uint16_t port)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct drm_nouveau_private *dev_priv = bios->dev->dev_private;
+	struct drm_device *dev = bios->dev;
 
 	/* if adding more ports here, the read/write functions below will need
 	 * updating so that the correct mmio range (PRMCIO, PRMDIO, PRMVIO) is
@@ -367,8 +369,11 @@ static bool valid_idx_port(struct drm_device *dev, uint16_t port)
 	return false;
 }
 
-static bool valid_port(struct drm_device *dev, uint16_t port)
+static bool
+valid_port(struct nvbios *bios, uint16_t port)
 {
+	struct drm_device *dev = bios->dev;
+
 	/* if adding more ports here, the read/write functions below will need
 	 * updating so that the correct mmio range (PRMCIO, PRMDIO, PRMVIO) is
 	 * used for the port in question
@@ -434,20 +439,19 @@ bios_wr32(struct nvbios *bios, uint32_t reg, uint32_t data)
 }
 
 static uint8_t
-bios_idxprt_rd(struct drm_device *dev, uint16_t port, uint8_t index)
+bios_idxprt_rd(struct nvbios *bios, uint16_t port, uint8_t index)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nvbios *bios = &dev_priv->VBIOS;
+	struct drm_nouveau_private *dev_priv = bios->dev->dev_private;
 	uint8_t data;
 
-	if (!valid_idx_port(dev, port))
+	if (!valid_idx_port(bios, port))
 		return 0;
 
 	if (dev_priv->card_type < NV_50) {
 		if (port == NV_VIO_SRX)
-			data = NVReadVgaSeq(dev, crtchead, index);
+			data = NVReadVgaSeq(bios->dev, crtchead, index);
 		else	/* assume NV_CIO_CRX__COLOR */
-			data = NVReadVgaCrtc(dev, crtchead, index);
+			data = NVReadVgaCrtc(bios->dev, crtchead, index);
 	} else {
 		uint32_t data32;
 
@@ -462,13 +466,11 @@ bios_idxprt_rd(struct drm_device *dev, uint16_t port, uint8_t index)
 }
 
 static void
-bios_idxprt_wr(struct drm_device *dev, uint16_t port,
-	       uint8_t index, uint8_t data)
+bios_idxprt_wr(struct nvbios *bios, uint16_t port, uint8_t index, uint8_t data)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nvbios *bios = &dev_priv->VBIOS;
+	struct drm_nouveau_private *dev_priv = bios->dev->dev_private;
 
-	if (!valid_idx_port(dev, port))
+	if (!valid_idx_port(bios, port))
 		return;
 
 	/* The current head is maintained in a file scope variable crtchead.
@@ -481,19 +483,19 @@ bios_idxprt_wr(struct drm_device *dev, uint16_t port,
 	    data != NV_CIO_CRE_44_HEADB)
 		crtchead = 0;
 
-	LOG_OLD_VALUE(bios_idxprt_rd(dev, port, index));
+	LOG_OLD_VALUE(bios_idxprt_rd(bios, port, index));
 	BIOSLOG(bios, "	Indexed IO write: Port: 0x%04X, Index: 0x%02X, "
 		      "Head: 0x%02X, Data: 0x%02X\n",
 		port, index, crtchead, data);
 
-	if (dev_priv->VBIOS.execute && dev_priv->card_type < NV_50) {
+	if (bios->execute && dev_priv->card_type < NV_50) {
 		still_alive();
 		if (port == NV_VIO_SRX)
-			NVWriteVgaSeq(dev, crtchead, index, data);
+			NVWriteVgaSeq(bios->dev, crtchead, index, data);
 		else	/* assume NV_CIO_CRX__COLOR */
-			NVWriteVgaCrtc(dev, crtchead, index, data);
+			NVWriteVgaCrtc(bios->dev, crtchead, index, data);
 	} else
-	if (dev_priv->VBIOS.execute) {
+	if (bios->execute) {
 		uint32_t data32, shift = (index & 3) << 3;
 
 		still_alive();
@@ -509,16 +511,15 @@ bios_idxprt_wr(struct drm_device *dev, uint16_t port,
 		crtchead = 1;
 }
 
-static uint8_t bios_port_rd(struct drm_device *dev, uint16_t port)
+static uint8_t
+bios_port_rd(struct nvbios *bios, uint16_t port)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nvbios *bios = &dev_priv->VBIOS;
 	uint8_t data;
 
-	if (!valid_port(dev, port))
+	if (!valid_port(bios, port))
 		return 0;
 
-	data = NVReadPRMVIO(dev, crtchead, NV_PRMVIO0_OFFSET + port);
+	data = NVReadPRMVIO(bios->dev, crtchead, NV_PRMVIO0_OFFSET + port);
 
 	BIOSLOG(bios, "	IO read:  Port: 0x%04X, Head: 0x%02X, Data: 0x%02X\n",
 		port, crtchead, data);
@@ -526,21 +527,19 @@ static uint8_t bios_port_rd(struct drm_device *dev, uint16_t port)
 	return data;
 }
 
-static void bios_port_wr(struct drm_device *dev, uint16_t port, uint8_t data)
+static void
+bios_port_wr(struct nvbios *bios, uint16_t port, uint8_t data)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nvbios *bios = &dev_priv->VBIOS;
-
-	if (!valid_port(dev, port))
+	if (!valid_port(bios, port))
 		return;
 
-	LOG_OLD_VALUE(bios_port_rd(dev, port));
+	LOG_OLD_VALUE(bios_port_rd(bios, port));
 	BIOSLOG(bios, "	IO write: Port: 0x%04X, Head: 0x%02X, Data: 0x%02X\n",
 		port, crtchead, data);
 
-	if (dev_priv->VBIOS.execute) {
+	if (bios->execute) {
 		still_alive();
-		NVWritePRMVIO(dev, crtchead, NV_PRMVIO0_OFFSET + port, data);
+		NVWritePRMVIO(bios->dev, crtchead, NV_PRMVIO0_OFFSET + port, data);
 	}
 }
 
@@ -570,7 +569,7 @@ static bool io_flag_condition_met(struct drm_device *dev, struct nvbios *bios, u
 		      "Cmpval: 0x%02X\n",
 		offset, crtcport, crtcindex, mask, shift, flagarray, flagarraymask, cmpval);
 
-	data = bios_idxprt_rd(dev, crtcport, crtcindex);
+	data = bios_idxprt_rd(bios, crtcport, crtcindex);
 
 	data = bios->data[flagarray + ((data & mask) >> shift)];
 	data &= flagarraymask;
@@ -619,7 +618,7 @@ static bool io_condition_met(struct drm_device *dev, struct nvbios *bios, uint16
 	uint8_t mask = bios->data[condptr + 3];
 	uint8_t cmpval = bios->data[condptr + 4];
 
-	uint8_t data = bios_idxprt_rd(dev, io_port, port_index) & mask;
+	uint8_t data = bios_idxprt_rd(bios, io_port, port_index) & mask;
 
 	BIOSLOG(bios, "0x%04X: Checking if 0x%02X equals 0x%02X\n",
 		offset, data, cmpval);
@@ -795,7 +794,7 @@ static bool init_io_restrict_prog(struct drm_device *dev, struct nvbios *bios, u
 		      "Shift: 0x%02X, Count: 0x%02X, Reg: 0x%08X\n",
 		offset, crtcport, crtcindex, mask, shift, count, reg);
 
-	config = (bios_idxprt_rd(dev, crtcport, crtcindex) & mask) >> shift;
+	config = (bios_idxprt_rd(bios, crtcport, crtcindex) & mask) >> shift;
 	if (config > count) {
 		NV_ERROR(dev,
 			 "0x%04X: Config 0x%02X exceeds maximal bound 0x%02X\n",
@@ -887,7 +886,7 @@ static bool init_io_restrict_pll(struct drm_device *dev, struct nvbios *bios, ui
 		      "Count: 0x%02X, Reg: 0x%08X\n",
 		offset, crtcport, crtcindex, mask, shift, io_flag_condition_idx, count, reg);
 
-	config = (bios_idxprt_rd(dev, crtcport, crtcindex) & mask) >> shift;
+	config = (bios_idxprt_rd(bios, crtcport, crtcindex) & mask) >> shift;
 	if (config > count) {
 		NV_ERROR(dev,
 			 "0x%04X: Config 0x%02X exceeds maximal bound 0x%02X\n",
@@ -976,8 +975,8 @@ static bool init_copy(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 
 	data &= srcmask;
 
-	crtcdata = (bios_idxprt_rd(dev, crtcport, crtcindex) & mask) | (uint8_t)data;
-	bios_idxprt_wr(dev, crtcport, crtcindex, crtcdata);
+	crtcdata = (bios_idxprt_rd(bios, crtcport, crtcindex) & mask) | (uint8_t)data;
+	bios_idxprt_wr(bios, crtcport, crtcindex, crtcdata);
 
 	return true;
 }
@@ -1114,7 +1113,7 @@ static bool init_io_restrict_pll2(struct drm_device *dev, struct nvbios *bios, u
 	if (!reg)
 		return true;
 
-	config = (bios_idxprt_rd(dev, crtcport, crtcindex) & mask) >> shift;
+	config = (bios_idxprt_rd(bios, crtcport, crtcindex) & mask) >> shift;
 	if (config > count) {
 		NV_ERROR(dev,
 			 "0x%04X: Config 0x%02X exceeds maximal bound 0x%02X\n",
@@ -1444,16 +1443,16 @@ static bool init_cr_idx_adr_latch(struct drm_device *dev, struct nvbios *bios, u
 		      "BaseAddr: 0x%02X, Count: 0x%02X\n",
 		offset, crtcindex1, crtcindex2, baseaddr, count);
 
-	oldaddr = bios_idxprt_rd(dev, NV_CIO_CRX__COLOR, crtcindex1);
+	oldaddr = bios_idxprt_rd(bios, NV_CIO_CRX__COLOR, crtcindex1);
 
 	for (i = 0; i < count; i++) {
-		bios_idxprt_wr(dev, NV_CIO_CRX__COLOR, crtcindex1, baseaddr + i);
+		bios_idxprt_wr(bios, NV_CIO_CRX__COLOR, crtcindex1, baseaddr + i);
 
 		data = bios->data[offset + 5 + i];
-		bios_idxprt_wr(dev, NV_CIO_CRX__COLOR, crtcindex2, data);
+		bios_idxprt_wr(bios, NV_CIO_CRX__COLOR, crtcindex2, data);
 	}
 
-	bios_idxprt_wr(dev, NV_CIO_CRX__COLOR, crtcindex1, oldaddr);
+	bios_idxprt_wr(bios, NV_CIO_CRX__COLOR, crtcindex1, oldaddr);
 
 	return true;
 }
@@ -1482,8 +1481,8 @@ static bool init_cr(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 	BIOSLOG(bios, "0x%04X: Index: 0x%02X, Mask: 0x%02X, Data: 0x%02X\n",
 		offset, crtcindex, mask, data);
 
-	value = (bios_idxprt_rd(dev, NV_CIO_CRX__COLOR, crtcindex) & mask) | data;
-	bios_idxprt_wr(dev, NV_CIO_CRX__COLOR, crtcindex, value);
+	value = (bios_idxprt_rd(bios, NV_CIO_CRX__COLOR, crtcindex) & mask) | data;
+	bios_idxprt_wr(bios, NV_CIO_CRX__COLOR, crtcindex, value);
 
 	return true;
 }
@@ -1505,7 +1504,7 @@ static bool init_zm_cr(struct drm_device *dev, struct nvbios *bios, uint16_t off
 	if (!iexec->execute)
 		return true;
 
-	bios_idxprt_wr(dev, NV_CIO_CRX__COLOR, crtcindex, data);
+	bios_idxprt_wr(bios, NV_CIO_CRX__COLOR, crtcindex, data);
 
 	return true;
 }
@@ -1708,7 +1707,7 @@ static bool init_zm_index_io(struct drm_device *dev, struct nvbios *bios, uint16
 	if (!iexec->execute)
 		return true;
 
-	bios_idxprt_wr(dev, crtcport, crtcindex, data);
+	bios_idxprt_wr(bios, crtcport, crtcindex, data);
 
 	return true;
 }
@@ -1825,15 +1824,15 @@ static bool init_configure_mem(struct drm_device *dev, struct nvbios *bios, uint
 
 	/* no iexec->execute check by design */
 
-	uint16_t meminitoffs = bios->legacy.mem_init_tbl_ptr + MEM_INIT_SIZE * (bios_idxprt_rd(dev, NV_CIO_CRX__COLOR, NV_CIO_CRE_SCRATCH4__INDEX) >> 4);
+	uint16_t meminitoffs = bios->legacy.mem_init_tbl_ptr + MEM_INIT_SIZE * (bios_idxprt_rd(bios, NV_CIO_CRX__COLOR, NV_CIO_CRE_SCRATCH4__INDEX) >> 4);
 	uint16_t seqtbloffs = bios->legacy.sdr_seq_tbl_ptr, meminitdata = meminitoffs + 6;
 	uint32_t reg, data;
 
 	if (bios->major_version > 2)
 		return false;
 
-	bios_idxprt_wr(dev, NV_VIO_SRX, NV_VIO_SR_CLOCK_INDEX,
-		       bios_idxprt_rd(dev, NV_VIO_SRX, NV_VIO_SR_CLOCK_INDEX) | 0x20);
+	bios_idxprt_wr(bios, NV_VIO_SRX, NV_VIO_SR_CLOCK_INDEX,
+		       bios_idxprt_rd(bios, NV_VIO_SRX, NV_VIO_SR_CLOCK_INDEX) | 0x20);
 
 	if (bios->data[meminitoffs] & 1)
 		seqtbloffs = bios->legacy.ddr_seq_tbl_ptr;
@@ -1878,7 +1877,7 @@ static bool init_configure_clk(struct drm_device *dev, struct nvbios *bios, uint
 
 	/* no iexec->execute check by design */
 
-	uint16_t meminitoffs = bios->legacy.mem_init_tbl_ptr + MEM_INIT_SIZE * (bios_idxprt_rd(dev, NV_CIO_CRX__COLOR, NV_CIO_CRE_SCRATCH4__INDEX) >> 4);
+	uint16_t meminitoffs = bios->legacy.mem_init_tbl_ptr + MEM_INIT_SIZE * (bios_idxprt_rd(bios, NV_CIO_CRX__COLOR, NV_CIO_CRE_SCRATCH4__INDEX) >> 4);
 	int clock;
 
 	if (bios->major_version > 2)
@@ -1914,7 +1913,7 @@ static bool init_configure_preinit(struct drm_device *dev, struct nvbios *bios, 
 	if (bios->major_version > 2)
 		return false;
 
-	bios_idxprt_wr(dev, NV_CIO_CRX__COLOR, NV_CIO_CRE_SCRATCH4__INDEX, cr3c);
+	bios_idxprt_wr(bios, NV_CIO_CRX__COLOR, NV_CIO_CRE_SCRATCH4__INDEX, cr3c);
 
 	return true;
 }
@@ -1980,7 +1979,7 @@ static bool init_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 		return true;
 	}
 
-	bios_port_wr(dev, crtcport, (bios_port_rd(dev, crtcport) & mask) | data);
+	bios_port_wr(bios, crtcport, (bios_port_rd(bios, crtcport) & mask) | data);
 
 	return true;
 }
@@ -2251,8 +2250,8 @@ static bool init_index_io(struct drm_device *dev, struct nvbios *bios, uint16_t 
 		      "Data: 0x%02X\n",
 		offset, crtcport, crtcindex, mask, data);
 
-	value = (bios_idxprt_rd(dev, crtcport, crtcindex) & mask) | data;
-	bios_idxprt_wr(dev, crtcport, crtcindex, value);
+	value = (bios_idxprt_rd(bios, crtcport, crtcindex) & mask) | data;
+	bios_idxprt_wr(bios, crtcport, crtcindex, value);
 
 	return true;
 }
@@ -2759,7 +2758,7 @@ static void run_digital_op_script(struct drm_device *dev, uint16_t scriptptr, st
 
 	NV_TRACE(dev, "0x%04X: Parsing digital output script table\n",
 		 scriptptr);
-	bios_idxprt_wr(dev, NV_CIO_CRX__COLOR, NV_CIO_CRE_44,
+	bios_idxprt_wr(bios, NV_CIO_CRX__COLOR, NV_CIO_CRE_44,
 		       head ? NV_CIO_CRE_44_HEADB : NV_CIO_CRE_44_HEADA);
 	/* note: if dcb entries have been merged, index may be misleading */
 	NVWriteVgaCrtc5758(dev, head, 0, dcbent->index);
@@ -3687,7 +3686,7 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 
 			if (((limit_match == NV_PRAMDAC_VPLL_COEFF || limit_match == VPLL1) && sel_clk & 0x20) ||
 			    ((limit_match == NV_RAMDAC_VPLL2 || limit_match == VPLL2) && sel_clk & 0x80)) {
-				if (bios_idxprt_rd(dev, NV_CIO_CRX__COLOR, NV_CIO_CRE_CHIP_ID_INDEX) < 0xa3)
+				if (bios_idxprt_rd(bios, NV_CIO_CRX__COLOR, NV_CIO_CRE_CHIP_ID_INDEX) < 0xa3)
 					pll_lim->refclk = 200000;
 				else
 					pll_lim->refclk = 25000;
