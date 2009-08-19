@@ -379,6 +379,16 @@ NVLockVgaCrtcs(struct drm_device *dev, bool lock)
 	return waslocked;
 }
 
+/* nv04 cursor max dimensions of 32x32 (A1R5G5B5) */
+#define NV04_CURSOR_SIZE 32
+/* limit nv10 cursors to 64x64 (ARGB8) (we could go to 64x255) */
+#define NV10_CURSOR_SIZE 64
+
+static inline int nv_cursor_width(struct drm_device *dev)
+{
+	return nv_arch(dev) >= NV_10 ? NV10_CURSOR_SIZE : NV04_CURSOR_SIZE;
+}
+
 static inline void
 nv_fix_nv40_hw_cursor(struct drm_device *dev, int head)
 {
