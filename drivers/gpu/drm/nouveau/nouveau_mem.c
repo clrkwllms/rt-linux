@@ -503,7 +503,7 @@ nouveau_mem_init(struct drm_device *dev)
 		return ret;
 
 	ret = ttm_bo_device_init(&dev_priv->ttm.bdev,
-				 dev_priv->ttm.mem_global_ref.object,
+				 dev_priv->ttm.bo_global_ref.ref.object,
 				 &nouveau_bo_driver, DRM_FILE_PAGE_OFFSET,
 				 dma_bits <= 32 ? true : false);
 	if (ret) {

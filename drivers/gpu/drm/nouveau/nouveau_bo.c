@@ -489,9 +489,9 @@ nouveau_bo_move_flipd(struct ttm_buffer_object *bo, bool evict, bool intr,
 	ret = ttm_bo_move_ttm(bo, evict, no_wait, new_mem);
 out:
 	if (tmp_mem.mm_node) {
-		spin_lock(&bo->bdev->lru_lock);
+		spin_lock(&bo->bdev->glob->lru_lock);
 		drm_mm_put_block(tmp_mem.mm_node);
-		spin_unlock(&bo->bdev->lru_lock);
+		spin_unlock(&bo->bdev->glob->lru_lock);
 	}
 
 	return ret;
@@ -521,9 +521,9 @@ nouveau_bo_move_flips(struct ttm_buffer_object *bo, bool evict, bool intr,
 
 out:
 	if (tmp_mem.mm_node) {
-		spin_lock(&bo->bdev->lru_lock);
+		spin_lock(&bo->bdev->glob->lru_lock);
 		drm_mm_put_block(tmp_mem.mm_node);
-		spin_unlock(&bo->bdev->lru_lock);
+		spin_unlock(&bo->bdev->glob->lru_lock);
 	}
 
 	return ret;

@@ -333,6 +333,10 @@ static int nouveau_fbcon_pan_display(struct fb_var_screeninfo *var,
 			ret = helper_funcs->mode_set_base(crtc,
 				modeset->x, modeset->y, modeset->fb);
 
+			mutex_lock(&dev->mode_config.mutex);
+			ret = crtc->funcs->set_config(modeset);
+			mutex_unlock(&dev->mode_config.mutex);
+
 			if (!ret) {
 				info->var.xoffset = var->xoffset;
 				info->var.yoffset = var->yoffset;
