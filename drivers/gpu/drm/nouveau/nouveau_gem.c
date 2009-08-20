@@ -578,9 +578,6 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 	struct list_head list;
 	int ret = 0, do_reloc = 0;
 
-	if (unlikely(dev_priv->card_type < NV_50))
-		return -ENODEV;
-
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 	NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(req->channel, file_priv, chan);
 
