@@ -152,7 +152,7 @@ static bool nv04_dfp_mode_fixup(struct drm_encoder *encoder,
 	struct nouveau_connector *nv_connector = nouveau_encoder_connector_get(nv_encoder);
 
 	/* For internal panels and gpu scaling on DVI we need the native mode */
-	if (nv_connector->scaling_mode != DRM_MODE_SCALE_NON_GPU) {
+	if (nv_connector->scaling_mode != DRM_MODE_SCALE_NONE) {
 		nv_encoder->mode = *nv_connector->native_mode;
 		adjusted_mode->clock = nv_connector->native_mode->clock;
 	} else {
@@ -294,8 +294,8 @@ static void nv04_dfp_mode_set(struct drm_encoder *encoder,
 	if (output_mode->flags & DRM_MODE_FLAG_PHSYNC)
 		regp->fp_control |= NV_PRAMDAC_FP_TG_CONTROL_HSYNC_POS;
 	/* panel scaling first, as native would get set otherwise */
-	if (nv_connector->scaling_mode == DRM_MODE_SCALE_NON_GPU ||
-	    nv_connector->scaling_mode == DRM_MODE_SCALE_NO_SCALE)	/* panel handles it */
+	if (nv_connector->scaling_mode == DRM_MODE_SCALE_NONE ||
+	    nv_connector->scaling_mode == DRM_MODE_SCALE_CENTER)	/* panel handles it */
 		regp->fp_control |= NV_PRAMDAC_FP_TG_CONTROL_MODE_CENTER;
 	else if (adjusted_mode->hdisplay == output_mode->hdisplay &&
 		 adjusted_mode->vdisplay == output_mode->vdisplay) /* native mode */

@@ -239,12 +239,12 @@ nv50_crtc_set_scale(struct nouveau_crtc *crtc, int scaling_mode, bool update)
 	NV_DEBUG(dev, "\n");
 
 	switch (scaling_mode) {
-	case DRM_MODE_SCALE_NON_GPU:
+	case DRM_MODE_SCALE_NONE:
 		break;
 	default:
 		if (!connector || !connector->native_mode) {
 			NV_ERROR(dev, "No native mode, forcing panel scaling\n");
-			scaling_mode = DRM_MODE_SCALE_NON_GPU;
+			scaling_mode = DRM_MODE_SCALE_NONE;
 		} else {
 			native_mode = connector->native_mode;
 		}
@@ -268,8 +268,8 @@ nv50_crtc_set_scale(struct nouveau_crtc *crtc, int scaling_mode, bool update)
 		outX = native_mode->hdisplay;
 		outY = native_mode->vdisplay;
 		break;
-	case DRM_MODE_SCALE_NO_SCALE:
-	case DRM_MODE_SCALE_NON_GPU:
+	case DRM_MODE_SCALE_CENTER:
+	case DRM_MODE_SCALE_NONE:
 	default:
 		outX = mode->hdisplay;
 		outY = mode->vdisplay;

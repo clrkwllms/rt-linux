@@ -303,9 +303,9 @@ nouveau_connector_set_property(struct drm_connector *connector,
 		bool modeset = false;
 
 		switch (value) {
-		case DRM_MODE_SCALE_NON_GPU:
+		case DRM_MODE_SCALE_NONE:
 		case DRM_MODE_SCALE_FULLSCREEN:
-		case DRM_MODE_SCALE_NO_SCALE:
+		case DRM_MODE_SCALE_CENTER:
 		case DRM_MODE_SCALE_ASPECT:
 			break;
 		default:
@@ -314,14 +314,14 @@ nouveau_connector_set_property(struct drm_connector *connector,
 
 		/* LVDS always needs gpu scaling */
 		if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS &&
-		    value == DRM_MODE_SCALE_NON_GPU)
+		    value == DRM_MODE_SCALE_NONE)
 			return -EINVAL;
 
 		/* Changing between GPU and panel scaling requires a full
 		 * modeset
 		 */
-		if ((nv_connector->scaling_mode == DRM_MODE_SCALE_NON_GPU) ||
-		    (value == DRM_MODE_SCALE_NON_GPU))
+		if ((nv_connector->scaling_mode == DRM_MODE_SCALE_NONE) ||
+		    (value == DRM_MODE_SCALE_NONE))
 			modeset = true;
 		nv_connector->scaling_mode = value;
 
@@ -602,7 +602,7 @@ nouveau_connector_create(struct drm_device *dev, int index, int type)
 					      : DRM_MODE_DITHERING_OFF);
 
 	} else {
-		nv_connector->scaling_mode = DRM_MODE_SCALE_NON_GPU;
+		nv_connector->scaling_mode = DRM_MODE_SCALE_NONE;
 	}
 
 	/* attach encoders */
