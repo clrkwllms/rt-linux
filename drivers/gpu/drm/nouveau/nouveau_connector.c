@@ -528,7 +528,7 @@ nouveau_connector_create_lvds(struct drm_device *dev,
 }
 
 int
-nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
+nouveau_connector_create(struct drm_device *dev, int index, int type)
 {
 	struct nouveau_connector *nv_connector = NULL;
 	struct drm_connector *connector;
@@ -609,8 +609,13 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
 		struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 
-		if (nv_encoder->dcb->i2c_index != i2c_index)
-			continue;
+		if (nv_arch(dev) >= NV_50) {
+			if (nv_encoder->dcb->connector != index)
+				continue;
+		} else {
+			if (nv_encoder->dcb->i2c_index != index)
+				continue;
+		}
 
 		if (get_slave_funcs(nv_encoder))
 			get_slave_funcs(nv_encoder)->create_resources(encoder, connector);
