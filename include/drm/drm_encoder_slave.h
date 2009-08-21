@@ -27,8 +27,8 @@
 #ifndef __DRM_ENCODER_SLAVE_H__
 #define __DRM_ENCODER_SLAVE_H__
 
-#include <drm/drmP.h>
-#include <drm/drm_crtc.h>
+#include "drmP.h"
+#include "drm_crtc.h"
 
 /**
  * struct drm_encoder_slave_funcs - Entry points exposed by a slave encoder driver
@@ -154,7 +154,7 @@ static inline int drm_i2c_encoder_register(struct module *owner,
  */
 static inline void drm_i2c_encoder_unregister(struct drm_i2c_encoder_driver *driver)
 {
-	return i2c_del_driver(&driver->i2c_driver);
+	i2c_del_driver(&driver->i2c_driver);
 }
 
 void drm_i2c_encoder_destroy(struct drm_encoder *encoder);

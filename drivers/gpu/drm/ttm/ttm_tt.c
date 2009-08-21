@@ -179,7 +179,7 @@ static void ttm_tt_free_user_pages(struct ttm_tt *ttm)
 			set_page_dirty_lock(page);
 
 		ttm->pages[i] = NULL;
-		ttm_mem_global_free(ttm->bdev->mem_glob, PAGE_SIZE, false);
+		ttm_mem_global_free(ttm->glob->mem_glob, PAGE_SIZE);
 		put_page(page);
 	}
 	ttm->state = tt_unpopulated;
@@ -190,8 +190,7 @@ static void ttm_tt_free_user_pages(struct ttm_tt *ttm)
 static struct page *__ttm_tt_get_page(struct ttm_tt *ttm, int index)
 {
 	struct page *p;
-	struct ttm_bo_device *bdev = ttm->bdev;
-	struct ttm_mem_global *mem_glob = bdev->mem_glob;
+	struct ttm_mem_global *mem_glob = ttm->glob->mem_glob;
 	int ret;
 
 	while (NULL == (p = ttm->pages[index])) {
@@ -200,21 +199,14 @@ static struct page *__ttm_tt_get_page(struct ttm_tt *ttm, int index)
 		if (!p)
 			return NULL;
 
-		if (PageHighMem(p)) {
-			ret =
-			    ttm_mem_global_alloc(mem_glob, PAGE_SIZE,
-						 false, false, true);
-			if (unlikely(ret != 0))
-				goto out_err;
+		ret = ttm_mem_global_alloc_page(mem_glob, p, false, false);
+		if (unlikely(ret != 0))
+			goto out_err;
+
+		if (PageHighMem(p))
 			ttm->pages[--ttm->first_himem_page] = p;
-		} else {
-			ret =
-			    ttm_mem_global_alloc(mem_glob, PAGE_SIZE,
-						 false, false, false);
-			if (unlikely(ret != 0))
-				goto out_err;
+		else
 			ttm->pages[++ttm->last_lomem_page] = p;
-		}
 	}
 	return p;
 out_err:
@@ -368,8 +360,8 @@ static void ttm_tt_free_alloced_pages(struct ttm_tt *ttm)
 				printk(KERN_ERR TTM_PFX
 				       "Erroneous page count. "
 				       "Leaking pages.\n");
-			ttm_mem_global_free(ttm->bdev->mem_glob, PAGE_SIZE,
-					    PageHighMem(cur_page));
+			ttm_mem_global_free_page(ttm->glob->mem_glob,
+						 cur_page);
 			__free_page(cur_page);
 		}
 	}
@@ -414,7 +406,7 @@ int ttm_tt_set_user(struct ttm_tt *ttm,
 	struct mm_struct *mm = tsk->mm;
 	int ret;
 	int write = (ttm->page_flags & TTM_PAGE_FLAG_WRITE) != 0;
-	struct ttm_mem_global *mem_glob = ttm->bdev->mem_glob;
+	struct ttm_mem_global *mem_glob = ttm->glob->mem_glob;
 
 	BUG_ON(num_pages != ttm->num_pages);
 	BUG_ON((ttm->page_flags & TTM_PAGE_FLAG_USER) == 0);
@@ -424,7 +416,7 @@ int ttm_tt_set_user(struct ttm_tt *ttm,
 	 */
 
 	ret = ttm_mem_global_alloc(mem_glob, num_pages * PAGE_SIZE,
-				   false, false, false);
+				   false, false);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -435,7 +427,7 @@ int ttm_tt_set_user(struct ttm_tt *ttm,
 
 	if (ret != num_pages && write) {
 		ttm_tt_free_user_pages(ttm);
-		ttm_mem_global_free(mem_glob, num_pages * PAGE_SIZE, false);
+		ttm_mem_global_free(mem_glob, num_pages * PAGE_SIZE);
 		return -ENOMEM;
 	}
 
@@ -459,8 +451,7 @@ struct ttm_tt *ttm_tt_create(struct ttm_bo_device *bdev, unsigned long size,
 	if (!ttm)
 		return NULL;
 
-	ttm->bdev = bdev;
-
+	ttm->glob = bdev->glob;
 	ttm->num_pages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	ttm->first_himem_page = ttm->num_pages;
 	ttm->last_lomem_page = -1;
