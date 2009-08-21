@@ -536,10 +536,10 @@ int nv50_display_destroy(struct drm_device *dev)
 
 	NV_DEBUG(dev, "\n");
 
+	drm_mode_config_cleanup(dev);
+
 	nv50_display_disable(dev);
 	nv50_evo_channel_del(&dev_priv->evo);
-
-	drm_mode_config_cleanup(dev);
 
 	return 0;
 }
