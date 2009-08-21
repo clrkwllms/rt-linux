@@ -96,6 +96,7 @@ nouveau_ttm_global_init(struct drm_nouveau_private *dev_priv)
 	ret = ttm_global_item_ref(global_ref);
 	if (unlikely(ret != 0)) {
 		DRM_ERROR("Failed setting up TTM memory accounting\n");
+		dev_priv->ttm.mem_global_ref.release = NULL;
 		return ret;
 	}
 
@@ -110,6 +111,7 @@ nouveau_ttm_global_init(struct drm_nouveau_private *dev_priv)
 	if (unlikely(ret != 0)) {
 		DRM_ERROR("Failed setting up TTM BO subsystem\n");
 		ttm_global_item_unref(&dev_priv->ttm.mem_global_ref);
+		dev_priv->ttm.mem_global_ref.release = NULL;
 		return ret;
 	}
 
@@ -119,6 +121,10 @@ nouveau_ttm_global_init(struct drm_nouveau_private *dev_priv)
 void
 nouveau_ttm_global_release(struct drm_nouveau_private *dev_priv)
 {
+	if (dev_priv->ttm.mem_global_ref.release == NULL)
+		return;
+	dev_priv->ttm.mem_global_ref.release = NULL;
+
 	ttm_global_item_unref(&dev_priv->ttm.bo_global_ref.ref);
 	ttm_global_item_unref(&dev_priv->ttm.mem_global_ref);
 }
