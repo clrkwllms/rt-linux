@@ -186,7 +186,7 @@ nv50_display_init(struct drm_device *dev)
 	struct nouveau_channel *evo = dev_priv->evo;
 	uint32_t val, ram_amount;
 	uint64_t start;
-	int i;
+	int ret, i;
 
 	NV_DEBUG(dev, "\n");
 
@@ -329,11 +329,16 @@ nv50_display_init(struct drm_device *dev)
 	evo->dma.cur = evo->dma.put;
 	evo->dma.free = evo->dma.max - evo->dma.cur;
 
-	RING_SPACE(evo, NOUVEAU_DMA_SKIPS);
+	ret = RING_SPACE(evo, NOUVEAU_DMA_SKIPS);
+	if (ret)
+		return ret;
+
 	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
 		OUT_RING  (evo, 0);
 
-	RING_SPACE(evo, 11);
+	ret = RING_SPACE(evo, 11);
+	if (ret)
+		return ret;
 	BEGIN_RING(evo, 0, NV50_EVO_UNK84, 2);
 	OUT_RING  (evo, NV50_EVO_UNK84_NOTIFY_DISABLED);
 	OUT_RING  (evo, NV50_EVO_DMA_NOTIFY_HANDLE_NONE);
@@ -367,7 +372,7 @@ static int nv50_display_disable(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_crtc *drm_crtc;
-	int i;
+	int ret, i;
 
 	NV_DEBUG(dev, "\n");
 
@@ -377,9 +382,11 @@ static int nv50_display_disable(struct drm_device *dev)
 		nv50_crtc_blank(crtc, true);
 	}
 
-	RING_SPACE(dev_priv->evo, 2);
-	BEGIN_RING(dev_priv->evo, 0, NV50_EVO_UPDATE, 1);
-	OUT_RING  (dev_priv->evo, 0);
+	ret = RING_SPACE(dev_priv->evo, 2);
+	if (ret == 0) {
+		BEGIN_RING(dev_priv->evo, 0, NV50_EVO_UPDATE, 1);
+		OUT_RING  (dev_priv->evo, 0);
+	}
 	FIRE_RING (dev_priv->evo);
 
 	/* Almost like ack'ing a vblank interrupt, maybe in the spirit of

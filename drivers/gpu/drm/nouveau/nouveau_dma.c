@@ -71,12 +71,17 @@ nouveau_dma_init(struct nouveau_channel *chan)
 	chan->dma.free = chan->dma.max - chan->dma.cur;
 
 	/* Insert NOPS for NOUVEAU_DMA_SKIPS */
-	RING_SPACE(chan, NOUVEAU_DMA_SKIPS);
+	ret = RING_SPACE(chan, NOUVEAU_DMA_SKIPS);
+	if (ret)
+		return ret;
+
 	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
 		OUT_RING (chan, 0);
 
 	/* Initialise NV_MEMORY_TO_MEMORY_FORMAT */
-	RING_SPACE(chan, 4);
+	ret = RING_SPACE(chan, 4);
+	if (ret)
+		return ret;
 	BEGIN_RING(chan, NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_NAME, 1);
 	OUT_RING  (chan, NvM2MF);
 	BEGIN_RING(chan, NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_DMA_NOTIFY, 1);
