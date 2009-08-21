@@ -248,6 +248,7 @@ nv04_display_destroy(struct drm_device *dev)
 void
 nv04_display_restore(struct drm_device *dev)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_encoder *encoder;
 	struct drm_crtc *crtc;
 
@@ -269,5 +270,13 @@ nv04_display_restore(struct drm_device *dev)
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head)
 		crtc->funcs->restore(crtc);
+
+	if (nv_two_heads(dev)) {
+		NV_INFO(dev, "Restoring CRTC_OWNER to %d.\n",
+			dev_priv->crtc_owner);
+		NVSetOwner(dev, dev_priv->crtc_owner);
+	}
+
+	NVLockVgaCrtcs(dev, true);
 }
 
