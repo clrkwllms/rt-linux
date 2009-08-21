@@ -113,8 +113,13 @@ READ_GET(struct nouveau_channel *chan, uint32_t *get)
 
 	val = nvchan_rd32(chan->user_get);
 	if (val < chan->pushbuf_base ||
-	    val >= chan->pushbuf_base + chan->pushbuf_bo->bo.mem.size)
+	    val >= chan->pushbuf_base + chan->pushbuf_bo->bo.mem.size) {
+		/* meaningless to dma_wait() except to know whether the
+		 * GPU has stalled or not
+		 */
+		*get = val;
 		return false;
+	}
 
 	*get = (val - chan->pushbuf_base) >> 2;
 	return true;
@@ -123,54 +128,79 @@ READ_GET(struct nouveau_channel *chan, uint32_t *get)
 int
 nouveau_dma_wait(struct nouveau_channel *chan, int size)
 {
-	const int us_timeout = 100000;
-	uint32_t get;
-	int ret = -EBUSY, i;
+	uint32_t get, prev_get = 0, cnt = 0;
+	bool get_valid;
 
-	for (i = 0; i < us_timeout; i++) {
-		if (!READ_GET(chan, &get)) {
+	while (chan->dma.free < size) {
+		/* reset counter as long as GET is still advancing, this is
+		 * to avoid misdetecting a GPU lockup if the GPU happens to
+		 * just be processing an operation that takes a long time
+		 */
+		get_valid = READ_GET(chan, &get);
+		if (get != prev_get) {
+			prev_get = get;
+			cnt = 0;
+		}
+
+		if ((++cnt & 0xff) == 0) {
 			DRM_UDELAY(1);
+			if (cnt > 100000)
+				return -EBUSY;
+		}
+
+		/* loop until we have a usable GET pointer.  the value
+		 * we read from the GPU may be outside the main ring if
+		 * PFIFO is processing a buffer called from the main ring,
+		 * discard these values until something sensible is seen.
+		 *
+		 * the other case we discard GET is while the GPU is fetching
+		 * from the SKIPS area, so the code below doesn't have to deal
+		 * with some fun corner cases.
+		 */
+		if (!get_valid || get < NOUVEAU_DMA_SKIPS)
 			continue;
-		}
 
-		if (chan->dma.put >= get) {
+		if (get <= chan->dma.cur) {
+			/* engine is fetching behind us, or is completely
+			 * idle (GET == PUT) so we have free space up until
+			 * the end of the push buffer
+			 *
+			 * we can only hit that path once per call due to
+			 * looping back to the beginning of the push buffer,
+			 * we'll hit the fetching-ahead-of-us path from that
+			 * point on.
+			 *
+			 * the *one* exception to that rule is if we read
+			 * GET==PUT, in which case the below conditional will
+			 * always succeed and break us out of the wait loop.
+			 */
 			chan->dma.free = chan->dma.max - chan->dma.cur;
+			if (chan->dma.free >= size)
+				break;
 
-			if (chan->dma.free < size) {
-				OUT_RING(chan, 0x20000000|chan->pushbuf_base);
-				if (get <= NOUVEAU_DMA_SKIPS) {
-					/*corner case - will be idle*/
-					if (chan->dma.put <= NOUVEAU_DMA_SKIPS)
-						WRITE_PUT(NOUVEAU_DMA_SKIPS + 1);
+			/* not enough space left at the end of the push buffer,
+			 * instruct the GPU to jump back to the start right
+			 * after processing the currently pending commands.
+			 */
+			OUT_RING  (chan, chan->pushbuf_base | 0x20000000);
+			WRITE_PUT (NOUVEAU_DMA_SKIPS);
 
-					for (; i < us_timeout; i++) {
-						if (READ_GET(chan, &get) &&
-						    get > NOUVEAU_DMA_SKIPS)
-							break;
-
-						DRM_UDELAY(1);
-					}
-
-					if (i >= us_timeout)
-						break;
-				}
-
-				WRITE_PUT(NOUVEAU_DMA_SKIPS);
-				chan->dma.cur  =
-				chan->dma.put  = NOUVEAU_DMA_SKIPS;
-				chan->dma.free = get - (NOUVEAU_DMA_SKIPS + 1);
-			}
-		} else {
-			chan->dma.free = get - chan->dma.cur - 1;
+			/* we're now submitting commands at the start of
+			 * the push buffer.
+			 */
+			chan->dma.cur  =
+			chan->dma.put  = NOUVEAU_DMA_SKIPS;
 		}
 
-		if (chan->dma.free >= size) {
-			ret = 0;
-			break;
-		}
-
-		DRM_UDELAY(1);
+		/* engine fetching ahead of us, we have space up until the
+		 * current GET pointer.  the "- 1" is to ensure there's
+		 * space left to emit a jump back to the beginning of the
+		 * push buffer if we require it.  we can never get GET == PUT
+		 * here, so this is safe.
+		 */
+		chan->dma.free = get - chan->dma.cur - 1;
 	}
 
-	return ret;
+	return 0;
 }
+
