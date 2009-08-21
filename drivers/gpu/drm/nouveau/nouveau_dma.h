@@ -84,7 +84,7 @@ typedef enum {
 #define NV50_MEMORY_TO_MEMORY_FORMAT_OFFSET_IN_HIGH                   0x00000238
 #define NV50_MEMORY_TO_MEMORY_FORMAT_OFFSET_OUT_HIGH                  0x0000023c
 
-static inline int
+static __must_check inline int
 RING_SPACE(struct nouveau_channel *chan, int size)
 {
 	if (chan->dma.free < size) {
