@@ -123,9 +123,9 @@ nouveau_ttm_global_release(struct drm_nouveau_private *dev_priv)
 {
 	if (dev_priv->ttm.mem_global_ref.release == NULL)
 		return;
-	dev_priv->ttm.mem_global_ref.release = NULL;
 
 	ttm_global_item_unref(&dev_priv->ttm.bo_global_ref.ref);
 	ttm_global_item_unref(&dev_priv->ttm.mem_global_ref);
+	dev_priv->ttm.mem_global_ref.release = NULL;
 }
 
