@@ -149,7 +149,7 @@ struct nv17_tv_norm_params nv17_tv_norms[NUM_TV_NORMS] = {
 
 	[TV_NORM_HD480P] = { CTV_ENC_MODE, {
 			.ctv_enc_mode = {
-				.mode = { DRM_MODE("720x480", DRM_MODE_TYPE_DRIVER, 25312,
+				.mode = { DRM_MODE("720x480", DRM_MODE_TYPE_DRIVER, 27000,
 						   720, 735, 743, 858, 0, 480, 490, 494, 525, 0,
 						   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) },
 				.ctv_regs = { 0x3540000, 0x0, 0x0, 0x314,
@@ -165,7 +165,7 @@ struct nv17_tv_norm_params nv17_tv_norms[NUM_TV_NORMS] = {
 
 	[TV_NORM_HD576P] = { CTV_ENC_MODE, {
 			.ctv_enc_mode = {
-				.mode = { DRM_MODE("720x576", DRM_MODE_TYPE_DRIVER, 25312,
+				.mode = { DRM_MODE("720x576", DRM_MODE_TYPE_DRIVER, 27000,
 						   720, 730, 738, 864, 0, 576, 581, 585, 625, 0,
 						   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) },
 				.ctv_regs = { 0x3540000, 0x0, 0x0, 0x314,
@@ -181,7 +181,7 @@ struct nv17_tv_norm_params nv17_tv_norms[NUM_TV_NORMS] = {
 
 	[TV_NORM_HD720P] = { CTV_ENC_MODE, {
 			.ctv_enc_mode = {
-				.mode = { DRM_MODE("1280x720", DRM_MODE_TYPE_DRIVER, 70875,
+				.mode = { DRM_MODE("1280x720", DRM_MODE_TYPE_DRIVER, 74250,
 						   1280, 1349, 1357, 1650, 0, 720, 725, 730, 750, 0,
 						   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) },
 				.ctv_regs = { 0x1260394, 0x0, 0x0, 0x622,
@@ -197,7 +197,7 @@ struct nv17_tv_norm_params nv17_tv_norms[NUM_TV_NORMS] = {
 
 	[TV_NORM_HD1080I] = { CTV_ENC_MODE, {
 			.ctv_enc_mode = {
-				.mode = { DRM_MODE("1920x1080", DRM_MODE_TYPE_DRIVER, 70875,
+				.mode = { DRM_MODE("1920x1080", DRM_MODE_TYPE_DRIVER, 74250,
 						   1920, 1961, 2049, 2200, 0, 1080, 1084, 1088, 1125, 0,
 						   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC
 						   | DRM_MODE_FLAG_INTERLACE) },
