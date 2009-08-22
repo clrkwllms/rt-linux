@@ -228,6 +228,15 @@ nv04_display_destroy(struct drm_device *dev)
 
 	NV_DEBUG(dev, "\n");
 
+	/* Turn every CRTC off. */
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		struct drm_mode_set modeset = {
+			.crtc = crtc,
+		};
+
+		crtc->funcs->set_config(&modeset);
+	}
+
 	/* Restore state */
 	NVLockVgaCrtcs(dev, false);
 
