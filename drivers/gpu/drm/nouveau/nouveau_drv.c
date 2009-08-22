@@ -57,6 +57,10 @@ MODULE_PARM_DESC(uscript_tmds, "TMDS output script table ID (>=GeForce 8)");
 int nouveau_uscript_tmds = -1;
 module_param_named(uscript_tmds, nouveau_uscript_tmds, int, 0400);
 
+MODULE_PARM_DESC(tv_norm, "Default TV norm");
+char *nouveau_tv_norm = NULL;
+module_param_named(tv_norm, nouveau_tv_norm, charp, 0400);
+
 int nouveau_fbpercrtc = 0;
 #if 0
 module_param_named(fbpercrtc, nouveau_fbpercrtc, int, 0400);

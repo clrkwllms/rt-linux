@@ -479,10 +479,24 @@ static int nv17_tv_create_resources(struct drm_encoder *encoder,
 	struct drm_mode_config *conf = &dev->mode_config;
 	struct nv17_tv_encoder *tv_enc = to_tv_enc(encoder);
 	struct dcb_entry *dcb = nouveau_encoder(encoder)->dcb;
+	int num_tv_norms = dcb->tvconf.has_component_output? NUM_TV_NORMS
+		: NUM_LD_TV_NORMS;
+	int i;
 
-	drm_mode_create_tv_properties(dev,
-				      dcb->tvconf.has_component_output? NUM_TV_NORMS
-				      : NUM_LD_TV_NORMS, nv17_tv_norm_names);
+	if (nouveau_tv_norm) {
+		for (i = 0; i < num_tv_norms; i++) {
+			if (!strcmp(nv17_tv_norm_names[i], nouveau_tv_norm)) {
+				tv_enc->tv_norm = i;
+				break;
+			}
+		}
+
+		if (i == num_tv_norms)
+			NV_WARN(dev, "Invalid TV norm setting \"%s\"\n",
+				nouveau_tv_norm);
+	}
+
+	drm_mode_create_tv_properties(dev, num_tv_norms, nv17_tv_norm_names);
 
 	drm_connector_attach_property(connector, conf->tv_select_subconnector_property,
 				      tv_enc->select_subconnector);

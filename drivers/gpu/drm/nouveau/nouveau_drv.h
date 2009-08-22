@@ -621,6 +621,7 @@ extern int nouveau_uscript_lvds;
 extern int nouveau_uscript_tmds;
 extern int nouveau_vram_pushbuf;
 extern int nouveau_fbpercrtc;
+extern char *nouveau_tv_norm;
 
 /* nouveau_state.c */
 extern void nouveau_preclose(struct drm_device *dev, struct drm_file *);
