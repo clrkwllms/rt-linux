@@ -429,6 +429,7 @@ static int ch7006_encoder_init(struct i2c_client *client,
 			       struct drm_encoder_slave *encoder)
 {
 	struct ch7006_priv *priv;
+	int i;
 
 	ch7006_dbg(client, "\n");
 
@@ -449,6 +450,27 @@ static int ch7006_encoder_init(struct i2c_client *client,
 	priv->hmargin = 50;
 	priv->vmargin = 50;
 	priv->last_dpms = -1;
+
+	if (ch7006_tv_norm) {
+		for (i = 0; i < NUM_TV_NORMS; i++) {
+			if (!strcmp(ch7006_tv_norm_names[i], ch7006_tv_norm)) {
+				priv->norm = i;
+				break;
+			}
+		}
+
+		if (i == NUM_TV_NORMS)
+			ch7006_err(client, "Invalid TV norm setting \"%s\".\n",
+				   ch7006_tv_norm);
+	}
+
+	if (ch7006_scale) {
+		if (ch7006_scale >= 0 && ch7006_scale <= 2)
+			priv->scale = ch7006_scale;
+		else
+			ch7006_err(client, "Invalid scale setting \"%d\".\n",
+				   ch7006_scale);
+	}
 
 	return 0;
 }
@@ -490,6 +512,14 @@ static void __exit ch7006_exit(void)
 int ch7006_debug = 0;
 module_param_named(debug, ch7006_debug, int, 0600);
 MODULE_PARM_DESC(debug, "Enable debug output.");
+
+char *ch7006_tv_norm = NULL;
+module_param_named(tv_norm, ch7006_tv_norm, charp, 0600);
+MODULE_PARM_DESC(tv_norm, "Default TV norm.");
+
+int ch7006_scale = 0;
+module_param_named(scale, ch7006_scale, int, 0600);
+MODULE_PARM_DESC(scale, "Default scale.");
 
 MODULE_AUTHOR("Francisco Jerez <currojerez@riseup.net>");
 MODULE_DESCRIPTION("Chrontel ch7006 TV encoder driver");

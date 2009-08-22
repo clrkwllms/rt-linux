@@ -101,6 +101,8 @@ struct ch7006_priv {
 #define to_ch7006_priv(x) ((struct ch7006_priv *)to_encoder_slave(x)->slave_priv)
 
 extern int ch7006_debug;
+extern char *ch7006_tv_norm;
+extern int ch7006_scale;
 
 extern char *ch7006_tv_norm_names[];
 extern struct ch7006_tv_norm_info ch7006_tv_norms[];
