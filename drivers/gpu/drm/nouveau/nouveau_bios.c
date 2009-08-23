@@ -3383,8 +3383,15 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 		return 1;
 	}
 
+	/* nothing useful has been in any of the pre-2.0 tables I've seen,
+	 * so until they are, we really don't need to care.
+	 */
+	if (table[0] < 0x20)
+		return 1;
+
 	if (table[0] != 0x20 && table[0] != 0x21) {
-		NV_ERROR(dev, "Output script table version 0x%02x unknown\n", table[0]);
+		NV_ERROR(dev, "Output script table version 0x%02x unknown\n",
+			 table[0]);
 		return 1;
 	}
 
