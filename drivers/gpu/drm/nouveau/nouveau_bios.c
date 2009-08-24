@@ -5078,10 +5078,7 @@ static bool NVInitVBIOS(struct drm_device *dev)
 	if (!NVShadowVBIOS(dev, bios->data))
 		return false;
 
-	bios->length = bios->data[2] * 512;
-	if (bios->length > NV_PROM_SIZE)
-		bios->length = NV_PROM_SIZE;
-
+	bios->length = NV_PROM_SIZE;
 	return true;
 }
 
