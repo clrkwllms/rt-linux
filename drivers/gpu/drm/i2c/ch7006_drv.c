@@ -515,11 +515,16 @@ MODULE_PARM_DESC(debug, "Enable debug output.");
 
 char *ch7006_tv_norm = NULL;
 module_param_named(tv_norm, ch7006_tv_norm, charp, 0600);
-MODULE_PARM_DESC(tv_norm, "Default TV norm.");
+MODULE_PARM_DESC(tv_norm, "Default TV norm.\n"
+		 "\t\tSupported: PAL, PAL-M, PAL-N, PAL-Nc, PAL-60, NTSC-M, NTSC-J.\n"
+		 "\t\tDefault: PAL");
 
 int ch7006_scale = 0;
 module_param_named(scale, ch7006_scale, int, 0600);
-MODULE_PARM_DESC(scale, "Default scale.");
+MODULE_PARM_DESC(scale, "Default scale.\n"
+		 "\t\tSupported: 0 -> Select video modes with a higher blanking ratio.\n"
+		 "\t\t\t1 -> Select default video modes.\n"
+		 "\t\t\t2 -> Select video modes with a lower blanking ratio.");
 
 MODULE_AUTHOR("Francisco Jerez <currojerez@riseup.net>");
 MODULE_DESCRIPTION("Chrontel ch7006 TV encoder driver");
