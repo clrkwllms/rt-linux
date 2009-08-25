@@ -464,13 +464,11 @@ static int ch7006_encoder_init(struct i2c_client *client,
 				   ch7006_tv_norm);
 	}
 
-	if (ch7006_scale) {
-		if (ch7006_scale >= 0 && ch7006_scale <= 2)
-			priv->scale = ch7006_scale;
-		else
-			ch7006_err(client, "Invalid scale setting \"%d\".\n",
-				   ch7006_scale);
-	}
+	if (ch7006_scale >= 0 && ch7006_scale <= 2)
+		priv->scale = ch7006_scale;
+	else
+		ch7006_err(client, "Invalid scale setting \"%d\".\n",
+			   ch7006_scale);
 
 	return 0;
 }
@@ -519,7 +517,7 @@ MODULE_PARM_DESC(tv_norm, "Default TV norm.\n"
 		 "\t\tSupported: PAL, PAL-M, PAL-N, PAL-Nc, PAL-60, NTSC-M, NTSC-J.\n"
 		 "\t\tDefault: PAL");
 
-int ch7006_scale = 0;
+int ch7006_scale = 1;
 module_param_named(scale, ch7006_scale, int, 0600);
 MODULE_PARM_DESC(scale, "Default scale.\n"
 		 "\t\tSupported: 0 -> Select video modes with a higher blanking ratio.\n"
