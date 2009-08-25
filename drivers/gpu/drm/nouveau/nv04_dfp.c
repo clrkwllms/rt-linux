@@ -153,6 +153,8 @@ static bool nv04_dfp_mode_fixup(struct drm_encoder *encoder,
 
 	/* For internal panels and gpu scaling on DVI we need the native mode */
 	if (nv_connector->scaling_mode != DRM_MODE_SCALE_NONE) {
+		if (!nv_connector->native_mode)
+			return false;
 		nv_encoder->mode = *nv_connector->native_mode;
 		adjusted_mode->clock = nv_connector->native_mode->clock;
 	} else {
@@ -305,7 +307,7 @@ static void nv04_dfp_mode_set(struct drm_encoder *encoder,
 	if (nvReadEXTDEV(dev, NV_PEXTDEV_BOOT_0) & NV_PEXTDEV_BOOT_0_STRAP_FP_IFACE_12BIT)
 		regp->fp_control |= NV_PRAMDAC_FP_TG_CONTROL_WIDTH_12;
 	if (nv_encoder->dcb->location != DCB_LOC_ON_CHIP &&
-	    nv_connector->native_mode->clock > 165000)
+	    output_mode->clock > 165000)
 		regp->fp_control |= (2 << 24);
 	if (nv_encoder->dcb->type == OUTPUT_LVDS) {
 		bool duallink, dummy;
@@ -315,7 +317,7 @@ static void nv04_dfp_mode_set(struct drm_encoder *encoder,
 		if (duallink)
 			regp->fp_control |= (8 << 28);
 	} else
-	if (nv_connector->native_mode->clock > 165000)
+	if (output_mode->clock > 165000)
 		regp->fp_control |= (8 << 28);
 
 	regp->fp_debug_0 = NV_PRAMDAC_FP_DEBUG_0_YWEIGHT_ROUND |
@@ -468,10 +470,14 @@ static void nv04_lvds_dpms(struct drm_encoder *encoder, int mode)
 		int head = crtc ? nouveau_crtc(crtc)->index :
 			   nv04_dfp_get_bound_head(dev, nv_encoder->dcb);
 
-		if (mode == DRM_MODE_DPMS_ON)
+		if (mode == DRM_MODE_DPMS_ON) {
+			if (!nv_connector->native_mode) {
+				NV_ERROR(dev, "Not turning on LVDS without native mode\n");
+				return;
+			}
 			call_lvds_script(dev, nv_encoder->dcb, head,
 					 LVDS_PANEL_ON, nv_connector->native_mode->clock);
-		else
+		} else
 			/* pxclk of 0 is fine for PANEL_OFF, and for a
 			 * disconnected LVDS encoder there is no native_mode
 			 */
@@ -523,8 +529,12 @@ static void nv04_dfp_restore(struct drm_encoder *encoder)
 	int head = nv_encoder->restore.head;
 
 	if (nv_encoder->dcb->type == OUTPUT_LVDS) {
-		call_lvds_script(dev, nv_encoder->dcb, head, LVDS_PANEL_ON,
-				 nouveau_encoder_connector_get(nv_encoder)->native_mode->clock);
+		struct drm_display_mode *native_mode = nouveau_encoder_connector_get(nv_encoder)->native_mode;
+		if (native_mode)
+			call_lvds_script(dev, nv_encoder->dcb, head, LVDS_PANEL_ON,
+					 native_mode->clock);
+		else
+			NV_ERROR(dev, "Not restoring LVDS without native mode\n");
 
 	} else if (nv_encoder->dcb->type == OUTPUT_TMDS) {
 		int clock = nouveau_hw_pllvals_to_clk
