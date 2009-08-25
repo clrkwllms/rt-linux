@@ -474,8 +474,27 @@ module_param_named(dev_loss_tmo, fc_dev_loss_tmo, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(dev_loss_tmo,
 		 "Maximum number of seconds that the FC transport should"
 		 " insulate the loss of a remote port. Once this value is"
-		 " exceeded, the scsi target is removed. Value should be"
+		 " exceeded, the scsi target may be removed. Reference the"
+		 " remove_on_dev_loss module parameter.  Value should be"
 		 " between 1 and SCSI_DEVICE_BLOCK_MAX_TIMEOUT.");
+/*
+ * remove_on_dev_loss: controls whether the transport will
+ *   remove a scsi target after the device loss timer expires.
+ *   Removal on disconnect is modeled after the USB subsystem
+ *   and expects subsystems layered on SCSI to be aware of
+ *   potential device loss and handle it appropriately. However,
+ *   many subsystems do not support device removal, leaving situations
+ *   where structure references may remain, causing new device
+ *   name assignments, etc., if the target returns.
+ */
+static unsigned int fc_remove_on_dev_loss = 0;
+module_param_named(remove_on_dev_loss, fc_remove_on_dev_loss,
+		int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(remove_on_dev_loss,
+		 "Boolean.  When the device loss timer fires, this variable"
+		 " controls whether the scsi infrastructure for the target"
+		 " device is removed.  Values: zero means do not remove,"
+		 " non-zero means remove.  Default is zero.");
 
 /*
  * Netlink Infrastructure
@@ -2391,7 +2410,9 @@ fc_starget_delete(struct work_struct *work)
 		container_of(work, struct fc_rport, stgt_delete_work);
 
 	fc_terminate_rport_io(rport);
-	scsi_remove_target(&rport->dev);
+
+	if (fc_remove_on_dev_loss)
+		scsi_remove_target(&rport->dev);
 }
 
 
@@ -3048,9 +3069,13 @@ fc_timeout_deleted_rport(struct work_struct *work)
 		return;
 	}
 
-	dev_printk(KERN_ERR, &rport->dev,
-		"blocked FC remote port time out: removing target and "
-		"saving binding\n");
+	if (fc_remove_on_dev_loss)
+		dev_printk(KERN_ERR, &rport->dev,
+			"blocked FC remote port time out: removing target and "
+			"saving binding\n");
+	else
+		dev_printk(KERN_ERR, &rport->dev,
+			"blocked FC remote port time out: saving binding\n");
 
 	list_move_tail(&rport->peers, &fc_host->rport_bindings);
 
