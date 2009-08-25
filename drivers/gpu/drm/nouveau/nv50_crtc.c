@@ -481,10 +481,7 @@ static void nv50_crtc_prepare(struct drm_crtc *drm_crtc)
 
 	NV_DEBUG(dev, "index %d\n", crtc->index);
 
-	/* Disconnect all unused encoders.
-	 * Checking for a non-NULL crtc isn't enough.
-	 * Check for connectors using the encoder.
-	 */
+	/* Disconnect all unused encoders. */
 	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
 		if (!drm_helper_encoder_in_use(drm_encoder)) {
 			struct nouveau_encoder *encoder =
@@ -705,8 +702,7 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 
 	/* This is the actual resolution of the mode. */
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, REAL_RES), 1);
-	OUT_RING  (evo, (crtc->base.mode.vdisplay << 16) |
-			 crtc->base.mode.hdisplay);
+	OUT_RING  (evo, (mode->vdisplay << 16) | mode->hdisplay);
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, SCALE_CENTER_OFFSET), 1);
 	OUT_RING  (evo, NV50_EVO_CRTC_SCALE_CENTER_OFFSET_VAL(0, 0));
 
