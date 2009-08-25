@@ -462,9 +462,9 @@ nouveau_ioctl_fifo_alloc(struct drm_device *dev, void *data,
 
 	init->subchan[0].handle = NvM2MF;
 	if (dev_priv->card_type < NV_50)
-		init->subchan[0].grclass = 0x5039;
-	else
 		init->subchan[0].grclass = 0x0039;
+	else
+		init->subchan[0].grclass = 0x5039;
 	init->nr_subchan = 1;
 
 	/* Named memory object area */
