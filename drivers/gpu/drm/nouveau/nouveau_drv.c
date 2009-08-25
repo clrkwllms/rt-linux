@@ -57,7 +57,11 @@ MODULE_PARM_DESC(uscript_tmds, "TMDS output script table ID (>=GeForce 8)");
 int nouveau_uscript_tmds = -1;
 module_param_named(uscript_tmds, nouveau_uscript_tmds, int, 0400);
 
-MODULE_PARM_DESC(tv_norm, "Default TV norm");
+MODULE_PARM_DESC(tv_norm, "Default TV norm.\n"
+		 "\t\tSupported: PAL, PAL-M, PAL-N, PAL-Nc, NTSC-M, NTSC-J,\n"
+		 "\t\t\thd480i, hd480p, hd576i, hd576p, hd720p, hd1080i.\n"
+		 "\t\tDefault: PAL\n"
+		 "\t\t*NOTE* Ignored for cards with external TV encoders.");
 char *nouveau_tv_norm = NULL;
 module_param_named(tv_norm, nouveau_tv_norm, charp, 0400);
 
