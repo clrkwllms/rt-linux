@@ -770,7 +770,8 @@ extern int nouveau_run_vbios_init(struct drm_device *);
 extern int get_pll_limits(struct drm_device *, uint32_t limit_match,
 			  struct pll_lims *);
 extern int nouveau_bios_run_display_table(struct drm_device *,
-					  struct dcb_entry *, int pxclk);
+					  struct dcb_entry *,
+					  uint32_t script, int pxclk);
 extern bool nouveau_bios_fp_mode(struct drm_device *, struct drm_display_mode *);
 extern uint8_t *nouveau_bios_embedded_edid(struct drm_device *);
 extern int nouveau_bios_parse_lvds_table(struct drm_device *, int pxclk,
