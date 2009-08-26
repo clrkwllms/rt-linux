@@ -551,6 +551,25 @@ int nv50_display_destroy(struct drm_device *dev)
 	return 0;
 }
 
+static inline uint32_t
+nv50_display_mode_ctrl(struct drm_device *dev, bool sor, int or)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t mc;
+
+	if (sor) {
+		if (dev_priv->chipset < 0x90 ||
+		    dev_priv->chipset == 0x92 || dev_priv->chipset == 0xa0)
+			mc = nv_rd32(dev, NV50_PDISPLAY_SOR_MODE_CTRL_P(or));
+		else
+			mc = nv_rd32(dev, NV90_PDISPLAY_SOR_MODE_CTRL_P(or));
+	} else {
+		mc = nv_rd32(dev, NV50_PDISPLAY_DAC_MODE_CTRL_P(or));
+	}
+
+	return mc;
+}
+
 static int
 nv50_display_irq_head(struct drm_device *dev, int *phead,
 		      struct dcb_entry **pdcbent)
@@ -578,21 +597,13 @@ nv50_display_irq_head(struct drm_device *dev, int *phead,
 	 * should be the case.
 	 */
 	for (i = 0; i < 3; i++) {
-		if (nv_rd32(dev, NV50_PDISPLAY_DAC_MODE_CTRL_P(i)) & (1 << head))
+		if (nv50_display_mode_ctrl(dev, false, i) & (1 << head))
 			dac |= (1 << i);
 	}
 
-	if (dev_priv->chipset < 0x90 || dev_priv->chipset == 0x92 ||
-	    dev_priv->chipset == 0xa0) {
-		for (i = 0; i < 4; i++) {
-			if (nv_rd32(dev, NV50_PDISPLAY_SOR_MODE_CTRL_P(i)) & (1 << head))
-				sor |= (1 << i);
-		}
-	} else {
-		for (i = 0; i < 4; i++) {
-			if (nv_rd32(dev, NV90_PDISPLAY_SOR_MODE_CTRL_P(i)) & (1 << head))
-				sor |= (1 << i);
-		}
+	for (i = 0; i < 4; i++) {
+		if (nv50_display_mode_ctrl(dev, true, i) & (1 << head))
+			sor |= (1 << i);
 	}
 
 	NV_DEBUG(dev, "dac: 0x%08x, sor: 0x%08x\n", dac, sor);
