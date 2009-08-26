@@ -468,6 +468,7 @@ nouveau_gpuobj_ref_add(struct drm_device *dev, struct nouveau_channel *chan,
 	ref = kzalloc(sizeof(*ref), GFP_KERNEL);
 	if (!ref)
 		return -ENOMEM;
+	INIT_LIST_HEAD(&ref->list);
 	ref->gpuobj   = gpuobj;
 	ref->channel  = chan;
 	ref->instance = instance;

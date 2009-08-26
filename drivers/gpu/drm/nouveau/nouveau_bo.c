@@ -63,6 +63,8 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 	nvbo = kzalloc(sizeof(struct nouveau_bo), GFP_KERNEL);
 	if (!nvbo)
 		return -ENOMEM;
+	INIT_LIST_HEAD(&nvbo->head);
+	INIT_LIST_HEAD(&nvbo->entry);
 	nvbo->mappable = mappable;
 	nvbo->no_vm = no_vm;
 	nvbo->tile_mode = tile_mode;
