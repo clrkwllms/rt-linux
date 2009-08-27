@@ -4588,10 +4588,8 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 	entry->type = conn & 0xf;
 	entry->i2c_index = (conn >> 4) & 0xf;
 	entry->heads = (conn >> 8) & 0xf;
-	if (bdcb->version >= 0x30)
+	if (bdcb->version >= 0x30) /* fixed up later for earlier chips */
 		entry->connector = (conn >> 12) & 0xf;
-	else
-		entry->connector = entry->i2c_index; /* sorta */
 	entry->bus = (conn >> 16) & 0xf;
 	entry->location = (conn >> 20) & 0x3;
 	entry->or = (conn >> 24) & 0xf;
@@ -4938,7 +4936,40 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 	return (dcb->entries ? 0 : -ENXIO);
 }
 
-static void fixup_legacy_i2c(struct nvbios *bios)
+static void
+fixup_legacy_connector(struct nvbios *bios)
+{
+	struct bios_parsed_dcb *bdcb = &bios->bdcb;
+	struct parsed_dcb *dcb = &bdcb->dcb;
+	int high = 0, i;
+
+	if (bdcb->version >= 0x30)
+		return;
+
+	/* no known connector info before v3.0, so make it up.  the rule here
+	 * is: anything on the same i2c bus is considered to be on the same
+	 * connector.  any output without an associated i2c bus is assigned
+	 * its own unique connector index.
+	 */
+	for (i = 0; i < dcb->entries; i++) {
+		if (dcb->entry[i].i2c_index == 0xf)
+			continue;
+
+		dcb->entry[i].connector = dcb->entry[i].i2c_index;
+		if (dcb->entry[i].connector > high)
+			high = dcb->entry[i].connector;
+	}
+
+	for (i = 0; i < dcb->entries; i++) {
+		if (dcb->entry[i].i2c_index != 0xf)
+			continue;
+
+		dcb->entry[i].connector = ++high;
+	}
+}
+
+static void
+fixup_legacy_i2c(struct nvbios *bios)
 {
 	struct parsed_dcb *dcb = &bios->bdcb.dcb;
 	int i;
@@ -5157,6 +5188,7 @@ nouveau_bios_init(struct drm_device *dev)
 		return ret;
 
 	fixup_legacy_i2c(bios);
+	fixup_legacy_connector(bios);
 
 	if (!bios->major_version)	/* we don't run version 0 bios */
 		return 0;
