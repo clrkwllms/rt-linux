@@ -96,7 +96,7 @@ nv04_display_create(struct drm_device *dev)
 	struct parsed_dcb *dcb = dev_priv->vbios->dcb;
 	struct drm_encoder *encoder;
 	struct drm_crtc *crtc;
-	uint16_t connectors[16] = { 0 };
+	uint16_t connector[16] = { 0 };
 	int i, ret;
 
 	NV_DEBUG(dev, "\n");
@@ -154,17 +154,18 @@ nv04_display_create(struct drm_device *dev)
 		if (ret)
 			continue;
 
-		connectors[dcbent->i2c_index] |= 1 << i;
+		connector[dcbent->connector] |= (1 << dcbent->type);
 	}
 
 	for (i = 0; i < dcb->entries; i++) {
 		struct dcb_entry *dcbent = &dcb->entry[i];
-		int i2c_index = dcbent->i2c_index;
-		uint16_t encoders = connectors[i2c_index];
+		uint16_t encoders;
 		int type;
 
-		if (!encoders)
+		encoders = connector[dcbent->connector];
+		if (!(encoders & (1 << dcbent->type)))
 			continue;
+		connector[dcbent->connector] = 0;
 
 		switch (dcbent->type) {
 		case OUTPUT_ANALOG:
@@ -181,10 +182,12 @@ nv04_display_create(struct drm_device *dev)
 			break;
 		case OUTPUT_LVDS:
 			type = DRM_MODE_CONNECTOR_LVDS;
+#if 0
 			/* don't create i2c adapter when lvds ddc not allowed */
 			if (dcbent->lvdsconf.use_straps_for_mode ||
 			    dev_priv->vbios->fp_no_ddc)
 				i2c_index = 0xf;
+#endif
 			break;
 		case OUTPUT_TV:
 			type = DRM_MODE_CONNECTOR_TV;
@@ -194,13 +197,7 @@ nv04_display_create(struct drm_device *dev)
 			continue;
 		}
 
-		if (i2c_index == 0xf)
-			encoders = 1 << dcbent->index; /* allow multiple connectors with the
-							  same dummy i2c index */
-		else
-			connectors[i2c_index] = 0; /* avoid connectors being added multiply */
-
-		nouveau_connector_create(dev, i2c_index, type);
+		nouveau_connector_create(dev, dcbent->connector, type);
 	}
 
 	/* Save previous state */
