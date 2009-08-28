@@ -38,7 +38,7 @@ nv04_fbcon_copyarea(struct fb_info *info, const struct fb_copyarea *region)
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 
-	if (RING_SPACE(chan, 4)) {
+	if (!(info->flags & FBINFO_HWACCEL_DISABLED) && RING_SPACE(chan, 4)) {
 		NV_ERROR(dev, "GPU lockup - switching to software fbcon\n");
 		info->flags |= FBINFO_HWACCEL_DISABLED;
 	}
@@ -67,7 +67,7 @@ nv04_fbcon_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 
-	if (RING_SPACE(chan, 7)) {
+	if (!(info->flags & FBINFO_HWACCEL_DISABLED) && RING_SPACE(chan, 7)) {
 		NV_ERROR(dev, "GPU lockup - switching to software fbcon\n");
 		info->flags |= FBINFO_HWACCEL_DISABLED;
 	}
