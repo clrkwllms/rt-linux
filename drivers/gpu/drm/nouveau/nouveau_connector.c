@@ -230,7 +230,8 @@ nouveau_connector_detect(struct drm_connector *connector)
 	struct nouveau_i2c_chan *i2c;
 	int type, flags;
 
-	nv_encoder = find_encoder_by_type(connector, OUTPUT_LVDS);
+	if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS)
+		nv_encoder = find_encoder_by_type(connector, OUTPUT_LVDS);
 	if (nv_encoder && nv_connector->native_mode) {
 		nouveau_connector_set_encoder(connector, nv_encoder);
 		return connector_status_connected;
@@ -467,7 +468,6 @@ nouveau_connector_mode_valid(struct drm_connector *connector,
 	case OUTPUT_TV:
 		return get_slave_funcs(nv_encoder)->
 			mode_valid(to_drm_encoder(nv_encoder), mode);
-
 	}
 
 	if (mode->clock < min_clock)
@@ -510,20 +510,80 @@ nouveau_connector_funcs = {
 
 static int
 nouveau_connector_create_lvds(struct drm_device *dev,
-			      struct nouveau_connector *nv_connector)
+			      struct drm_connector *connector)
 {
-	struct drm_display_mode native;
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_i2c_chan *i2c = NULL;
+	struct nouveau_encoder *nv_encoder;
+	struct drm_display_mode native, *mode, *temp;
 	bool dummy, if_is_24bit = false;
-	int ret;
+	int ret, flags;
+
+	nv_encoder = find_encoder_by_type(connector, OUTPUT_LVDS);
+	if (!nv_encoder)
+		return -ENODEV;
 
 	ret = nouveau_bios_parse_lvds_table(dev, 0, &dummy, &if_is_24bit);
-	if (ret)
+	if (ret) {
+		NV_ERROR(dev, "Error parsing LVDS table, disabling LVDS\n");
 		return ret;
-
-	if (nouveau_bios_fp_mode(dev, &native))
-		nv_connector->native_mode = drm_mode_duplicate(dev, &native);
-
+	}
 	nv_connector->use_dithering = !if_is_24bit;
+
+	/* Firstly try getting EDID over DDC, if allowed and I2C channel
+	 * is available.
+	 */
+	if (!dev_priv->VBIOS.pub.fp_no_ddc && nv_encoder->dcb->i2c_index < 0xf)
+		i2c = nouveau_i2c_find(dev, nv_encoder->dcb->i2c_index);
+
+	if (i2c) {
+		nouveau_connector_ddc_prepare(connector, &flags);
+		nv_connector->edid = drm_get_edid(connector, &i2c->adapter);
+		nouveau_connector_ddc_finish(connector, flags);
+	}
+
+	/* If no EDID found above, and the VBIOS indicates a hardcoded
+	 * modeline is avalilable for the panel, set it as the panel's
+	 * native mode and exit.
+	 */
+	if (!nv_connector->edid &&
+	     nv_encoder->dcb->lvdsconf.use_straps_for_mode &&
+	     nouveau_bios_fp_mode(dev, &native)) {
+		nv_connector->native_mode = drm_mode_duplicate(dev, &native);
+		goto out;
+	}
+
+	/* Still nothing, some VBIOS images have a hardcoded EDID block
+	 * stored for the panel stored in them.
+	 */
+	if (!nv_connector->edid && !dev_priv->VBIOS.pub.fp_no_ddc) {
+		nv_connector->edid =
+			(struct edid *)nouveau_bios_embedded_edid(dev);
+	}
+
+	if (!nv_connector->edid)
+		goto out;
+
+	/* We didn't find/use a panel mode from the VBIOS, so parse the EDID
+	 * block and look for the preferred mode there.
+	 */
+	ret = drm_add_edid_modes(connector, nv_connector->edid);
+	if (ret == 0)
+		goto out;
+	nv_connector->detected_encoder = nv_encoder;
+	nv_connector->native_mode = nouveau_connector_native_mode(nv_connector);
+	list_for_each_entry_safe(mode, temp, &connector->probed_modes, head)
+		drm_mode_remove(connector, mode);
+
+out:
+	if (!nv_connector->native_mode) {
+		NV_ERROR(dev, "LVDS present in DCB table, but couldn't "
+			      "determine its native mode.  Disabling.\n");
+		return -ENODEV;
+	}
+
+	drm_mode_connector_update_edid_property(connector, nv_connector->edid);
 	return 0;
 }
 
@@ -554,12 +614,6 @@ nouveau_connector_create(struct drm_device *dev, int index, int type)
 		break;
 	case DRM_MODE_CONNECTOR_LVDS:
 		NV_INFO(dev, "Detected a LVDS connector\n");
-
-		ret = nouveau_connector_create_lvds(dev, nv_connector);
-		if (ret) {
-			kfree(nv_connector);
-			return ret;
-		}
 		break;
 	case DRM_MODE_CONNECTOR_TV:
 		NV_INFO(dev, "Detected a TV connector\n");
@@ -619,5 +673,14 @@ nouveau_connector_create(struct drm_device *dev, int index, int type)
 	}
 
 	drm_sysfs_connector_add(connector);
+
+	if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
+		ret = nouveau_connector_create_lvds(dev, connector);
+		if (ret) {
+			connector->funcs->destroy(connector);
+			return ret;
+		}
+	}
+
 	return 0;
 }
