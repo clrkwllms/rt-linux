@@ -29,13 +29,12 @@
 
 #define NOUVEAUFB_CONN_LIMIT 4
 
+#include "drm_fb_helper.h"
+
 struct nouveau_fbcon_par {
+	struct drm_fb_helper helper;
 	struct drm_device *dev;
-	struct drm_display_mode *our_mode;
 	struct nouveau_framebuffer *nouveau_fb;
-	int crtc_count;
-	/* crtc currently bound to this */
-	uint32_t crtc_ids[2];
 };
 
 int nouveau_fbcon_probe(struct drm_device *dev);

@@ -993,10 +993,6 @@ nv04_crtc_create(struct drm_device *dev, int crtc_num)
 	nv_crtc->index = crtc_num;
 	nv_crtc->last_dpms = NV_DPMS_CLEARED;
 
-	nv_crtc->mode_set.crtc = &nv_crtc->base;
-	nv_crtc->mode_set.connectors = (struct drm_connector **)(nv_crtc + 1);
-	nv_crtc->mode_set.num_connectors = 0;
-
 	drm_crtc_init(dev, &nv_crtc->base, &nv04_crtc_funcs);
 	drm_crtc_helper_add(&nv_crtc->base, &nv04_crtc_helper_funcs);
 	drm_mode_crtc_set_gamma_size(&nv_crtc->base, 256);

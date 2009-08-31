@@ -802,10 +802,6 @@ nv50_crtc_create(struct drm_device *dev, int index)
 	crtc->set_dither = nv50_crtc_set_dither;
 	crtc->set_scale = nv50_crtc_set_scale;
 
-	crtc->mode_set.crtc = &crtc->base;
-	crtc->mode_set.connectors = (struct drm_connector **)(crtc + 1);
-	crtc->mode_set.num_connectors = 0;
-
 	drm_crtc_init(dev, &crtc->base, &nv50_crtc_funcs);
 	drm_crtc_helper_add(&crtc->base, &nv50_crtc_helper_funcs);
 	drm_mode_crtc_set_gamma_size(&crtc->base, 256);
