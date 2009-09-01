@@ -139,6 +139,7 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	dev_priv->fifo_alloc_count++;
 	chan = dev_priv->fifos[channel];
 	INIT_LIST_HEAD(&chan->nvsw.vbl_wait);
+	INIT_LIST_HEAD(&chan->fence.pending);
 	chan->dev = dev;
 	chan->id = channel;
 	chan->file_priv = file_priv;
