@@ -378,10 +378,6 @@ nouveau_connector_native_mode(struct nouveau_connector *connector)
 {
 	struct drm_device *dev = connector->base.dev;
 	struct drm_display_mode *mode;
-	uint8_t type = connector->detected_encoder->dcb->type;
-
-	if (type != OUTPUT_LVDS && type != OUTPUT_TMDS)
-		return NULL;
 
 	list_for_each_entry(mode, &connector->base.probed_modes, head) {
 		if (mode->type & DRM_MODE_TYPE_PREFERRED)
