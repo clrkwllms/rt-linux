@@ -268,8 +268,14 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	}
 
 	if (dev_priv->card_type < NV_50) {
-		engine->fifo.load_context(dev_priv->channel);
-		engine->graph.load_context(dev_priv->channel);
+		struct nouveau_channel *chan = dev_priv->channel;
+		int ptr = chan->pushbuf_base + (chan->dma.cur << 2);
+
+		nvchan_wr32(chan->user_get, ptr);
+		nvchan_wr32(chan->user_put, ptr);
+
+		engine->fifo.load_context(chan);
+		engine->graph.load_context(chan);
 	}
 
 	NV_INFO(dev, "Re-enabling acceleration..\n");
