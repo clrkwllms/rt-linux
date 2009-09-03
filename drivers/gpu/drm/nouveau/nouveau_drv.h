@@ -486,6 +486,8 @@ struct drm_nouveau_private {
 		struct list_head bo_list;
 	} ttm;
 
+	struct fb_info *fbdev_info;
+
 	int fifo_alloc_count;
 	struct nouveau_channel *fifos[NOUVEAU_MAX_CHANNEL_NR];
 
