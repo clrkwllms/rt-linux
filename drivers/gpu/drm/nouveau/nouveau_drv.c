@@ -29,6 +29,7 @@
 #include "drm_crtc_helper.h"
 #include "nouveau_drv.h"
 #include "nouveau_hw.h"
+#include "nouveau_fb.h"
 #include "nv50_display.h"
 
 #include "drm_pciids.h"
@@ -108,6 +109,7 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	struct drm_device *dev = pci_get_drvdata(pdev);
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
+	struct drm_crtc *crtc;
 	uint32_t fbdev_flags;
 	int ret, i;
 
@@ -119,6 +121,16 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 
 	fbdev_flags = dev_priv->fbdev_info->flags;
 	dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
+
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		struct nouveau_framebuffer *nouveau_fb;
+
+		nouveau_fb = nouveau_framebuffer(crtc->fb);
+		if (!nouveau_fb || !nouveau_fb->nvbo)
+			continue;
+
+		nouveau_bo_unpin(nouveau_fb->nvbo);
+	}
 
 	NV_INFO(dev, "Evicting buffers...\n");
 	ttm_bo_evict_mm(&dev_priv->ttm.bdev, TTM_PL_VRAM);
