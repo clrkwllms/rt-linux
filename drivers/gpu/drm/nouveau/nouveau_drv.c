@@ -211,7 +211,7 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	struct nouveau_engine *engine = &dev_priv->engine;
 	struct drm_crtc *crtc;
 	uint32_t fbdev_flags;
-	int ret;
+	int ret, i;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -ENODEV;
@@ -251,6 +251,21 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	nouveau_gpuobj_resume(dev);
 
 	nouveau_irq_postinstall(dev);
+
+	/* Re-write SKIPS, they'll have been lost over the suspend */
+	if (nouveau_vram_pushbuf) {
+		struct nouveau_channel *chan;
+		int j;
+
+		for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+			chan = dev_priv->fifos[i];
+			if (!chan)
+				continue;
+
+			for (j = 0; j < NOUVEAU_DMA_SKIPS; j++)
+				nouveau_bo_wr32(chan->pushbuf_bo, i, 0);
+		}
+	}
 
 	if (dev_priv->card_type < NV_50) {
 		engine->fifo.load_context(dev_priv->channel);
