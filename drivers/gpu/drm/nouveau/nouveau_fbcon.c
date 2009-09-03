@@ -198,6 +198,7 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 					    NOUVEAUFB_CONN_LIMIT);
 	if (ret)
 		goto out_unref;
+	dev_priv->fbdev_info = info;
 
 	strcpy(info->fix.id, "nouveaufb");
 	info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_COPYAREA |
