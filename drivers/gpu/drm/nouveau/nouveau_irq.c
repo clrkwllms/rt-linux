@@ -211,7 +211,7 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 
 		if (status) {
 			NV_INFO(dev, "PFIFO_INTR 0x%08x - Ch %d\n",
-				chid, status);
+				status, chid);
 			nv_wr32(dev, NV03_PFIFO_INTR_0, status);
 		}
 
