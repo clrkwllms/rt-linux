@@ -566,6 +566,7 @@ struct drm_nouveau_private {
 	} susres;
 
 	struct backlight_device *backlight;
+	bool acpi_dsm;
 
 	struct nouveau_channel *evo;
 };
@@ -749,6 +750,21 @@ extern struct ttm_backend *nouveau_sgdma_init_ttm(struct drm_device *);
 /* nouveau_dma.c */
 extern int  nouveau_dma_init(struct nouveau_channel *);
 extern int  nouveau_dma_wait(struct nouveau_channel *, int size);
+
+/* nouveau_acpi.c */
+#ifdef CONFIG_ACPI
+extern int nouveau_hybrid_setup(struct drm_device *dev);
+extern bool nouveau_dsm_probe(struct drm_device *dev);
+#else
+static inline int nouveau_hybrid_setup(struct drm_device *dev)
+{
+	return 0;
+}
+static inline bool nouveau_dsm_probe(struct drm_device *dev)
+{
+	return false;
+}
+#endif
 
 /* nouveau_backlight.c */
 #ifdef CONFIG_DRM_NOUVEAU_BACKLIGHT

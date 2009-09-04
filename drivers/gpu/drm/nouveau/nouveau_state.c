@@ -497,6 +497,11 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	NV_DEBUG(dev, "vendor: 0x%X device: 0x%X class: 0x%X\n",
 		 dev->pci_vendor, dev->pci_device, dev->pdev->class);
 
+	dev_priv->acpi_dsm = nouveau_dsm_probe(dev);
+
+	if (dev_priv->acpi_dsm)
+		nouveau_hybrid_setup(dev);
+
 	/* resource 0 is mmio regs */
 	/* resource 1 is linear FB */
 	/* resource 2 is RAMIN (mmio regs + 0x1000000) */
