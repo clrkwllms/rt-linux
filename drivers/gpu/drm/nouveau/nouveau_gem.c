@@ -283,11 +283,18 @@ nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
 	struct list_head *entry, *tmp;
 	int ret = -EINVAL;
 	int i;
+	int trycnt = 0;
 
 	if (nr_buffers == 0)
 		return 0;
 
 retry:
+	if (++trycnt > 100000) {
+		ret = -EINVAL;
+		NV_ERROR(dev, "%s failed and gave up.\n", __func__);
+		goto out_unref;
+	}
+
 	for (i = 0, b = pbbo; i < nr_buffers; i++, b++) {
 		struct drm_gem_object *gem;
 
