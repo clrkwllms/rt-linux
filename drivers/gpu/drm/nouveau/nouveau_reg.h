@@ -75,7 +75,6 @@
 #define NV50_USER_DMA_PUT__SIZE                                              128
 #define NV50_USER_DMA_GET(i)                     (0x00c00044+(i*NV50_USER_SIZE))
 #define NV50_USER_DMA_GET__SIZE                                              128
-/*XXX: I don't think this actually exists.. */
 #define NV50_USER_REF_CNT(i)                     (0x00c00048+(i*NV50_USER_SIZE))
 #define NV50_USER_REF_CNT__SIZE                                              128
 
