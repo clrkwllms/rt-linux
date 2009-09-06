@@ -308,6 +308,16 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	engine->graph.fifo_access(dev, true);
 
 	NV_INFO(dev, "Restoring mode...\n");
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		struct nouveau_framebuffer *nouveau_fb;
+
+		nouveau_fb = nouveau_framebuffer(crtc->fb);
+		if (!nouveau_fb || !nouveau_fb->nvbo)
+			continue;
+
+		nouveau_bo_pin(nouveau_fb->nvbo, TTM_PL_FLAG_VRAM);
+	}
+
 	if (dev_priv->card_type < NV_50)
 		nv04_display_restore(dev);
 	else
