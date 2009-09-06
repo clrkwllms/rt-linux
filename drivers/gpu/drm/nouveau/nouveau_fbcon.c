@@ -218,6 +218,10 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	info->fix.mmio_start = pci_resource_start(dev->pdev, 1);
 	info->fix.mmio_len = pci_resource_len(dev->pdev, 1);
 
+	/* Set aperture base/size for vesafb takeover */
+	info->aperture_base = info->fix.mmio_start;
+	info->aperture_size = info->fix.mmio_len;
+
 	info->pixmap.size = 64*1024;
 	info->pixmap.buf_align = 8;
 	info->pixmap.access_align = 32;
