@@ -115,19 +115,6 @@ nvWriteEXTDEV(struct drm_device *dev, uint32_t reg, uint32_t val)
 	nv_wr32(dev, reg, val);
 }
 
-static inline uint32_t NVRead(struct drm_device *dev, uint32_t reg)
-{
-	uint32_t val = nv_rd32(dev, reg);
-	NV_REG_DEBUG(REG, dev, "reg %08x val %08x\n", reg, val);
-	return val;
-}
-
-static inline void NVWrite(struct drm_device *dev, uint32_t reg, uint32_t val)
-{
-	NV_REG_DEBUG(REG, dev, "reg %08x val %08x\n", reg, val);
-	nv_wr32(dev, reg, val);
-}
-
 static inline uint32_t NVReadCRTC(struct drm_device *dev,
 					int head, uint32_t reg)
 {

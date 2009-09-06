@@ -66,9 +66,10 @@ MODULE_PARM_DESC(tv_norm, "Default TV norm.\n"
 char *nouveau_tv_norm = NULL;
 module_param_named(tv_norm, nouveau_tv_norm, charp, 0400);
 
-MODULE_PARM_DESC(reg_debug, "Reg debug bitmask: 0x1 mc, 0x2 video, 0x4 fb, 0x8 extdev,\n"
-		"\t\t0x10 misc regs, 0x20 crtc, 0x40 ramdac, 0x80 vgacrtc,\n"
-		"\t\t0x100 rmvio, 0x200 vgaattr.\n");
+MODULE_PARM_DESC(reg_debug, "Register access debug bitmask:\n"
+		"\t\t0x1 mc, 0x2 video, 0x4 fb, 0x8 extdev,\n"
+		"\t\t0x10 crtc, 0x20 ramdac, 0x40 vgacrtc, 0x80 rmvio,\n"
+		"\t\t0x100 vgaattr. ");
 int nouveau_reg_debug;
 module_param_named(reg_debug, nouveau_reg_debug, int, 0600);
 
