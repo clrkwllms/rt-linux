@@ -620,6 +620,7 @@ extern int nouveau_uscript_tmds;
 extern int nouveau_vram_pushbuf;
 extern int nouveau_fbpercrtc;
 extern char *nouveau_tv_norm;
+extern int nouveau_reg_debug;
 
 /* nouveau_state.c */
 extern void nouveau_preclose(struct drm_device *dev, struct drm_file *);
@@ -1110,6 +1111,25 @@ static inline void nv_wo32(struct drm_device *dev, struct nouveau_gpuobj *obj,
 #define NV_TRACEWARN(d, fmt, arg...) NV_PRINTK(KERN_NOTICE, d, fmt, ##arg)
 #define NV_TRACE(d, fmt, arg...) NV_PRINTK(KERN_INFO, d, fmt, ##arg)
 #define NV_WARN(d, fmt, arg...) NV_PRINTK(KERN_WARNING, d, fmt, ##arg)
+
+/* nouveau_reg_debug bitmask */
+enum {
+	NOUVEAU_REG_DEBUG_MC             = 0x1,
+	NOUVEAU_REG_DEBUG_VIDEO          = 0x2,
+	NOUVEAU_REG_DEBUG_FB             = 0x4,
+	NOUVEAU_REG_DEBUG_EXTDEV         = 0x8,
+	NOUVEAU_REG_DEBUG_REG            = 0x10,
+	NOUVEAU_REG_DEBUG_CRTC           = 0x20,
+	NOUVEAU_REG_DEBUG_RAMDAC         = 0x40,
+	NOUVEAU_REG_DEBUG_VGACRTC        = 0x80,
+	NOUVEAU_REG_DEBUG_RMVIO          = 0x100,
+	NOUVEAU_REG_DEBUG_VGAATTR        = 0x200,
+};
+
+#define NV_REG_DEBUG(type, dev, fmt, arg...) do { \
+	if (nouveau_reg_debug & NOUVEAU_REG_DEBUG_##type) \
+		NV_PRINTK(KERN_DEBUG, dev, "%s: " fmt, __func__, ##arg); \
+} while (0)
 
 static inline enum nouveau_card_type
 nv_arch(struct drm_device *dev)
