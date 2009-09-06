@@ -203,7 +203,7 @@ nouveau_ramht_remove(struct drm_device *dev, struct nouveau_gpuobj_ref *ref)
 
 int
 nouveau_gpuobj_new(struct drm_device *dev, struct nouveau_channel *chan,
-		   int size, int align, uint32_t flags,
+		   uint32_t size, int align, uint32_t flags,
 		   struct nouveau_gpuobj **gpuobj_ret)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -212,7 +212,7 @@ nouveau_gpuobj_new(struct drm_device *dev, struct nouveau_channel *chan,
 	struct mem_block *pramin = NULL;
 	int ret;
 
-	NV_DEBUG(dev, "ch%d size=%d align=%d flags=0x%08x\n",
+	NV_DEBUG(dev, "ch%d size=%u align=%d flags=0x%08x\n",
 		 chan ? chan->id : -1, size, align, flags);
 
 	if (!dev_priv || !gpuobj_ret || *gpuobj_ret != NULL)
@@ -520,8 +520,8 @@ int nouveau_gpuobj_ref_del(struct drm_device *dev, struct nouveau_gpuobj_ref **p
 int
 nouveau_gpuobj_new_ref(struct drm_device *dev,
 		       struct nouveau_channel *oc, struct nouveau_channel *rc,
-		       uint32_t handle, int size, int align, uint32_t flags,
-		       struct nouveau_gpuobj_ref **ref)
+		       uint32_t handle, uint32_t size, int align,
+		       uint32_t flags, struct nouveau_gpuobj_ref **ref)
 {
 	struct nouveau_gpuobj *gpuobj = NULL;
 	int ret;
@@ -616,7 +616,7 @@ nouveau_gpuobj_new_fake(struct drm_device *dev, uint32_t p_offset,
 }
 
 
-static int
+static uint32_t
 nouveau_gpuobj_class_instmem_size(struct drm_device *dev, int class)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -899,7 +899,9 @@ nouveau_gpuobj_channel_init_pramin(struct nouveau_channel *chan)
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gpuobj *pramin = NULL;
-	int size, base, ret;
+	uint32_t size;
+	uint32_t base;
+	int ret;
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
 

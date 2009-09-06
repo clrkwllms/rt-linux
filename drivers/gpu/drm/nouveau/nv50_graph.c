@@ -182,8 +182,10 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 	struct nouveau_gpuobj *ramin = chan->ramin->gpuobj;
 	struct nouveau_gpuobj *ctx;
 	uint32_t *ctxvals = NULL;
-	int grctx_size = 0x70000, hdr;
-	int ret, pos;
+	uint32_t grctx_size = 0x70000;
+	int hdr;
+	int ret;
+	int pos;
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
 

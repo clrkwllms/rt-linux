@@ -698,7 +698,7 @@ extern int nouveau_gpuobj_channel_init(struct nouveau_channel *,
 				       uint32_t vram_h, uint32_t tt_h);
 extern void nouveau_gpuobj_channel_takedown(struct nouveau_channel *);
 extern int nouveau_gpuobj_new(struct drm_device *, struct nouveau_channel *,
-			      int size, int align, uint32_t flags,
+			      uint32_t size, int align, uint32_t flags,
 			      struct nouveau_gpuobj **);
 extern int nouveau_gpuobj_del(struct drm_device *, struct nouveau_gpuobj **);
 extern int nouveau_gpuobj_ref_add(struct drm_device *, struct nouveau_channel *,
@@ -711,7 +711,7 @@ extern int nouveau_gpuobj_ref_find(struct nouveau_channel *, uint32_t handle,
 extern int nouveau_gpuobj_new_ref(struct drm_device *,
 				  struct nouveau_channel *alloc_chan,
 				  struct nouveau_channel *ref_chan,
-				  uint32_t handle, int size, int align,
+				  uint32_t handle, uint32_t size, int align,
 				  uint32_t flags, struct nouveau_gpuobj_ref **);
 extern int nouveau_gpuobj_new_fake(struct drm_device *,
 				   uint32_t p_offset, uint32_t b_offset,
