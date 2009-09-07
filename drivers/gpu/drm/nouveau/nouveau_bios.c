@@ -4588,7 +4588,7 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 	entry->type = conn & 0xf;
 	entry->i2c_index = (conn >> 4) & 0xf;
 	entry->heads = (conn >> 8) & 0xf;
-	if (bdcb->version >= 0x30) /* fixed up later for earlier chips */
+	if (bdcb->version >= 0x40)
 		entry->connector = (conn >> 12) & 0xf;
 	entry->bus = (conn >> 16) & 0xf;
 	entry->location = (conn >> 20) & 0x3;
@@ -4943,7 +4943,12 @@ fixup_legacy_connector(struct nvbios *bios)
 	struct parsed_dcb *dcb = &bdcb->dcb;
 	int high = 0, i;
 
-	if (bdcb->version >= 0x30)
+	/* DCB 3.0 also has the table in most cases, but there are some cards
+	 * where the table is filled with stub entries, and the DCB entriy
+	 * indices are all 0.  We don't need the connector indices on pre-G80
+	 * chips (yet?) so limit the use to DCB 4.0 and above.
+	 */
+	if (bdcb->version >= 0x40)
 		return;
 
 	/* no known connector info before v3.0, so make it up.  the rule here
