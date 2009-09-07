@@ -35,6 +35,7 @@
 #include <linux/delay.h>
 #include <linux/fb.h>
 #include <linux/init.h>
+#include <linux/screen_info.h>
 
 #include "drmP.h"
 #include "drm.h"
@@ -121,6 +122,41 @@ static void nouveau_fbcon_gamma_set(struct drm_crtc *crtc, u16 red, u16 green,
 static struct drm_fb_helper_funcs nouveau_fbcon_helper_funcs = {
 	.gamma_set = nouveau_fbcon_gamma_set,
 };
+
+static bool
+nouveau_fbcon_has_vesafb(struct drm_device *dev)
+{
+	struct pci_dev *pdev = dev->pdev;
+	int ramin;
+
+	if (screen_info.orig_video_isVGA != VIDEO_TYPE_VLFB)
+		return false;
+
+	if (screen_info.lfb_base < pci_resource_len(pdev, 1))
+		goto not_fb;
+
+	if (screen_info.lfb_base + screen_info.lfb_size >=
+	    pci_resource_start(pdev, 1) + pci_resource_len(pdev, 1))
+		goto not_fb;
+
+	return true;
+not_fb:
+	ramin = 2;
+	if (pci_resource_len(pdev, ramin) == 0) {
+		ramin = 3;
+		if (pci_resource_len(pdev, ramin) == 0)
+			return false;
+	}
+
+	if (screen_info.lfb_base < pci_resource_len(pdev, 1))
+		return false;
+
+	if (screen_info.lfb_base + screen_info.lfb_size >=
+	    pci_resource_start(pdev, ramin) + pci_resource_len(pdev, ramin))
+		return false;
+
+	return true;
+}
 
 static int
 nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
@@ -219,8 +255,20 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	info->fix.mmio_len = pci_resource_len(dev->pdev, 1);
 
 	/* Set aperture base/size for vesafb takeover */
-	info->aperture_base = info->fix.mmio_start;
-	info->aperture_size = info->fix.mmio_len;
+	if (nouveau_fbcon_has_vesafb(dev)) {
+		/* Some NVIDIA VBIOS' are stupid and decide to put the
+		 * framebuffer in the middle of the PRAMIN BAR for
+		 * whatever reason.  We need to know the exact lfb_base
+		 * to get vesafb kicked off, and the only reliable way
+		 * we have left is to find out lfb_base the same way
+		 * vesafb did.
+		 */
+		info->aperture_base = screen_info.lfb_base;
+		info->aperture_size = screen_info.lfb_size * 65536;
+	} else {
+		info->aperture_base = info->fix.mmio_start;
+		info->aperture_size = info->fix.mmio_len;
+	}
 
 	info->pixmap.size = 64*1024;
 	info->pixmap.buf_align = 8;
