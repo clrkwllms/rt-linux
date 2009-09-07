@@ -365,47 +365,44 @@ nv50_crtc_cursor_set(struct drm_crtc *drm_crtc, struct drm_file *file_priv,
 		     uint32_t buffer_handle, uint32_t width, uint32_t height)
 {
 	struct drm_device *dev = drm_crtc->dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_crtc *crtc = nouveau_crtc(drm_crtc);
 	struct nouveau_bo *cursor = NULL;
-	int ret = 0;
+	struct drm_gem_object *gem;
+	int ret = 0, i;
 
 	if (width != 64 || height != 64)
 		return -EINVAL;
 
-	if (buffer_handle) {
-		struct drm_nouveau_private *dev_priv = dev->dev_private;
-		struct drm_gem_object *gem;
-		struct nouveau_bo *nvbo;
-		int i;
-
-		gem = drm_gem_object_lookup(dev, file_priv, buffer_handle);
-		if (!gem)
-			return -EINVAL;
-		nvbo = nouveau_gem_object(gem);
-
-		nouveau_bo_ref(nvbo, &cursor);
-		mutex_lock(&dev->struct_mutex);
-		drm_gem_object_unreference(gem);
-		mutex_unlock(&dev->struct_mutex);
-
-		ret = nouveau_bo_map(nvbo);
-		if (ret)
-			goto out;
-
-		/* The simple will do for now. */
-		for (i = 0; i < 64*64; i++)
-			nouveau_bo_wr32(crtc->cursor.nvbo, i, nouveau_bo_rd32(nvbo, i));
-
-		nouveau_bo_unmap(nvbo);
-
-		crtc->cursor.offset = crtc->cursor.nvbo->bo.offset - dev_priv->vm_vram_base;
-		crtc->cursor.set_offset(crtc, crtc->cursor.offset);
-		crtc->cursor.show(crtc, true);
-	} else {
+	if (!buffer_handle) {
 		crtc->cursor.hide(crtc, true);
+		return 0;
 	}
 
+	gem = drm_gem_object_lookup(dev, file_priv, buffer_handle);
+	if (!gem)
+		return -EINVAL;
+	cursor = nouveau_gem_object(gem);
+
+	ret = nouveau_bo_map(cursor);
+	if (ret)
+		goto out;
+
+	/* The simple will do for now. */
+	for (i = 0; i < 64 * 64; i++)
+		nouveau_bo_wr32(crtc->cursor.nvbo, i, nouveau_bo_rd32(cursor, i));
+
+	nouveau_bo_unmap(cursor);
+
+	crtc->cursor.offset  = crtc->cursor.nvbo->bo.offset;
+	crtc->cursor.offset -= dev_priv->vm_vram_base;
+	crtc->cursor.set_offset(crtc, crtc->cursor.offset);
+	crtc->cursor.show(crtc, true);
+
 out:
+	mutex_lock(&dev->struct_mutex);
+	drm_gem_object_unreference(gem);
+	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }
 
