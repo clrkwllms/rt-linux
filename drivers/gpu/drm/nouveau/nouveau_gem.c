@@ -310,14 +310,15 @@ retry:
 				     chan->fence.sequence);
 		if (ret) {
 			nouveau_gem_pushbuf_backoff(list);
-			if (ret == -EAGAIN) {
+			if (ret == -EAGAIN)
 				ret = ttm_bo_wait_unreserved(&nvbo->bo, false);
-				if (unlikely(ret))
-					goto out_unref;
-				goto retry;
-			} else
+			drm_gem_object_unreference(gem);
+			if (ret)
 				goto out_unref;
+			goto retry;
 		}
+
+		list_add_tail(&nvbo->entry, list);
 
 		if (unlikely(atomic_read(&nvbo->bo.cpu_writers) > 0)) {
 			nouveau_gem_pushbuf_backoff(list);
@@ -326,8 +327,6 @@ retry:
 				goto out_unref;
 			goto retry;
 		}
-
-		list_add_tail(&nvbo->entry, list);
 	}
 
 	b = pbbo;
