@@ -44,7 +44,7 @@ struct nouveau_crtc {
 		int cpp;
 		bool blanked;
 		uint32_t offset;
-		bool tiled;
+		uint32_t tile_flags;
 	} fb;
 
 	struct {

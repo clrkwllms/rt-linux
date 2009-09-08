@@ -148,11 +148,14 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 		OUT_RING  (evo, crtc->fb.offset >> 8);
 		OUT_RING  (evo, 0);
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, FB_DMA), 1);
-		if (dev_priv->chipset != 0x50 && crtc->fb.tiled)
-			if (crtc->fb.cpp == 2)
+		if (dev_priv->chipset != 0x50)
+			if (crtc->fb.tile_flags == 0x7a00)
+				OUT_RING(evo, NvEvoFB32);
+			else
+			if (crtc->fb.tile_flags == 0x7000)
 				OUT_RING(evo, NvEvoFB16);
 			else
-				OUT_RING(evo, NvEvoFB32);
+				OUT_RING(evo, NvEvoVRAM);
 		else
 			OUT_RING(evo, NvEvoVRAM);
 	}
@@ -561,7 +564,7 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	}
 
 	crtc->fb.offset = fb->nvbo->bo.offset - dev_priv->vm_vram_base;
-	crtc->fb.tiled = fb->nvbo->tile_flags ? true : false;
+	crtc->fb.tile_flags = fb->nvbo->tile_flags;
 	crtc->fb.cpp = drm_fb->bits_per_pixel / 8;
 	if (!crtc->fb.blanked && dev_priv->chipset != 0x50) {
 		ret = RING_SPACE(evo, 2);
@@ -569,12 +572,12 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 			return ret;
 
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, FB_DMA), 1);
-		if (crtc->fb.tiled) {
-			if (crtc->fb.cpp == 4)
-				OUT_RING  (evo, NvEvoFB32);
-			else
-				OUT_RING  (evo, NvEvoFB16);
-		} else
+		if (crtc->fb.tile_flags == 0x7a00)
+			OUT_RING  (evo, NvEvoFB32);
+		else
+		if (crtc->fb.tile_flags == 0x7000)
+			OUT_RING  (evo, NvEvoFB16);
+		else
 			OUT_RING  (evo, NvEvoVRAM);
 	}
 
@@ -586,7 +589,7 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	OUT_RING  (evo, crtc->fb.offset >> 8);
 	OUT_RING  (evo, 0);
 	OUT_RING  (evo, (drm_fb->height << 16) | drm_fb->width);
-	if (!crtc->fb.tiled) {
+	if (!crtc->fb.tile_flags) {
 		OUT_RING  (evo, drm_fb->pitch | (1 << 20));
 	} else {
 		OUT_RING  (evo, ((drm_fb->pitch / 4) << 4) |
