@@ -123,6 +123,7 @@ static struct drm_fb_helper_funcs nouveau_fbcon_helper_funcs = {
 	.gamma_set = nouveau_fbcon_gamma_set,
 };
 
+#if defined(__i386__) || defined(__x86_64__)
 static bool
 nouveau_fbcon_has_vesafb(struct drm_device *dev)
 {
@@ -157,6 +158,7 @@ not_fb:
 
 	return true;
 }
+#endif
 
 static int
 nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
@@ -255,6 +257,7 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	info->fix.mmio_len = pci_resource_len(dev->pdev, 1);
 
 	/* Set aperture base/size for vesafb takeover */
+#if defined(__i386__) || defined(__x86_64__)
 	if (nouveau_fbcon_has_vesafb(dev)) {
 		/* Some NVIDIA VBIOS' are stupid and decide to put the
 		 * framebuffer in the middle of the PRAMIN BAR for
@@ -265,7 +268,9 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 		 */
 		info->aperture_base = screen_info.lfb_base;
 		info->aperture_size = screen_info.lfb_size * 65536;
-	} else {
+	} else
+#endif
+	{
 		info->aperture_base = info->fix.mmio_start;
 		info->aperture_size = info->fix.mmio_len;
 	}
