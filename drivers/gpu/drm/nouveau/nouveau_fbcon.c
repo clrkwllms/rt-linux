@@ -133,7 +133,7 @@ nouveau_fbcon_has_vesafb(struct drm_device *dev)
 	if (screen_info.orig_video_isVGA != VIDEO_TYPE_VLFB)
 		return false;
 
-	if (screen_info.lfb_base < pci_resource_len(pdev, 1))
+	if (screen_info.lfb_base < pci_resource_start(pdev, 1))
 		goto not_fb;
 
 	if (screen_info.lfb_base + screen_info.lfb_size >=
@@ -149,7 +149,7 @@ not_fb:
 			return false;
 	}
 
-	if (screen_info.lfb_base < pci_resource_len(pdev, 1))
+	if (screen_info.lfb_base < pci_resource_start(pdev, ramin))
 		return false;
 
 	if (screen_info.lfb_base + screen_info.lfb_size >=
