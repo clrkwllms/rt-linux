@@ -157,6 +157,7 @@ config DRM_SAVAGE
 config DRM_NOUVEAU
 	tristate "Nouveau (nVidia) cards"
 	depends on DRM
+	select DRM_KMS_HELPER
 	select DRM_TTM
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
