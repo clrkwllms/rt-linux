@@ -318,9 +318,10 @@ nouveau_pci_resume(struct pci_dev *pdev)
 		nouveau_bo_pin(nouveau_fb->nvbo, TTM_PL_FLAG_VRAM);
 	}
 
-	if (dev_priv->card_type < NV_50)
+	if (dev_priv->card_type < NV_50) {
 		nv04_display_restore(dev);
-	else
+		NVLockVgaCrtcs(dev, false);
+	} else
 		nv50_display_init(dev);
 
 	/* Force CLUT to get re-loaded during modeset */
