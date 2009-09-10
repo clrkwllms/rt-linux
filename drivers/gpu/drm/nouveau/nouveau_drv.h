@@ -68,6 +68,7 @@ struct nouveau_bo {
 	struct ttm_bo_kmap_obj kmap;
 	struct list_head head;
 
+	struct drm_file *reserved_by;
 	struct list_head entry;
 
 	struct nouveau_channel *channel;

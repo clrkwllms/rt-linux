@@ -239,6 +239,7 @@ nouveau_gem_pushbuf_backoff(struct list_head *list)
 		nvbo = list_entry(entry, struct nouveau_bo, entry);
 
 		list_del(&nvbo->entry);
+		nvbo->reserved_by = NULL;
 		ttm_bo_unreserve(&nvbo->bo);
 		drm_gem_object_unreference(nvbo->gem);
 	}
@@ -260,6 +261,7 @@ nouveau_gem_pushbuf_fence(struct list_head *list, struct nouveau_fence *fence)
 		spin_unlock(&nvbo->bo.lock);
 
 		list_del(&nvbo->entry);
+		nvbo->reserved_by = NULL;
 		ttm_bo_unreserve(&nvbo->bo);
 		drm_gem_object_unreference(nvbo->gem);
 
@@ -309,6 +311,13 @@ retry:
 		}
 		nvbo = gem->driver_private;
 
+		if (nvbo->reserved_by && nvbo->reserved_by == file_priv) {
+			NV_INFO(dev, "multiple instances of buffer %d on "
+				     "validation list\n", b->handle);
+			ret = -EINVAL;
+			goto out_unref;
+		}
+
 		ret = ttm_bo_reserve(&nvbo->bo, false, false, true, sequence);
 		if (ret) {
 			nouveau_gem_pushbuf_backoff(list);
@@ -320,6 +329,7 @@ retry:
 			goto retry;
 		}
 
+		nvbo->reserved_by = file_priv;
 		list_add_tail(&nvbo->entry, list);
 
 		if (unlikely(atomic_read(&nvbo->bo.cpu_writers) > 0)) {
