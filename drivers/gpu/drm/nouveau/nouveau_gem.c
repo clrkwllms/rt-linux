@@ -274,6 +274,7 @@ nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
 			     uint64_t user_buffers, int nr_buffers,
 			     struct list_head *list, int *apply_relocs)
 {
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_gem_pushbuf_bo *b;
 	struct drm_nouveau_gem_pushbuf_bo __user *user_pbbos =
@@ -281,6 +282,7 @@ nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
 	struct nouveau_fence *prev_fence;
 	struct nouveau_bo *nvbo;
 	struct list_head *entry, *tmp;
+	uint32_t sequence;
 	int ret = -EINVAL;
 	int i;
 	int trycnt = 0;
@@ -288,6 +290,7 @@ nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
 	if (nr_buffers == 0)
 		return 0;
 
+	sequence = atomic_add_return(1, &dev_priv->ttm.validate_sequence);
 retry:
 	if (++trycnt > 100000) {
 		ret = -EINVAL;
@@ -306,8 +309,7 @@ retry:
 		}
 		nvbo = gem->driver_private;
 
-		ret = ttm_bo_reserve(&nvbo->bo, false, false, true,
-				     chan->fence.sequence);
+		ret = ttm_bo_reserve(&nvbo->bo, false, false, true, sequence);
 		if (ret) {
 			nouveau_gem_pushbuf_backoff(list);
 			if (ret == -EAGAIN)

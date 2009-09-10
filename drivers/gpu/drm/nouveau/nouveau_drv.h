@@ -158,8 +158,7 @@ struct nouveau_gpuobj_ref {
 	int handle;
 };
 
-struct nouveau_channel
-{
+struct nouveau_channel {
 	struct drm_device *dev;
 	int id;
 
@@ -484,6 +483,7 @@ struct drm_nouveau_private {
 		struct ttm_bo_device bdev;
 		spinlock_t bo_list_lock;
 		struct list_head bo_list;
+		atomic_t validate_sequence;
 	} ttm;
 
 	struct fb_info *fbdev_info;
