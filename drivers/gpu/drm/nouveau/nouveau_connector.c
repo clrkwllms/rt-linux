@@ -387,6 +387,61 @@ nouveau_connector_native_mode(struct nouveau_connector *connector)
 	return NULL;
 }
 
+struct moderec {
+	int hdisplay;
+	int vdisplay;
+};
+
+static struct moderec scaler_modes[] = {
+	{ 1920, 1440 },
+	{ 1920, 1280 },
+	{ 1600, 1200 },
+	{ 1400, 1050 },
+	{ 1280, 1024 },
+	{ 1280, 960 },
+	{ 1152, 864 },
+	{ 1024, 768 },
+	{ 800, 600 },
+	{ 720, 400 },
+	{ 640, 480 },
+	{ 640, 400 },
+	{ 640, 350 },
+	{}
+};
+
+static int
+nouveau_connector_scaler_modes_add(struct drm_connector *connector)
+{
+	struct nouveau_connector *nv_connector = nouveau_connector(connector);
+	struct drm_display_mode *native = nv_connector->native_mode, *m;
+	struct drm_device *dev = connector->dev;
+	struct moderec *mode = &scaler_modes[0];
+	int modes = 0;
+
+	if (!native)
+		return 0;
+
+	while (mode->hdisplay) {
+		if (mode->hdisplay <= native->hdisplay &&
+		    mode->vdisplay <= native->vdisplay) {
+			m = drm_cvt_mode(dev, mode->hdisplay, mode->vdisplay,
+					 drm_mode_vrefresh(native), false,
+					 false);
+			if (!m)
+				continue;
+
+			m->type |= DRM_MODE_TYPE_DRIVER;
+
+			drm_mode_probed_add(connector, m);
+			modes++;
+		}
+
+		mode++;
+	}
+
+	return modes;
+}
+
 static int
 nouveau_connector_get_modes(struct drm_connector *connector)
 {
@@ -425,6 +480,9 @@ nouveau_connector_get_modes(struct drm_connector *connector)
 	if (nv_encoder->dcb->type == OUTPUT_TV)
 		ret = get_slave_funcs(nv_encoder)->
 			get_modes(to_drm_encoder(nv_encoder), connector);
+
+	if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS)
+		ret += nouveau_connector_scaler_modes_add(connector);
 
 	return ret;
 }
