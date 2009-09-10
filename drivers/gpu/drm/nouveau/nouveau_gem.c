@@ -238,9 +238,9 @@ nouveau_gem_pushbuf_backoff(struct list_head *list)
 	list_for_each_safe(entry, tmp, list) {
 		nvbo = list_entry(entry, struct nouveau_bo, entry);
 
-		drm_gem_object_unreference(nvbo->gem);
-		ttm_bo_unreserve(&nvbo->bo);
 		list_del(&nvbo->entry);
+		ttm_bo_unreserve(&nvbo->bo);
+		drm_gem_object_unreference(nvbo->gem);
 	}
 }
 
@@ -259,9 +259,9 @@ nouveau_gem_pushbuf_fence(struct list_head *list, struct nouveau_fence *fence)
 		nvbo->bo.sync_obj = nouveau_fence_ref(fence);
 		spin_unlock(&nvbo->bo.lock);
 
-		drm_gem_object_unreference(nvbo->gem);
-		ttm_bo_unreserve(&nvbo->bo);
 		list_del(&nvbo->entry);
+		ttm_bo_unreserve(&nvbo->bo);
+		drm_gem_object_unreference(nvbo->gem);
 
 		nouveau_fence_unref((void *)&prev_fence);
 	}
