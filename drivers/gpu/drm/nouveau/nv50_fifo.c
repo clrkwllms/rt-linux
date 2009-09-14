@@ -280,8 +280,6 @@ nv50_fifo_create_context(struct nouveau_channel *chan)
 	nv_wo32(dev, ramfc, 0x44/4, 0x2101ffff);
 	nv_wo32(dev, ramfc, 0x60/4, 0x7fffffff);
 	nv_wo32(dev, ramfc, 0x40/4, 0x00000000);
-	nv_wo32(dev, ramfc, 0x50/4, 0x2039b2e0);
-	nv_wo32(dev, ramfc, 0x54/4, 0x000f0000);
 	nv_wo32(dev, ramfc, 0x7c/4, 0x30000001);
 	nv_wo32(dev, ramfc, 0x78/4, 0x00000000);
 	nv_wo32(dev, ramfc, 0x4c/4, 0xffffffff);
