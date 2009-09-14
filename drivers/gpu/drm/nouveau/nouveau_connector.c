@@ -503,6 +503,7 @@ nouveau_connector_mode_valid(struct drm_connector *connector,
 		    mode->vdisplay > nv_connector->native_mode->vdisplay)
 			return MODE_PANEL;
 
+		min_clock = 0;
 		max_clock = 400000;
 		break;
 	case OUTPUT_TMDS:
