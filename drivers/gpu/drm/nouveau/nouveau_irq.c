@@ -134,9 +134,10 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
 	uint32_t status, reassign;
+	int cnt = 0;
 
 	reassign = nv_rd32(dev, NV03_PFIFO_CACHES) & 1;
-	while ((status = nv_rd32(dev, NV03_PFIFO_INTR_0))) {
+	while ((status = nv_rd32(dev, NV03_PFIFO_INTR_0)) && (cnt++ < 100)) {
 		struct nouveau_channel *chan = NULL;
 		uint32_t chid, get;
 
@@ -213,9 +214,16 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 			NV_INFO(dev, "PFIFO_INTR 0x%08x - Ch %d\n",
 				status, chid);
 			nv_wr32(dev, NV03_PFIFO_INTR_0, status);
+			status = 0;
 		}
 
 		nv_wr32(dev, NV03_PFIFO_CACHES, reassign);
+	}
+
+	if (status) {
+		NV_INFO(dev, "PFIFO still angry after %d spins, halt\n", cnt);
+		nv_wr32(dev, 0x2140, 0);
+		nv_wr32(dev, 0x140, 0);
 	}
 
 	nv_wr32(dev, NV03_PMC_INTR_0, NV_PMC_INTR_0_PFIFO_PENDING);
