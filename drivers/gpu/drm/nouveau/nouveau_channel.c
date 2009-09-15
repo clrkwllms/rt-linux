@@ -112,6 +112,7 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
 	struct nouveau_channel *chan;
+	unsigned fbdev_flags = 0;
 	int channel, user;
 	int ret;
 
@@ -201,6 +202,11 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		return ret;
 	}
 
+	if (dev_priv->fbdev_info) {
+		fbdev_flags = dev_priv->fbdev_info->flags;
+		dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
+	}
+
 	engine->graph.fifo_access(dev, false);
 	nouveau_wait_for_idle(dev);
 
@@ -261,6 +267,9 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	nv_wr32(dev, NV03_PFIFO_CACHES, 1);
 
 	engine->graph.fifo_access(dev, true);
+
+	if (dev_priv->fbdev_info)
+		dev_priv->fbdev_info->flags = fbdev_flags;
 
 	ret = nouveau_dma_init(chan);
 	if (!ret)
@@ -323,6 +332,7 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
+	unsigned fbdev_flags = 0;
 	uint64_t t_start;
 	bool timeout = false;
 	int ret;
@@ -367,6 +377,11 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	nouveau_fence_fini(chan);
 
 	/* disable the fifo caches */
+	if (dev_priv->fbdev_info) {
+		fbdev_flags = dev_priv->fbdev_info->flags;
+		dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
+	}
+
 	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000000);
 	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
 			nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) & ~0x1);
@@ -384,6 +399,9 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
 	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000001);
 	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000001);
+
+	if (dev_priv->fbdev_info)
+		dev_priv->fbdev_info->flags = fbdev_flags;
 
 	/* Deallocate push buffer */
 	nouveau_gpuobj_ref_del(dev, &chan->pushbuf);
