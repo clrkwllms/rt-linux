@@ -1514,6 +1514,17 @@ nv40_graph_create_context(struct nouveau_channel *chan)
 void
 nv40_graph_destroy_context(struct nouveau_channel *chan)
 {
+	struct drm_device *dev = chan->dev;
+	uint32_t inst;
+
+	/* Mark context as unloaded if still active on PGRAPH */
+	inst = nv_rd32(dev, NV40_PGRAPH_CTXCTL_CUR);
+	if (inst & NV40_PGRAPH_CTXCTL_CUR_LOADED) {
+		inst &= NV40_PGRAPH_CTXCTL_CUR_INSTANCE;
+		if (inst == (chan->ramin_grctx->instance >> 4))
+			nv_wr32(dev, NV40_PGRAPH_CTXCTL_CUR, inst);
+	}
+
 	nouveau_gpuobj_ref_del(chan->dev, &chan->ramin_grctx);
 }
 
