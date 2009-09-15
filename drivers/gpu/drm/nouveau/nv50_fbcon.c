@@ -14,15 +14,14 @@ nv50_fbcon_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 
-	if (info->flags & FBINFO_HWACCEL_DISABLED) {
-		cfb_fillrect(info, rect);
-		return;
-	}
-
-	if (RING_SPACE(chan, rect->rop == ROP_COPY ? 7 : 11)) {
+	if (!(info->flags & FBINFO_HWACCEL_DISABLED) &&
+	     RING_SPACE(chan, rect->rop == ROP_COPY ? 7 : 11)) {
 		NV_ERROR(dev, "GPU lockup - switching to software fbcon\n");
 
 		info->flags |= FBINFO_HWACCEL_DISABLED;
+	}
+
+	if (info->flags & FBINFO_HWACCEL_DISABLED) {
 		cfb_fillrect(info, rect);
 		return;
 	}
@@ -56,15 +55,13 @@ nv50_fbcon_copyarea(struct fb_info *info, const struct fb_copyarea *region)
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 
-	if (info->flags & FBINFO_HWACCEL_DISABLED) {
-		cfb_copyarea(info, region);
-		return;
-	}
-
-	if (RING_SPACE(chan, 12)) {
+	if (!(info->flags & FBINFO_HWACCEL_DISABLED) && RING_SPACE(chan, 12)) {
 		NV_ERROR(dev, "GPU lockup - switching to software fbcon\n");
 
 		info->flags |= FBINFO_HWACCEL_DISABLED;
+	}
+
+	if (info->flags & FBINFO_HWACCEL_DISABLED) {
 		cfb_copyarea(info, region);
 		return;
 	}
@@ -98,14 +95,17 @@ nv50_fbcon_imageblit(struct fb_info *info, const struct fb_image *image)
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 
-	if (image->depth != 1 || (info->flags & FBINFO_HWACCEL_DISABLED)) {
+	if (image->depth != 1) {
 		cfb_imageblit(info, image);
 		return;
 	}
 
-	if (RING_SPACE(chan, 11)) {
+	if (!(info->flags & FBINFO_HWACCEL_DISABLED) && RING_SPACE(chan, 11)) {
 		NV_ERROR(dev, "GPU lockup - switching to software fbcon\n");
 		info->flags |= FBINFO_HWACCEL_DISABLED;
+	}
+
+	if (info->flags & FBINFO_HWACCEL_DISABLED) {
 		cfb_imageblit(info, image);
 		return;
 	}
