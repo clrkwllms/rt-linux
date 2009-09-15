@@ -76,7 +76,7 @@ nouveau_fifo_instmem_configure(struct drm_device *dev)
 			nv_wr32(dev, 0x2230, 0);
 			nv_wr32(dev, NV40_PFIFO_RAMFC,
 				((nouveau_mem_fb_amount(dev) - 512 * 1024 +
-				  dev_priv->ramfc_offset) >> 16) | (2 << 16));
+				  dev_priv->ramfc_offset) >> 16) | (3 << 16));
 			break;
 		}
 		break;

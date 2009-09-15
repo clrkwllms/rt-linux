@@ -121,12 +121,18 @@ int nv04_instmem_init(struct drm_device *dev)
 	 */
 	offset = dev_priv->ramfc_offset + dev_priv->ramfc_size;
 
-	/* On my NV4E, there's *something* clobbering the 16KiB just after
-	 * where we setup these fixed tables.  No idea what it is just yet,
-	 * so reserve this space on all NV4X cards for now.
+	/* It appears RAMRO (or something?) is controlled by 0x2220/0x2230
+	 * on certain NV4x chipsets as well as RAMFC.  When 0x2230 == 0
+	 * ("new style" control) the upper 16-bits of 0x2220 points at this
+	 * other mysterious table that's clobbering important things.
+	 *
+	 * We're now pointing this at RAMIN+0x30000 to avoid RAMFC getting
+	 * smashed to pieces on us, so reserve 0x30000-0x40000 too..
 	 */
-	if (dev_priv->card_type >= NV_40)
-		offset += 16*1024;
+	if (dev_priv->card_type >= NV_40) {
+		if (offset < 0x40000)
+			offset = 0x40000;
+	}
 
 	ret = nouveau_mem_init_heap(&dev_priv->ramin_heap,
 				    offset, dev_priv->ramin_rsvd_vram - offset);
