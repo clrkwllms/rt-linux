@@ -78,8 +78,7 @@ nouveau_fbcon_sync(struct fb_info *info)
 
 	ret = -EBUSY;
 	for (i = 0; i < 100000; i++) {
-		if (nouveau_bo_rd32(chan->notifier_bo, chan->m2mf_ntfy + 3)
-									== 0) {
+		if (!nouveau_bo_rd32(chan->notifier_bo, chan->m2mf_ntfy + 3)) {
 			ret = 0;
 			break;
 		}
