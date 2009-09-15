@@ -235,25 +235,24 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	 * isn't entirely.. well.. correct.. setup PFIFO ourselves.  For any
 	 * other case, the GPU will handle this when it switches contexts.
 	 */
-	if (dev_priv->engine.fifo.init == nv04_fifo_init ||
-	    dev_priv->engine.fifo.init == nv40_fifo_init) {
+	if ((dev_priv->engine.fifo.init == nv04_fifo_init ||
+	     dev_priv->engine.fifo.init == nv40_fifo_init) &&
+	    dev_priv->fifo_alloc_count == 1) {
 		/* setup channel's default get/put values
 		 */
 		nvchan_wr32(chan->user_get, chan->pushbuf_base);
 		nvchan_wr32(chan->user_put, chan->pushbuf_base);
 
-		if (dev_priv->fifo_alloc_count == 1) {
-			ret = engine->fifo.load_context(chan);
-			if (ret) {
-				nouveau_channel_free(chan);
-				return ret;
-			}
+		ret = engine->fifo.load_context(chan);
+		if (ret) {
+			nouveau_channel_free(chan);
+			return ret;
+		}
 
-			ret = engine->graph.load_context(chan);
-			if (ret) {
-				nouveau_channel_free(chan);
-				return ret;
-			}
+		ret = engine->graph.load_context(chan);
+		if (ret) {
+			nouveau_channel_free(chan);
+			return ret;
 		}
 	}
 
