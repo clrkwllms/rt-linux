@@ -5134,6 +5134,11 @@ nouveau_run_vbios_init(struct drm_device *dev)
 	if (bios->major_version < 5)	/* BMP only */
 		load_nv17_hw_sequencer_ucode(dev, bios);
 
+	if (bios->execute) {
+		bios->fp.last_script_invoc = 0;
+		bios->fp.lvds_init_run = false;
+	}
+
 	parse_init_tables(bios);
 
 	/* Runs some additional script seen on G8x VBIOSen.  The VBIOS'
