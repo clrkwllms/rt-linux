@@ -137,14 +137,15 @@ nouveau_fence_emit(struct nouveau_fence *fence)
 
 	fence->sequence = ++chan->fence.sequence;
 
-	BEGIN_RING(chan, NvSubM2MF, USE_REFCNT ? 0x0050 : 0x0150, 1);
-	OUT_RING  (chan, fence->sequence);
-	FIRE_RING (chan);
-
 	kref_get(&fence->refcount);
 	spin_lock_irqsave(&chan->fence.lock, flags);
 	list_add_tail(&fence->entry, &chan->fence.pending);
 	spin_unlock_irqrestore(&chan->fence.lock, flags);
+
+	BEGIN_RING(chan, NvSubM2MF, USE_REFCNT ? 0x0050 : 0x0150, 1);
+	OUT_RING  (chan, fence->sequence);
+	FIRE_RING (chan);
+
 	return 0;
 }
 
