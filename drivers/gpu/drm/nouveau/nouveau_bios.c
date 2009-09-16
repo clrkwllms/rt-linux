@@ -5228,9 +5228,12 @@ nouveau_bios_init(struct drm_device *dev)
 		return ret;
 	}
 
-	if (bios->major_version < 5)
-		/* feature_byte on BMP is poor, but init always sets CR4B */
+	/* feature_byte on BMP is poor, but init always sets CR4B */
+	if (bios->major_version < 5) {
+		bool waslocked = NVLockVgaCrtcs(dev, false);
 		bios->is_mobile = NVReadVgaCrtc(dev, 0, NV_CIO_CRE_4B) & 0x40;
+		NVLockVgaCrtcs(dev, waslocked);
+	}
 
 	/* all BIT systems need p_f_m_t for digital_min_front_porch */
 	if (bios->is_mobile || bios->major_version >= 5)
