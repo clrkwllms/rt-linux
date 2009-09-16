@@ -270,20 +270,27 @@ nv50_graph_destroy_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	int i, hdr = IS_G80 ? 0x200 : 0x20;
+	uint32_t inst;
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
 
-	if (chan->ramin && chan->ramin->gpuobj) {
-		int i, hdr;
+	if (!chan->ramin || !chan->ramin->gpuobj)
+		return;
 
-		hdr = IS_G80 ? 0x200 : 0x20;
-		dev_priv->engine.instmem.prepare_access(dev, true);
-		for (i=hdr; i<hdr+24; i+=4)
-			nv_wo32(dev, chan->ramin->gpuobj, i/4, 0);
-		dev_priv->engine.instmem.finish_access(dev);
-
-		nouveau_gpuobj_ref_del(dev, &chan->ramin_grctx);
+	inst = nv_rd32(dev, NV50_PGRAPH_CTXCTL_CUR);
+	if (inst & NV50_PGRAPH_CTXCTL_CUR_LOADED) {
+		inst &= NV50_PGRAPH_CTXCTL_CUR_INSTANCE;
+		if (inst == chan->ramin->instance >> 12)
+			nv_wr32(dev, NV50_PGRAPH_CTXCTL_CUR, inst);
 	}
+
+	dev_priv->engine.instmem.prepare_access(dev, true);
+	for (i=hdr; i<hdr+24; i+=4)
+		nv_wo32(dev, chan->ramin->gpuobj, i/4, 0);
+	dev_priv->engine.instmem.finish_access(dev);
+
+	nouveau_gpuobj_ref_del(dev, &chan->ramin_grctx);
 }
 
 static int
