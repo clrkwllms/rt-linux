@@ -167,13 +167,12 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	else
 		user = NV50_USER(channel);
 
-	ret = drm_addmap(dev, drm_get_resource_start(dev, 0) + user,
-			 PAGE_SIZE, _DRM_REGISTERS, _DRM_DRIVER |
-			 _DRM_READ_ONLY, &chan->user);
-	if (ret) {
-		NV_ERROR(dev, "regs %d\n", ret);
+	chan->user = ioremap(pci_resource_start(dev->pdev, 0) + user,
+								PAGE_SIZE);
+	if (!chan->user) {
+		NV_ERROR(dev, "ioremap of regs failed.\n");
 		nouveau_channel_free(chan);
-		return ret;
+		return -ENOMEM;
 	}
 	chan->user_put = 0x40;
 	chan->user_get = 0x44;
@@ -416,7 +415,7 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	nouveau_notifier_takedown_channel(chan);
 
 	if (chan->user)
-		drm_rmmap(dev, chan->user);
+		iounmap(chan->user);
 
 	dev_priv->fifos[chan->id] = NULL;
 	dev_priv->fifo_alloc_count--;

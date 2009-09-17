@@ -44,7 +44,7 @@ nv50_evo_channel_del(struct nouveau_channel **pchan)
 	nouveau_bo_ref(NULL, &chan->pushbuf_bo);
 
 	if (chan->user)
-		drm_rmmap(chan->dev, chan->user);
+		iounmap(chan->user);
 
 	kfree(chan);
 }
@@ -166,13 +166,12 @@ nv50_evo_channel_new(struct drm_device *dev, struct nouveau_channel **pchan)
 		return ret;
 	}
 
-	ret = drm_addmap(dev, drm_get_resource_start(dev, 0) +
-			 NV50_PDISPLAY_USER(0), PAGE_SIZE, _DRM_REGISTERS,
-			 _DRM_DRIVER | _DRM_READ_ONLY, &chan->user);
-	if (ret) {
-		NV_ERROR(dev, "Error mapping EVO control regs: %d\n", ret);
+	chan->user = ioremap(pci_resource_start(dev->pdev, 0) +
+					NV50_PDISPLAY_USER(0), PAGE_SIZE);
+	if (!chan->user) {
+		NV_ERROR(dev, "Error mapping EVO control regs.\n");
 		nv50_evo_channel_del(pchan);
-		return ret;
+		return -ENOMEM;
 	}
 
 	return 0;
