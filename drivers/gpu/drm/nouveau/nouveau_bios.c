@@ -300,7 +300,7 @@ valid_reg(struct nvbios *bios, uint32_t reg)
 	if (dev_priv->card_type >= NV_50)
 		return 1;
 
-	#define WITHIN(x, y, z) ((x >= y) && (x <= y + z))
+	#define WITHIN(x, y, z) ((x >= y) && (x < y + z))
 	if (WITHIN(reg, NV_PMC_OFFSET, NV_PMC_SIZE))
 		return 1;
 	if (WITHIN(reg, NV_PBUS_OFFSET, NV_PBUS_SIZE))
