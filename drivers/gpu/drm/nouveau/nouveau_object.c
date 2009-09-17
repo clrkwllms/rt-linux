@@ -74,7 +74,7 @@ nouveau_ramht_hash_handle(struct drm_device *dev, int channel, uint32_t handle)
 
 	NV_DEBUG(dev, "ch%d handle=0x%08x\n", channel, handle);
 
-	for (i=32;i>0;i-=dev_priv->ramht_bits) {
+	for (i = 32; i > 0; i -= dev_priv->ramht_bits) {
 		hash ^= (handle & ((1 << dev_priv->ramht_bits) - 1));
 		handle >>= dev_priv->ramht_bits;
 	}

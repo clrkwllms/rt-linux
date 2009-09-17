@@ -530,7 +530,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	reg0 = nv_rd32(dev, NV03_PMC_BOOT_0);
 
 	/* We're dealing with >=NV10 */
-	if ((reg0 & 0x0f000000) > 0 ) {
+	if ((reg0 & 0x0f000000) > 0) {
 		/* Bit 27-20 contain the architecture in hex */
 		architecture = (reg0 & 0xff00000) >> 20;
 	/* NV04 or NV05 */
@@ -660,7 +660,8 @@ nouveau_ioctl_card_init(struct drm_device *dev, void *data,
 	return nouveau_card_init(dev);
 }
 
-int nouveau_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *file_priv)
+int nouveau_ioctl_getparam(struct drm_device *dev, void *data,
+						struct drm_file *file_priv)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_getparam *getparam = data;
@@ -672,28 +673,28 @@ int nouveau_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *
 		getparam->value = dev_priv->chipset;
 		break;
 	case NOUVEAU_GETPARAM_PCI_VENDOR:
-		getparam->value=dev->pci_vendor;
+		getparam->value = dev->pci_vendor;
 		break;
 	case NOUVEAU_GETPARAM_PCI_DEVICE:
-		getparam->value=dev->pci_device;
+		getparam->value = dev->pci_device;
 		break;
 	case NOUVEAU_GETPARAM_BUS_TYPE:
 		if (drm_device_is_agp(dev))
-			getparam->value=NV_AGP;
+			getparam->value = NV_AGP;
 		else if (drm_device_is_pcie(dev))
-			getparam->value=NV_PCIE;
+			getparam->value = NV_PCIE;
 		else
-			getparam->value=NV_PCI;
+			getparam->value = NV_PCI;
 		break;
 	case NOUVEAU_GETPARAM_FB_PHYSICAL:
-		getparam->value=dev_priv->fb_phys;
+		getparam->value = dev_priv->fb_phys;
 		break;
 	case NOUVEAU_GETPARAM_AGP_PHYSICAL:
-		getparam->value=dev_priv->gart_info.aper_base;
+		getparam->value = dev_priv->gart_info.aper_base;
 		break;
 	case NOUVEAU_GETPARAM_PCI_PHYSICAL:
-		if ( dev -> sg )
-			getparam->value=(unsigned long)dev->sg->virtual;
+		if (dev->sg)
+			getparam->value = (unsigned long)dev->sg->virtual;
 		else
 		     {
 		     NV_ERROR(dev, "Requested PCIGART address, "
@@ -702,10 +703,10 @@ int nouveau_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *
 		     }
 		break;
 	case NOUVEAU_GETPARAM_FB_SIZE:
-		getparam->value=dev_priv->fb_available_size;
+		getparam->value = dev_priv->fb_available_size;
 		break;
 	case NOUVEAU_GETPARAM_AGP_SIZE:
-		getparam->value=dev_priv->gart_info.aper_size;
+		getparam->value = dev_priv->gart_info.aper_size;
 		break;
 	case NOUVEAU_GETPARAM_VM_VRAM_BASE:
 		getparam->value = dev_priv->vm_vram_base;

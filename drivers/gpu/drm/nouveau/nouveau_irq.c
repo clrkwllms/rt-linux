@@ -388,15 +388,14 @@ nouveau_graph_trap_info(struct drm_device *dev,
 		trap->data2 = nv_rd32(dev, NV10_PGRAPH_TRAPPED_DATA_HIGH);
 	}
 
-	if (dev_priv->card_type < NV_10) {
+	if (dev_priv->card_type < NV_10)
 		trap->class = nv_rd32(dev, 0x400180 + trap->subc*4) & 0xFF;
-	} else if (dev_priv->card_type < NV_40) {
+	else if (dev_priv->card_type < NV_40)
 		trap->class = nv_rd32(dev, 0x400160 + trap->subc*4) & 0xFFF;
-	} else if (dev_priv->card_type < NV_50) {
+	else if (dev_priv->card_type < NV_50)
 		trap->class = nv_rd32(dev, 0x400160 + trap->subc*4) & 0xFFFF;
-	} else {
+	else
 		trap->class = nv_rd32(dev, 0x400814);
-	}
 }
 
 static void
@@ -642,7 +641,7 @@ nouveau_crtc_irq_handler(struct drm_device *dev, int crtc)
 irqreturn_t
 nouveau_irq_handler(DRM_IRQ_ARGS)
 {
-	struct drm_device *dev = (struct drm_device*)arg;
+	struct drm_device *dev = (struct drm_device *)arg;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t status;
 

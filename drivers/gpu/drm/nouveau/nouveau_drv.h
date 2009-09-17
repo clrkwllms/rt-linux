@@ -116,8 +116,8 @@ struct mem_block {
 };
 
 enum nouveau_flags {
-	NV_NFORCE   =0x10000000,
-	NV_NFORCE2  =0x20000000
+	NV_NFORCE   = 0x10000000,
+	NV_NFORCE2  = 0x20000000
 };
 
 #define NVOBJ_ENGINE_SW		0

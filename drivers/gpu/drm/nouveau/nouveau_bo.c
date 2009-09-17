@@ -73,25 +73,26 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 	if (!nvbo->mappable && (flags & TTM_PL_FLAG_VRAM))
 		flags |= TTM_PL_FLAG_PRIV0;
 
-	/* Some of the tile_flags have a periodic structure of 24*4096 bytes, 
-	 * align to to that as well as the page size. Overallocate memory to 
+	/*
+	 * Some of the tile_flags have a periodic structure of 24*4096 bytes,
+	 * align to to that as well as the page size. Overallocate memory to
 	 * avoid corruption of other buffer objects.
 	 */
 	switch (tile_flags) {
-		case 0x1800:
-		case 0x2800:
-		case 0x4800:
-		case 0x7a00:
-			size += 6*4096;
-			align = 2*24*4096;
-			break;
-		default:
-			break;
+	case 0x1800:
+	case 0x2800:
+	case 0x4800:
+	case 0x7a00:
+		size += 6 * 4096;
+		align = 2 * 24 * 4096;
+		break;
+	default:
+		break;
 	}
 
 	align >>= PAGE_SHIFT;
 
-	size = (size + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1);
+	size = (size + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1);
 	if (dev_priv->card_type == NV_50) {
 		size = (size + 65535) & ~65535;
 		if (align < (65536 / PAGE_SIZE))
@@ -569,13 +570,10 @@ nouveau_bo_move(struct ttm_buffer_object *bo, bool evict, bool intr,
 			return ttm_bo_move_memcpy(bo, evict, no_wait, new_mem);
 		if (nouveau_bo_move_flipd(bo, evict, intr, no_wait, new_mem))
 			return ttm_bo_move_memcpy(bo, evict, no_wait, new_mem);
-	}
-	else
-	if (old_mem->mem_type == TTM_PL_SYSTEM) {
+	} else if (old_mem->mem_type == TTM_PL_SYSTEM) {
 		if (nouveau_bo_move_flips(bo, evict, intr, no_wait, new_mem))
 			return ttm_bo_move_memcpy(bo, evict, no_wait, new_mem);
-	}
-	else {
+	} else {
 		if (nouveau_bo_move_m2mf(bo, evict, no_wait, old_mem, new_mem))
 			return ttm_bo_move_memcpy(bo, evict, no_wait, new_mem);
 	}

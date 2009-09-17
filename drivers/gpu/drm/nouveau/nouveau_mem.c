@@ -155,7 +155,7 @@ int nouveau_mem_init_heap(struct mem_block **heap, uint64_t start,
 	blocks->next = blocks->prev = *heap;
 
 	memset(*heap, 0, sizeof(**heap));
-	(*heap)->file_priv = (struct drm_file *) - 1;
+	(*heap)->file_priv = (struct drm_file *) -1;
 	(*heap)->next = (*heap)->prev = blocks;
 	return 0;
 }

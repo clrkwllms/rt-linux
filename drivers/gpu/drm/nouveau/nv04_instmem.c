@@ -35,22 +35,22 @@ nv04_instmem_determine_amount(struct drm_device *dev)
 		case 0x47:
 		case 0x49:
 		case 0x4b:
-			dev_priv->ramin_rsvd_vram = (2*1024* 1024);
+			dev_priv->ramin_rsvd_vram = (2 * 1024 * 1024);
 			break;
 		default:
-			dev_priv->ramin_rsvd_vram = (1*1024* 1024);
+			dev_priv->ramin_rsvd_vram = (1 * 1024 * 1024);
 			break;
 		}
 	} else {
 		/*XXX: what *are* the limits on <NV40 cards?
 		 */
-		dev_priv->ramin_rsvd_vram = (512*1024);
+		dev_priv->ramin_rsvd_vram = (512 * 1024);
 	}
-	NV_DEBUG(dev, "RAMIN size: %dKiB\n", dev_priv->ramin_rsvd_vram>>10);
+	NV_DEBUG(dev, "RAMIN size: %dKiB\n", dev_priv->ramin_rsvd_vram >> 10);
 
 	/* Clear all of it, except the BIOS image that's in the first 64KiB */
 	dev_priv->engine.instmem.prepare_access(dev, true);
-	for (i=(64*1024); i<dev_priv->ramin_rsvd_vram; i+=4)
+	for (i = 64 * 1024; i < dev_priv->ramin_rsvd_vram; i += 4)
 		nv_wi32(dev, i, 0x00000000);
 	dev_priv->engine.instmem.finish_access(dev);
 }

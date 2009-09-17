@@ -300,36 +300,39 @@ valid_reg(struct nvbios *bios, uint32_t reg)
 	if (dev_priv->card_type >= NV_50)
 		return 1;
 
-	#define WITHIN(x,y,z) ((x>=y)&&(x<=y+z))
-	if (WITHIN(reg,NV_PMC_OFFSET,NV_PMC_SIZE))
+	#define WITHIN(x, y, z) ((x >= y) && (x <= y + z))
+	if (WITHIN(reg, NV_PMC_OFFSET, NV_PMC_SIZE))
 		return 1;
-	if (WITHIN(reg,NV_PBUS_OFFSET,NV_PBUS_SIZE))
+	if (WITHIN(reg, NV_PBUS_OFFSET, NV_PBUS_SIZE))
 		return 1;
-	if (WITHIN(reg,NV_PFIFO_OFFSET,NV_PFIFO_SIZE))
+	if (WITHIN(reg, NV_PFIFO_OFFSET, NV_PFIFO_SIZE))
 		return 1;
-	if (dev_priv->VBIOS.pub.chip_version >= 0x30 && WITHIN(reg,0x4000,0x600))
+	if (dev_priv->VBIOS.pub.chip_version >= 0x30 &&
+						WITHIN(reg, 0x4000, 0x600))
 		return 1;
-	if (dev_priv->VBIOS.pub.chip_version >= 0x40 && WITHIN(reg,0xc000,0x48))
+	if (dev_priv->VBIOS.pub.chip_version >= 0x40 &&
+						WITHIN(reg, 0xc000, 0x48))
 		return 1;
 	if (dev_priv->VBIOS.pub.chip_version >= 0x17 && reg == 0x0000d204)
 		return 1;
 	if (dev_priv->VBIOS.pub.chip_version >= 0x40) {
 		if (reg == 0x00011014 || reg == 0x00020328)
 			return 1;
-		if (WITHIN(reg,0x88000,NV_PBUS_SIZE)) /* new PBUS */
+		if (WITHIN(reg, 0x88000, NV_PBUS_SIZE)) /* new PBUS */
 			return 1;
 	}
-	if (WITHIN(reg,NV_PFB_OFFSET,NV_PFB_SIZE))
+	if (WITHIN(reg, NV_PFB_OFFSET, NV_PFB_SIZE))
 		return 1;
-	if (WITHIN(reg,NV_PEXTDEV_OFFSET,NV_PEXTDEV_SIZE))
+	if (WITHIN(reg, NV_PEXTDEV_OFFSET, NV_PEXTDEV_SIZE))
 		return 1;
-	if (WITHIN(reg,NV_PCRTC0_OFFSET,NV_PCRTC0_SIZE * 2))
+	if (WITHIN(reg, NV_PCRTC0_OFFSET, NV_PCRTC0_SIZE * 2))
 		return 1;
-	if (WITHIN(reg,NV_PRAMDAC0_OFFSET,NV_PRAMDAC0_SIZE * 2))
+	if (WITHIN(reg, NV_PRAMDAC0_OFFSET, NV_PRAMDAC0_SIZE * 2))
 		return 1;
 	if (dev_priv->VBIOS.pub.chip_version >= 0x17 && reg == 0x0070fff0)
 		return 1;
-	if (dev_priv->VBIOS.pub.chip_version == 0x51 && WITHIN(reg,NV_PRAMIN_OFFSET,NV_PRAMIN_SIZE))
+	if (dev_priv->VBIOS.pub.chip_version == 0x51 &&
+				WITHIN(reg, NV_PRAMIN_OFFSET, NV_PRAMIN_SIZE))
 		return 1;
 	#undef WITHIN
 
@@ -2014,10 +2017,10 @@ init_io(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 		bios_wr32(bios, 0x614900, (bios_rd32(
 			  bios, 0x614900) & 0x0fffffff) | 0x00800000);
 		bios_wr32(bios, 0x000200, bios_rd32(
-			  bios, 0x000200) &~0x40000000);
+			  bios, 0x000200) & ~0x40000000);
 		mdelay(10);
 		bios_wr32(bios, 0x00e18c, bios_rd32(
-			  bios, 0x00e18c) &~0x00020000);
+			  bios, 0x00e18c) & ~0x00020000);
 		bios_wr32(bios, 0x000200, bios_rd32(
 			  bios, 0x000200) | 0x40000000);
 		bios_wr32(bios, 0x614100, 0x00800018);
@@ -3670,7 +3673,7 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 		 */
 		pll_lim->vco2.max_n = 0x28;
 		if (cv == 0x30 || cv == 0x35)
-		       /* only 5 bits available for N2 on nv30/35 */
+			/* only 5 bits available for N2 on nv30/35 */
 			pll_lim->vco2.max_n = 0x1f;
 		pll_lim->vco2.min_m = 0x1;
 		pll_lim->vco2.max_m = 0x4;

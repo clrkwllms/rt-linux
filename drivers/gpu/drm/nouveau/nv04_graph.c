@@ -27,7 +27,7 @@
 #include "nouveau_drm.h"
 #include "nouveau_drv.h"
 
-static uint32_t nv04_graph_ctx_regs [] = {
+static uint32_t nv04_graph_ctx_regs[] = {
 	NV04_PGRAPH_CTX_SWITCH1,
 	NV04_PGRAPH_CTX_SWITCH2,
 	NV04_PGRAPH_CTX_SWITCH3,
@@ -419,8 +419,8 @@ void nv04_graph_context_switch(struct drm_device *dev)
 }
 
 int nv04_graph_create_context(struct nouveau_channel *chan) {
-	struct graph_state* pgraph_ctx;
-	NV_DEBUG(chan-> dev, "nv04_graph_context_create %d\n", chan->id);
+	struct graph_state *pgraph_ctx;
+	NV_DEBUG(chan->dev, "nv04_graph_context_create %d\n", chan->id);
 
 	chan->pgraph_ctx = pgraph_ctx = kzalloc(sizeof(*pgraph_ctx),
 						GFP_KERNEL);

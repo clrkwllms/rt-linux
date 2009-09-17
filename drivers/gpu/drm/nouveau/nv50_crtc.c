@@ -450,13 +450,13 @@ nv50_crtc_gamma_set(struct drm_crtc *drm_crtc, u16 *r, u16 *g, u16 *b,
 static void
 nv50_crtc_save(struct drm_crtc *crtc)
 {
-	NV_ERROR(crtc->dev ,"!!\n");
+	NV_ERROR(crtc->dev, "!!\n");
 }
 
 static void
 nv50_crtc_restore(struct drm_crtc *crtc)
 {
-	NV_ERROR(crtc->dev ,"!!\n");
+	NV_ERROR(crtc->dev, "!!\n");
 }
 
 static const struct drm_crtc_funcs nv50_crtc_funcs = {

@@ -1814,7 +1814,7 @@ static uint32_t nv47_ctx_prog[] = {
 };
 
 //this is used for nv49 and nv4b
-static uint32_t nv49_4b_ctx_prog[] ={
+static uint32_t nv49_4b_ctx_prog[] = {
 	0x00400564, 0x00400505, 0x00408165, 0x00408206, 0x00409e68, 0x00200020,
 	0x0060000a, 0x00700080, 0x00104042, 0x00200020, 0x0060000a, 0x00700000,
 	0x001040c5, 0x00400f26, 0x00401068, 0x0060000d, 0x0070008f, 0x0070000e,
@@ -2017,7 +2017,8 @@ nv40_graph_init(struct drm_device *dev)
 
 	j = nv_rd32(dev, 0x1540) & 0xff;
 	if (j) {
-		for (i=0; !(j&1); j>>=1, i++);
+		for (i = 0; !(j & 1); j >>= 1, i++)
+			;
 		nv_wr32(dev, 0x405000, i);
 	}
 
