@@ -239,8 +239,8 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	    dev_priv->fifo_alloc_count == 1) {
 		/* setup channel's default get/put values
 		 */
-		nvchan_wr32(chan->user_get, chan->pushbuf_base);
-		nvchan_wr32(chan->user_put, chan->pushbuf_base);
+		nvchan_wr32(chan, chan->user_get, chan->pushbuf_base);
+		nvchan_wr32(chan, chan->user_put, chan->pushbuf_base);
 
 		ret = engine->fifo.load_context(chan);
 		if (ret) {

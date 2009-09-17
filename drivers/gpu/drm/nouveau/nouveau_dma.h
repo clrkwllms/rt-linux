@@ -121,7 +121,7 @@ BEGIN_RING(struct nouveau_channel *chan, int subc, int mthd, int size)
 #define WRITE_PUT(val) do {                                                    \
 	DRM_MEMORYBARRIER();                                                   \
 	nouveau_bo_rd32(chan->pushbuf_bo, 0);                                  \
-	nvchan_wr32(chan->user_put, ((val) << 2) + chan->pushbuf_base);        \
+	nvchan_wr32(chan, chan->user_put, ((val) << 2) + chan->pushbuf_base);  \
 } while (0)
 
 static inline void

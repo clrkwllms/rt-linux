@@ -1086,8 +1086,16 @@ extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 #endif /* !ioread32_native */
 
 /* channel control reg access */
-#define nvchan_wr32(reg, val) iowrite32_native((val), chan->user + (reg))
-#define nvchan_rd32(reg) ioread32_native(chan->user + (reg))
+static inline u32 nvchan_rd32(struct nouveau_channel *chan, unsigned reg)
+{
+	return ioread32_native(chan->user + reg);
+}
+
+static inline void nvchan_wr32(struct nouveau_channel *chan,
+							unsigned reg, u32 val)
+{
+	iowrite32_native(val, chan->user + reg);
+}
 
 /* register access */
 static inline u32 nv_rd32(struct drm_device *dev, unsigned reg)

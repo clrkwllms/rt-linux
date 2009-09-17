@@ -111,7 +111,7 @@ READ_GET(struct nouveau_channel *chan, uint32_t *get)
 {
 	uint32_t val;
 
-	val = nvchan_rd32(chan->user_get);
+	val = nvchan_rd32(chan, chan->user_get);
 	if (val < chan->pushbuf_base ||
 	    val >= chan->pushbuf_base + chan->pushbuf_bo->bo.mem.size) {
 		/* meaningless to dma_wait() except to know whether the

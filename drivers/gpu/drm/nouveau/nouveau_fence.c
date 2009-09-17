@@ -65,7 +65,7 @@ nouveau_fence_update(struct nouveau_channel *chan)
 	uint32_t sequence;
 
 	if (USE_REFCNT)
-		sequence = nvchan_rd32(0x48);
+		sequence = nvchan_rd32(chan, 0x48);
 	else
 		sequence = chan->fence.last_sequence_irq;
 

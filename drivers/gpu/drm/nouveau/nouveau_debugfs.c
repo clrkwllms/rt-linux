@@ -50,8 +50,10 @@ nouveau_debugfs_channel_info(struct seq_file *m, void *data)
 	seq_printf(m, "          free: 0x%08x\n", chan->dma.free << 2);
 
 	seq_printf(m, "gpu fifo state:\n");
-	seq_printf(m, "           get: 0x%08x\n", nvchan_rd32(chan->user_get));
-	seq_printf(m, "           put: 0x%08x\n", nvchan_rd32(chan->user_put));
+	seq_printf(m, "           get: 0x%08x\n",
+					nvchan_rd32(chan, chan->user_get));
+	seq_printf(m, "           put: 0x%08x\n",
+					nvchan_rd32(chan, chan->user_put));
 
 	seq_printf(m, "last fence    : %d\n", chan->fence.sequence);
 	seq_printf(m, "last signalled: %d\n", chan->fence.sequence_ack);

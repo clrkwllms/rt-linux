@@ -290,8 +290,8 @@ nouveau_pci_resume(struct pci_dev *pdev)
 		struct nouveau_channel *chan = dev_priv->channel;
 		int ptr = chan->pushbuf_base + (chan->dma.cur << 2);
 
-		nvchan_wr32(chan->user_get, ptr);
-		nvchan_wr32(chan->user_put, ptr);
+		nvchan_wr32(chan, chan->user_get, ptr);
+		nvchan_wr32(chan, chan->user_put, ptr);
 
 		engine->fifo.load_context(chan);
 		engine->graph.load_context(chan);
