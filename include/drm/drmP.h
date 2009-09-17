@@ -1240,8 +1240,6 @@ extern void drm_idlelock_release(struct drm_lock_data *lock_data);
 extern int drm_i_have_hw_lock(struct drm_device *dev, struct drm_file *file_priv);
 
 				/* Buffer management support (drm_bufs.h) */
-extern struct drm_map_list *drm_find_matching_map(struct drm_device *dev,
-						  drm_local_map_t *map);
 extern int drm_addbufs_agp(struct drm_device *dev, struct drm_buf_desc * request);
 extern int drm_addbufs_pci(struct drm_device *dev, struct drm_buf_desc * request);
 extern int drm_addmap(struct drm_device *dev, resource_size_t offset,
