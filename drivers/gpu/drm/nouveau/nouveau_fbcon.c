@@ -124,12 +124,13 @@ static struct drm_fb_helper_funcs nouveau_fbcon_helper_funcs = {
 
 #if defined(__i386__) || defined(__x86_64__)
 static bool
-nouveau_fbcon_has_vesafb(struct drm_device *dev)
+nouveau_fbcon_has_vesafb_or_efifb(struct drm_device *dev)
 {
 	struct pci_dev *pdev = dev->pdev;
 	int ramin;
 
-	if (screen_info.orig_video_isVGA != VIDEO_TYPE_VLFB)
+	if (screen_info.orig_video_isVGA != VIDEO_TYPE_VLFB &&
+	    screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
 		return false;
 
 	if (screen_info.lfb_base < pci_resource_start(pdev, 1))
@@ -257,7 +258,7 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 
 	/* Set aperture base/size for vesafb takeover */
 #if defined(__i386__) || defined(__x86_64__)
-	if (nouveau_fbcon_has_vesafb(dev)) {
+	if (nouveau_fbcon_has_vesafb_or_efifb(dev)) {
 		/* Some NVIDIA VBIOS' are stupid and decide to put the
 		 * framebuffer in the middle of the PRAMIN BAR for
 		 * whatever reason.  We need to know the exact lfb_base
@@ -266,7 +267,9 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 		 * vesafb did.
 		 */
 		info->aperture_base = screen_info.lfb_base;
-		info->aperture_size = screen_info.lfb_size * 65536;
+		info->aperture_size = screen_info.lfb_size;
+		if (screen_info.orig_video_isVGA == VIDEO_TYPE_VLFB)
+			info->aperture_size *= 65536;
 	} else
 #endif
 	{
