@@ -1813,7 +1813,7 @@ static uint32_t nv47_ctx_prog[] = {
 	0x0060000e, ~0
 };
 
-//this is used for nv49 and nv4b
+/* this is used for nv49 and nv4b */
 static uint32_t nv49_4b_ctx_prog[] = {
 	0x00400564, 0x00400505, 0x00408165, 0x00408206, 0x00409e68, 0x00200020,
 	0x0060000a, 0x00700080, 0x00104042, 0x00200020, 0x0060000a, 0x00700000,
@@ -2038,7 +2038,7 @@ nv40_graph_init(struct drm_device *dev)
 		break;
 	case 0x41:
 	case 0x42: /* pciid also 0x00Cx */
-//	case 0x0120: //XXX (pciid)
+	/* case 0x0120: XXX (pciid) */
 		nv_wr32(dev, 0x400828, 0x007596ff);
 		nv_wr32(dev, 0x40082c, 0x00000108);
 		break;

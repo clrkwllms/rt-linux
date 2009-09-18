@@ -855,8 +855,10 @@ void nv10_graph_destroy_context(struct nouveau_channel *chan)
 		NV_INFO(dev, "cleanning a channel with graph in current context\n");
 		nouveau_wait_for_idle(dev);
 		NV_INFO(dev, "reseting current graph context\n");
-		/* can't be call here because of dynamic mem alloc */
-		//nv10_graph_create_context(chan);
+		/*
+		 * can't be call here because of dynamic mem alloc
+		 * nv10_graph_create_context(chan);
+		 */
 		nv10_graph_load_context(chan);
 	}
 	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x1);

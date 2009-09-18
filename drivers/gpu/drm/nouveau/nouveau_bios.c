@@ -38,7 +38,7 @@
 #define EDID1_LEN 128
 
 #define BIOSLOG(sip, fmt, arg...) NV_DEBUG(sip->dev, fmt, ##arg)
-#define LOG_OLD_VALUE(x) //x
+#define LOG_OLD_VALUE(x)
 
 #define BIOS_USLEEP(n) mdelay((n)/1000)
 
@@ -52,7 +52,10 @@ struct init_exec {
 
 static bool nv_cksum(const uint8_t *data, unsigned int length)
 {
-	/* there's a few checksums in the BIOS, so here's a generic checking function */
+	/*
+	 * There's a few checksums in the BIOS, so here's a generic checking
+	 * function.
+	 */
 	int i;
 	uint8_t sum = 0;
 
@@ -261,8 +264,10 @@ static int parse_init_table(struct nvbios *, unsigned int, struct init_exec *);
 
 static void still_alive(void)
 {
-//	sync();
-//	BIOS_USLEEP(2000);
+#if 0
+	sync();
+	BIOS_USLEEP(2000);
+#endif
 }
 
 static uint32_t
@@ -290,7 +295,10 @@ valid_reg(struct nvbios *bios, uint32_t reg)
 			 reg);
 		return 0;
 	}
-	/* warn on C51 regs that haven't been verified accessible in mmiotracing */
+	/*
+	 * Warn on C51 regs that have not been verified accessible in
+	 * mmiotracing
+	 */
 	if (reg & 0x1 && dev_priv->VBIOS.pub.chip_version == 0x51 &&
 	    reg != 0x130d && reg != 0x1311 && reg != 0x60081d)
 		NV_WARN(dev, "=== C51 misaligned reg 0x%08X not verified ===\n",
@@ -347,7 +355,8 @@ valid_idx_port(struct nvbios *bios, uint16_t port)
 	struct drm_nouveau_private *dev_priv = bios->dev->dev_private;
 	struct drm_device *dev = bios->dev;
 
-	/* if adding more ports here, the read/write functions below will need
+	/*
+	 * If adding more ports here, the read/write functions below will need
 	 * updating so that the correct mmio range (PRMCIO, PRMDIO, PRMVIO) is
 	 * used for the port in question
 	 */
@@ -372,7 +381,8 @@ valid_port(struct nvbios *bios, uint16_t port)
 {
 	struct drm_device *dev = bios->dev;
 
-	/* if adding more ports here, the read/write functions below will need
+	/*
+	 * If adding more ports here, the read/write functions below will need
 	 * updating so that the correct mmio range (PRMCIO, PRMDIO, PRMVIO) is
 	 * used for the port in question
 	 */
@@ -393,7 +403,8 @@ bios_rd32(struct nvbios *bios, uint32_t reg)
 	if (!valid_reg(bios, reg))
 		return 0;
 
-	/* C51 sometimes uses regs with bit0 set in the address. For these
+	/*
+	 * C51 sometimes uses regs with bit0 set in the address. For these
 	 * cases there should exist a translation in a BIOS table to an IO
 	 * port address which the BIOS uses for accessing the reg
 	 *
@@ -473,7 +484,8 @@ bios_idxprt_wr(struct nvbios *bios, uint16_t port, uint8_t index, uint8_t data)
 	if (!valid_idx_port(bios, port))
 		return;
 
-	/* The current head is maintained in the nvbios member  state.crtchead.
+	/*
+	 * The current head is maintained in the nvbios member  state.crtchead.
 	 * We trap changes to CR44 and update the head variable and hence the
 	 * register set written.
 	 * As CR44 only exists on CRTC0, we update crtchead to head0 in advance
@@ -549,7 +561,8 @@ bios_port_wr(struct nvbios *bios, uint16_t port, uint8_t data)
 static bool
 io_flag_condition_met(struct nvbios *bios, uint16_t offset, uint8_t cond)
 {
-	/* The IO flag condition entry has 2 bytes for the CRTC port; 1 byte
+	/*
+	 * The IO flag condition entry has 2 bytes for the CRTC port; 1 byte
 	 * for the CRTC index; 1 byte for the mask to apply to the value
 	 * retrieved from the CRTC; 1 byte for the shift right to apply to the
 	 * masked CRTC value; 2 bytes for the offset to the flag array, to
@@ -587,7 +600,8 @@ io_flag_condition_met(struct nvbios *bios, uint16_t offset, uint8_t cond)
 static bool
 bios_condition_met(struct nvbios *bios, uint16_t offset, uint8_t cond)
 {
-	/* The condition table entry has 4 bytes for the address of the
+	/*
+	 * The condition table entry has 4 bytes for the address of the
 	 * register to check, 4 bytes for a mask to apply to the register and
 	 * 4 for a test comparison value
 	 */
@@ -612,7 +626,8 @@ bios_condition_met(struct nvbios *bios, uint16_t offset, uint8_t cond)
 static bool
 io_condition_met(struct nvbios *bios, uint16_t offset, uint8_t cond)
 {
-	/* The IO condition entry has 2 bytes for the IO port address; 1 byte
+	/*
+	 * The IO condition entry has 2 bytes for the IO port address; 1 byte
 	 * for the index to write to io_port; 1 byte for the mask to apply to
 	 * the byte read from io_port+1; and 1 byte for the value to compare
 	 * against the masked byte.
@@ -695,7 +710,8 @@ static int dcb_entry_idx_from_crtchead(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;
 
-	/* for the results of this function to be correct, CR44 must have been
+	/*
+	 * For the results of this function to be correct, CR44 must have been
 	 * set (using bios_idxprt_wr to set crtchead), CR58 set for CR57 = 0,
 	 * and the DCB table parsed, before the script calling the function is
 	 * run.  run_digital_op_script is example of how to do such setup
@@ -736,11 +752,14 @@ init_i2c_device_find(struct drm_device *dev, int i2c_index)
 
 static uint32_t get_tmds_index_reg(struct drm_device *dev, uint8_t mlv)
 {
-	/* For mlv < 0x80, it is an index into a table of TMDS base addresses
-	 * For mlv == 0x80 use the "or" value of the dcb_entry indexed by CR58 for CR57 = 0
-	 * to index a table of offsets to the basic 0x6808b0 address
-	 * For mlv == 0x81 use the "or" value of the dcb_entry indexed by CR58 for CR57 = 0
-	 * to index a table of offsets to the basic 0x6808b0 address, and then flip the offset by 8
+	/*
+	 * For mlv < 0x80, it is an index into a table of TMDS base addresses.
+	 * For mlv == 0x80 use the "or" value of the dcb_entry indexed by
+	 * CR58 for CR57 = 0 to index a table of offsets to the basic
+	 * 0x6808b0 address.
+	 * For mlv == 0x81 use the "or" value of the dcb_entry indexed by
+	 * CR58 for CR57 = 0 to index a table of offsets to the basic
+	 * 0x6808b0 address, and then flip the offset by 8.
 	 */
 
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -756,7 +775,7 @@ static uint32_t get_tmds_index_reg(struct drm_device *dev, uint8_t mlv)
 		dacoffset = pramdac_offset[dev_priv->VBIOS.bdcb.dcb.entry[dcb_entry].or];
 		if (mlv == 0x81)
 			dacoffset ^= 8;
-		return (0x6808b0 + dacoffset);
+		return 0x6808b0 + dacoffset;
 	} else {
 		if (mlv > ARRAY_SIZE(pramdac_table)) {
 			NV_ERROR(dev, "Magic Lookup Value too big (%02X)\n", mlv);
@@ -770,7 +789,8 @@ static bool
 init_io_restrict_prog(struct nvbios *bios, uint16_t offset,
 		      struct init_exec *iexec)
 {
-	/* INIT_IO_RESTRICT_PROG   opcode: 0x32 ('2')
+	/*
+	 * INIT_IO_RESTRICT_PROG   opcode: 0x32 ('2')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (16 bit): CRTC port
@@ -825,7 +845,8 @@ init_io_restrict_prog(struct nvbios *bios, uint16_t offset,
 static bool
 init_repeat(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_REPEAT   opcode: 0x33 ('3')
+	/*
+	 * INIT_REPEAT   opcode: 0x33 ('3')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): count
@@ -844,7 +865,8 @@ init_repeat(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 
 	iexec->repeat = true;
 
-	/* count - 1, as the script block will execute once when we leave this
+	/*
+	 * count - 1, as the script block will execute once when we leave this
 	 * opcode -- this is compatible with bios behaviour as:
 	 * a) the block is always executed at least once, even if count == 0
 	 * b) the bios interpreter skips to the op following INIT_END_REPEAT,
@@ -862,7 +884,8 @@ static bool
 init_io_restrict_pll(struct nvbios *bios, uint16_t offset,
 		     struct init_exec *iexec)
 {
-	/* INIT_IO_RESTRICT_PLL   opcode: 0x34 ('4')
+	/*
+	 * INIT_IO_RESTRICT_PLL   opcode: 0x34 ('4')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (16 bit): CRTC port
@@ -934,7 +957,8 @@ init_io_restrict_pll(struct nvbios *bios, uint16_t offset,
 static bool
 init_end_repeat(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_END_REPEAT   opcode: 0x36 ('6')
+	/*
+	 * INIT_END_REPEAT   opcode: 0x36 ('6')
 	 *
 	 * offset      (8 bit): opcode
 	 *
@@ -943,7 +967,8 @@ init_end_repeat(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 
 	/* no iexec->execute check by design */
 
-	/* iexec->repeat flag necessary to go past INIT_END_REPEAT opcode when
+	/*
+	 * iexec->repeat flag necessary to go past INIT_END_REPEAT opcode when
 	 * we're not in repeat mode
 	 */
 	if (iexec->repeat)
@@ -955,7 +980,8 @@ init_end_repeat(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_copy(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_COPY   opcode: 0x37 ('7')
+	/*
+	 * INIT_COPY   opcode: 0x37 ('7')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): register
@@ -1005,7 +1031,8 @@ init_copy(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_not(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_NOT   opcode: 0x38 ('8')
+	/*
+	 * INIT_NOT   opcode: 0x38 ('8')
 	 *
 	 * offset      (8  bit): opcode
 	 *
@@ -1024,7 +1051,8 @@ static bool
 init_io_flag_condition(struct nvbios *bios, uint16_t offset,
 		       struct init_exec *iexec)
 {
-	/* INIT_IO_FLAG_CONDITION   opcode: 0x39 ('9')
+	/*
+	 * INIT_IO_FLAG_CONDITION   opcode: 0x39 ('9')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): condition number
@@ -1053,7 +1081,8 @@ static bool
 init_idx_addr_latched(struct nvbios *bios, uint16_t offset,
 		      struct init_exec *iexec)
 {
-	/* INIT_INDEX_ADDRESS_LATCHED   opcode: 0x49 ('I')
+	/*
+	 * INIT_INDEX_ADDRESS_LATCHED   opcode: 0x49 ('I')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): control register
@@ -1107,7 +1136,8 @@ static bool
 init_io_restrict_pll2(struct nvbios *bios, uint16_t offset,
 		      struct init_exec *iexec)
 {
-	/* INIT_IO_RESTRICT_PLL2   opcode: 0x4A ('J')
+	/*
+	 * INIT_IO_RESTRICT_PLL2   opcode: 0x4A ('J')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (16 bit): CRTC port
@@ -1165,7 +1195,8 @@ init_io_restrict_pll2(struct nvbios *bios, uint16_t offset,
 static bool
 init_pll2(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_PLL2   opcode: 0x4B ('K')
+	/*
+	 * INIT_PLL2   opcode: 0x4B ('K')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): register
@@ -1190,7 +1221,8 @@ init_pll2(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_i2c_byte(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_I2C_BYTE   opcode: 0x4C ('L')
+	/*
+	 * INIT_I2C_BYTE   opcode: 0x4C ('L')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): DCB I2C table entry index
@@ -1260,7 +1292,8 @@ init_i2c_byte(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_zm_i2c_byte(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_ZM_I2C_BYTE   opcode: 0x4D ('M')
+	/*
+	 * INIT_ZM_I2C_BYTE   opcode: 0x4D ('M')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): DCB I2C table entry index
@@ -1316,7 +1349,8 @@ init_zm_i2c_byte(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_zm_i2c(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_ZM_I2C   opcode: 0x4E ('N')
+	/*
+	 * INIT_ZM_I2C   opcode: 0x4E ('N')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): DCB I2C table entry index
@@ -1369,7 +1403,8 @@ init_zm_i2c(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_tmds(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_TMDS   opcode: 0x4F ('O')	(non-canon name)
+	/*
+	 * INIT_TMDS   opcode: 0x4F ('O')	(non-canon name)
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): magic lookup value
@@ -1412,7 +1447,8 @@ static bool
 init_zm_tmds_group(struct nvbios *bios, uint16_t offset,
 		   struct init_exec *iexec)
 {
-	/* INIT_ZM_TMDS_GROUP   opcode: 0x50 ('P')	(non-canon name)
+	/*
+	 * INIT_ZM_TMDS_GROUP   opcode: 0x50 ('P')	(non-canon name)
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): magic lookup value
@@ -1455,7 +1491,8 @@ static bool
 init_cr_idx_adr_latch(struct nvbios *bios, uint16_t offset,
 		      struct init_exec *iexec)
 {
-	/* INIT_CR_INDEX_ADDRESS_LATCHED   opcode: 0x51 ('Q')
+	/*
+	 * INIT_CR_INDEX_ADDRESS_LATCHED   opcode: 0x51 ('Q')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): CRTC index1
@@ -1500,7 +1537,8 @@ init_cr_idx_adr_latch(struct nvbios *bios, uint16_t offset,
 static bool
 init_cr(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_CR   opcode: 0x52 ('R')
+	/*
+	 * INIT_CR   opcode: 0x52 ('R')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (8  bit): CRTC index
@@ -1532,7 +1570,8 @@ init_cr(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_zm_cr(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_ZM_CR   opcode: 0x53 ('S')
+	/*
+	 * INIT_ZM_CR   opcode: 0x53 ('S')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): CRTC index
@@ -1555,7 +1594,8 @@ init_zm_cr(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_zm_cr_group(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_ZM_CR_GROUP   opcode: 0x54 ('T')
+	/*
+	 * INIT_ZM_CR_GROUP   opcode: 0x54 ('T')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): count
@@ -1583,7 +1623,8 @@ static bool
 init_condition_time(struct nvbios *bios, uint16_t offset,
 		    struct init_exec *iexec)
 {
-	/* INIT_CONDITION_TIME   opcode: 0x56 ('V')
+	/*
+	 * INIT_CONDITION_TIME   opcode: 0x56 ('V')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): condition number
@@ -1632,7 +1673,8 @@ static bool
 init_zm_reg_sequence(struct nvbios *bios, uint16_t offset,
 		     struct init_exec *iexec)
 {
-	/* INIT_ZM_REG_SEQUENCE   opcode: 0x58 ('X')
+	/*
+	 * INIT_ZM_REG_SEQUENCE   opcode: 0x58 ('X')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): base register
@@ -1668,7 +1710,8 @@ init_zm_reg_sequence(struct nvbios *bios, uint16_t offset,
 static bool
 init_sub_direct(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_SUB_DIRECT   opcode: 0x5B ('[')
+	/*
+	 * INIT_SUB_DIRECT   opcode: 0x5B ('[')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (16 bit): subroutine offset (in bios)
@@ -1695,7 +1738,8 @@ init_sub_direct(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_copy_nv_reg(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_COPY_NV_REG   opcode: 0x5F ('_')
+	/*
+	 * INIT_COPY_NV_REG   opcode: 0x5F ('_')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): src reg
@@ -1744,7 +1788,8 @@ init_copy_nv_reg(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_zm_index_io(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_ZM_INDEX_IO   opcode: 0x62 ('b')
+	/*
+	 * INIT_ZM_INDEX_IO   opcode: 0x62 ('b')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (16 bit): CRTC port
@@ -1768,7 +1813,8 @@ init_zm_index_io(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_compute_mem(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_COMPUTE_MEM   opcode: 0x63 ('c')
+	/*
+	 * INIT_COMPUTE_MEM   opcode: 0x63 ('c')
 	 *
 	 * offset      (8 bit): opcode
 	 *
@@ -1804,7 +1850,8 @@ init_compute_mem(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 
 	/* no iexec->execute check by design */
 
-	/* this appears to be a NOP on G8x chipsets, both io logs of the VBIOS
+	/*
+	 * This appears to be a NOP on G8x chipsets, both io logs of the VBIOS
 	 * and kmmio traces of the binary driver POSTing the card show nothing
 	 * being done for this opcode.  why is it still listed in the table?!
 	 */
@@ -1814,12 +1861,15 @@ init_compute_mem(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 	if (dev_priv->card_type >= NV_50)
 		return true;
 
-	/* on every card I've seen, this step gets done for us earlier in the init scripts
+	/*
+	 * On every card I've seen, this step gets done for us earlier in
+	 * the init scripts
 	uint8_t crdata = bios_idxprt_rd(dev, NV_VIO_SRX, 0x01);
 	bios_idxprt_wr(dev, NV_VIO_SRX, 0x01, crdata | 0x20);
-	*/
+	 */
 
-	/* this also has probably been done in the scripts, but an mmio trace of
+	/*
+	 * This also has probably been done in the scripts, but an mmio trace of
 	 * s3 resume shows nvidia doing it anyway (unlike the NV_VIO_SRX write)
 	 */
 	bios_wr32(bios, NV_PFB_REFCTRL, NV_PFB_REFCTRL_VALID_1);
@@ -1833,7 +1883,8 @@ init_compute_mem(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_reset(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_RESET   opcode: 0x65 ('e')
+	/*
+	 * INIT_RESET   opcode: 0x65 ('e')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): register
@@ -1870,7 +1921,8 @@ static bool
 init_configure_mem(struct nvbios *bios, uint16_t offset,
 		   struct init_exec *iexec)
 {
-	/* INIT_CONFIGURE_MEM   opcode: 0x66 ('f')
+	/*
+	 * INIT_CONFIGURE_MEM   opcode: 0x66 ('f')
 	 *
 	 * offset      (8 bit): opcode
 	 *
@@ -1925,7 +1977,8 @@ static bool
 init_configure_clk(struct nvbios *bios, uint16_t offset,
 		   struct init_exec *iexec)
 {
-	/* INIT_CONFIGURE_CLK   opcode: 0x67 ('g')
+	/*
+	 * INIT_CONFIGURE_CLK   opcode: 0x67 ('g')
 	 *
 	 * offset      (8 bit): opcode
 	 *
@@ -1957,7 +2010,8 @@ static bool
 init_configure_preinit(struct nvbios *bios, uint16_t offset,
 		       struct init_exec *iexec)
 {
-	/* INIT_CONFIGURE_PREINIT   opcode: 0x68 ('h')
+	/*
+	 * INIT_CONFIGURE_PREINIT   opcode: 0x68 ('h')
 	 *
 	 * offset      (8 bit): opcode
 	 *
@@ -1983,7 +2037,8 @@ init_configure_preinit(struct nvbios *bios, uint16_t offset,
 static bool
 init_io(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_IO   opcode: 0x69 ('i')
+	/*
+	 * INIT_IO   opcode: 0x69 ('i')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (16 bit): CRTC port
@@ -2004,7 +2059,8 @@ init_io(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 	BIOSLOG(bios, "0x%04X: Port: 0x%04X, Mask: 0x%02X, Data: 0x%02X\n",
 		offset, crtcport, mask, data);
 
-	/* I have no idea what this does, but NVIDIA do this magic sequence
+	/*
+	 * I have no idea what this does, but NVIDIA do this magic sequence
 	 * in the places where this INIT_IO happens..
 	 */
 	if (dev_priv->card_type >= NV_50 && crtcport == 0x3c3 && data == 1) {
@@ -2068,7 +2124,8 @@ init_io(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_sub(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_SUB   opcode: 0x6B ('k')
+	/*
+	 * INIT_SUB   opcode: 0x6B ('k')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): script number
@@ -2096,7 +2153,8 @@ static bool
 init_ram_condition(struct nvbios *bios, uint16_t offset,
 		   struct init_exec *iexec)
 {
-	/* INIT_RAM_CONDITION   opcode: 0x6D ('m')
+	/*
+	 * INIT_RAM_CONDITION   opcode: 0x6D ('m')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): mask
@@ -2132,7 +2190,8 @@ init_ram_condition(struct nvbios *bios, uint16_t offset,
 static bool
 init_nv_reg(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_NV_REG   opcode: 0x6E ('n')
+	/*
+	 * INIT_NV_REG   opcode: 0x6E ('n')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): register
@@ -2160,14 +2219,15 @@ init_nv_reg(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_macro(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_MACRO   opcode: 0x6F ('o')
+	/*
+	 * INIT_MACRO   opcode: 0x6F ('o')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): macro number
 	 *
 	 * Look up macro index "macro number" in the macro index table.
-	 * The macro index table entry has 1 byte for the index in the macro table,
-	 * and 1 byte for the number of times to repeat the macro.
+	 * The macro index table entry has 1 byte for the index in the macro
+	 * table, and 1 byte for the number of times to repeat the macro.
 	 * The macro table entry has 4 bytes for the register address and
 	 * 4 bytes for the value to write to that register
 	 */
@@ -2201,7 +2261,8 @@ init_macro(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_done(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_DONE   opcode: 0x71 ('q')
+	/*
+	 * INIT_DONE   opcode: 0x71 ('q')
 	 *
 	 * offset      (8  bit): opcode
 	 *
@@ -2215,7 +2276,8 @@ init_done(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_resume(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_RESUME   opcode: 0x72 ('r')
+	/*
+	 * INIT_RESUME   opcode: 0x72 ('r')
 	 *
 	 * offset      (8  bit): opcode
 	 *
@@ -2234,7 +2296,8 @@ init_resume(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_time(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_TIME   opcode: 0x74 ('t')
+	/*
+	 * INIT_TIME   opcode: 0x74 ('t')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (16 bit): time
@@ -2258,7 +2321,8 @@ init_time(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_condition(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_CONDITION   opcode: 0x75 ('u')
+	/*
+	 * INIT_CONDITION   opcode: 0x75 ('u')
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): condition number
@@ -2288,7 +2352,8 @@ init_condition(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_io_condition(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_IO_CONDITION  opcode: 0x76
+	/*
+	 * INIT_IO_CONDITION  opcode: 0x76
 	 *
 	 * offset      (8 bit): opcode
 	 * offset + 1  (8 bit): condition number
@@ -2318,7 +2383,8 @@ init_io_condition(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_index_io(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_INDEX_IO   opcode: 0x78 ('x')
+	/*
+	 * INIT_INDEX_IO   opcode: 0x78 ('x')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (16 bit): CRTC port
@@ -2352,7 +2418,8 @@ init_index_io(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_pll(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_PLL   opcode: 0x79 ('y')
+	/*
+	 * INIT_PLL   opcode: 0x79 ('y')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): register
@@ -2378,7 +2445,8 @@ init_pll(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_zm_reg(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_ZM_REG   opcode: 0x7A ('z')
+	/*
+	 * INIT_ZM_REG   opcode: 0x7A ('z')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): register
@@ -2404,7 +2472,8 @@ init_zm_reg(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_8e(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_8E   opcode: 0x8E ('')
+	/*
+	 * INIT_8E   opcode: 0x8E ('')
 	 *
 	 * offset      (8 bit): opcode
 	 *
@@ -2489,7 +2558,8 @@ static bool
 init_ram_restrict_zm_reg_group(struct nvbios *bios, uint16_t offset,
 			       struct init_exec *iexec)
 {
-	/* INIT_RAM_RESTRICT_ZM_REG_GROUP   opcode: 0x8F ('')
+	/*
+	 * INIT_RAM_RESTRICT_ZM_REG_GROUP   opcode: 0x8F ('')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): reg
@@ -2548,7 +2618,8 @@ init_ram_restrict_zm_reg_group(struct nvbios *bios, uint16_t offset,
 static bool
 init_copy_zm_reg(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_COPY_ZM_REG   opcode: 0x90 ('')
+	/*
+	 * INIT_COPY_ZM_REG   opcode: 0x90 ('')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): src reg
@@ -2572,7 +2643,8 @@ static bool
 init_zm_reg_group_addr_latched(struct nvbios *bios, uint16_t offset,
 			       struct init_exec *iexec)
 {
-	/* INIT_ZM_REG_GROUP_ADDRESS_LATCHED   opcode: 0x91 ('')
+	/*
+	 * INIT_ZM_REG_GROUP_ADDRESS_LATCHED   opcode: 0x91 ('')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): dst reg
@@ -2601,7 +2673,8 @@ init_zm_reg_group_addr_latched(struct nvbios *bios, uint16_t offset,
 static bool
 init_reserved(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_RESERVED   opcode: 0x92 ('')
+	/*
+	 * INIT_RESERVED   opcode: 0x92 ('')
 	 *
 	 * offset      (8 bit): opcode
 	 *
@@ -2614,7 +2687,8 @@ init_reserved(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_96(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_96   opcode: 0x96 ('')
+	/*
+	 * INIT_96   opcode: 0x96 ('')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): sreg
@@ -2652,7 +2726,8 @@ init_96(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 static bool
 init_97(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
-	/* INIT_97   opcode: 0x97 ('')
+	/*
+	 * INIT_97   opcode: 0x97 ('')
 	 *
 	 * offset      (8  bit): opcode
 	 * offset + 1  (32 bit): register
@@ -2748,7 +2823,8 @@ static int
 parse_init_table(struct nvbios *bios, unsigned int offset,
 		 struct init_exec *iexec)
 {
-	/* Parses all commands in an init table.
+	/*
+	 * Parses all commands in an init table.
 	 *
 	 * We start out executing all commands found in the init table. Some
 	 * opcodes may change the status of iexec->execute to SKIP, which will
@@ -2759,9 +2835,11 @@ parse_init_table(struct nvbios *bios, unsigned int offset,
 	int count = 0, i;
 	uint8_t id;
 
-	/* Loop until INIT_DONE causes us to break out of the loop
+	/*
+	 * Loop until INIT_DONE causes us to break out of the loop
 	 * (or until offset > bios length just in case... )
-	 * (and no more than MAX_TABLE_OPS iterations, just in case... ) */
+	 * (and no more than MAX_TABLE_OPS iterations, just in case... )
+	 */
 	while ((offset < bios->length) && (count++ < MAX_TABLE_OPS)) {
 		id = bios->data[offset];
 
@@ -2784,7 +2862,8 @@ parse_init_table(struct nvbios *bios, unsigned int offset,
 			return -ENOENT;
 		}
 
-		/* Add the offset of the current command including all data
+		/*
+		 * Add the offset of the current command including all data
 		 * of that command. The offset will then be pointing on the
 		 * next op code.
 		 */
@@ -2913,7 +2992,8 @@ static int call_lvds_manufacturer_script(struct drm_device *dev, struct dcb_entr
 
 static int run_lvds_table(struct drm_device *dev, struct dcb_entry *dcbent, int head, enum LVDS_script script, int pxclk)
 {
-	/* The BIT LVDS table's header has the information to setup the
+	/*
+	 * The BIT LVDS table's header has the information to setup the
 	 * necessary registers. Following the standard 4 byte header are:
 	 * A bitmask byte and a dual-link transition pxclk value for use in
 	 * selecting the init script when not using straps; 4 script pointers
@@ -2928,7 +3008,10 @@ static int run_lvds_table(struct drm_device *dev, struct dcb_entry *dcbent, int 
 	uint16_t scriptptr = 0, clktable;
 	uint8_t clktableptr = 0;
 
-	/* for now we assume version 3.0 table - g80 support will need some changes */
+	/*
+	 * For now we assume version 3.0 table - g80 support will need some
+	 * changes
+	 */
 
 	switch (script) {
 	case LVDS_INIT:
@@ -2980,7 +3063,8 @@ static int run_lvds_table(struct drm_device *dev, struct dcb_entry *dcbent, int 
 
 int call_lvds_script(struct drm_device *dev, struct dcb_entry *dcbent, int head, enum LVDS_script script, int pxclk)
 {
-	/* LVDS operations are multiplexed in an effort to present a single API
+	/*
+	 * LVDS operations are multiplexed in an effort to present a single API
 	 * which works with two vastly differing underlying structures.
 	 * This acts as the demux
 	 */
@@ -3031,10 +3115,12 @@ struct lvdstableheader {
 
 static int parse_lvds_manufacturer_table_header(struct drm_device *dev, struct nvbios *bios, struct lvdstableheader *lth)
 {
-	/* BMP version (0xa) LVDS table has a simple header of version and
+	/*
+	 * BMP version (0xa) LVDS table has a simple header of version and
 	 * record length. The BIT LVDS table has the typical BIT table header:
 	 * version byte, header length byte, record length byte, and a byte for
-	 * the maximum number of records that can be held in the table */
+	 * the maximum number of records that can be held in the table.
+	 */
 
 	uint8_t lvds_ver, headerlen, recordlen;
 
@@ -3084,7 +3170,8 @@ static int parse_lvds_manufacturer_table_header(struct drm_device *dev, struct n
 
 static int get_fp_strap(struct drm_device *dev, struct nvbios *bios)
 {
-	/* the fp strap is normally dictated by the "User Strap" in
+	/*
+	 * The fp strap is normally dictated by the "User Strap" in
 	 * PEXTDEV_BOOT_0[20:16], but on BMP cards when bit 2 of the
 	 * Internal_Flags struct at 0x48 is set, the user strap gets overriden
 	 * by the PCI subsystem ID during POST, but not before the previous user
@@ -3122,12 +3209,15 @@ static int parse_fp_mode_table(struct drm_device *dev, struct nvbios *bios)
 	fptable_ver = fptable[0];
 
 	switch (fptable_ver) {
-	/* BMP version 0x5.0x11 BIOSen have version 1 like tables, but no version field,
-	 * and miss one of the spread spectrum/PWM bytes.
-	 * This could affect early GF2Go parts (not seen any appropriate ROMs though).
-	 * Here we assume that a version of 0x05 matches this case (combining with a
-	 * BMP version check would be better), as the common case for the panel type
-	 * field is 0x0005, and that is in fact what we are reading the first byte of. */
+	/*
+	 * BMP version 0x5.0x11 BIOSen have version 1 like tables, but no
+	 * version field, and miss one of the spread spectrum/PWM bytes.
+	 * This could affect early GF2Go parts (not seen any appropriate ROMs
+	 * though). Here we assume that a version of 0x05 matches this case
+	 * (combining with a BMP version check would be better), as the
+	 * common case for the panel type field is 0x0005, and that is in
+	 * fact what we are reading the first byte of.
+	 */
 	case 0x05:	/* some NV10, 11, 15, 16 */
 		recordlen = 42;
 		ofs = -1;
@@ -3140,7 +3230,10 @@ static int parse_fp_mode_table(struct drm_device *dev, struct nvbios *bios)
 		headerlen = fptable[1];
 		recordlen = fptable[2];
 		fpentries = fptable[3];
-		/* fptable[4] is the minimum RAMDAC_FP_HCRTC->RAMDAC_FP_HSYNC_START gap */
+		/*
+		 * fptable[4] is the minimum
+		 * RAMDAC_FP_HCRTC -> RAMDAC_FP_HSYNC_START gap
+		 */
 		bios->pub.digital_min_front_porch = fptable[4];
 		ofs = -7;
 		break;
@@ -3179,7 +3272,8 @@ static int parse_fp_mode_table(struct drm_device *dev, struct nvbios *bios)
 	if (lth.lvds_ver > 0x10)
 		bios->pub.fp_no_ddc = fpstrapping != 0xf || fpindex != 0xf;
 
-	/* if either the strap or xlated fpindex value are 0xf there is no
+	/*
+	 * If either the strap or xlated fpindex value are 0xf there is no
 	 * panel using a strap-derived bios mode present.  this condition
 	 * includes, but is different from, the DDC panel indicator above
 	 */
@@ -3207,15 +3301,19 @@ bool nouveau_bios_fp_mode(struct drm_device *dev, struct drm_display_mode *mode)
 		return bios->fp.mode_ptr;
 
 	memset(mode, 0, sizeof(struct drm_display_mode));
-	/* for version 1.0 (version in byte 0):
+	/*
+	 * For version 1.0 (version in byte 0):
 	 * bytes 1-2 are "panel type", including bits on whether Colour/mono,
 	 * single/dual link, and type (TFT etc.)
-	 * bytes 3-6 are bits per colour in RGBX */
+	 * bytes 3-6 are bits per colour in RGBX
+	 */
 	mode->clock = ROM16(mode_entry[7]) * 10;
 	/* bytes 9-10 is HActive */
 	mode->hdisplay = ROM16(mode_entry[11]) + 1;
-	/* bytes 13-14 is HValid Start
-	 * bytes 15-16 is HValid End */
+	/*
+	 * bytes 13-14 is HValid Start
+	 * bytes 15-16 is HValid End
+	 */
 	mode->hsync_start = ROM16(mode_entry[17]) + 1;
 	mode->hsync_end = ROM16(mode_entry[19]) + 1;
 	mode->htotal = ROM16(mode_entry[21]) + 1;
@@ -3228,8 +3326,10 @@ bool nouveau_bios_fp_mode(struct drm_device *dev, struct drm_display_mode *mode)
 			DRM_MODE_FLAG_PHSYNC : DRM_MODE_FLAG_NHSYNC;
 	mode->flags |= (mode_entry[37] & 0x1) ?
 			DRM_MODE_FLAG_PVSYNC : DRM_MODE_FLAG_NVSYNC;
-	/* bytes 38-39 relate to spread spectrum settings
-	 * bytes 40-43 are something to do with PWM */
+	/*
+	 * bytes 38-39 relate to spread spectrum settings
+	 * bytes 40-43 are something to do with PWM
+	 */
 
 	mode->status = MODE_OK;
 	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
@@ -3239,7 +3339,8 @@ bool nouveau_bios_fp_mode(struct drm_device *dev, struct drm_display_mode *mode)
 
 int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, bool *if_is_24bit)
 {
-	/* The LVDS table header is (mostly) described in
+	/*
+	 * The LVDS table header is (mostly) described in
 	 * parse_lvds_manufacturer_table_header(): the BIT header additionally
 	 * contains the dual-link transition pxclk (in 10s kHz), at byte 5 - if
 	 * straps are not being used for the panel, this specifies the frequency
@@ -3282,15 +3383,18 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 			break;
 
 		if (chip_version < 0x25) {
-			/* nv17 behaviour */
-			/* it seems the old style lvds script pointer is reused
-			 * to select 18/24 bit colour depth for EDID panels */
+			/* nv17 behaviour
+			 *
+			 * It seems the old style lvds script pointer is reused
+			 * to select 18/24 bit colour depth for EDID panels.
+			 */
 			lvdsmanufacturerindex = (bios->legacy.lvds_single_a_script_ptr & 1) ? 2 : 0;
 			if (pxclk >= bios->fp.duallink_transition_clk)
 				lvdsmanufacturerindex++;
 		} else if (chip_version < 0x30) {
-			/* nv28 behaviour (off-chip encoder) */
-			/* nv28 does a complex dance of first using byte 121 of
+			/* nv28 behaviour (off-chip encoder)
+			 *
+			 * nv28 does a complex dance of first using byte 121 of
 			 * the EDID to choose the lvdsmanufacturerindex, then
 			 * later attempting to match the EDID manufacturer and
 			 * product IDs in a table (signature 'pidt' (panel id
@@ -3307,8 +3411,10 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 				lvdsmanufacturerindex = 3;
 		}
 
-		/* nvidia set the high nibble of (cr57=f, cr58) to
-		 * lvdsmanufacturerindex in this case; we don't */
+		/*
+		 * nvidia set the high nibble of (cr57=f, cr58) to
+		 * lvdsmanufacturerindex in this case; we don't
+		 */
 		break;
 	case 0x30:	/* NV4x */
 	case 0x40:	/* G80/G90 */
@@ -3329,25 +3435,31 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 		*if_is_24bit = bios->data[lvdsofs] & 16;
 		break;
 	case 0x30:
-		/* My money would be on there being a 24 bit interface bit in this table,
-		 * but I have no example of a laptop bios with a 24 bit panel to confirm that.
-		 * Hence we shout loudly if any bit other than bit 0 is set (I've not even
-		 * seen bit 1)
+		/*
+		 * My money would be on there being a 24 bit interface bit in
+		 * this table, but I have no example of a laptop bios with a
+		 * 24 bit panel to confirm that. Hence we shout loudly if any
+		 * bit other than bit 0 is set (I've not even seen bit 1)
 		 */
 		if (bios->data[lvdsofs] > 1)
 			NV_ERROR(dev,
 				 "You have a very unusual laptop display; please report it\n");
-		/* no sign of the "power off for reset" or "reset for panel on" bits, but it's safer to assume we should */
+		/*
+		 * No sign of the "power off for reset" or "reset for panel
+		 * on" bits, but it's safer to assume we should
+		 */
 		bios->fp.power_off_for_reset = true;
 		bios->fp.reset_after_pclk_change = true;
-		/* it's ok lvdsofs is wrong for nv4x edid case; dual_link is
-		 * over-written, and BITbit1 isn't used */
+		/*
+		 * It's ok lvdsofs is wrong for nv4x edid case; dual_link is
+		 * over-written, and BITbit1 isn't used
+		 */
 		bios->fp.dual_link = bios->data[lvdsofs] & 1;
 		bios->fp.BITbit1 = bios->data[lvdsofs] & 2;
 		bios->fp.duallink_transition_clk = ROM16(bios->data[bios->fp.lvdsmanufacturerpointer + 5]) * 10;
 		break;
 	case 0x40:
-		//bios->fp.dual_link = bios->data[lvdsofs] & 1;
+		/* bios->fp.dual_link = bios->data[lvdsofs] & 1; */
 		bios->fp.duallink_transition_clk = ROM16(bios->data[bios->fp.lvdsmanufacturerpointer + 5]) * 10;
 		break;
 	}
@@ -3365,7 +3477,8 @@ int
 nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 			       uint32_t sub, int pxclk)
 {
-	/* The display script table is located by the BIT 'U' table.
+	/*
+	 * The display script table is located by the BIT 'U' table.
 	 *
 	 * It contains an array of pointers to various tables describing
 	 * a particular output type.  The first 32-bits of the output
@@ -3400,7 +3513,8 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 		return 1;
 	}
 
-	/* nothing useful has been in any of the pre-2.0 tables I've seen,
+	/*
+	 * Nothing useful has been in any of the pre-2.0 tables I've seen,
 	 * so until they are, we really don't need to care.
 	 */
 	if (table[0] < 0x20)
@@ -3412,7 +3526,8 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 		return 1;
 	}
 
-	/* The output script tables describing a particular output type
+	/*
+	 * The output script tables describing a particular output type
 	 * look as follows:
 	 *
 	 * offset + 0   (32 bits): output this table matches (hash of DCB)
@@ -3545,7 +3660,8 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 
 int run_tmds_table(struct drm_device *dev, struct dcb_entry *dcbent, int head, int pxclk)
 {
-	/* the pxclk parameter is in kHz
+	/*
+	 * the pxclk parameter is in kHz
 	 *
 	 * This runs the TMDS regs setting code found on BIT bios cards
 	 *
@@ -3597,7 +3713,8 @@ int run_tmds_table(struct drm_device *dev, struct dcb_entry *dcbent, int head, i
 
 int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims *pll_lim)
 {
-	/* PLL limits table
+	/*
+	 * PLL limits table
 	 *
 	 * Version 0x10: NV30, NV31
 	 * One byte header (version), one record of 24 bytes
@@ -3634,12 +3751,18 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 	crystal_straps = nvReadEXTDEV(dev, NV_PEXTDEV_BOOT_0) & crystal_strap_mask;
 
 	switch (pll_lim_ver) {
-	/* we use version 0 to indicate a pre limit table bios (single stage pll)
-	 * and load the hard coded limits instead */
+	/*
+	 * We use version 0 to indicate a pre limit table bios (single stage
+	 * pll) and load the hard coded limits instead.
+	 */
 	case 0:
 		break;
 	case 0x10:
-	case 0x11: /* strictly v0x11 has 3 entries, but the last two don't seem to get used */
+	case 0x11:
+		/*
+		 * Strictly v0x11 has 3 entries, but the last two don't seem
+		 * to get used.
+		 */
 		headerlen = 1;
 		recordlen = 0x18;
 		entries = 1;
@@ -3680,7 +3803,8 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 		pll_lim->vco1.min_m = 0x1;
 		pll_lim->vco1.max_m = 0xd;
 		pll_lim->vco2.min_n = 0x4;
-		/* on nv30, 31, 36 (i.e. all cards with two stage PLLs with this
+		/*
+		 * On nv30, 31, 36 (i.e. all cards with two stage PLLs with this
 		 * table version (apart from nv35)), N2 is compared to
 		 * maxN2 (0x46) and 10 * maxM2 (0x4), so set maxN2 to 0x28 and
 		 * save a comparison
@@ -3699,7 +3823,10 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 		uint8_t *pll_rec;
 		int i;
 
-		/* first entry is default match, if nothing better. warn if reg field nonzero */
+		/*
+		 * First entry is default match, if nothing better. warn if
+		 * reg field nonzero
+		 */
 		if (ROM32(bios->data[plloffs]))
 			NV_WARN(dev, "Default PLL limit entry has non-zero "
 				       "register field\n");
@@ -3736,7 +3863,10 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 		BIOSLOG(bios, "Loading PLL limits for reg 0x%08x\n",
 			pllindex ? reg : 0);
 
-		/* frequencies are stored in tables in MHz, kHz are more useful, so we convert */
+		/*
+		 * Frequencies are stored in tables in MHz, kHz are more
+		 * useful, so we convert.
+		 */
 
 		/* What output frequencies can each VCO generate? */
 		pll_lim->vco1.minfreq = ROM16(pll_rec[4]) * 1000;
@@ -3744,7 +3874,7 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 		pll_lim->vco2.minfreq = ROM16(pll_rec[8]) * 1000;
 		pll_lim->vco2.maxfreq = ROM16(pll_rec[10]) * 1000;
 
-		/* What input frequencies do they accept (past the m-divider)? */
+		/* What input frequencies they accept (past the m-divider)? */
 		pll_lim->vco1.min_inputfreq = ROM16(pll_rec[12]) * 1000;
 		pll_lim->vco2.min_inputfreq = ROM16(pll_rec[14]) * 1000;
 		pll_lim->vco1.max_inputfreq = ROM16(pll_rec[16]) * 1000;
@@ -3831,7 +3961,8 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 		pll_lim->refclk = ROM32(record[28]);
 	}
 
-	/* By now any valid limit table ought to have set a max frequency for
+	/*
+	 * By now any valid limit table ought to have set a max frequency for
 	 * vco1, so if it's zero it's either a pre limit table bios, or one
 	 * with an empty limit table (seen on nv18)
 	 */
@@ -3907,7 +4038,8 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 
 static void parse_bios_version(struct drm_device *dev, struct nvbios *bios, uint16_t offset)
 {
-	/* offset + 0  (8 bits): Micro version
+	/*
+	 * offset + 0  (8 bits): Micro version
 	 * offset + 1  (8 bits): Minor version
 	 * offset + 2  (8 bits): Chip version
 	 * offset + 3  (8 bits): Major version
@@ -3922,7 +4054,8 @@ static void parse_bios_version(struct drm_device *dev, struct nvbios *bios, uint
 
 static void parse_script_table_pointers(struct nvbios *bios, uint16_t offset)
 {
-	/* Parses the init table segment for pointers used in script execution.
+	/*
+	 * Parses the init table segment for pointers used in script execution.
 	 *
 	 * offset + 0  (16 bits): init script tables pointer
 	 * offset + 2  (16 bits): macro index table pointer
@@ -3944,7 +4077,8 @@ static void parse_script_table_pointers(struct nvbios *bios, uint16_t offset)
 
 static int parse_bit_A_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
-	/* Parses the load detect values for g80 cards.
+	/*
+	 * Parses the load detect values for g80 cards.
 	 *
 	 * offset + 0 (16 bits): loadval table pointer
 	 */
@@ -3989,7 +4123,8 @@ static int parse_bit_A_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 
 static int parse_bit_C_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
-	/* offset + 8  (16 bits): PLL limits table pointer
+	/*
+	 * offset + 8  (16 bits): PLL limits table pointer
 	 *
 	 * There's more in here, but that's unknown.
 	 */
@@ -4006,10 +4141,12 @@ static int parse_bit_C_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 
 static int parse_bit_display_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
-	/* Parses the flat panel table segment that the bit entry points to.
+	/*
+	 * Parses the flat panel table segment that the bit entry points to.
 	 * Starting at bitentry->offset:
 	 *
-	 * offset + 0  (16 bits): ??? table pointer - seems to have 18 byte records beginning with a freq
+	 * offset + 0  (16 bits): ??? table pointer - seems to have 18 byte
+	 * records beginning with a freq.
 	 * offset + 2  (16 bits): mode table pointer
 	 */
 
@@ -4025,7 +4162,8 @@ static int parse_bit_display_tbl_entry(struct drm_device *dev, struct nvbios *bi
 
 static int parse_bit_init_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
-	/* Parses the init table segment that the bit entry points to.
+	/*
+	 * Parses the init table segment that the bit entry points to.
 	 *
 	 * See parse_script_table_pointers for layout
 	 */
@@ -4047,11 +4185,13 @@ static int parse_bit_init_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 
 static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
-	/* BIT 'i' (info?) table
+	/*
+	 * BIT 'i' (info?) table
 	 *
 	 * offset + 0  (32 bits): BIOS version dword (as in B table)
 	 * offset + 5  (8  bits): BIOS feature byte (same as for BMP?)
-	 * offset + 13 (16 bits): pointer to table containing DAC load detection comparison values
+	 * offset + 13 (16 bits): pointer to table containing DAC load
+	 * detection comparison values
 	 *
 	 * There's other things in the table, purpose unknown
 	 */
@@ -4066,7 +4206,8 @@ static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 
 	parse_bios_version(dev, bios, bitentry->offset);
 
-	/* bit 4 seems to indicate a mobile bios (doesn't suffer from BMP's
+	/*
+	 * bit 4 seems to indicate a mobile bios (doesn't suffer from BMP's
 	 * Quadro identity crisis), other bits possibly as for BMP feature byte
 	 */
 	bios->feature_byte = bios->data[bitentry->offset + 5];
@@ -4084,8 +4225,10 @@ static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 	if (!daccmpoffset)
 		return 0;
 
-	/* The first value in the table, following the header, is the comparison value,
-	 * the second entry is a comparison value for TV load detection.
+	/*
+	 * The first value in the table, following the header, is the
+	 * comparison value, the second entry is a comparison value for
+	 * TV load detection.
 	 */
 
 	dacver = bios->data[daccmpoffset];
@@ -4105,7 +4248,8 @@ static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 
 static int parse_bit_lvds_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
-	/* Parses the LVDS table segment that the bit entry points to.
+	/*
+	 * Parses the LVDS table segment that the bit entry points to.
 	 * Starting at bitentry->offset:
 	 *
 	 * offset + 0  (16 bits): LVDS strap xlate table pointer
@@ -4116,7 +4260,10 @@ static int parse_bit_lvds_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 		return -EINVAL;
 	}
 
-	/* no idea if it's still called the LVDS manufacturer table, but the concept's close enough */
+	/*
+	 * No idea if it's still called the LVDS manufacturer table, but
+	 * the concept's close enough.
+	 */
 	bios->fp.lvdsmanufacturerpointer = ROM16(bios->data[bitentry->offset]);
 
 	return 0;
@@ -4124,8 +4271,11 @@ static int parse_bit_lvds_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 
 static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
-	/* offset + 2  (8  bits): number of options in an INIT_RAM_RESTRICT_ZM_REG_GROUP opcode option set
-	 * offset + 3  (16 bits): pointer to strap xlate table for RAM restrict option selection
+	/*
+	 * offset + 2  (8  bits): number of options in an
+	 * 	INIT_RAM_RESTRICT_ZM_REG_GROUP opcode option set
+	 * offset + 3  (16 bits): pointer to strap xlate table for RAM
+	 * 	restrict option selection
 	 *
 	 * There's a bunch of bits in this table other than the RAM restrict
 	 * stuff that we don't use - their use currently unknown
@@ -4133,7 +4283,10 @@ static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 
 	int i;
 
-	/* Older bios versions don't have a sufficiently long table for what we want */
+	/*
+	 * Older bios versions don't have a sufficiently long table for
+	 * what we want
+	 */
 	if (bitentry->length < 0x5)
 		return 0;
 
@@ -4150,7 +4303,8 @@ static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 
 static int parse_bit_tmds_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
-	/* Parses the pointer to the TMDS table
+	/*
+	 * Parses the pointer to the TMDS table
 	 *
 	 * Starting at bitentry->offset:
 	 *
@@ -4160,7 +4314,8 @@ static int parse_bit_tmds_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	 * characteristic signature of 0x11,0x13 (1.1 being version, 0x13 being
 	 * length?)
 	 *
-	 * At offset +7 is a pointer to a script, which I don't know how to run yet
+	 * At offset +7 is a pointer to a script, which I don't know how to
+	 * run yet.
 	 * At offset +9 is a pointer to another script, likewise
 	 * Offset +11 has a pointer to a table where the first word is a pxclk
 	 * frequency and the second word a pointer to a script, which should be
@@ -4193,7 +4348,10 @@ static int parse_bit_tmds_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 		return -ENOSYS;
 	}
 
-	/* These two scripts are odd: they don't seem to get run even when they are not stubbed */
+	/*
+	 * These two scripts are odd: they don't seem to get run even when
+	 * they are not stubbed.
+	 */
 	script1 = ROM16(bios->data[tmdstableptr + 7]);
 	script2 = ROM16(bios->data[tmdstableptr + 9]);
 	if (bios->data[script1] != 'q' || bios->data[script2] != 'q')
@@ -4209,7 +4367,8 @@ static int
 parse_bit_U_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 		      struct bit_entry *bitentry)
 {
-	/* Parses the pointer to the G80 output script tables
+	/*
+	 * Parses the pointer to the G80 output script tables
 	 *
 	 * Starting at bitentry->offset:
 	 *
@@ -4263,7 +4422,8 @@ static int parse_bit_structure(struct drm_device *dev, struct nvbios *bios, cons
 {
 	int ret;
 
-	/* the only restriction on parsing order currently is having 'i' first
+	/*
+	 * The only restriction on parsing order currently is having 'i' first
 	 * for use of bios->*_version or bios->feature_byte while parsing;
 	 * functions shouldn't be actually *doing* anything apart from pulling
 	 * data from the image into the bios struct, thus no interdependencies
@@ -4287,7 +4447,8 @@ static int parse_bit_structure(struct drm_device *dev, struct nvbios *bios, cons
 
 static int parse_bmp_structure(struct drm_device *dev, struct nvbios *bios, unsigned int offset)
 {
-	/* Parses the BMP structure for useful things, but does not act on them
+	/*
+	 * Parses the BMP structure for useful things, but does not act on them
 	 *
 	 * offset +   5: BMP major version
 	 * offset +   6: BMP minor version
@@ -4295,7 +4456,8 @@ static int parse_bmp_structure(struct drm_device *dev, struct nvbios *bios, unsi
 	 * offset +  10: BCD encoded BIOS version
 	 *
 	 * offset +  18: init script table pointer (for bios versions < 5.10h)
-	 * offset +  20: extra init script table pointer (for bios versions < 5.10h)
+	 * offset +  20: extra init script table pointer (for bios
+	 * versions < 5.10h)
 	 *
 	 * offset +  24: memory init table pointer (used on early bios versions)
 	 * offset +  26: SDR memory sequencing setup data table
@@ -4312,7 +4474,8 @@ static int parse_bmp_structure(struct drm_device *dev, struct nvbios *bios, unsi
 	 * offset +  67: maximum internal PLL frequency (single stage PLL)
 	 * offset +  71: minimum internal PLL frequency (single stage PLL)
 	 *
-	 * offset +  75: script table pointers, as described in parse_script_table_pointers
+	 * offset +  75: script table pointers, as described in
+	 * parse_script_table_pointers
 	 *
 	 * offset +  89: TMDS single link output A table pointer
 	 * offset +  91: TMDS single link output B table pointer
@@ -4347,28 +4510,38 @@ static int parse_bmp_structure(struct drm_device *dev, struct nvbios *bios, unsi
 	NV_TRACE(dev, "BMP version %d.%d\n",
 		 bmp_version_major, bmp_version_minor);
 
-	/* Make sure that 0x36 is blank and can't be mistaken for a DCB pointer on early versions */
+	/*
+	 * Make sure that 0x36 is blank and can't be mistaken for a DCB
+	 * pointer on early versions
+	 */
 	if (bmp_version_major < 5)
 		*(uint16_t *)&bios->data[0x36] = 0;
 
-	/* Seems that the minor version was 1 for all major versions prior to 5 */
-	/* Version 6 could theoretically exist, but I suspect BIT happened instead */
+	/*
+	 * Seems that the minor version was 1 for all major versions prior
+	 * to 5. Version 6 could theoretically exist, but I suspect BIT
+	 * happened instead.
+	 */
 	if ((bmp_version_major < 5 && bmp_version_minor != 1) || bmp_version_major > 5) {
 		NV_ERROR(dev, "You have an unsupported BMP version. "
 				"Please send in your bios\n");
 		return -ENOSYS;
 	}
 
-	if (bmp_version_major == 0) /* nothing that's currently useful in this version */
+	if (bmp_version_major == 0)
+		/* nothing that's currently useful in this version */
 		return 0;
 	else if (bmp_version_major == 1)
 		bmplength = 44; /* exact for 1.01 */
 	else if (bmp_version_major == 2)
 		bmplength = 48; /* exact for 2.01 */
 	else if (bmp_version_major == 3)
-		bmplength = 54; /* guessed - mem init tables added in this version */
-	else if (bmp_version_major == 4 || bmp_version_minor < 0x1) /* don't know if 5.0 exists... */
-		bmplength = 62; /* guessed - BMP I2C indices added in version 4*/
+		bmplength = 54;
+		/* guessed - mem init tables added in this version */
+	else if (bmp_version_major == 4 || bmp_version_minor < 0x1)
+		/* don't know if 5.0 exists... */
+		bmplength = 62;
+		/* guessed - BMP I2C indices added in version 4*/
 	else if (bmp_version_minor < 0x6)
 		bmplength = 67; /* exact for 5.01 */
 	else if (bmp_version_minor < 0x10)
@@ -4377,15 +4550,24 @@ static int parse_bmp_structure(struct drm_device *dev, struct nvbios *bios, unsi
 		bmplength = 89; /* exact for 5.10h */
 	else if (bmp_version_minor < 0x14)
 		bmplength = 118; /* exact for 5.11h */
-	else if (bmp_version_minor < 0x24) /* not sure of version where pll limits came in;
-					    * certainly exist by 0x24 though */
+	else if (bmp_version_minor < 0x24)
+		/*
+		 * Not sure of version where pll limits came in;
+		 * certainly exist by 0x24 though.
+		 */
 		/* length not exact: this is long enough to get lvds members */
 		bmplength = 123;
 	else if (bmp_version_minor < 0x27)
-		/* length not exact: this is long enough to get pll limit member */
+		/*
+		 * Length not exact: this is long enough to get pll limit
+		 * member
+		 */
 		bmplength = 144;
 	else
-		/* length not exact: this is long enough to get dual link transition clock */
+		/*
+		 * Length not exact: this is long enough to get dual link
+		 * transition clock.
+		 */
 		bmplength = 158;
 
 	/* checksum */
@@ -4394,10 +4576,12 @@ static int parse_bmp_structure(struct drm_device *dev, struct nvbios *bios, unsi
 		return -EINVAL;
 	}
 
-	/* bit 4 seems to indicate either a mobile bios or a quadro card --
+	/*
+	 * Bit 4 seems to indicate either a mobile bios or a quadro card --
 	 * mobile behaviour consistent (nv11+), quadro only seen nv18gl-nv36gl
 	 * (not nv10gl), bit 5 that the flat panel tables are present, and
-	 * bit 6 a tv bios */
+	 * bit 6 a tv bios.
+	 */
 	bios->feature_byte = bmp[9];
 
 	parse_bios_version(dev, bios, offset + 10);
@@ -4436,9 +4620,11 @@ static int parse_bmp_structure(struct drm_device *dev, struct nvbios *bios, unsi
 	if (bmplength > 94) {
 		bios->tmds.output0_script_ptr = ROM16(bmp[89]);
 		bios->tmds.output1_script_ptr = ROM16(bmp[91]);
-		/* never observed in use with lvds scripts, but is reused for
+		/*
+		 * Never observed in use with lvds scripts, but is reused for
 		 * 18/24 bit panel interface default for EDID equipped panels
-		 * (if_is_24bit not set directly to avoid any oscillation) */
+		 * (if_is_24bit not set directly to avoid any oscillation).
+		 */
 		bios->legacy.lvds_single_a_script_ptr = ROM16(bmp[95]);
 	}
 	if (bmplength > 108) {
@@ -4501,7 +4687,8 @@ read_dcb_i2c_entry(struct drm_device *dev, int dcb_version, uint8_t *i2ctable, i
 		entry_len = i2ctable[3];
 		/* [4] is i2c_default_indices, read in parse_dcb_table() */
 	}
-	/* it's your own fault if you call this function on a DCB 1.1 BIOS --
+	/*
+	 * It's your own fault if you call this function on a DCB 1.1 BIOS --
 	 * the test below is for DCB 1.2
 	 */
 	if (dcb_version < 0x14) {
@@ -4525,7 +4712,10 @@ read_dcb_i2c_entry(struct drm_device *dev, int dcb_version, uint8_t *i2ctable, i
 	if (dcb_i2c_ver >= 0x30) {
 		port_type = i2ctable[headerlen + recordoffset + 3 + entry_len * index];
 
-		/* fixup for chips using same address offset for read and write */
+		/*
+		 * Fixup for chips using same address offset for read and
+		 * write.
+		 */
 		if (port_type == 4)	/* seen on C51 */
 			rdofs = wrofs = 1;
 		if (port_type == 5)	/* G80+ */
@@ -4574,7 +4764,8 @@ static void fabricate_dvi_i_output(struct parsed_dcb *dcb, bool twoHeads)
 	entry->duallink_possible = false; /* SiI164 and co. are single link */
 
 #if 0
-	/* for dvi-a either crtc probably works, but my card appears to only
+	/*
+	 * For dvi-a either crtc probably works, but my card appears to only
 	 * support dvi-d.  "nvidia" still attempts to program it for dvi-a,
 	 * doing the full fp output setup (program 0x6808.. fp dimension regs,
 	 * setting 0x680848 to 0x10000111 to enable, maybe setting 0x680880);
@@ -4610,7 +4801,8 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 	entry->bus = (conn >> 16) & 0xf;
 	entry->location = (conn >> 20) & 0x3;
 	entry->or = (conn >> 24) & 0xf;
-	/* Normal entries consist of a single bit, but dual link has the
+	/*
+	 * Normal entries consist of a single bit, but dual link has the
 	 * next most significant bit set too
 	 */
 	entry->duallink_possible =
@@ -4618,7 +4810,8 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 
 	switch (entry->type) {
 	case OUTPUT_ANALOG:
-		/* although the rest of a CRT conf dword is usually
+		/*
+		 * Although the rest of a CRT conf dword is usually
 		 * zeros, mac biosen have stuff there so we must mask
 		 */
 		entry->crtconf.maxfreq = (bdcb->version < 0x30) ?
@@ -4632,12 +4825,14 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 			entry->lvdsconf.use_straps_for_mode = true;
 		if (bdcb->version < 0x22) {
 			mask = ~0xd;
-			/* the laptop in bug 14567 lies and claims to not use
+			/*
+			 * The laptop in bug 14567 lies and claims to not use
 			 * straps when it does, so assume all DCB 2.0 laptops
 			 * use straps, until a broken EDID using one is produced
 			 */
 			entry->lvdsconf.use_straps_for_mode = true;
-			/* both 0x4 and 0x8 show up in v2.0 tables; assume they
+			/*
+			 * Both 0x4 and 0x8 show up in v2.0 tables; assume they
 			 * mean the same thing (probably wrong, but might work)
 			 */
 			if (conf & 0x4 || conf & 0x8)
@@ -4648,7 +4843,10 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 				entry->lvdsconf.use_power_scripts = true;
 		}
 		if (conf & mask) {
-			/* I'm bored of getting this reported; left as a reminder for someone to fix it */
+			/*
+			 * I'm bored of getting this reported; left as a
+			 * reminder for someone to fix it.
+			 */
 			if (bdcb->version >= 0x40) {
 				NV_WARN(dev, "G80+ LVDS not initialized by driver; ignoring conf bits\n");
 				break;
@@ -4726,14 +4924,18 @@ parse_dcb15_entry(struct drm_device *dev, struct parsed_dcb *dcb,
 		entry->crtconf.maxfreq = (conf & 0xffff) * 10;
 		break;
 	case OUTPUT_LVDS:
-		/* this is probably buried in conn's unknown bits */
-		/* this will upset EDID-ful models, if they exist */
+		/*
+		 * This is probably buried in conn's unknown bits.
+		 * This will upset EDID-ful models, if they exist
+		 */
 		entry->lvdsconf.use_straps_for_mode = true;
 		entry->lvdsconf.use_power_scripts = true;
 		break;
 	case OUTPUT_TMDS:
-		/* invent a DVI-A output, by copying the fields of the DVI-D
-		 * output; reported to work by math_b on an NV20(!) */
+		/*
+		 * Invent a DVI-A output, by copying the fields of the DVI-D
+		 * output; reported to work by math_b on an NV20(!).
+		 */
 		fabricate_vga_output(dcb, entry->i2c_index, entry->heads);
 		break;
 	case OUTPUT_TV:
@@ -4766,8 +4968,10 @@ static bool parse_dcb_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb
 static
 void merge_like_dcb_entries(struct drm_device *dev, struct parsed_dcb *dcb)
 {
-	/* DCB v2.0 lists each output combination separately.
-	 * Here we merge compatible entries to have fewer outputs, with more options
+	/*
+	 * DCB v2.0 lists each output combination separately.
+	 * Here we merge compatible entries to have fewer outputs, with
+	 * more options
 	 */
 
 	int i, newentries = 0;
@@ -4884,7 +5088,8 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 			return -EINVAL;
 		}
 	} else {
-		/* v1.4 (some NV15/16, NV11+) seems the same as v1.5, but always
+		/*
+		 * v1.4 (some NV15/16, NV11+) seems the same as v1.5, but always
 		 * has the same single (crt) entry, even when tv-out present, so
 		 * the conclusion is this version cannot really be used.
 		 * v1.2 tables (some NV6/10, and NV15+) normally have the same
@@ -4898,7 +5103,8 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 				  "adding all possible outputs\n");
 		fabricate_vga_output(dcb, LEGACY_I2C_CRT, 1);
 
-		/* Attempt to detect TV before DVI because the test
+		/*
+		 * Attempt to detect TV before DVI because the test
 		 * for the former is more accurate and it rules the
 		 * latter out.
 		 */
@@ -4931,10 +5137,15 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 		if (configblock)
 			config = ROM32(dcbtable[headerlen + confofs + recordlength * i]);
 
-		/* Should we allow discontinuous DCBs? Certainly DCB I2C tables can be discontinuous */
-		if ((connection & 0x0000000f) == 0x0000000f) /* end of records */
+		/*
+		 * Should we allow discontinuous DCBs? Certainly DCB I2C
+		 * tables can be discontinuous.
+		 */
+		if ((connection & 0x0000000f) == 0x0000000f)
+			/* end of records */
 			break;
-		if (connection == 0x00000000) /* seen on an NV11 with DCB v1.5 */
+		if (connection == 0x00000000)
+			/* seen on an NV11 with DCB v1.5 */
 			break;
 
 		NV_TRACEWARN(dev, "Raw DCB entry %d: %08x %08x\n",
@@ -4944,7 +5155,8 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 			break;
 	}
 
-	/* apart for v2.1+ not being known for requiring merging, this
+	/*
+	 * apart for v2.1+ not being known for requiring merging, this
 	 * guarantees dcbent->index is the index of the entry in the rom image
 	 */
 	if (bdcb->version < 0x21)
@@ -4960,7 +5172,8 @@ fixup_legacy_connector(struct nvbios *bios)
 	struct parsed_dcb *dcb = &bdcb->dcb;
 	int high = 0, i;
 
-	/* DCB 3.0 also has the table in most cases, but there are some cards
+	/*
+	 * DCB 3.0 also has the table in most cases, but there are some cards
 	 * where the table is filled with stub entries, and the DCB entriy
 	 * indices are all 0.  We don't need the connector indices on pre-G80
 	 * chips (yet?) so limit the use to DCB 4.0 and above.
@@ -4968,7 +5181,8 @@ fixup_legacy_connector(struct nvbios *bios)
 	if (bdcb->version >= 0x40)
 		return;
 
-	/* no known connector info before v3.0, so make it up.  the rule here
+	/*
+	 * No known connector info before v3.0, so make it up.  the rule here
 	 * is: anything on the same i2c bus is considered to be on the same
 	 * connector.  any output without an associated i2c bus is assigned
 	 * its own unique connector index.
@@ -5008,7 +5222,8 @@ fixup_legacy_i2c(struct nvbios *bios)
 
 static int load_nv17_hwsq_ucode_entry(struct drm_device *dev, struct nvbios *bios, uint16_t hwsq_offset, int entry)
 {
-	/* The header following the "HWSQ" signature has the number of entries,
+	/*
+	 * The header following the "HWSQ" signature has the number of entries,
 	 * and the entry size
 	 *
 	 * An entry consists of a dword to write to the sequencer control reg
@@ -5053,7 +5268,8 @@ static int load_nv17_hwsq_ucode_entry(struct drm_device *dev, struct nvbios *bio
 
 static int load_nv17_hw_sequencer_ucode(struct drm_device *dev, struct nvbios *bios)
 {
-	/* BMP based cards, from NV17, need a microcode loading to correctly
+	/*
+	 * BMP based cards, from NV17, need a microcode loading to correctly
 	 * control the GPIO etc for LVDS panels
 	 *
 	 * BIT based cards seem to do this directly in the init scripts
@@ -5158,7 +5374,8 @@ nouveau_run_vbios_init(struct drm_device *dev)
 
 	parse_init_tables(bios);
 
-	/* Runs some additional script seen on G8x VBIOSen.  The VBIOS'
+	/*
+	 * Runs some additional script seen on G8x VBIOSen.  The VBIOS'
 	 * parser will run this right after the init tables, the binary
 	 * driver appears to run it at some point later.
 	 */

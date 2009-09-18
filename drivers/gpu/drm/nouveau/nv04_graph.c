@@ -427,7 +427,7 @@ int nv04_graph_create_context(struct nouveau_channel *chan) {
 	if (pgraph_ctx == NULL)
 		return -ENOMEM;
 
-	//dev_priv->fifos[channel].pgraph_ctx_user = channel << 24;
+	/* dev_priv->fifos[channel].pgraph_ctx_user = channel << 24; */
 	pgraph_ctx->nv04[0] = 0x0001ffff;
 	/* is it really needed ??? */
 #if 0
