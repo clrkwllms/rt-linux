@@ -442,7 +442,7 @@ int nv04_graph_create_context(struct nouveau_channel *chan)
 
 void nv04_graph_destroy_context(struct nouveau_channel *chan)
 {
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 
 	kfree(pgraph_ctx);
 	chan->pgraph_ctx = NULL;
@@ -451,7 +451,7 @@ void nv04_graph_destroy_context(struct nouveau_channel *chan)
 int nv04_graph_load_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(nv04_graph_ctx_regs); i++)
@@ -463,7 +463,7 @@ int nv04_graph_load_context(struct nouveau_channel *chan)
 int nv04_graph_save_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(nv04_graph_ctx_regs); i++)

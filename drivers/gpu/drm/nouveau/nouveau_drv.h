@@ -614,7 +614,7 @@ nouveau_bo_ref(struct nouveau_bo *ref, struct nouveau_bo **pnvbo)
 	}                                                     \
 } while(0)
 
-#define NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(id,cl,ch) do {      \
+#define NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(id, cl, ch) do {    \
 	struct drm_nouveau_private *nv = dev->dev_private;       \
 	if (!nouveau_channel_owner(dev, (cl), (id))) {           \
 		NV_ERROR(dev, "pid %d doesn't own channel %d\n", \
@@ -1122,8 +1122,8 @@ static inline void nv_wr08(struct drm_device *dev, unsigned reg, u8 val)
 	iowrite8(val, dev_priv->mmio + reg);
 }
 
-#define nv_wait(reg,mask,val) nouveau_wait_until(dev, 2000000000ULL, (reg),    \
-						 (mask), (val))
+#define nv_wait(reg, mask, val) \
+	nouveau_wait_until(dev, 2000000000ULL, (reg), (mask), (val))
 
 /* PRAMIN access */
 static inline u32 nv_ri32(struct drm_device *dev, unsigned offset)
@@ -1164,7 +1164,7 @@ static inline void nv_wo32(struct drm_device *dev, struct nouveau_gpuobj *obj,
 #else
 #define NV_DEBUG(d, fmt, arg...) do {                                          \
 	if (drm_debug)                                                         \
-		NV_PRINTK(KERN_DEBUG, d, fmt,##arg);                           \
+		NV_PRINTK(KERN_DEBUG, d, fmt, ##arg);                          \
 } while(0)
 #endif
 #define NV_ERROR(d, fmt, arg...) NV_PRINTK(KERN_ERR, d, fmt, ##arg)

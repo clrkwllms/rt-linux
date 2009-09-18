@@ -45,7 +45,7 @@ struct nv50_instmem_priv {
 
 /*NOTE: - Assumes 0x1700 already covers the correct MiB of PRAMIN
  */
-#define BAR0_WI32(g,o,v) do {                                     \
+#define BAR0_WI32(g, o, v) do {                                   \
 	uint32_t offset;                                          \
 	if ((g)->im_backing) {                                    \
 		offset = (g)->im_backing_start;                   \

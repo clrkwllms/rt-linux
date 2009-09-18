@@ -394,7 +394,7 @@ struct graph_state {
 static void nv10_graph_save_pipe(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	struct pipe_state *fifo_pipe_state = &pgraph_ctx->pipe_state;
 	int i;
 #define PIPE_SAVE(addr) \
@@ -421,7 +421,7 @@ static void nv10_graph_save_pipe(struct nouveau_channel *chan)
 static void nv10_graph_load_pipe(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	struct pipe_state *fifo_pipe_state = &pgraph_ctx->pipe_state;
 	int i;
 	uint32_t xfmode0, xfmode1;
@@ -480,7 +480,7 @@ static void nv10_graph_load_pipe(struct nouveau_channel *chan)
 static void nv10_graph_create_pipe(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	struct pipe_state *fifo_pipe_state = &pgraph_ctx->pipe_state;
 	uint32_t *fifo_pipe_state_addr;
 	int i;
@@ -658,7 +658,7 @@ int nv10_graph_load_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(nv10_graph_ctx_regs); i++)
@@ -678,7 +678,7 @@ int nv10_graph_save_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(nv10_graph_ctx_regs); i++)
@@ -773,7 +773,7 @@ int nv10_graph_create_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct graph_state* pgraph_ctx;
+	struct graph_state *pgraph_ctx;
 
 	NV_DEBUG(dev, "nv10_graph_context_create %d\n", chan->id);
 
@@ -839,7 +839,7 @@ void nv10_graph_destroy_context(struct nouveau_channel *chan)
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	int chid;
 
 	kfree(pgraph_ctx);

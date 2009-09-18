@@ -259,12 +259,12 @@ nouveau_sgdma_init(struct drm_device *dev)
 				       (NV_DMA_ACCESS_RW  << 14) |
 				       (NV_DMA_TARGET_PCI << 16));
 		nv_wo32(dev, gpuobj, 1, aper_size - 1);
-		for (i=2; i<2+(aper_size>>12); i++) {
+		for (i = 2; i < 2 + (aper_size >> 12); i++) {
 			nv_wo32(dev, gpuobj, i,
 				    dev_priv->gart_info.sg_dummy_bus | 3);
 		}
 	} else {
-		for (i=0; i<obj_size; i+=8) {
+		for (i = 0; i < obj_size; i += 8) {
 			nv_wo32(dev, gpuobj, (i+0)/4,
 				    dev_priv->gart_info.sg_dummy_bus | 0x21);
 			nv_wo32(dev, gpuobj, (i+4)/4, 0);

@@ -987,7 +987,7 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 			instmem->finish_access(dev);
 			return ret;
 		}
-		for (i=0; i<0x4000; i+=8) {
+		for (i = 0; i < 0x4000; i += 8) {
 			nv_wo32(dev, chan->vm_pd, (i+0)/4, 0x00000000);
 			nv_wo32(dev, chan->vm_pd, (i+4)/4, 0xdeadcafe);
 		}

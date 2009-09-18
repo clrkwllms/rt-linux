@@ -341,7 +341,7 @@ nouveau_mem_fb_amount_igp(struct drm_device *dev)
 	struct pci_dev *bridge;
 	uint32_t mem;
 
-	bridge = pci_get_bus_and_slot(0, PCI_DEVFN(0,1));
+	bridge = pci_get_bus_and_slot(0, PCI_DEVFN(0, 1));
 	if (!bridge) {
 		NV_ERROR(dev, "no bridge device\n");
 		return 0;

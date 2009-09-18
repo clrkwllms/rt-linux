@@ -231,7 +231,7 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 
 struct nouveau_bitfield_names {
 	uint32_t mask;
-	const char * name;
+	const char *name;
 };
 
 static struct nouveau_bitfield_names nouveau_nstatus_names[] =
@@ -279,7 +279,7 @@ nouveau_print_bitfield_names(uint32_t value,
                              const int namelist_len)
 {
 	int i;
-	for(i=0; i<namelist_len; ++i) {
+	for (i = 0; i < namelist_len; ++i) {
 		uint32_t mask = namelist[i].mask;
 		if(value & mask) {
 			printk(" %s", namelist[i].name);

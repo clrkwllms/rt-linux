@@ -239,7 +239,7 @@ static bool NVShadowVBIOS(struct drm_device *dev, uint8_t *data)
 }
 
 struct init_tbl_entry {
-	char* name;
+	char *name;
 	uint8_t id;
 	int length;
 	int length_offset;
@@ -4731,7 +4731,7 @@ read_dcb_i2c_entry(struct drm_device *dev, int dcb_version, uint8_t *i2ctable, i
 	return 0;
 }
 
-static struct dcb_entry * new_dcb_entry(struct parsed_dcb *dcb)
+static struct dcb_entry *new_dcb_entry(struct parsed_dcb *dcb)
 {
 	struct dcb_entry *entry = &dcb->entry[dcb->entries];
 
@@ -5289,7 +5289,7 @@ static int load_nv17_hw_sequencer_ucode(struct drm_device *dev, struct nvbios *b
 					  hwsq_offset + sizeof(hwsq_signature), 0);
 }
 
-uint8_t * nouveau_bios_embedded_edid(struct drm_device *dev)
+uint8_t *nouveau_bios_embedded_edid(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;

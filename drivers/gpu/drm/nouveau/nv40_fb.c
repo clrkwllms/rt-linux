@@ -40,13 +40,13 @@ nv40_fb_init(struct drm_device *dev)
 	fb_bar_size = drm_get_resource_len(dev, 0) - 1;
 	switch (dev_priv->chipset) {
 	case 0x40:
-		for (i=0; i<num_tiles; i++) {
+		for (i = 0; i < num_tiles; i++) {
 			nv_wr32(dev, NV10_PFB_TILE(i), 0);
 			nv_wr32(dev, NV10_PFB_TLIMIT(i), fb_bar_size);
 		}
 		break;
 	default:
-		for (i=0; i<num_tiles; i++) {
+		for (i = 0; i < num_tiles; i++) {
 			nv_wr32(dev, NV40_PFB_TILE(i), 0);
 			nv_wr32(dev, NV40_PFB_TLIMIT(i), fb_bar_size);
 		}

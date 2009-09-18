@@ -34,7 +34,7 @@
 #define NV50_EVO_DMA_NOTIFY_HANDLE_NONE                              0x00000000
 #define NV50_EVO_UNK8C                                               0x0000008C
 
-#define NV50_EVO_DAC(n,r)                        ((n) * 0x80 + NV50_EVO_DAC_##r)
+#define NV50_EVO_DAC(n, r)                       ((n) * 0x80 + NV50_EVO_DAC_##r)
 #define NV50_EVO_DAC_MODE_CTRL                                       0x00000400
 #define NV50_EVO_DAC_MODE_CTRL_CRTC0                                 0x00000001
 #define NV50_EVO_DAC_MODE_CTRL_CRTC1                                 0x00000002
@@ -42,7 +42,7 @@
 #define NV50_EVO_DAC_MODE_CTRL2_NHSYNC                               0x00000001
 #define NV50_EVO_DAC_MODE_CTRL2_NVSYNC                               0x00000002
 
-#define NV50_EVO_SOR(n,r)                        ((n) * 0x40 + NV50_EVO_SOR_##r)
+#define NV50_EVO_SOR(n, r)                       ((n) * 0x40 + NV50_EVO_SOR_##r)
 #define NV50_EVO_SOR_MODE_CTRL                                       0x00000600
 #define NV50_EVO_SOR_MODE_CTRL_CRTC0                                 0x00000001
 #define NV50_EVO_SOR_MODE_CTRL_CRTC1                                 0x00000002
@@ -51,8 +51,8 @@
 #define NV50_EVO_SOR_MODE_CTRL_NHSYNC                                0x00001000
 #define NV50_EVO_SOR_MODE_CTRL_NVSYNC                                0x00002000
 
-#define NV50_EVO_CRTC(n,r)                     ((n) * 0x400 + NV50_EVO_CRTC_##r)
-#define NV84_EVO_CRTC(n,r)                     ((n) * 0x400 + NV84_EVO_CRTC_##r)
+#define NV50_EVO_CRTC(n, r)                    ((n) * 0x400 + NV50_EVO_CRTC_##r)
+#define NV84_EVO_CRTC(n, r)                    ((n) * 0x400 + NV84_EVO_CRTC_##r)
 #define NV50_EVO_CRTC_UNK0800                                        0x00000800
 #define NV50_EVO_CRTC_CLOCK                                          0x00000804
 #define NV50_EVO_CRTC_INTERLACE                                      0x00000808
