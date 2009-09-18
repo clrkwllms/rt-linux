@@ -758,10 +758,33 @@ extern int nouveau_sgdma_get_page(struct drm_device *, uint32_t offset,
 extern struct ttm_backend *nouveau_sgdma_init_ttm(struct drm_device *);
 
 /* nouveau_debugfs.c */
+#if defined(CONFIG_DEBUG_FS)
 extern int  nouveau_debugfs_init(struct drm_minor *);
 extern void nouveau_debugfs_takedown(struct drm_minor *);
 extern int  nouveau_debugfs_channel_init(struct nouveau_channel *);
 extern void nouveau_debugfs_channel_fini(struct nouveau_channel *);
+#else
+static inline int
+nouveau_debugfs_init(struct drm_minor *minor)
+{
+	return 0;
+}
+
+static inline void nouveau_debugfs_takedown(struct drm_minor *minor)
+{
+}
+
+static inline int
+nouveau_debugfs_channel_init(struct nouveau_channel *chan)
+{
+	return 0;
+}
+
+static inline void
+nouveau_debugfs_channel_fini(struct nouveau_channel *chan)
+{
+}
+#endif
 
 /* nouveau_dma.c */
 extern int  nouveau_dma_init(struct nouveau_channel *);
