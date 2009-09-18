@@ -2012,42 +2012,56 @@ init_io(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 
 		bios_wr32(bios, 0x614100, (bios_rd32(
 			  bios, 0x614100) & 0x0fffffff) | 0x00800000);
+
 		bios_wr32(bios, 0x00e18c, bios_rd32(
 			  bios, 0x00e18c) | 0x00020000);
+
 		bios_wr32(bios, 0x614900, (bios_rd32(
 			  bios, 0x614900) & 0x0fffffff) | 0x00800000);
+
 		bios_wr32(bios, 0x000200, bios_rd32(
 			  bios, 0x000200) & ~0x40000000);
+
 		mdelay(10);
+
 		bios_wr32(bios, 0x00e18c, bios_rd32(
 			  bios, 0x00e18c) & ~0x00020000);
+
 		bios_wr32(bios, 0x000200, bios_rd32(
 			  bios, 0x000200) | 0x40000000);
+
 		bios_wr32(bios, 0x614100, 0x00800018);
 		bios_wr32(bios, 0x614900, 0x00800018);
+
 		mdelay(10);
+
 		bios_wr32(bios, 0x614100, 0x10000018);
 		bios_wr32(bios, 0x614900, 0x10000018);
+
 		for (i = 0; i < 3; i++)
-		bios_wr32(bios, 0x614280 + (i*0x800), bios_rd32(
-			  bios, 0x614280 + (i*0x800)) & 0xf0f0f0f0);
+			bios_wr32(bios, 0x614280 + (i*0x800), bios_rd32(
+				  bios, 0x614280 + (i*0x800)) & 0xf0f0f0f0);
+
 		for (i = 0; i < 2; i++)
-		bios_wr32(bios, 0x614300 + (i*0x800), bios_rd32(
-			  bios, 0x614300 + (i*0x800)) & 0xfffff0f0);
+			bios_wr32(bios, 0x614300 + (i*0x800), bios_rd32(
+				  bios, 0x614300 + (i*0x800)) & 0xfffff0f0);
+
 		for (i = 0; i < 3; i++)
-		bios_wr32(bios, 0x614380 + (i*0x800), bios_rd32(
-			  bios, 0x614380 + (i*0x800)) & 0xfffff0f0);
+			bios_wr32(bios, 0x614380 + (i*0x800), bios_rd32(
+				  bios, 0x614380 + (i*0x800)) & 0xfffff0f0);
+
 		for (i = 0; i < 2; i++)
-		bios_wr32(bios, 0x614200 + (i*0x800), bios_rd32(
-			  bios, 0x614200 + (i*0x800)) & 0xfffffff0);
+			bios_wr32(bios, 0x614200 + (i*0x800), bios_rd32(
+				  bios, 0x614200 + (i*0x800)) & 0xfffffff0);
+
 		for (i = 0; i < 2; i++)
-		bios_wr32(bios, 0x614108 + (i*0x800), bios_rd32(
-			  bios, 0x614108 + (i*0x800)) & 0x0fffffff);
+			bios_wr32(bios, 0x614108 + (i*0x800), bios_rd32(
+				  bios, 0x614108 + (i*0x800)) & 0x0fffffff);
 		return true;
 	}
 
-	bios_port_wr(bios, crtcport, (bios_port_rd(bios, crtcport) & mask) | data);
-
+	bios_port_wr(bios, crtcport, (bios_port_rd(bios, crtcport) & mask) |
+									data);
 	return true;
 }
 
