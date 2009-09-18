@@ -575,6 +575,10 @@ struct drm_nouveau_private {
 	bool acpi_dsm;
 
 	struct nouveau_channel *evo;
+
+	struct {
+		struct dentry *channel_root;
+	} debugfs;
 };
 
 static inline struct drm_nouveau_private *

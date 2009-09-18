@@ -28,6 +28,8 @@
  *  Ben Skeggs <bskeggs@redhat.com>
  */
 
+#include <linux/debugfs.h>
+
 #include "drmP.h"
 #include "nouveau_drv.h"
 
@@ -58,16 +60,25 @@ nouveau_debugfs_channel_info(struct seq_file *m, void *data)
 int
 nouveau_debugfs_channel_init(struct nouveau_channel *chan)
 {
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
+	struct drm_minor *minor = chan->dev->primary;
 	int ret;
 
-	snprintf(chan->debugfs.name, 32, "channel-%d", chan->id);
+	if (!dev_priv->debugfs.channel_root) {
+		dev_priv->debugfs.channel_root =
+			debugfs_create_dir("channel", minor->debugfs_root);
+		if (!dev_priv->debugfs.channel_root)
+			return -ENOENT;
+	}
+
+	snprintf(chan->debugfs.name, 32, "%d", chan->id);
 	chan->debugfs.info.name = chan->debugfs.name;
 	chan->debugfs.info.show = nouveau_debugfs_channel_info;
 	chan->debugfs.info.driver_features = 0;
 	chan->debugfs.info.data = chan;
 
 	ret = drm_debugfs_create_files(&chan->debugfs.info, 1,
-				       chan->dev->primary->debugfs_root,
+				       dev_priv->debugfs.channel_root,
 				       chan->dev->primary);
 	if (ret == 0)
 		chan->debugfs.active = true;
@@ -77,11 +88,18 @@ nouveau_debugfs_channel_init(struct nouveau_channel *chan)
 void
 nouveau_debugfs_channel_fini(struct nouveau_channel *chan)
 {
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
+
 	if (!chan->debugfs.active)
 		return;
 
 	drm_debugfs_remove_files(&chan->debugfs.info, 1, chan->dev->primary);
 	chan->debugfs.active = false;
+
+	if (chan == dev_priv->channel) {
+		debugfs_remove(dev_priv->debugfs.channel_root);
+		dev_priv->debugfs.channel_root = NULL;
+	}
 }
 
 static int
