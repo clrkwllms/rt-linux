@@ -84,24 +84,21 @@ nv04_instmem_configure_fixed_tables(struct drm_device *dev)
 	 *           cards.  RAMFC is 4kb (32 fifos, 128byte entries).
 	 *   Others: Position RAMFC at RAMIN+0x11400
 	 */
-	switch(dev_priv->card_type)
-	{
-		case NV_40:
-			dev_priv->ramfc_offset = 0x20000;
-			dev_priv->ramfc_size   = engine->fifo.channels *
-						 nouveau_fifo_ctx_size(dev);
-			break;
-		case NV_30:
-		case NV_20:
-		case NV_17:
-		case NV_11:
-		case NV_10:
-		case NV_04:
-		default:
-			dev_priv->ramfc_offset = 0x11400;
-			dev_priv->ramfc_size   = engine->fifo.channels *
-						 nouveau_fifo_ctx_size(dev);
-			break;
+	dev_priv->ramfc_size = engine->fifo.channels *
+						nouveau_fifo_ctx_size(dev);
+	switch (dev_priv->card_type) {
+	case NV_40:
+		dev_priv->ramfc_offset = 0x20000;
+		break;
+	case NV_30:
+	case NV_20:
+	case NV_17:
+	case NV_11:
+	case NV_10:
+	case NV_04:
+	default:
+		dev_priv->ramfc_offset = 0x11400;
+		break;
 	}
 	NV_DEBUG(dev, "RAMFC offset=0x%x, size=%d\n", dev_priv->ramfc_offset,
 						      dev_priv->ramfc_size);

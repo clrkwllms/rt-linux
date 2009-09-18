@@ -468,8 +468,9 @@ void nv17_tv_update_properties(struct drm_encoder *encoder)
 	struct nv17_tv_encoder *tv_enc = to_tv_enc(encoder);
 	struct nv17_tv_state *regs = &tv_enc->state;
 	struct nv17_tv_norm_params *tv_norm = get_tv_norm(encoder);
-	int subconnector = tv_enc->select_subconnector? tv_enc->select_subconnector
-		: tv_enc->subconnector;
+	int subconnector = tv_enc->select_subconnector ?
+						tv_enc->select_subconnector :
+						tv_enc->subconnector;
 
 	switch (subconnector) {
 	case DRM_MODE_SUBCONNECTOR_Composite:

@@ -121,7 +121,8 @@ static void nv04_tv_dpms(struct drm_encoder *encoder, int mode)
 		int head = nouveau_crtc(encoder->crtc)->index;
 		crtc1A = NVReadVgaCrtc(dev, head, NV_CIO_CRE_RPC1_INDEX);
 
-		state->pllsel |= head? PLLSEL_TV_CRTC2_MASK : PLLSEL_TV_CRTC1_MASK;
+		state->pllsel |= head ? PLLSEL_TV_CRTC2_MASK :
+					PLLSEL_TV_CRTC1_MASK;
 
 		/* Inhibit hsync */
 		crtc1A |= 0x80;

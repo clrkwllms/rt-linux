@@ -364,49 +364,48 @@ nouveau_mem_fb_amount_igp(struct drm_device *dev)
 uint64_t nouveau_mem_fb_amount(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv=dev->dev_private;
-	switch(dev_priv->card_type)
-	{
-		case NV_04:
-		case NV_05:
-			if (nv_rd32(dev, NV03_BOOT_0) & 0x00000100) {
-				return (((nv_rd32(dev, NV03_BOOT_0) >> 12) &
-						0xf) * 2 + 2) * 1024 * 1024;
-			} else
-			switch (nv_rd32(dev, NV03_BOOT_0) &
-						NV03_BOOT_0_RAM_AMOUNT)
-			{
-				case NV04_BOOT_0_RAM_AMOUNT_32MB:
-					return 32*1024*1024;
-				case NV04_BOOT_0_RAM_AMOUNT_16MB:
-					return 16*1024*1024;
-				case NV04_BOOT_0_RAM_AMOUNT_8MB:
-					return 8*1024*1024;
-				case NV04_BOOT_0_RAM_AMOUNT_4MB:
-					return 4*1024*1024;
-			}
-			break;
-		case NV_10:
-		case NV_11:
-		case NV_17:
-		case NV_20:
-		case NV_30:
-		case NV_40:
-		case NV_50:
-		default:
-			if (dev_priv->flags & (NV_NFORCE | NV_NFORCE2)) {
-				return nouveau_mem_fb_amount_igp(dev);
-			} else {
-				uint64_t mem;
+	switch (dev_priv->card_type) {
+	case NV_04:
+	case NV_05: {
+		uint32_t boot0 = nv_rd32(dev, NV03_BOOT_0);
+		if (boot0 & 0x00000100)
+			return (((boot0 >> 12) & 0xf) * 2 + 2) * 1024 * 1024;
 
-				mem = (nv_rd32(dev, NV04_FIFO_DATA) &
-				       NV10_FIFO_DATA_RAM_AMOUNT_MB_MASK) >>
-				      NV10_FIFO_DATA_RAM_AMOUNT_MB_SHIFT;
-				return mem*1024*1024;
-			}
-			break;
+		switch (boot0 & NV03_BOOT_0_RAM_AMOUNT) {
+		case NV04_BOOT_0_RAM_AMOUNT_32MB:
+			return 32 * 1024 * 1024;
+		case NV04_BOOT_0_RAM_AMOUNT_16MB:
+			return 16 * 1024 * 1024;
+		case NV04_BOOT_0_RAM_AMOUNT_8MB:
+			return 8 * 1024 * 1024;
+		case NV04_BOOT_0_RAM_AMOUNT_4MB:
+			return 4 * 1024 * 1024;
+		}
+		break;
+	}
+	case NV_10:
+	case NV_11:
+	case NV_17:
+	case NV_20:
+	case NV_30:
+	case NV_40:
+	case NV_50:
+	default:
+		if (dev_priv->flags & (NV_NFORCE | NV_NFORCE2)) {
+			return nouveau_mem_fb_amount_igp(dev);
+		} else {
+			uint64_t mem;
+			mem = (nv_rd32(dev, NV04_FIFO_DATA) &
+					NV10_FIFO_DATA_RAM_AMOUNT_MB_MASK) >>
+					NV10_FIFO_DATA_RAM_AMOUNT_MB_SHIFT;
+			return mem * 1024 * 1024;
+		}
+		break;
 	}
 
-	NV_ERROR(dev, "Unable to detect video ram size. Please report your setup to " DRIVER_EMAIL "\n");
+	NV_ERROR(dev,
+		"Unable to detect video ram size. Please report your setup to "
+							DRIVER_EMAIL "\n");
 	return 0;
 }
 

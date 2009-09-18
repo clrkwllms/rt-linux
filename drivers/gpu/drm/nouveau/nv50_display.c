@@ -508,20 +508,18 @@ int nv50_display_create(struct drm_device *dev)
 
 		if (encoders & (1 << OUTPUT_DP)) {
 			type = DRM_MODE_CONNECTOR_DisplayPort;
-		} else
-		if (encoders & (1 << OUTPUT_TMDS)) {
+		} else if (encoders & (1 << OUTPUT_TMDS)) {
 			if (encoders & (1 << OUTPUT_ANALOG))
 				type = DRM_MODE_CONNECTOR_DVII;
 			else
 				type = DRM_MODE_CONNECTOR_DVID;
-		} else
-		if (encoders & (1 << OUTPUT_ANALOG)) {
+		} else if (encoders & (1 << OUTPUT_ANALOG)) {
 			type = DRM_MODE_CONNECTOR_VGA;
-		} else
-		if (encoders & (1 << OUTPUT_LVDS)) {
+		} else if (encoders & (1 << OUTPUT_LVDS)) {
 			type = DRM_MODE_CONNECTOR_LVDS;
-		} else
+		} else {
 			type = DRM_MODE_CONNECTOR_Unknown;
+		}
 
 		if (type == DRM_MODE_CONNECTOR_Unknown)
 			continue;

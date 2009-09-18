@@ -61,11 +61,11 @@ enum drm_connector_status nv17_tv_detect(struct drm_encoder *encoder,
 	}
 
 	drm_connector_property_set_value(connector,
-					 encoder->dev->mode_config.tv_subconnector_property,
-					 tv_enc->subconnector);
+			encoder->dev->mode_config.tv_subconnector_property,
+							tv_enc->subconnector);
 
-	return tv_enc->subconnector? connector_status_connected
-		: connector_status_disconnected;
+	return tv_enc->subconnector ? connector_status_connected :
+					connector_status_disconnected;
 }
 
 static int nv17_tv_get_modes(struct drm_encoder *encoder,
@@ -76,7 +76,8 @@ static int nv17_tv_get_modes(struct drm_encoder *encoder,
 	int n = 0;
 
 	if (tv_norm->kind == CTV_ENC_MODE) {
-		struct drm_display_mode *output_mode = &tv_norm->ctv_enc_mode.mode;
+		struct drm_display_mode *output_mode =
+						&tv_norm->ctv_enc_mode.mode;
 		int i;
 		struct {
 			int hdisplay;
@@ -455,7 +456,9 @@ static void nv17_tv_save(struct drm_encoder *encoder)
 	struct nv17_tv_encoder *tv_enc = to_tv_enc(encoder);
 
 	nouveau_encoder(encoder)->restore.output =
-		NVReadRAMDAC(dev, 0, NV_PRAMDAC_DACCLK + nv04_dac_output_offset(encoder));
+					NVReadRAMDAC(dev, 0,
+					NV_PRAMDAC_DACCLK +
+					nv04_dac_output_offset(encoder));
 
 	nv17_tv_state_save(dev, &tv_enc->saved_state);
 
@@ -466,8 +469,9 @@ static void nv17_tv_restore(struct drm_encoder *encoder)
 {
 	struct drm_device *dev = encoder->dev;
 
-	NVWriteRAMDAC(dev, 0, NV_PRAMDAC_DACCLK + nv04_dac_output_offset(encoder),
-		      nouveau_encoder(encoder)->restore.output);
+	NVWriteRAMDAC(dev, 0, NV_PRAMDAC_DACCLK +
+				nv04_dac_output_offset(encoder),
+				nouveau_encoder(encoder)->restore.output);
 
 	nv17_tv_state_load(dev, &to_tv_enc(encoder)->saved_state);
 }
@@ -479,8 +483,8 @@ static int nv17_tv_create_resources(struct drm_encoder *encoder,
 	struct drm_mode_config *conf = &dev->mode_config;
 	struct nv17_tv_encoder *tv_enc = to_tv_enc(encoder);
 	struct dcb_entry *dcb = nouveau_encoder(encoder)->dcb;
-	int num_tv_norms = dcb->tvconf.has_component_output? NUM_TV_NORMS
-		: NUM_LD_TV_NORMS;
+	int num_tv_norms = dcb->tvconf.has_component_output ? NUM_TV_NORMS :
+							NUM_LD_TV_NORMS;
 	int i;
 
 	if (nouveau_tv_norm) {

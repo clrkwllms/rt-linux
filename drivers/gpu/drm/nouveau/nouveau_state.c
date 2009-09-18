@@ -599,11 +599,10 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	nouveau_OF_copy_vbios_to_ramin(dev);
 
 	/* Special flags */
-	if (dev->pci_device == 0x01a0) {
+	if (dev->pci_device == 0x01a0)
 		dev_priv->flags |= NV_NFORCE;
-	} else if (dev->pci_device == 0x01f0) {
+	else if (dev->pci_device == 0x01f0)
 		dev_priv->flags |= NV_NFORCE2;
-	}
 
 	/* For kernel modesetting, init card now and bring up fbcon */
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
@@ -693,14 +692,13 @@ int nouveau_ioctl_getparam(struct drm_device *dev, void *data,
 		getparam->value = dev_priv->gart_info.aper_base;
 		break;
 	case NOUVEAU_GETPARAM_PCI_PHYSICAL:
-		if (dev->sg)
+		if (dev->sg) {
 			getparam->value = (unsigned long)dev->sg->virtual;
-		else
-		     {
-		     NV_ERROR(dev, "Requested PCIGART address, "
-				   "while no PCIGART was created\n");
-		     return -EINVAL;
-		     }
+		} else {
+			NV_ERROR(dev, "Requested PCIGART address, "
+					"while no PCIGART was created\n");
+			return -EINVAL;
+		}
 		break;
 	case NOUVEAU_GETPARAM_FB_SIZE:
 		getparam->value = dev_priv->fb_available_size;
