@@ -235,6 +235,12 @@ struct nouveau_channel {
 		uint32_t vblsem_rval;
 		struct list_head vbl_wait;
 	} nvsw;
+
+	struct {
+		bool active;
+		char name[32];
+		struct drm_info_list info;
+	} debugfs;
 };
 
 struct nouveau_instmem_engine {
@@ -750,6 +756,8 @@ extern struct ttm_backend *nouveau_sgdma_init_ttm(struct drm_device *);
 /* nouveau_debugfs.c */
 extern int  nouveau_debugfs_init(struct drm_minor *);
 extern void nouveau_debugfs_takedown(struct drm_minor *);
+extern int  nouveau_debugfs_channel_init(struct nouveau_channel *);
+extern void nouveau_debugfs_channel_fini(struct nouveau_channel *);
 
 /* nouveau_dma.c */
 extern int  nouveau_dma_init(struct nouveau_channel *);

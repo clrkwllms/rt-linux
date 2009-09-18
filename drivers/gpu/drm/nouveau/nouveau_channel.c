@@ -278,6 +278,8 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		return ret;
 	}
 
+	nouveau_debugfs_channel_init(chan);
+
 	NV_INFO(dev, "%s: initialised FIFO %d\n", __func__, channel);
 	*chan_ret = chan;
 	return 0;
@@ -337,6 +339,8 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	int ret;
 
 	NV_INFO(dev, "%s: freeing fifo %d\n", __func__, chan->id);
+
+	nouveau_debugfs_channel_fini(chan);
 
 	/* Give the channel a chance to idle, wait 2s (hopefully) */
 	t_start = engine->timer.read(dev);

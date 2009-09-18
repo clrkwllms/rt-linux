@@ -32,6 +32,59 @@
 #include "nouveau_drv.h"
 
 static int
+nouveau_debugfs_channel_info(struct seq_file *m, void *data)
+{
+	struct drm_info_node *node = (struct drm_info_node *) m->private;
+	struct nouveau_channel *chan = node->info_ent->data;
+
+	seq_printf(m, "channel id    : %d\n", chan->id);
+
+	seq_printf(m, "cpu fifo state:\n");
+	seq_printf(m, "          base: 0x%08x\n", chan->pushbuf_base);
+	seq_printf(m, "           max: 0x%08x\n", chan->dma.max << 2);
+	seq_printf(m, "           cur: 0x%08x\n", chan->dma.cur << 2);
+	seq_printf(m, "           put: 0x%08x\n", chan->dma.put << 2);
+	seq_printf(m, "          free: 0x%08x\n", chan->dma.free << 2);
+
+	seq_printf(m, "gpu fifo state:\n");
+	seq_printf(m, "           get: 0x%08x\n", nvchan_rd32(chan->user_get));
+	seq_printf(m, "           put: 0x%08x\n", nvchan_rd32(chan->user_put));
+
+	seq_printf(m, "last fence    : %d\n", chan->fence.sequence);
+	seq_printf(m, "last signalled: %d\n", chan->fence.sequence_ack);
+	return 0;
+}
+
+int
+nouveau_debugfs_channel_init(struct nouveau_channel *chan)
+{
+	int ret;
+
+	snprintf(chan->debugfs.name, 32, "channel-%d", chan->id);
+	chan->debugfs.info.name = chan->debugfs.name;
+	chan->debugfs.info.show = nouveau_debugfs_channel_info;
+	chan->debugfs.info.driver_features = 0;
+	chan->debugfs.info.data = chan;
+
+	ret = drm_debugfs_create_files(&chan->debugfs.info, 1,
+				       chan->dev->primary->debugfs_root,
+				       chan->dev->primary);
+	if (ret == 0)
+		chan->debugfs.active = true;
+	return ret;
+}
+
+void
+nouveau_debugfs_channel_fini(struct nouveau_channel *chan)
+{
+	if (!chan->debugfs.active)
+		return;
+
+	drm_debugfs_remove_files(&chan->debugfs.info, 1, chan->dev->primary);
+	chan->debugfs.active = false;
+}
+
+static int
 nouveau_debugfs_chipset_info(struct seq_file *m, void *data)
 {
 	struct drm_info_node *node = (struct drm_info_node *) m->private;
@@ -60,9 +113,9 @@ nouveau_debugfs_memory_info(struct seq_file *m, void *data)
 	return 0;
 }
 
-struct drm_info_list nouveau_debugfs_list[] = {
-	{ "chipset", nouveau_debugfs_chipset_info, 0 },
-	{ "memory", nouveau_debugfs_memory_info, 0 },
+static struct drm_info_list nouveau_debugfs_list[] = {
+	{ "chipset", nouveau_debugfs_chipset_info, 0, NULL },
+	{ "memory", nouveau_debugfs_memory_info, 0, NULL },
 };
 #define NOUVEAU_DEBUGFS_ENTRIES ARRAY_SIZE(nouveau_debugfs_list)
 
