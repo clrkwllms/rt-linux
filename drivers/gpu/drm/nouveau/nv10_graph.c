@@ -391,7 +391,8 @@ struct graph_state {
 	struct pipe_state pipe_state;
 };
 
-static void nv10_graph_save_pipe(struct nouveau_channel *chan) {
+static void nv10_graph_save_pipe(struct nouveau_channel *chan)
+{
 	struct drm_device *dev = chan->dev;
 	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
 	struct pipe_state *fifo_pipe_state = &pgraph_ctx->pipe_state;
@@ -417,7 +418,8 @@ static void nv10_graph_save_pipe(struct nouveau_channel *chan) {
 #undef PIPE_SAVE
 }
 
-static void nv10_graph_load_pipe(struct nouveau_channel *chan) {
+static void nv10_graph_load_pipe(struct nouveau_channel *chan)
+{
 	struct drm_device *dev = chan->dev;
 	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
 	struct pipe_state *fifo_pipe_state = &pgraph_ctx->pipe_state;
@@ -475,7 +477,8 @@ static void nv10_graph_load_pipe(struct nouveau_channel *chan) {
 #undef PIPE_RESTORE
 }
 
-static void nv10_graph_create_pipe(struct nouveau_channel *chan) {
+static void nv10_graph_create_pipe(struct nouveau_channel *chan)
+{
 	struct drm_device *dev = chan->dev;
 	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
 	struct pipe_state *fifo_pipe_state = &pgraph_ctx->pipe_state;
@@ -766,7 +769,8 @@ void nv10_graph_context_switch(struct drm_device *dev)
 		pgraph_ctx->nv17[offset] = val; \
 	} while (0)
 
-int nv10_graph_create_context(struct nouveau_channel *chan) {
+int nv10_graph_create_context(struct nouveau_channel *chan)
+{
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct graph_state* pgraph_ctx;
@@ -868,7 +872,8 @@ void nv10_graph_destroy_context(struct nouveau_channel *chan)
 #endif
 }
 
-int nv10_graph_init(struct drm_device *dev) {
+int nv10_graph_init(struct drm_device *dev)
+{
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	int i;
 

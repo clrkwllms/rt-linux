@@ -482,7 +482,7 @@ nouveau_hw_pllvals_to_clk(struct nouveau_pll_vals *pv)
 	if (!pv->M1 || !pv->M2)
 		return 0;
 
-	return (pv->N1 * pv->N2 * pv->refclk / (pv->M1 * pv->M2) >> pv->log2P);
+	return pv->N1 * pv->N2 * pv->refclk / (pv->M1 * pv->M2) >> pv->log2P;
 }
 
 int

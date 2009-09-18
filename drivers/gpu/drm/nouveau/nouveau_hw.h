@@ -26,8 +26,11 @@
 #include "drmP.h"
 #include "nouveau_drv.h"
 
-#define MASK(field) ((0xffffffff >> (31 - ((1?field) - (0?field)))) << (0?field))
-#define XLATE(src, srclowbit, outfield) ((((src) >> (srclowbit)) << (0?outfield)) & MASK(outfield))
+#define MASK(field) ( \
+	(0xffffffff >> (31 - ((1 ? field) - (0 ? field)))) << (0 ? field))
+
+#define XLATE(src, srclowbit, outfield) ( \
+	(((src) >> (srclowbit)) << (0 ? outfield)) & MASK(outfield))
 
 void NVWriteVgaSeq(struct drm_device *, int head, uint8_t index, uint8_t value);
 uint8_t NVReadVgaSeq(struct drm_device *, int head, uint8_t index);
@@ -323,7 +326,7 @@ nv_heads_tied(struct drm_device *dev)
 	if (dev_priv->chipset == 0x11)
 		return !!(nvReadMC(dev, NV_PBUS_DEBUG_1) & (1 << 28));
 
-	return (NVReadVgaCrtc(dev, 0, NV_CIO_CRE_44) & 0x4);
+	return NVReadVgaCrtc(dev, 0, NV_CIO_CRE_44) & 0x4;
 }
 
 /* makes cr0-7 on the specified head read-only */

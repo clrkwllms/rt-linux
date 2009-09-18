@@ -35,7 +35,7 @@
 #include "drm_pciids.h"
 
 MODULE_PARM_DESC(noagp, "Disable AGP");
-int nouveau_noagp = 0;
+int nouveau_noagp;
 module_param_named(noagp, nouveau_noagp, int, 0400);
 
 MODULE_PARM_DESC(modeset, "Enable kernel modesetting");
@@ -43,7 +43,7 @@ static int nouveau_modeset = -1; /* kms */
 module_param_named(modeset, nouveau_modeset, int, 0400);
 
 MODULE_PARM_DESC(vram_pushbuf, "Force DMA push buffers to be in VRAM");
-int nouveau_vram_pushbuf = 0;
+int nouveau_vram_pushbuf;
 module_param_named(vram_pushbuf, nouveau_vram_pushbuf, int, 0400);
 
 MODULE_PARM_DESC(duallink, "Allow dual-link TMDS (>=GeForce 8)");
@@ -63,7 +63,7 @@ MODULE_PARM_DESC(tv_norm, "Default TV norm.\n"
 		 "\t\t\thd480i, hd480p, hd576i, hd576p, hd720p, hd1080i.\n"
 		 "\t\tDefault: PAL\n"
 		 "\t\t*NOTE* Ignored for cards with external TV encoders.");
-char *nouveau_tv_norm = NULL;
+char *nouveau_tv_norm;
 module_param_named(tv_norm, nouveau_tv_norm, charp, 0400);
 
 MODULE_PARM_DESC(reg_debug, "Register access debug bitmask:\n"
@@ -73,7 +73,7 @@ MODULE_PARM_DESC(reg_debug, "Register access debug bitmask:\n"
 int nouveau_reg_debug;
 module_param_named(reg_debug, nouveau_reg_debug, int, 0600);
 
-int nouveau_fbpercrtc = 0;
+int nouveau_fbpercrtc;
 #if 0
 module_param_named(fbpercrtc, nouveau_fbpercrtc, int, 0400);
 #endif

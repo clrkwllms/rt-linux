@@ -509,7 +509,8 @@ int nv20_graph_save_context(struct nouveau_channel *chan)
 	return 0;
 }
 
-static void nv20_graph_rdi(struct drm_device *dev) {
+static void nv20_graph_rdi(struct drm_device *dev)
+{
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	int i, writecount = 32;
 	uint32_t rdi_index = 0x2c80000;
@@ -526,7 +527,8 @@ static void nv20_graph_rdi(struct drm_device *dev) {
 	nouveau_wait_for_idle(dev);
 }
 
-int nv20_graph_init(struct drm_device *dev) {
+int nv20_graph_init(struct drm_device *dev)
+{
 	struct drm_nouveau_private *dev_priv =
 		(struct drm_nouveau_private *)dev->dev_private;
 	uint32_t tmp, vramsz;

@@ -2552,7 +2552,7 @@ init_8e(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 }
 
 /* hack to avoid moving the itbl_entry array before this function */
-int init_ram_restrict_zm_reg_group_blocklen = 0;
+int init_ram_restrict_zm_reg_group_blocklen;
 
 static bool
 init_ram_restrict_zm_reg_group(struct nvbios *bios, uint16_t offset,
@@ -3180,12 +3180,12 @@ static int get_fp_strap(struct drm_device *dev, struct nvbios *bios)
 	 */
 
 	if (bios->major_version < 5 && bios->data[0x48] & 0x4)
-		return (NVReadVgaCrtc5758(dev, 0, 0xf) & 0xf);
+		return NVReadVgaCrtc5758(dev, 0, 0xf) & 0xf;
 
 	if (nv_arch(dev) >= NV_50)
-		return ((bios_rd32(bios, NV_PEXTDEV_BOOT_0) >> 24) & 0xf);
+		return (bios_rd32(bios, NV_PEXTDEV_BOOT_0) >> 24) & 0xf;
 	else
-		return ((bios_rd32(bios, NV_PEXTDEV_BOOT_0) >> 16) & 0xf);
+		return (bios_rd32(bios, NV_PEXTDEV_BOOT_0) >> 16) & 0xf;
 }
 
 static int parse_fp_mode_table(struct drm_device *dev, struct nvbios *bios)
@@ -5162,7 +5162,7 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 	if (bdcb->version < 0x21)
 		merge_like_dcb_entries(dev, dcb);
 
-	return (dcb->entries ? 0 : -ENXIO);
+	return dcb->entries ? 0 : -ENXIO;
 }
 
 static void
@@ -5313,7 +5313,7 @@ uint8_t * nouveau_bios_embedded_edid(struct drm_device *dev)
 
 	NV_TRACE(dev, "Found EDID in BIOS\n");
 
-	return (bios->fp.edid = &bios->data[offset]);
+	return bios->fp.edid = &bios->data[offset];
 }
 
 static bool NVInitVBIOS(struct drm_device *dev)
