@@ -747,6 +747,10 @@ extern int nouveau_sgdma_get_page(struct drm_device *, uint32_t offset,
 				  uint32_t *page);
 extern struct ttm_backend *nouveau_sgdma_init_ttm(struct drm_device *);
 
+/* nouveau_debugfs.c */
+extern int  nouveau_debugfs_init(struct drm_minor *);
+extern void nouveau_debugfs_takedown(struct drm_minor *);
+
 /* nouveau_dma.c */
 extern int  nouveau_dma_init(struct nouveau_channel *);
 extern int  nouveau_dma_wait(struct nouveau_channel *, int size);

@@ -349,6 +349,10 @@ static struct drm_driver driver = {
 	.lastclose = nouveau_lastclose,
 	.unload = nouveau_unload,
 	.preclose = nouveau_preclose,
+#if defined(CONFIG_DEBUG_FS)
+	.debugfs_init = nouveau_debugfs_init,
+	.debugfs_cleanup = nouveau_debugfs_takedown,
+#endif
 	.irq_preinstall = nouveau_irq_preinstall,
 	.irq_postinstall = nouveau_irq_postinstall,
 	.irq_uninstall = nouveau_irq_uninstall,
