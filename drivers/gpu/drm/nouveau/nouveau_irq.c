@@ -234,7 +234,7 @@ struct nouveau_bitfield_names {
 	const char *name;
 };
 
-static struct nouveau_bitfield_names nouveau_nstatus_names[] =
+static struct nouveau_bitfield_names nstatus_names[] =
 {
 	{ NV04_PGRAPH_NSTATUS_STATE_IN_USE,       "STATE_IN_USE" },
 	{ NV04_PGRAPH_NSTATUS_INVALID_STATE,      "INVALID_STATE" },
@@ -242,7 +242,7 @@ static struct nouveau_bitfield_names nouveau_nstatus_names[] =
 	{ NV04_PGRAPH_NSTATUS_PROTECTION_FAULT,   "PROTECTION_FAULT" }
 };
 
-static struct nouveau_bitfield_names nouveau_nstatus_names_nv10[] =
+static struct nouveau_bitfield_names nstatus_names_nv10[] =
 {
 	{ NV10_PGRAPH_NSTATUS_STATE_IN_USE,       "STATE_IN_USE" },
 	{ NV10_PGRAPH_NSTATUS_INVALID_STATE,      "INVALID_STATE" },
@@ -250,7 +250,7 @@ static struct nouveau_bitfield_names nouveau_nstatus_names_nv10[] =
 	{ NV10_PGRAPH_NSTATUS_PROTECTION_FAULT,   "PROTECTION_FAULT" }
 };
 
-static struct nouveau_bitfield_names nouveau_nsource_names[] =
+static struct nouveau_bitfield_names nsource_names[] =
 {
 	{ NV03_PGRAPH_NSOURCE_NOTIFICATION,       "NOTIFICATION" },
 	{ NV03_PGRAPH_NSOURCE_DATA_ERROR,         "DATA_ERROR" },
@@ -274,10 +274,14 @@ static struct nouveau_bitfield_names nouveau_nsource_names[] =
 };
 
 static void
-nouveau_print_bitfield_names(uint32_t value,
+nouveau_print_bitfield_names_(uint32_t value,
 				const struct nouveau_bitfield_names *namelist,
 				const int namelist_len)
 {
+	/*
+	 * Caller must have already printed the KERN_* log level for us.
+	 * Also the caller is responsible for adding the newline.
+	 */
 	int i;
 	for (i = 0; i < namelist_len; ++i) {
 		uint32_t mask = namelist[i].mask;
@@ -289,6 +293,9 @@ nouveau_print_bitfield_names(uint32_t value,
 	if (value)
 		printk(" (unknown bits 0x%08x)", value);
 }
+#define nouveau_print_bitfield_names(val, namelist) \
+	nouveau_print_bitfield_names_((val), (namelist), ARRAY_SIZE(namelist))
+
 
 static int
 nouveau_graph_chid_from_grctx(struct drm_device *dev)
@@ -406,21 +413,19 @@ nouveau_graph_dump_trap_info(struct drm_device *dev, const char *id,
 	uint32_t nsource = trap->nsource, nstatus = trap->nstatus;
 
 	NV_INFO(dev, "%s - nSource:", id);
-	nouveau_print_bitfield_names(nsource, nouveau_nsource_names,
-					ARRAY_SIZE(nouveau_nsource_names));
+	nouveau_print_bitfield_names(nsource, nsource_names);
 	printk(", nStatus:");
 	if (dev_priv->card_type < NV_10)
-		nouveau_print_bitfield_names(nstatus, nouveau_nstatus_names,
-					ARRAY_SIZE(nouveau_nstatus_names));
+		nouveau_print_bitfield_names(nstatus, nstatus_names);
 	else
-		nouveau_print_bitfield_names(nstatus,
-					nouveau_nstatus_names_nv10,
-					ARRAY_SIZE(nouveau_nstatus_names_nv10));
+		nouveau_print_bitfield_names(nstatus, nstatus_names_nv10);
 	printk("\n");
 
-	NV_INFO(dev, "%s - Ch %d/%d Class 0x%04x Mthd 0x%04x Data 0x%08x:0x%08x\n",
-		 id, trap->channel, trap->subc, trap->class, trap->mthd,
-		 trap->data2, trap->data);
+	NV_INFO(dev, "%s - Ch %d/%d Class 0x%04x Mthd 0x%04x "
+					"Data 0x%08x:0x%08x\n",
+					id, trap->channel, trap->subc,
+					trap->class, trap->mthd,
+					trap->data2, trap->data);
 }
 
 static int

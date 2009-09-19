@@ -4757,7 +4757,7 @@ static struct dcb_entry *new_dcb_entry(struct parsed_dcb *dcb)
 {
 	struct dcb_entry *entry = &dcb->entry[dcb->entries];
 
-	memset(entry, 0, sizeof (struct dcb_entry));
+	memset(entry, 0, sizeof(struct dcb_entry));
 	entry->index = dcb->entries++;
 
 	return entry;
