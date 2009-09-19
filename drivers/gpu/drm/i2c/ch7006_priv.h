@@ -98,7 +98,8 @@ struct ch7006_priv {
 	int last_dpms;
 };
 
-#define to_ch7006_priv(x) ((struct ch7006_priv *)to_encoder_slave(x)->slave_priv)
+#define to_ch7006_priv(x) \
+	((struct ch7006_priv *)to_encoder_slave(x)->slave_priv)
 
 extern int ch7006_debug;
 extern char *ch7006_tv_norm;
@@ -132,22 +133,25 @@ void ch7006_state_save(struct i2c_client *client,
 			dev_printk(KERN_DEBUG, &client->dev,		\
 				   "%s: " format, __func__, ## __VA_ARGS__); \
 	} while (0)
-#define ch7006_info(client, format, ...) dev_info(&client->dev, format, __VA_ARGS__)
-#define ch7006_err(client, format, ...) dev_err(&client->dev, format, __VA_ARGS__)
+#define ch7006_info(client, format, ...) \
+				dev_info(&client->dev, format, __VA_ARGS__)
+#define ch7006_err(client, format, ...) \
+				dev_err(&client->dev, format, __VA_ARGS__)
 
-#define __mask(src, bitfield) (((2 << (1?bitfield)) - 1) & ~((1 << (0?bitfield)) - 1))
+#define __mask(src, bitfield) \
+		(((2 << (1 ? bitfield)) - 1) & ~((1 << (0 ? bitfield)) - 1))
 #define mask(bitfield) __mask(bitfield)
 
-#define __bitf(src, bitfield, x) (((x) >> (src) << (0?bitfield)) &	\
-				  __mask(src, bitfield))
+#define __bitf(src, bitfield, x) \
+		(((x) >> (src) << (0 ? bitfield)) &  __mask(src, bitfield))
 #define bitf(bitfield, x) __bitf(bitfield, x)
 #define bitfs(bitfield, s) __bitf(bitfield, bitfield##_##s)
 #define setbitf(state, reg, bitfield, x)				\
 	state->regs[reg] = (state->regs[reg] & ~mask(reg##_##bitfield))	\
 		| bitf(reg##_##bitfield, x)
 
-#define __unbitf(src, bitfield, x) ((x & __mask(src, bitfield)) \
-				    >> (0?bitfield) << (src))
+#define __unbitf(src, bitfield, x) \
+		((x & __mask(src, bitfield)) >> (0 ? bitfield) << (src))
 #define unbitf(bitfield, x) __unbitf(bitfield, x)
 
 static inline int interpolate(int y0, int y1, int y2, int x)

@@ -296,8 +296,8 @@ void ch7006_setup_power_state(struct drm_encoder *encoder)
 	uint8_t *power = &priv->state.regs[CH7006_POWER];
 	int subconnector;
 
-	subconnector = priv->select_subconnector?
-		priv->select_subconnector : priv->subconnector;
+	subconnector = priv->select_subconnector ? priv->select_subconnector :
+							priv->subconnector;
 
 	*power = CH7006_POWER_RESET;
 

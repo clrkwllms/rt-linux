@@ -213,12 +213,11 @@ static enum drm_connector_status ch7006_encoder_detect(struct drm_encoder *encod
 		priv->subconnector = DRM_MODE_SUBCONNECTOR_Unknown;
 
 	drm_connector_property_set_value(connector,
-					 encoder->dev->mode_config.tv_subconnector_property,
-					 priv->subconnector);
+			encoder->dev->mode_config.tv_subconnector_property,
+							priv->subconnector);
 
-	return priv->subconnector?
-		connector_status_connected
-		: connector_status_disconnected;
+	return priv->subconnector ? connector_status_connected :
+					connector_status_disconnected;
 }
 
 static int ch7006_encoder_get_modes(struct drm_encoder *encoder,
@@ -234,7 +233,7 @@ static int ch7006_encoder_get_modes(struct drm_encoder *encoder,
 			continue;
 
 		drm_mode_probed_add(connector,
-				    drm_mode_duplicate(encoder->dev, &mode->mode));
+				drm_mode_duplicate(encoder->dev, &mode->mode));
 
 		n++;
 	}
@@ -507,11 +506,11 @@ static void __exit ch7006_exit(void)
 	drm_i2c_encoder_unregister(&ch7006_driver);
 }
 
-int ch7006_debug = 0;
+int ch7006_debug;
 module_param_named(debug, ch7006_debug, int, 0600);
 MODULE_PARM_DESC(debug, "Enable debug output.");
 
-char *ch7006_tv_norm = NULL;
+char *ch7006_tv_norm;
 module_param_named(tv_norm, ch7006_tv_norm, charp, 0600);
 MODULE_PARM_DESC(tv_norm, "Default TV norm.\n"
 		 "\t\tSupported: PAL, PAL-M, PAL-N, PAL-Nc, PAL-60, NTSC-M, NTSC-J.\n"
