@@ -2070,7 +2070,7 @@ nv40_graph_init(struct drm_device *dev)
 	/* copy tile info from PFB */
 	switch (dev_priv->chipset) {
 	case 0x40: /* vanilla NV40 */
-		for (i=0; i<NV10_PFB_TILE__SIZE; i++) {
+		for (i = 0; i < NV10_PFB_TILE__SIZE; i++) {
 			tmp = nv_rd32(dev, NV10_PFB_TILE(i));
 			nv_wr32(dev, NV40_PGRAPH_TILE0(i), tmp);
 			nv_wr32(dev, NV40_PGRAPH_TILE1(i), tmp);
@@ -2088,7 +2088,7 @@ nv40_graph_init(struct drm_device *dev)
 	case 0x44:
 	case 0x4a:
 	case 0x4e: /* NV44-based cores don't have 0x406900? */
-		for (i=0; i<NV40_PFB_TILE__SIZE_0; i++) {
+		for (i = 0; i < NV40_PFB_TILE__SIZE_0; i++) {
 			tmp = nv_rd32(dev, NV40_PFB_TILE(i));
 			nv_wr32(dev, NV40_PGRAPH_TILE0(i), tmp);
 			tmp = nv_rd32(dev, NV40_PFB_TLIMIT(i));
@@ -2103,7 +2103,7 @@ nv40_graph_init(struct drm_device *dev)
 	case 0x47:
 	case 0x49:
 	case 0x4b: /* G7X-based cores */
-		for (i=0; i<NV40_PFB_TILE__SIZE_1; i++) {
+		for (i = 0; i < NV40_PFB_TILE__SIZE_1; i++) {
 			tmp = nv_rd32(dev, NV40_PFB_TILE(i));
 			nv_wr32(dev, NV47_PGRAPH_TILE0(i), tmp);
 			nv_wr32(dev, NV40_PGRAPH_TILE1(i), tmp);
@@ -2119,7 +2119,7 @@ nv40_graph_init(struct drm_device *dev)
 		}
 		break;
 	default: /* everything else */
-		for (i=0; i<NV40_PFB_TILE__SIZE_0; i++) {
+		for (i = 0; i < NV40_PFB_TILE__SIZE_0; i++) {
 			tmp = nv_rd32(dev, NV40_PFB_TILE(i));
 			nv_wr32(dev, NV40_PGRAPH_TILE0(i), tmp);
 			nv_wr32(dev, NV40_PGRAPH_TILE1(i), tmp);

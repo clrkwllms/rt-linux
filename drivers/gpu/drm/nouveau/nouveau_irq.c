@@ -281,12 +281,12 @@ nouveau_print_bitfield_names(uint32_t value,
 	int i;
 	for (i = 0; i < namelist_len; ++i) {
 		uint32_t mask = namelist[i].mask;
-		if(value & mask) {
+		if (value & mask) {
 			printk(" %s", namelist[i].name);
 			value &= ~mask;
 		}
 	}
-	if(value)
+	if (value)
 		printk(" (unknown bits 0x%08x)", value);
 }
 
@@ -486,7 +486,7 @@ nouveau_pgraph_intr_context_switch(struct drm_device *dev)
 	chid = engine->fifo.channel_id(dev);
 	NV_DEBUG(dev, "PGRAPH context switch interrupt channel %x\n", chid);
 
-	switch(dev_priv->card_type) {
+	switch (dev_priv->card_type) {
 	case NV_04:
 	case NV_05:
 		nv04_graph_context_switch(dev);

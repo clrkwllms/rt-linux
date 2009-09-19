@@ -83,17 +83,17 @@
 #define NV03_PMC_BOOT_0                                    0x00000000
 #define NV03_PMC_BOOT_1                                    0x00000004
 #define NV03_PMC_INTR_0                                    0x00000100
-#    define NV_PMC_INTR_0_PFIFO_PENDING                       (1<< 8)
+#    define NV_PMC_INTR_0_PFIFO_PENDING                        (1<<8)
 #    define NV_PMC_INTR_0_PGRAPH_PENDING                      (1<<12)
-#    define NV_PMC_INTR_0_NV50_I2C_PENDING                  (1<<21)
+#    define NV_PMC_INTR_0_NV50_I2C_PENDING                    (1<<21)
 #    define NV_PMC_INTR_0_CRTC0_PENDING                       (1<<24)
 #    define NV_PMC_INTR_0_CRTC1_PENDING                       (1<<25)
-#    define NV_PMC_INTR_0_NV50_DISPLAY_PENDING           (1<<26)
+#    define NV_PMC_INTR_0_NV50_DISPLAY_PENDING                (1<<26)
 #    define NV_PMC_INTR_0_CRTCn_PENDING                       (3<<24)
 #define NV03_PMC_INTR_EN_0                                 0x00000140
-#    define NV_PMC_INTR_EN_0_MASTER_ENABLE                    (1<< 0)
+#    define NV_PMC_INTR_EN_0_MASTER_ENABLE                     (1<<0)
 #define NV03_PMC_ENABLE                                    0x00000200
-#    define NV_PMC_ENABLE_PFIFO                               (1<< 8)
+#    define NV_PMC_ENABLE_PFIFO                                (1<<8)
 #    define NV_PMC_ENABLE_PGRAPH                              (1<<12)
 /* Disabling the below bit breaks newer (G7X only?) mobile chipsets,
  * the card will hang early on in the X init process.
@@ -163,16 +163,16 @@
 #    define NV10_PGRAPH_NSTATUS_BAD_ARGUMENT                  (1<<25)
 #    define NV10_PGRAPH_NSTATUS_PROTECTION_FAULT              (1<<26)
 #define NV03_PGRAPH_NSOURCE                                0x00400108
-#    define NV03_PGRAPH_NSOURCE_NOTIFICATION                  (1<< 0)
-#    define NV03_PGRAPH_NSOURCE_DATA_ERROR                    (1<< 1)
-#    define NV03_PGRAPH_NSOURCE_PROTECTION_ERROR              (1<< 2)
-#    define NV03_PGRAPH_NSOURCE_RANGE_EXCEPTION               (1<< 3)
-#    define NV03_PGRAPH_NSOURCE_LIMIT_COLOR                   (1<< 4)
-#    define NV03_PGRAPH_NSOURCE_LIMIT_ZETA                    (1<< 5)
-#    define NV03_PGRAPH_NSOURCE_ILLEGAL_MTHD                  (1<< 6)
-#    define NV03_PGRAPH_NSOURCE_DMA_R_PROTECTION              (1<< 7)
-#    define NV03_PGRAPH_NSOURCE_DMA_W_PROTECTION              (1<< 8)
-#    define NV03_PGRAPH_NSOURCE_FORMAT_EXCEPTION              (1<< 9)
+#    define NV03_PGRAPH_NSOURCE_NOTIFICATION                   (1<<0)
+#    define NV03_PGRAPH_NSOURCE_DATA_ERROR                     (1<<1)
+#    define NV03_PGRAPH_NSOURCE_PROTECTION_ERROR               (1<<2)
+#    define NV03_PGRAPH_NSOURCE_RANGE_EXCEPTION                (1<<3)
+#    define NV03_PGRAPH_NSOURCE_LIMIT_COLOR                    (1<<4)
+#    define NV03_PGRAPH_NSOURCE_LIMIT_ZETA                     (1<<5)
+#    define NV03_PGRAPH_NSOURCE_ILLEGAL_MTHD                   (1<<6)
+#    define NV03_PGRAPH_NSOURCE_DMA_R_PROTECTION               (1<<7)
+#    define NV03_PGRAPH_NSOURCE_DMA_W_PROTECTION               (1<<8)
+#    define NV03_PGRAPH_NSOURCE_FORMAT_EXCEPTION               (1<<9)
 #    define NV03_PGRAPH_NSOURCE_PATCH_EXCEPTION               (1<<10)
 #    define NV03_PGRAPH_NSOURCE_STATE_INVALID                 (1<<11)
 #    define NV03_PGRAPH_NSOURCE_DOUBLE_NOTIFY                 (1<<12)
@@ -184,8 +184,8 @@
 #    define NV03_PGRAPH_NSOURCE_DMA_WIDTH_B                   (1<<18)
 #define NV03_PGRAPH_INTR_EN                                0x00400140
 #define NV40_PGRAPH_INTR_EN                                0x0040013C
-#    define NV_PGRAPH_INTR_NOTIFY                             (1<< 0)
-#    define NV_PGRAPH_INTR_MISSING_HW                         (1<< 4)
+#    define NV_PGRAPH_INTR_NOTIFY                              (1<<0)
+#    define NV_PGRAPH_INTR_MISSING_HW                          (1<<4)
 #    define NV_PGRAPH_INTR_CONTEXT_SWITCH                     (1<<12)
 #    define NV_PGRAPH_INTR_BUFFER_NOTIFY                      (1<<16)
 #    define NV_PGRAPH_INTR_ERROR                              (1<<20)
@@ -421,9 +421,9 @@
 #define NV04_PFIFO_NEXT_CHANNEL                            0x00002050
 #define NV03_PFIFO_INTR_0                                  0x00002100
 #define NV03_PFIFO_INTR_EN_0                               0x00002140
-#    define NV_PFIFO_INTR_CACHE_ERROR                         (1<< 0)
-#    define NV_PFIFO_INTR_RUNOUT                              (1<< 4)
-#    define NV_PFIFO_INTR_RUNOUT_OVERFLOW                     (1<< 8)
+#    define NV_PFIFO_INTR_CACHE_ERROR                          (1<<0)
+#    define NV_PFIFO_INTR_RUNOUT                               (1<<4)
+#    define NV_PFIFO_INTR_RUNOUT_OVERFLOW                      (1<<8)
 #    define NV_PFIFO_INTR_DMA_PUSHER                          (1<<12)
 #    define NV_PFIFO_INTR_DMA_PT                              (1<<16)
 #    define NV_PFIFO_INTR_SEMAPHORE                           (1<<20)
@@ -740,8 +740,8 @@
 #define NV50_PDISPLAY_UNK_388                                        0x00610388
 #define NV50_PDISPLAY_UNK_38C                                        0x0061038c
 
-#define NV50_PDISPLAY_CRTC_P(i,r)         ((i) * 0x540 + NV50_PDISPLAY_CRTC_##r)
-#define NV50_PDISPLAY_CRTC_C(i,r)     (4 + (i) * 0x540 + NV50_PDISPLAY_CRTC_##r)
+#define NV50_PDISPLAY_CRTC_P(i, r)        ((i) * 0x540 + NV50_PDISPLAY_CRTC_##r)
+#define NV50_PDISPLAY_CRTC_C(i, r)    (4 + (i) * 0x540 + NV50_PDISPLAY_CRTC_##r)
 #define NV50_PDISPLAY_CRTC_UNK_0A18 /* mthd 0x0900 */                0x00610a18
 #define NV50_PDISPLAY_CRTC_CLUT_MODE                                 0x00610a24
 #define NV50_PDISPLAY_CRTC_INTERLACE                                 0x00610a48

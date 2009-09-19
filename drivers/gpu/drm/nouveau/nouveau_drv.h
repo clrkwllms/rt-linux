@@ -612,7 +612,7 @@ nouveau_bo_ref(struct nouveau_bo *ref, struct nouveau_bo **pnvbo)
 		NV_ERROR(dev, "called without init\n");       \
 		return -EINVAL;                               \
 	}                                                     \
-} while(0)
+} while (0)
 
 #define NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(id, cl, ch) do {    \
 	struct drm_nouveau_private *nv = dev->dev_private;       \
@@ -622,7 +622,7 @@ nouveau_bo_ref(struct nouveau_bo *ref, struct nouveau_bo **pnvbo)
 		return -EPERM;                                   \
 	}                                                        \
 	(ch) = nv->fifos[(id)];                                  \
-} while(0)
+} while (0)
 
 /* nouveau_drv.c */
 extern int nouveau_noagp;
@@ -1160,12 +1160,12 @@ static inline void nv_wo32(struct drm_device *dev, struct nouveau_gpuobj *obj,
 		NV_PRINTK(KERN_DEBUG, d, "%s:%d - " fmt, __func__,             \
 			  __LINE__, ##arg);                                    \
 	}                                                                      \
-} while(0)
+} while (0)
 #else
 #define NV_DEBUG(d, fmt, arg...) do {                                          \
 	if (drm_debug)                                                         \
 		NV_PRINTK(KERN_DEBUG, d, fmt, ##arg);                          \
-} while(0)
+} while (0)
 #endif
 #define NV_ERROR(d, fmt, arg...) NV_PRINTK(KERN_ERR, d, fmt, ##arg)
 #define NV_INFO(d, fmt, arg...) NV_PRINTK(KERN_INFO, d, fmt, ##arg)

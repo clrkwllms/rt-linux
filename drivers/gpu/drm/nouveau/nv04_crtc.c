@@ -170,7 +170,8 @@ nv_crtc_dpms(struct drm_crtc *crtc, int mode)
 	unsigned char seq1 = 0, crtc17 = 0;
 	unsigned char crtc1A;
 
-	NV_TRACE(dev, "Setting dpms mode %d on CRTC %d\n", mode, nv_crtc->index);
+	NV_TRACE(dev, "Setting dpms mode %d on CRTC %d\n", mode,
+							nv_crtc->index);
 
 	if (nv_crtc->last_dpms == mode) /* Don't do unnecesary mode changes. */
 		return;
@@ -181,8 +182,9 @@ nv_crtc_dpms(struct drm_crtc *crtc, int mode)
 		NVSetOwner(dev, nv_crtc->index);
 
 	/* nv4ref indicates these two RPC1 bits inhibit h/v sync */
-	crtc1A = NVReadVgaCrtc(dev, nv_crtc->index, NV_CIO_CRE_RPC1_INDEX) & ~0xC0;
-	switch(mode) {
+	crtc1A = NVReadVgaCrtc(dev, nv_crtc->index,
+					NV_CIO_CRE_RPC1_INDEX) & ~0xC0;
+	switch (mode) {
 	case DRM_MODE_DPMS_STANDBY:
 		/* Screen: Off; HSync: Off, VSync: On -- Not Supported */
 		seq1 = 0x20;

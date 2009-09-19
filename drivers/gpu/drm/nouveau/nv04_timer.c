@@ -41,7 +41,7 @@ nv04_timer_read(struct drm_device *dev)
 		high1 = high2;
 		low = nv_rd32(dev, NV04_PTIMER_TIME_0);
 		high2 = nv_rd32(dev, NV04_PTIMER_TIME_1);
-	} while(high1 != high2);
+	} while (high1 != high2);
 	return (((uint64_t)high2) << 32) | (uint64_t)low;
 }
 

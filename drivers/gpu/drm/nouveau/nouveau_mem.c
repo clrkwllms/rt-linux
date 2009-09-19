@@ -351,7 +351,7 @@ nouveau_mem_fb_amount_igp(struct drm_device *dev)
 		pci_read_config_dword(bridge, 0x7C, &mem);
 		return (uint64_t)(((mem >> 6) & 31) + 1)*1024*1024;
 	} else
-	if(dev_priv->flags&NV_NFORCE2) {
+	if (dev_priv->flags&NV_NFORCE2) {
 		pci_read_config_dword(bridge, 0x84, &mem);
 		return (uint64_t)(((mem >> 4) & 127) + 1)*1024*1024;
 	}
@@ -363,7 +363,7 @@ nouveau_mem_fb_amount_igp(struct drm_device *dev)
 /* returns the amount of FB ram in bytes */
 uint64_t nouveau_mem_fb_amount(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv=dev->dev_private;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	switch (dev_priv->card_type) {
 	case NV_04:
 	case NV_05: {

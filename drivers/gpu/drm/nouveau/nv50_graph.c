@@ -286,7 +286,7 @@ nv50_graph_destroy_context(struct nouveau_channel *chan)
 	}
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
-	for (i=hdr; i<hdr+24; i+=4)
+	for (i = hdr; i < hdr + 24; i += 4)
 		nv_wo32(dev, chan->ramin->gpuobj, i/4, 0);
 	dev_priv->engine.instmem.finish_access(dev);
 

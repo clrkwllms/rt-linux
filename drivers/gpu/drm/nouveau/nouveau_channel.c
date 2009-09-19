@@ -431,7 +431,7 @@ nouveau_channel_cleanup(struct drm_device *dev, struct drm_file *file_priv)
 	int i;
 
 	NV_DEBUG(dev, "clearing FIFO enables from file_priv\n");
-	for(i = 0; i < engine->fifo.channels; i++) {
+	for (i = 0; i < engine->fifo.channels; i++) {
 		struct nouveau_channel *chan = dev_priv->fifos[i];
 
 		if (chan && chan->file_priv == file_priv)

@@ -68,7 +68,7 @@
 static uint32_t
 nouveau_ramht_hash_handle(struct drm_device *dev, int channel, uint32_t handle)
 {
-	struct drm_nouveau_private *dev_priv=dev->dev_private;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t hash = 0;
 	int i;
 
@@ -91,7 +91,7 @@ static int
 nouveau_ramht_entry_valid(struct drm_device *dev, struct nouveau_gpuobj *ramht,
 			  uint32_t offset)
 {
-	struct drm_nouveau_private *dev_priv=dev->dev_private;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t ctx = nv_ro32(dev, ramht, (offset + 4)/4);
 
 	if (dev_priv->card_type < NV_40)
@@ -102,7 +102,7 @@ nouveau_ramht_entry_valid(struct drm_device *dev, struct nouveau_gpuobj *ramht,
 static int
 nouveau_ramht_insert(struct drm_device *dev, struct nouveau_gpuobj_ref *ref)
 {
-	struct drm_nouveau_private *dev_priv=dev->dev_private;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_instmem_engine *instmem = &dev_priv->engine.instmem;
 	struct nouveau_channel *chan = ref->channel;
 	struct nouveau_gpuobj *ramht = chan->ramht ? chan->ramht->gpuobj : NULL;

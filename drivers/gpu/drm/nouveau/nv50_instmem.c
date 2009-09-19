@@ -55,7 +55,7 @@ struct nv50_instmem_priv {
 	}                                                         \
 	offset += (o);                                            \
 	nv_wr32(dev, NV_RAMIN + (offset & 0xfffff), (v));              \
-} while(0)
+} while (0)
 
 int
 nv50_instmem_init(struct drm_device *dev)
@@ -73,7 +73,7 @@ nv50_instmem_init(struct drm_device *dev)
 	dev_priv->engine.instmem.priv = priv;
 
 	/* Save state, will restore at takedown. */
-	for (i = 0x1700; i <= 0x1710; i+=4)
+	for (i = 0x1700; i <= 0x1710; i += 4)
 		priv->save1700[(i-0x1700)/4] = nv_rd32(dev, i);
 
 	/* Reserve the last MiB of VRAM, we should probably try to avoid
@@ -172,7 +172,7 @@ nv50_instmem_init(struct drm_device *dev)
 					  0, &priv->pramin_pt)))
 		return ret;
 
-	for (i = 0, v = c_offset; i < pt_size; i+=8, v+=0x1000) {
+	for (i = 0, v = c_offset; i < pt_size; i += 8, v += 0x1000) {
 		if (v < (c_offset + c_size))
 			BAR0_WI32(priv->pramin_pt->gpuobj, i + 0, v | 1);
 		else
@@ -189,13 +189,15 @@ nv50_instmem_init(struct drm_device *dev)
 					     NV50_VM_BLOCK/65536*8, 0, 0,
 					     &chan->vm_vram_pt[i]);
 		if (ret) {
-			NV_ERROR(dev, "Error creating VRAM page tables: %d\n", ret);
+			NV_ERROR(dev, "Error creating VRAM page tables: %d\n",
+									ret);
 			dev_priv->vm_vram_pt_nr = i;
 			return ret;
 		}
 		dev_priv->vm_vram_pt[i] = chan->vm_vram_pt[i]->gpuobj;
 
-		for (v = 0; v < dev_priv->vm_vram_pt[i]->im_pramin->size; v+=4)
+		for (v = 0; v < dev_priv->vm_vram_pt[i]->im_pramin->size;
+								v += 4)
 			BAR0_WI32(dev_priv->vm_vram_pt[i], v, 0);
 
 		BAR0_WI32(chan->vm_pd, 0x10 + (i*8),
@@ -242,9 +244,10 @@ nv50_instmem_init(struct drm_device *dev)
 	/* Assume that praying isn't enough, check that we can re-read the
 	 * entire fake channel back from the PRAMIN BAR */
 	dev_priv->engine.instmem.prepare_access(dev, false);
-	for (i = 0; i < c_size; i+=4) {
+	for (i = 0; i < c_size; i += 4) {
 		if (nv_rd32(dev, NV_RAMIN + i) != nv_ri32(dev, i)) {
-			NV_ERROR(dev, "Error reading back PRAMIN at 0x%08x\n", i);
+			NV_ERROR(dev, "Error reading back PRAMIN at 0x%08x\n",
+									i);
 			dev_priv->engine.instmem.finish_access(dev);
 			return -EINVAL;
 		}
@@ -281,8 +284,8 @@ nv50_instmem_takedown(struct drm_device *dev)
 		return;
 
 	/* Restore state from before init */
-	for (i = 0x1700; i <= 0x1710; i+=4)
-		nv_wr32(dev, i, priv->save1700[(i-0x1700)/4]);
+	for (i = 0x1700; i <= 0x1710; i += 4)
+		nv_wr32(dev, i, priv->save1700[(i - 0x1700) / 4]);
 
 	nouveau_gpuobj_ref_del(dev, &priv->fb_bar);
 	nouveau_gpuobj_ref_del(dev, &priv->pramin_bar);

@@ -120,7 +120,7 @@ static void nv2a_graph_context_init(struct drm_device *dev,
 	nv_wo32(dev, ctx, 0x618/4, 0x00040000);
 	nv_wo32(dev, ctx, 0x61c/4, 0x00010000);
 
-	for (i=0x1a9c; i <= 0x22fc/4; i += 32) {
+	for (i = 0x1a9c; i <= 0x22fc/4; i += 32) {
 		nv_wo32(dev, ctx, i/4    , 0x10700ff9);
 		nv_wo32(dev, ctx, i/4 + 1, 0x0436086c);
 		nv_wo32(dev, ctx, i/4 + 2, 0x000c001b);
