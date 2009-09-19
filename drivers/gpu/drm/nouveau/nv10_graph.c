@@ -734,7 +734,7 @@ void nv10_graph_context_switch(struct drm_device *dev)
 			next->id);
 	} else {
 		NV_DEBUG(dev, "NV: PGRAPH context switch interrupt channel %x -> %x\n",
-		         last->id, next->id);
+							last->id, next->id);
 	}
 
 	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x0);

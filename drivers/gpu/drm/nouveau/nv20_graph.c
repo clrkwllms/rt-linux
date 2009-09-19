@@ -33,7 +33,7 @@
 #define NV35_36_GRCTX_SIZE (22396)
 
 static void nv20_graph_context_init(struct drm_device *dev,
-                                    struct nouveau_gpuobj *ctx)
+					struct nouveau_gpuobj *ctx)
 {
 	int i;
 
@@ -91,7 +91,7 @@ static void nv20_graph_context_init(struct drm_device *dev,
 }
 
 static void nv2a_graph_context_init(struct drm_device *dev,
-                                    struct nouveau_gpuobj *ctx)
+					struct nouveau_gpuobj *ctx)
 {
 	int i;
 
@@ -143,7 +143,7 @@ static void nv2a_graph_context_init(struct drm_device *dev,
 }
 
 static void nv25_graph_context_init(struct drm_device *dev,
-                                    struct nouveau_gpuobj *ctx)
+					struct nouveau_gpuobj *ctx)
 {
 	int i;
 
@@ -220,7 +220,7 @@ static void nv25_graph_context_init(struct drm_device *dev,
 }
 
 static void nv30_31_graph_context_init(struct drm_device *dev,
-                                       struct nouveau_gpuobj *ctx)
+					struct nouveau_gpuobj *ctx)
 {
 	int i;
 
@@ -278,7 +278,7 @@ static void nv30_31_graph_context_init(struct drm_device *dev,
 }
 
 static void nv34_graph_context_init(struct drm_device *dev,
-                                    struct nouveau_gpuobj *ctx)
+					struct nouveau_gpuobj *ctx)
 {
 	int i;
 
@@ -336,7 +336,7 @@ static void nv34_graph_context_init(struct drm_device *dev,
 }
 
 static void nv35_36_graph_context_init(struct drm_device *dev,
-                                       struct nouveau_gpuobj *ctx)
+					struct nouveau_gpuobj *ctx)
 {
 	int i;
 
@@ -451,8 +451,8 @@ int nv20_graph_create_context(struct nouveau_channel *chan)
 	ctx_init(dev, chan->ramin_grctx->gpuobj);
 
 	/* nv20: nv_wo32(dev, chan->ramin_grctx->gpuobj, 10, chan->id<<24); */
-	nv_wo32(dev, chan->ramin_grctx->gpuobj, idoffs, (chan->id<<24)|0x1);
-	                                                     /* CTX_USER */
+	nv_wo32(dev, chan->ramin_grctx->gpuobj, idoffs,
+					(chan->id << 24) | 0x1); /* CTX_USER */
 
 	nv_wo32(dev, dev_priv->ctx_table->gpuobj, chan->id,
 			chan->ramin_grctx->instance >> 4);

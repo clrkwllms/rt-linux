@@ -3745,10 +3745,11 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 		pll_lim_ver = bios->data[bios->pll_limit_tbl_ptr];
 
 	crystal_strap_mask = 1 << 6;
-        /* open coded dev->twoHeads test */
-        if (cv > 0x10 && cv != 0x15 && cv != 0x1a && cv != 0x20)
-                crystal_strap_mask |= 1 << 22;
-	crystal_straps = nvReadEXTDEV(dev, NV_PEXTDEV_BOOT_0) & crystal_strap_mask;
+	/* open coded dev->twoHeads test */
+	if (cv > 0x10 && cv != 0x15 && cv != 0x1a && cv != 0x20)
+		crystal_strap_mask |= 1 << 22;
+	crystal_straps = nvReadEXTDEV(dev, NV_PEXTDEV_BOOT_0) &
+							crystal_strap_mask;
 
 	switch (pll_lim_ver) {
 	/*

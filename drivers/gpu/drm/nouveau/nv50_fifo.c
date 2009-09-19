@@ -73,12 +73,15 @@ nv50_fifo_channel_enable(struct drm_device *dev, int channel, bool nt)
 	if (!chan->ramfc)
 		return -EINVAL;
 
-	if (IS_G80) inst = chan->ramfc->instance >> 12;
-	else        inst = chan->ramfc->instance >> 8;
+	if (IS_G80)
+		inst = chan->ramfc->instance >> 12;
+	else
+		inst = chan->ramfc->instance >> 8;
 	nv_wr32(dev, NV50_PFIFO_CTX_TABLE(channel),
 		 inst | NV50_PFIFO_CTX_TABLE_CHANNEL_ENABLED);
 
-	if (!nt) nv50_fifo_init_thingo(dev);
+	if (!nt)
+		nv50_fifo_init_thingo(dev);
 	return 0;
 }
 
@@ -90,11 +93,14 @@ nv50_fifo_channel_disable(struct drm_device *dev, int channel, bool nt)
 
 	NV_DEBUG(dev, "ch%d, nt=%d\n", channel, nt);
 
-	if (IS_G80) inst = NV50_PFIFO_CTX_TABLE_INSTANCE_MASK_G80;
-	else        inst = NV50_PFIFO_CTX_TABLE_INSTANCE_MASK_G84;
+	if (IS_G80)
+		inst = NV50_PFIFO_CTX_TABLE_INSTANCE_MASK_G80;
+	else
+		inst = NV50_PFIFO_CTX_TABLE_INSTANCE_MASK_G84;
 	nv_wr32(dev, NV50_PFIFO_CTX_TABLE(channel), inst);
 
-	if (!nt) nv50_fifo_init_thingo(dev);
+	if (!nt)
+		nv50_fifo_init_thingo(dev);
 }
 
 static void

@@ -349,14 +349,14 @@ static inline void
 nv_lock_vga_crtc_shadow(struct drm_device *dev, int head, int lock)
 {
 	/* shadow lock: connects 0x60?3d? regs to "real" 0x3d? regs
-         * bit7: unlocks HDT, HBS, HBE, HRS, HRE, HEB
-         * bit6: seems to have some effect on CR09 (double scan, VBS_9)
-         * bit5: unlocks HDE
-         * bit4: unlocks VDE
-         * bit3: unlocks VDT, OVL, VRS, ?VRE?, VBS, VBE, LSR, EBR
-         * bit2: same as bit 1 of 0x60?804
-         * bit0: same as bit 0 of 0x60?804
-         */
+	 * bit7: unlocks HDT, HBS, HBE, HRS, HRE, HEB
+	 * bit6: seems to have some effect on CR09 (double scan, VBS_9)
+	 * bit5: unlocks HDE
+	 * bit4: unlocks VDE
+	 * bit3: unlocks VDT, OVL, VRS, ?VRE?, VBS, VBE, LSR, EBR
+	 * bit2: same as bit 1 of 0x60?804
+	 * bit0: same as bit 0 of 0x60?804
+	 */
 
 	uint8_t cr21 = lock;
 

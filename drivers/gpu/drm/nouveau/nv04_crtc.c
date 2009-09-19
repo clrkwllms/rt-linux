@@ -304,8 +304,10 @@ nv_crtc_mode_set_vga(struct drm_crtc *crtc, struct drm_display_mode *mode)
 		&& (mode->flags & (DRM_MODE_FLAG_PVSYNC | DRM_MODE_FLAG_NVSYNC))) {
 
 		regp->MiscOutReg = 0x23;
-		if (mode->flags & DRM_MODE_FLAG_NHSYNC) regp->MiscOutReg |= 0x40;
-		if (mode->flags & DRM_MODE_FLAG_NVSYNC) regp->MiscOutReg |= 0x80;
+		if (mode->flags & DRM_MODE_FLAG_NHSYNC)
+			regp->MiscOutReg |= 0x40;
+		if (mode->flags & DRM_MODE_FLAG_NVSYNC)
+			regp->MiscOutReg |= 0x80;
 	} else {
 		int vdisplay = mode->vdisplay;
 		if (mode->flags & DRM_MODE_FLAG_DBLSCAN)
@@ -313,13 +315,13 @@ nv_crtc_mode_set_vga(struct drm_crtc *crtc, struct drm_display_mode *mode)
 		if (mode->vscan > 1)
 			vdisplay *= mode->vscan;
 		if (vdisplay < 400)
-			regp->MiscOutReg = 0xA3;		/* +hsync -vsync */
+			regp->MiscOutReg = 0xA3;	/* +hsync -vsync */
 		else if (vdisplay < 480)
-			regp->MiscOutReg = 0x63;		/* -hsync +vsync */
+			regp->MiscOutReg = 0x63;	/* -hsync +vsync */
 		else if (vdisplay < 768)
-			regp->MiscOutReg = 0xE3;		/* -hsync -vsync */
+			regp->MiscOutReg = 0xE3;	/* -hsync -vsync */
 		else
-			regp->MiscOutReg = 0x23;		/* +hsync +vsync */
+			regp->MiscOutReg = 0x23;	/* +hsync +vsync */
 	}
 
 	regp->MiscOutReg |= (mode->clock_index & 0x03) << 2;

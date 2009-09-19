@@ -286,7 +286,8 @@ nouveau_card_init(struct drm_device *dev)
 
 	/* Initialise internal driver API hooks */
 	ret = nouveau_init_engine_ptrs(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 	engine = &dev_priv->engine;
 	dev_priv->init_state = NOUVEAU_CARD_INIT_FAILED;
 
@@ -298,64 +299,77 @@ nouveau_card_init(struct drm_device *dev)
 	}
 
 	ret = nouveau_gpuobj_early_init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* Initialise instance memory, must happen before mem_init so we
 	 * know exactly how much VRAM we're able to use for "normal"
 	 * purposes.
 	 */
 	ret = engine->instmem.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* Setup the memory manager */
 	ret = nouveau_mem_init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	ret = nouveau_gpuobj_init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* PMC */
 	ret = engine->mc.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* PTIMER */
 	ret = engine->timer.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* PFB */
 	ret = engine->fb.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* PGRAPH */
 	ret = engine->graph.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* PFIFO */
 	ret = engine->fifo.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* this call irq_preinstall, register irq handler and
 	 * call irq_postinstall
 	 */
 	ret = drm_irq_install(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	ret = drm_vblank_init(dev, 0);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* what about PVIDEO/PCRTC/PRAMDAC etc? */
 
 	ret = nouveau_channel_alloc(dev, &dev_priv->channel,
 				    (struct drm_file *)-2,
 				    NvDmaFB, NvDmaTT);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	gpuobj = NULL;
 	ret = nouveau_gpuobj_dma_new(dev_priv->channel, NV_CLASS_DMA_IN_MEMORY,
 				     0, nouveau_mem_fb_amount(dev),
 				     NV_DMA_ACCESS_RW, NV_DMA_TARGET_VIDMEM,
 				     &gpuobj);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	ret = nouveau_gpuobj_ref_add(dev, dev_priv->channel, NvDmaVRAM,
 				     gpuobj, NULL);
@@ -368,7 +382,8 @@ nouveau_card_init(struct drm_device *dev)
 	ret = nouveau_gpuobj_gart_dma_new(dev_priv->channel, 0,
 					  dev_priv->gart_info.aper_size,
 					  NV_DMA_ACCESS_RW, &gpuobj, NULL);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	ret = nouveau_gpuobj_ref_add(dev, dev_priv->channel, NvDmaGART,
 				     gpuobj, NULL);

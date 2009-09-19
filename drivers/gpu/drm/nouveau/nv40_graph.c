@@ -1967,19 +1967,41 @@ nv40_graph_init(struct drm_device *dev)
 			 NV_PMC_ENABLE_PGRAPH);
 
 	switch (dev_priv->chipset) {
-	case 0x40: ctx_prog = nv40_ctx_prog; break;
+	case 0x40:
+		ctx_prog = nv40_ctx_prog;
+		break;
 	case 0x41:
-	case 0x42: ctx_prog = nv41_ctx_prog; break;
-	case 0x43: ctx_prog = nv43_ctx_prog; break;
-	case 0x44: ctx_prog = nv44_ctx_prog; break;
-	case 0x46: ctx_prog = nv46_ctx_prog; break;
-	case 0x47: ctx_prog = nv47_ctx_prog; break;
-	case 0x49: ctx_prog = nv49_4b_ctx_prog; break;
-	case 0x4a: ctx_prog = nv4a_ctx_prog; break;
-	case 0x4b: ctx_prog = nv49_4b_ctx_prog; break;
+	case 0x42:
+		ctx_prog = nv41_ctx_prog;
+		break;
+	case 0x43:
+		ctx_prog = nv43_ctx_prog;
+		break;
+	case 0x44:
+		ctx_prog = nv44_ctx_prog;
+		break;
+	case 0x46:
+		ctx_prog = nv46_ctx_prog;
+		break;
+	case 0x47:
+		ctx_prog = nv47_ctx_prog;
+		break;
+	case 0x49:
+		ctx_prog = nv49_4b_ctx_prog;
+		break;
+	case 0x4a:
+		ctx_prog = nv4a_ctx_prog;
+		break;
+	case 0x4b:
+		ctx_prog = nv49_4b_ctx_prog;
+		break;
 	case 0x4c:
-	case 0x67: ctx_prog = nv4c_ctx_prog; break;
-	case 0x4e: ctx_prog = nv4e_ctx_prog; break;
+	case 0x67:
+		ctx_prog = nv4c_ctx_prog;
+		break;
+	case 0x4e:
+		ctx_prog = nv4e_ctx_prog;
+		break;
 	default:
 		NV_ERROR(dev, "Context program for 0x%02x unavailable\n",
 			 dev_priv->chipset);

@@ -544,11 +544,21 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	NV_DEBUG(dev, "index %d\n", crtc->index);
 
 	switch (drm_fb->depth) {
-	case  8: format = NV50_EVO_CRTC_FB_DEPTH_8; break;
-	case 15: format = NV50_EVO_CRTC_FB_DEPTH_15; break;
-	case 16: format = NV50_EVO_CRTC_FB_DEPTH_16; break;
-	case 24: format = NV50_EVO_CRTC_FB_DEPTH_24; break;
-	case 30: format = NV50_EVO_CRTC_FB_DEPTH_30; break;
+	case  8:
+		format = NV50_EVO_CRTC_FB_DEPTH_8;
+		break;
+	case 15:
+		format = NV50_EVO_CRTC_FB_DEPTH_15;
+		break;
+	case 16:
+		format = NV50_EVO_CRTC_FB_DEPTH_16;
+		break;
+	case 24:
+		format = NV50_EVO_CRTC_FB_DEPTH_24;
+		break;
+	case 30:
+		format = NV50_EVO_CRTC_FB_DEPTH_30;
+		break;
 	default:
 		 NV_ERROR(dev, "unknown depth %d\n", drm_fb->depth);
 		 return -EINVAL;

@@ -275,8 +275,8 @@ static struct nouveau_bitfield_names nouveau_nsource_names[] =
 
 static void
 nouveau_print_bitfield_names(uint32_t value,
-                             const struct nouveau_bitfield_names *namelist,
-                             const int namelist_len)
+				const struct nouveau_bitfield_names *namelist,
+				const int namelist_len)
 {
 	int i;
 	for (i = 0; i < namelist_len; ++i) {
@@ -407,14 +407,15 @@ nouveau_graph_dump_trap_info(struct drm_device *dev, const char *id,
 
 	NV_INFO(dev, "%s - nSource:", id);
 	nouveau_print_bitfield_names(nsource, nouveau_nsource_names,
-	                             ARRAY_SIZE(nouveau_nsource_names));
+					ARRAY_SIZE(nouveau_nsource_names));
 	printk(", nStatus:");
 	if (dev_priv->card_type < NV_10)
 		nouveau_print_bitfield_names(nstatus, nouveau_nstatus_names,
-	                             ARRAY_SIZE(nouveau_nstatus_names));
+					ARRAY_SIZE(nouveau_nstatus_names));
 	else
-		nouveau_print_bitfield_names(nstatus, nouveau_nstatus_names_nv10,
-	                             ARRAY_SIZE(nouveau_nstatus_names_nv10));
+		nouveau_print_bitfield_names(nstatus,
+					nouveau_nstatus_names_nv10,
+					ARRAY_SIZE(nouveau_nstatus_names_nv10));
 	printk("\n");
 
 	NV_INFO(dev, "%s - Ch %d/%d Class 0x%04x Mthd 0x%04x Data 0x%08x:0x%08x\n",

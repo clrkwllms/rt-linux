@@ -671,12 +671,12 @@ nouveau_gpuobj_dma_new(struct nouveau_channel *chan, int class,
 	NV_DEBUG(dev, "access=%d target=%d\n", access, target);
 
 	switch (target) {
-        case NV_DMA_TARGET_AGP:
-                 offset += dev_priv->gart_info.aper_base;
-                 break;
-        default:
-                break;
-        }
+	case NV_DMA_TARGET_AGP:
+		offset += dev_priv->gart_info.aper_base;
+		break;
+	default:
+		break;
+	}
 
 	ret = nouveau_gpuobj_new(dev, chan,
 				 nouveau_gpuobj_class_instmem_size(dev, class),

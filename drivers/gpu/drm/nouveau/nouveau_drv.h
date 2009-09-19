@@ -548,8 +548,8 @@ struct drm_nouveau_private {
 
 	struct mem_block *ramin_heap;
 
-        /* context table pointed to be NV_PGRAPH_CHANNEL_CTX_TABLE (0x400780) */
-        uint32_t ctx_table_size;
+	/* context table pointed to be NV_PGRAPH_CHANNEL_CTX_TABLE (0x400780) */
+	uint32_t ctx_table_size;
 	struct nouveau_gpuobj_ref *ctx_table;
 
 	struct list_head gpuobj_list;
