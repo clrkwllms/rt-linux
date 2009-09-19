@@ -68,73 +68,39 @@ enum drm_connector_status nv17_tv_detect(struct drm_encoder *encoder,
 					connector_status_disconnected;
 }
 
+static const struct {
+	int hdisplay;
+	int vdisplay;
+} modes[] = {
+	{ 640, 400 },
+	{ 640, 480 },
+	{ 720, 480 },
+	{ 720, 576 },
+	{ 800, 600 },
+	{ 1024, 768 },
+	{ 1280, 720 },
+	{ 1280, 1024 },
+	{ 1920, 1080 }
+};
+
 static int nv17_tv_get_modes(struct drm_encoder *encoder,
 			     struct drm_connector *connector)
 {
 	struct nv17_tv_norm_params *tv_norm = get_tv_norm(encoder);
 	struct drm_display_mode *mode;
+	struct drm_display_mode *output_mode;
 	int n = 0;
+	int i;
 
-	if (tv_norm->kind == CTV_ENC_MODE) {
-		struct drm_display_mode *output_mode =
-						&tv_norm->ctv_enc_mode.mode;
-		int i;
-		struct {
-			int hdisplay;
-			int vdisplay;
-		} modes[] = {{ 640, 400 },
-			     { 640, 480 },
-			     { 720, 480 },
-			     { 720, 576 },
-			     { 800, 600 },
-			     { 1024, 768 },
-			     { 1280, 720 },
-			     { 1280, 1024 },
-			     { 1920, 1080 }};
-
-		for (i = 0; i < ARRAY_SIZE(modes); i++) {
-			if (modes[i].hdisplay > output_mode->hdisplay ||
-			    modes[i].vdisplay > output_mode->vdisplay)
-				continue;
-
-			if (modes[i].hdisplay == output_mode->hdisplay &&
-			    modes[i].vdisplay == output_mode->vdisplay) {
-				mode = drm_mode_duplicate(encoder->dev, output_mode);
-				mode->type |= DRM_MODE_TYPE_PREFERRED;
-			} else {
-				mode = drm_cvt_mode(encoder->dev, modes[i].hdisplay,
-						    modes[i].vdisplay, 60, false,
-						    output_mode->flags & DRM_MODE_FLAG_INTERLACE);
-			}
-
-			/* CVT modes are sometimes unsuitable... */
-			if (output_mode->hdisplay <= 720
-			    || output_mode->hdisplay >= 1920) {
-				mode->htotal = output_mode->htotal;
-				mode->hsync_start = (mode->hdisplay + (mode->htotal
-						     - mode->hdisplay) * 9 / 10) & ~7;
-				mode->hsync_end = mode->hsync_start + 8;
-			}
-			if (output_mode->vdisplay >= 1024) {
-				mode->vtotal = output_mode->vtotal;
-				mode->vsync_start = output_mode->vsync_start;
-				mode->vsync_end = output_mode->vsync_end;
-			}
-
-			mode->type |= DRM_MODE_TYPE_DRIVER;
-			drm_mode_probed_add(connector, mode);
-			n++;
-		}
-
-
-	} else {
+	if (tv_norm->kind != CTV_ENC_MODE) {
 		struct drm_display_mode *tv_mode;
 
 		for (tv_mode = nv17_tv_modes; tv_mode->hdisplay; tv_mode++) {
 			mode = drm_mode_duplicate(encoder->dev, tv_mode);
 
-			mode->clock = tv_norm->tv_enc_mode.vrefresh
-				*mode->htotal/1000*mode->vtotal/1000;
+			mode->clock = tv_norm->tv_enc_mode.vrefresh *
+						mode->htotal / 1000 *
+						mode->vtotal / 1000;
 
 			if (mode->flags & DRM_MODE_FLAG_DBLSCAN)
 				mode->clock *= 2;
@@ -146,8 +112,44 @@ static int nv17_tv_get_modes(struct drm_encoder *encoder,
 			drm_mode_probed_add(connector, mode);
 			n++;
 		}
+		return n;
 	}
 
+	/* tv_norm->kind == CTV_ENC_MODE */
+	output_mode = &tv_norm->ctv_enc_mode.mode;
+	for (i = 0; i < ARRAY_SIZE(modes); i++) {
+		if (modes[i].hdisplay > output_mode->hdisplay ||
+		    modes[i].vdisplay > output_mode->vdisplay)
+			continue;
+
+		if (modes[i].hdisplay == output_mode->hdisplay &&
+		    modes[i].vdisplay == output_mode->vdisplay) {
+			mode = drm_mode_duplicate(encoder->dev, output_mode);
+			mode->type |= DRM_MODE_TYPE_PREFERRED;
+		} else {
+			mode = drm_cvt_mode(encoder->dev, modes[i].hdisplay,
+				modes[i].vdisplay, 60, false,
+				output_mode->flags & DRM_MODE_FLAG_INTERLACE);
+		}
+
+		/* CVT modes are sometimes unsuitable... */
+		if (output_mode->hdisplay <= 720
+		    || output_mode->hdisplay >= 1920) {
+			mode->htotal = output_mode->htotal;
+			mode->hsync_start = (mode->hdisplay + (mode->htotal
+					     - mode->hdisplay) * 9 / 10) & ~7;
+			mode->hsync_end = mode->hsync_start + 8;
+		}
+		if (output_mode->vdisplay >= 1024) {
+			mode->vtotal = output_mode->vtotal;
+			mode->vsync_start = output_mode->vsync_start;
+			mode->vsync_end = output_mode->vsync_end;
+		}
+
+		mode->type |= DRM_MODE_TYPE_DRIVER;
+		drm_mode_probed_add(connector, mode);
+		n++;
+	}
 	return n;
 }
 
@@ -157,7 +159,8 @@ static int nv17_tv_mode_valid(struct drm_encoder *encoder,
 	struct nv17_tv_norm_params *tv_norm = get_tv_norm(encoder);
 
 	if (tv_norm->kind == CTV_ENC_MODE) {
-		struct drm_display_mode *output_mode = &tv_norm->ctv_enc_mode.mode;
+		struct drm_display_mode *output_mode =
+						&tv_norm->ctv_enc_mode.mode;
 
 		if (mode->clock > 400000)
 			return MODE_CLOCK_HIGH;
@@ -179,8 +182,8 @@ static int nv17_tv_mode_valid(struct drm_encoder *encoder,
 		if (mode->clock > 70000)
 			return MODE_CLOCK_HIGH;
 
-		if (abs(drm_mode_vrefresh(mode) - tv_norm->tv_enc_mode.vrefresh) >
-		    vsync_tolerance)
+		if (abs(drm_mode_vrefresh(mode) -
+			    tv_norm->tv_enc_mode.vrefresh) > vsync_tolerance)
 			return MODE_VSYNC;
 
 		/* The encoder takes care of the actual interlacing */
@@ -253,8 +256,10 @@ static void nv17_tv_prepare(struct drm_encoder *encoder)
 	struct drm_encoder_helper_funcs *helper = encoder->helper_private;
 	struct nv17_tv_norm_params *tv_norm = get_tv_norm(encoder);
 	int head = nouveau_crtc(encoder->crtc)->index;
-	uint8_t *cr_lcd = &dev_priv->mode_reg.crtc_reg[head].CRTC[NV_CIO_CRE_LCD__INDEX];
-	uint32_t dacclk_off = NV_PRAMDAC_DACCLK + nv04_dac_output_offset(encoder);
+	uint8_t *cr_lcd = &dev_priv->mode_reg.crtc_reg[head].CRTC[
+							NV_CIO_CRE_LCD__INDEX];
+	uint32_t dacclk_off = NV_PRAMDAC_DACCLK +
+					nv04_dac_output_offset(encoder);
 	uint32_t dacclk;
 
 	helper->dpms(encoder, DRM_MODE_DPMS_OFF);
@@ -269,9 +274,13 @@ static void nv17_tv_prepare(struct drm_encoder *encoder)
 		list_for_each_entry(enc, &dev->mode_config.encoder_list, head) {
 			struct dcb_entry *dcb = nouveau_encoder(enc)->dcb;
 
-			if ((dcb->type == OUTPUT_TMDS || dcb->type == OUTPUT_LVDS)
-			    && !enc->crtc && nv04_dfp_get_bound_head(dev, dcb) == head)
-				nv04_dfp_bind_head(dev, dcb, head ^ 1, dev_priv->VBIOS.fp.dual_link);
+			if ((dcb->type == OUTPUT_TMDS ||
+			     dcb->type == OUTPUT_LVDS) &&
+			     !enc->crtc &&
+			     nv04_dfp_get_bound_head(dev, dcb) == head) {
+				nv04_dfp_bind_head(dev, dcb, head ^ 1,
+						dev_priv->VBIOS.fp.dual_link);
+			}
 		}
 
 	}
@@ -370,7 +379,8 @@ static void nv17_tv_mode_set(struct drm_encoder *encoder,
 			tv_regs->tv_enc[i] = tv_norm->tv_enc_mode.tv_enc[i];
 
 	} else {
-		struct drm_display_mode *output_mode = &tv_norm->ctv_enc_mode.mode;
+		struct drm_display_mode *output_mode =
+						&tv_norm->ctv_enc_mode.mode;
 
 		/* The registers in PRAMDAC+0xc00 control some timings and CSC
 		 * parameters for the CTV encoder (It's only used for "HD" TV
@@ -385,14 +395,16 @@ static void nv17_tv_mode_set(struct drm_encoder *encoder,
 
 		regs->fp_horiz_regs[FP_DISPLAY_END] = output_mode->hdisplay - 1;
 		regs->fp_horiz_regs[FP_TOTAL] = output_mode->htotal - 1;
-		regs->fp_horiz_regs[FP_SYNC_START] = output_mode->hsync_start - 1;
+		regs->fp_horiz_regs[FP_SYNC_START] =
+						output_mode->hsync_start - 1;
 		regs->fp_horiz_regs[FP_SYNC_END] = output_mode->hsync_end - 1;
 		regs->fp_horiz_regs[FP_CRTC] = output_mode->hdisplay +
 			max((output_mode->hdisplay-600)/40 - 1, 1);
 
 		regs->fp_vert_regs[FP_DISPLAY_END] = output_mode->vdisplay - 1;
 		regs->fp_vert_regs[FP_TOTAL] = output_mode->vtotal - 1;
-		regs->fp_vert_regs[FP_SYNC_START] = output_mode->vsync_start - 1;
+		regs->fp_vert_regs[FP_SYNC_START] =
+						output_mode->vsync_start - 1;
 		regs->fp_vert_regs[FP_SYNC_END] = output_mode->vsync_end - 1;
 		regs->fp_vert_regs[FP_CRTC] = output_mode->vdisplay - 1;
 
@@ -437,16 +449,21 @@ static void nv17_tv_commit(struct drm_encoder *encoder)
 
 	nv17_tv_state_load(dev, &to_tv_enc(encoder)->state);
 
-	/* This could use refinement for flatpanels, but it should work this way */
+	/* This could use refinement for flatpanels, but it should work */
 	if (dev_priv->chipset < 0x44)
-		NVWriteRAMDAC(dev, 0, NV_PRAMDAC_TEST_CONTROL + nv04_dac_output_offset(encoder), 0xf0000000);
+		NVWriteRAMDAC(dev, 0, NV_PRAMDAC_TEST_CONTROL +
+					nv04_dac_output_offset(encoder),
+					0xf0000000);
 	else
-		NVWriteRAMDAC(dev, 0, NV_PRAMDAC_TEST_CONTROL + nv04_dac_output_offset(encoder), 0x00100000);
+		NVWriteRAMDAC(dev, 0, NV_PRAMDAC_TEST_CONTROL +
+					nv04_dac_output_offset(encoder),
+					0x00100000);
 
 	helper->dpms(encoder, DRM_MODE_DPMS_ON);
 
 	NV_INFO(dev, "Output %s is running on CRTC %d using output %c\n",
-		drm_get_connector_name(&nouveau_encoder_connector_get(nv_encoder)->base),
+		drm_get_connector_name(
+			&nouveau_encoder_connector_get(nv_encoder)->base),
 		nv_crtc->index, '@' + ffs(nv_encoder->dcb->or));
 }
 
@@ -502,20 +519,27 @@ static int nv17_tv_create_resources(struct drm_encoder *encoder,
 
 	drm_mode_create_tv_properties(dev, num_tv_norms, nv17_tv_norm_names);
 
-	drm_connector_attach_property(connector, conf->tv_select_subconnector_property,
-				      tv_enc->select_subconnector);
-	drm_connector_attach_property(connector, conf->tv_subconnector_property,
-				      tv_enc->subconnector);
-	drm_connector_attach_property(connector, conf->tv_mode_property,
-				      tv_enc->tv_norm);
-	drm_connector_attach_property(connector, conf->tv_flicker_reduction_property,
-				      tv_enc->flicker);
-	drm_connector_attach_property(connector, conf->tv_saturation_property,
-				      tv_enc->saturation);
-	drm_connector_attach_property(connector, conf->tv_hue_property,
-				      tv_enc->hue);
-	drm_connector_attach_property(connector, conf->tv_overscan_property,
-				      tv_enc->overscan);
+	drm_connector_attach_property(connector,
+					conf->tv_select_subconnector_property,
+					tv_enc->select_subconnector);
+	drm_connector_attach_property(connector,
+					conf->tv_subconnector_property,
+					tv_enc->subconnector);
+	drm_connector_attach_property(connector,
+					conf->tv_mode_property,
+					tv_enc->tv_norm);
+	drm_connector_attach_property(connector,
+					conf->tv_flicker_reduction_property,
+					tv_enc->flicker);
+	drm_connector_attach_property(connector,
+					conf->tv_saturation_property,
+					tv_enc->saturation);
+	drm_connector_attach_property(connector,
+					conf->tv_hue_property,
+					tv_enc->hue);
+	drm_connector_attach_property(connector,
+					conf->tv_overscan_property,
+					tv_enc->overscan);
 
 	return 0;
 }
