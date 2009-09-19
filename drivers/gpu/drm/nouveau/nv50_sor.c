@@ -50,7 +50,7 @@ nv50_sor_disconnect(struct nouveau_encoder *encoder)
 		return;
 	}
 	BEGIN_RING(evo, 0, NV50_EVO_SOR(encoder->or, MODE_CTRL), 1);
-	OUT_RING  (evo, 0);
+	OUT_RING(evo, 0);
 }
 
 static void nv50_sor_dpms(struct drm_encoder *drm_encoder, int mode)
@@ -169,7 +169,7 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 		return;
 	}
 	BEGIN_RING(evo, 0, NV50_EVO_SOR(encoder->or, MODE_CTRL), 1);
-	OUT_RING  (evo, mode_ctl);
+	OUT_RING(evo, mode_ctl);
 }
 
 static const struct drm_encoder_helper_funcs nv50_sor_helper_funcs = {

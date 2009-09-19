@@ -112,15 +112,15 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 			return ret;
 		}
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, CLUT_MODE), 2);
-		OUT_RING  (evo, NV50_EVO_CRTC_CLUT_MODE_BLANK);
-		OUT_RING  (evo, 0);
+		OUT_RING(evo, NV50_EVO_CRTC_CLUT_MODE_BLANK);
+		OUT_RING(evo, 0);
 		if (dev_priv->chipset != 0x50) {
 			BEGIN_RING(evo, 0, NV84_EVO_CRTC(index, CLUT_DMA), 1);
-			OUT_RING  (evo, NV84_EVO_CRTC_CLUT_DMA_HANDLE_NONE);
+			OUT_RING(evo, NV84_EVO_CRTC_CLUT_DMA_HANDLE_NONE);
 		}
 
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, FB_DMA), 1);
-		OUT_RING  (evo, NV50_EVO_CRTC_FB_DMA_HANDLE_NONE);
+		OUT_RING(evo, NV50_EVO_CRTC_FB_DMA_HANDLE_NONE);
 	} else {
 		crtc->cursor.set_offset(crtc, crtc->cursor.offset);
 		if (crtc->cursor.visible)
@@ -134,19 +134,19 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 			return ret;
 		}
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, CLUT_MODE), 2);
-		OUT_RING  (evo, crtc->lut.depth == 8 ?
+		OUT_RING(evo, crtc->lut.depth == 8 ?
 				NV50_EVO_CRTC_CLUT_MODE_OFF :
 				NV50_EVO_CRTC_CLUT_MODE_ON);
-		OUT_RING  (evo, (crtc->lut.nvbo->bo.mem.mm_node->start <<
+		OUT_RING(evo, (crtc->lut.nvbo->bo.mem.mm_node->start <<
 				 PAGE_SHIFT) >> 8);
 		if (dev_priv->chipset != 0x50) {
 			BEGIN_RING(evo, 0, NV84_EVO_CRTC(index, CLUT_DMA), 1);
-			OUT_RING  (evo, NvEvoVRAM);
+			OUT_RING(evo, NvEvoVRAM);
 		}
 
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, FB_OFFSET), 2);
-		OUT_RING  (evo, crtc->fb.offset >> 8);
-		OUT_RING  (evo, 0);
+		OUT_RING(evo, crtc->fb.offset >> 8);
+		OUT_RING(evo, 0);
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, FB_DMA), 1);
 		if (dev_priv->chipset != 0x50)
 			if (crtc->fb.tile_flags == 0x7a00)
@@ -187,8 +187,8 @@ static int nv50_crtc_set_dither(struct nouveau_crtc *crtc, bool on, bool update)
 
 	if (update) {
 		BEGIN_RING(evo, 0, NV50_EVO_UPDATE, 1);
-		OUT_RING  (evo, 0);
-		FIRE_RING (evo);
+		OUT_RING(evo, 0);
+		FIRE_RING(evo);
 	}
 
 	return 0;
@@ -280,13 +280,13 @@ nv50_crtc_set_scale(struct nouveau_crtc *crtc, int scaling_mode, bool update)
 	}
 
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, SCALE_RES1), 2);
-	OUT_RING  (evo, outY << 16 | outX);
-	OUT_RING  (evo, outY << 16 | outX);
+	OUT_RING(evo, outY << 16 | outX);
+	OUT_RING(evo, outY << 16 | outX);
 
 	if (update) {
 		BEGIN_RING(evo, 0, NV50_EVO_UPDATE, 1);
-		OUT_RING  (evo, 0);
-		FIRE_RING (evo);
+		OUT_RING(evo, 0);
+		FIRE_RING(evo);
 	}
 
 	return 0;
@@ -518,8 +518,8 @@ static void nv50_crtc_commit(struct drm_crtc *drm_crtc)
 		return;
 	}
 	BEGIN_RING(evo, 0, NV50_EVO_UPDATE, 1);
-	OUT_RING  (evo, 0);
-	FIRE_RING (evo);
+	OUT_RING(evo, 0);
+	FIRE_RING(evo);
 }
 
 static bool nv50_crtc_mode_fixup(struct drm_crtc *drm_crtc,
@@ -583,12 +583,12 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, FB_DMA), 1);
 		if (crtc->fb.tile_flags == 0x7a00)
-			OUT_RING  (evo, NvEvoFB32);
+			OUT_RING(evo, NvEvoFB32);
 		else
 		if (crtc->fb.tile_flags == 0x7000)
-			OUT_RING  (evo, NvEvoFB16);
+			OUT_RING(evo, NvEvoFB16);
 		else
-			OUT_RING  (evo, NvEvoVRAM);
+			OUT_RING(evo, NvEvoVRAM);
 	}
 
 	ret = RING_SPACE(evo, 10);
@@ -596,24 +596,24 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 		return ret;
 
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, FB_OFFSET), 5);
-	OUT_RING  (evo, crtc->fb.offset >> 8);
-	OUT_RING  (evo, 0);
-	OUT_RING  (evo, (drm_fb->height << 16) | drm_fb->width);
+	OUT_RING(evo, crtc->fb.offset >> 8);
+	OUT_RING(evo, 0);
+	OUT_RING(evo, (drm_fb->height << 16) | drm_fb->width);
 	if (!crtc->fb.tile_flags) {
-		OUT_RING  (evo, drm_fb->pitch | (1 << 20));
+		OUT_RING(evo, drm_fb->pitch | (1 << 20));
 	} else {
-		OUT_RING  (evo, ((drm_fb->pitch / 4) << 4) |
+		OUT_RING(evo, ((drm_fb->pitch / 4) << 4) |
 				  fb->nvbo->tile_mode);
 	}
 	if (dev_priv->chipset == 0x50)
-		OUT_RING  (evo, (fb->nvbo->tile_flags << 8) | format);
+		OUT_RING(evo, (fb->nvbo->tile_flags << 8) | format);
 	else
-		OUT_RING  (evo, format);
+		OUT_RING(evo, format);
 
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, COLOR_CTRL), 1);
-	OUT_RING  (evo, NV50_EVO_CRTC_COLOR_CTRL_COLOR);
+	OUT_RING(evo, NV50_EVO_CRTC_COLOR_CTRL_COLOR);
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, FB_POS), 1);
-	OUT_RING  (evo, (y << 16) | x);
+	OUT_RING(evo, (y << 16) | x);
 
 	if (crtc->lut.depth != fb->base.depth) {
 		crtc->lut.depth = fb->base.depth;
@@ -625,8 +625,8 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 		if (ret)
 			return ret;
 		BEGIN_RING(evo, 0, NV50_EVO_UPDATE, 1);
-		OUT_RING  (evo, 0);
-		FIRE_RING (evo);
+		OUT_RING(evo, 0);
+		FIRE_RING(evo);
 	}
 
 	return 0;
@@ -688,33 +688,33 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 		return ret;
 
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, CLOCK), 2);
-	OUT_RING  (evo, adjusted_mode->clock | 0x800000);
-	OUT_RING  (evo, (adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE) ? 2 : 0);
+	OUT_RING(evo, adjusted_mode->clock | 0x800000);
+	OUT_RING(evo, (adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE) ? 2 : 0);
 
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, DISPLAY_START), 5);
-	OUT_RING  (evo, 0);
-	OUT_RING  (evo, (adjusted_mode->vtotal << 16) | adjusted_mode->htotal);
-	OUT_RING  (evo, (vsync_dur - 1) << 16 | (hsync_dur - 1));
-	OUT_RING  (evo, (vsync_start_to_end - 1) << 16 |
+	OUT_RING(evo, 0);
+	OUT_RING(evo, (adjusted_mode->vtotal << 16) | adjusted_mode->htotal);
+	OUT_RING(evo, (vsync_dur - 1) << 16 | (hsync_dur - 1));
+	OUT_RING(evo, (vsync_start_to_end - 1) << 16 |
 			(hsync_start_to_end - 1));
-	OUT_RING  (evo, (vunk1 - 1) << 16 | (hunk1 - 1));
+	OUT_RING(evo, (vunk1 - 1) << 16 | (hunk1 - 1));
 
 	if (adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE) {
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, UNK0824), 1);
-		OUT_RING  (evo, (vunk2b - 1) << 16 | (vunk2a - 1));
+		OUT_RING(evo, (vunk2b - 1) << 16 | (vunk2a - 1));
 	} else {
-		OUT_RING  (evo, 0);
-		OUT_RING  (evo, 0);
+		OUT_RING(evo, 0);
+		OUT_RING(evo, 0);
 	}
 
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, UNK082C), 1);
-	OUT_RING  (evo, 0);
+	OUT_RING(evo, 0);
 
 	/* This is the actual resolution of the mode. */
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, REAL_RES), 1);
-	OUT_RING  (evo, (mode->vdisplay << 16) | mode->hdisplay);
+	OUT_RING(evo, (mode->vdisplay << 16) | mode->hdisplay);
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, SCALE_CENTER_OFFSET), 1);
-	OUT_RING  (evo, NV50_EVO_CRTC_SCALE_CENTER_OFFSET_VAL(0, 0));
+	OUT_RING(evo, NV50_EVO_CRTC_SCALE_CENTER_OFFSET_VAL(0, 0));
 
 	crtc->set_dither(crtc, connector->use_dithering, false);
 	crtc->set_scale(crtc, connector->scaling_mode, false);

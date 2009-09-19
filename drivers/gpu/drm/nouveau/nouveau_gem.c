@@ -724,18 +724,18 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 			NV_ERROR(dev, "cal_space: %d\n", ret);
 			goto out;
 		}
-		OUT_RING  (chan, ((pbbo->bo.mem.mm_node->start << PAGE_SHIFT) +
+		OUT_RING(chan, ((pbbo->bo.mem.mm_node->start << PAGE_SHIFT) +
 				  req->offset) | 2);
-		OUT_RING  (chan, 0);
+		OUT_RING(chan, 0);
 	} else {
 		ret = RING_SPACE(chan, 2);
 		if (ret) {
 			NV_ERROR(dev, "jmp_space: %d\n", ret);
 			goto out;
 		}
-		OUT_RING  (chan, ((pbbo->bo.mem.mm_node->start << PAGE_SHIFT) +
+		OUT_RING(chan, ((pbbo->bo.mem.mm_node->start << PAGE_SHIFT) +
 				  req->offset) | 0x20000000);
-		OUT_RING  (chan, 0);
+		OUT_RING(chan, 0);
 	}
 
 	ret = nouveau_fence_emit(fence);

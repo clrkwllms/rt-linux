@@ -76,19 +76,19 @@ nouveau_dma_init(struct nouveau_channel *chan)
 		return ret;
 
 	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
-		OUT_RING (chan, 0);
+		OUT_RING(chan, 0);
 
 	/* Initialise NV_MEMORY_TO_MEMORY_FORMAT */
 	ret = RING_SPACE(chan, 4);
 	if (ret)
 		return ret;
 	BEGIN_RING(chan, NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_NAME, 1);
-	OUT_RING  (chan, NvM2MF);
+	OUT_RING(chan, NvM2MF);
 	BEGIN_RING(chan, NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_DMA_NOTIFY, 1);
-	OUT_RING  (chan, NvNotify0);
+	OUT_RING(chan, NvNotify0);
 
 	/* Sit back and pray the channel works.. */
-	FIRE_RING (chan);
+	FIRE_RING(chan);
 
 	return 0;
 }
@@ -182,8 +182,8 @@ nouveau_dma_wait(struct nouveau_channel *chan, int size)
 			 * instruct the GPU to jump back to the start right
 			 * after processing the currently pending commands.
 			 */
-			OUT_RING  (chan, chan->pushbuf_base | 0x20000000);
-			WRITE_PUT (NOUVEAU_DMA_SKIPS);
+			OUT_RING(chan, chan->pushbuf_base | 0x20000000);
+			WRITE_PUT(NOUVEAU_DMA_SKIPS);
 
 			/* we're now submitting commands at the start of
 			 * the push buffer.

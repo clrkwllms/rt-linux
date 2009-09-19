@@ -333,23 +333,23 @@ nv50_display_init(struct drm_device *dev)
 		return ret;
 
 	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
-		OUT_RING  (evo, 0);
+		OUT_RING(evo, 0);
 
 	ret = RING_SPACE(evo, 11);
 	if (ret)
 		return ret;
 	BEGIN_RING(evo, 0, NV50_EVO_UNK84, 2);
-	OUT_RING  (evo, NV50_EVO_UNK84_NOTIFY_DISABLED);
-	OUT_RING  (evo, NV50_EVO_DMA_NOTIFY_HANDLE_NONE);
+	OUT_RING(evo, NV50_EVO_UNK84_NOTIFY_DISABLED);
+	OUT_RING(evo, NV50_EVO_DMA_NOTIFY_HANDLE_NONE);
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(0, FB_DMA), 1);
-	OUT_RING  (evo, NV50_EVO_CRTC_FB_DMA_HANDLE_NONE);
+	OUT_RING(evo, NV50_EVO_CRTC_FB_DMA_HANDLE_NONE);
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(0, UNK0800), 1);
-	OUT_RING  (evo, 0);
+	OUT_RING(evo, 0);
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(0, DISPLAY_START), 1);
-	OUT_RING  (evo, 0);
+	OUT_RING(evo, 0);
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(0, UNK082C), 1);
-	OUT_RING  (evo, 0);
-	FIRE_RING (evo);
+	OUT_RING(evo, 0);
+	FIRE_RING(evo);
 	if (!nv_wait(0x640004, 0xffffffff, evo->dma.put << 2))
 		NV_ERROR(dev, "evo pushbuf stalled\n");
 
@@ -384,9 +384,9 @@ static int nv50_display_disable(struct drm_device *dev)
 	ret = RING_SPACE(dev_priv->evo, 2);
 	if (ret == 0) {
 		BEGIN_RING(dev_priv->evo, 0, NV50_EVO_UPDATE, 1);
-		OUT_RING  (dev_priv->evo, 0);
+		OUT_RING(dev_priv->evo, 0);
 	}
-	FIRE_RING (dev_priv->evo);
+	FIRE_RING(dev_priv->evo);
 
 	/* Almost like ack'ing a vblank interrupt, maybe in the spirit of
 	 * cleaning up?

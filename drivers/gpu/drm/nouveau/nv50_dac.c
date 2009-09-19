@@ -50,7 +50,7 @@ nv50_dac_disconnect(struct nouveau_encoder *encoder)
 		return;
 	}
 	BEGIN_RING(evo, 0, NV50_EVO_DAC(encoder->or, MODE_CTRL), 1);
-	OUT_RING  (evo, 0);
+	OUT_RING(evo, 0);
 }
 
 static enum drm_connector_status
@@ -235,8 +235,8 @@ static void nv50_dac_mode_set(struct drm_encoder *drm_encoder,
 		return;
 	}
 	BEGIN_RING(evo, 0, NV50_EVO_DAC(encoder->or, MODE_CTRL), 2);
-	OUT_RING  (evo, mode_ctl);
-	OUT_RING  (evo, mode_ctl2);
+	OUT_RING(evo, mode_ctl);
+	OUT_RING(evo, mode_ctl2);
 }
 
 static const struct drm_encoder_helper_funcs nv50_dac_helper_funcs = {

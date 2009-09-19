@@ -49,15 +49,15 @@ nv50_cursor_show(struct nouveau_crtc *crtc, bool update)
 
 	if (dev_priv->chipset != 0x50) {
 		BEGIN_RING(evo, 0, NV84_EVO_CRTC(crtc->index, CURSOR_DMA), 1);
-		OUT_RING  (evo, NvEvoVRAM);
+		OUT_RING(evo, NvEvoVRAM);
 	}
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, CURSOR_CTRL), 1);
-	OUT_RING  (evo, NV50_EVO_CRTC_CURSOR_CTRL_SHOW);
+	OUT_RING(evo, NV50_EVO_CRTC_CURSOR_CTRL_SHOW);
 
 	if (update) {
 		BEGIN_RING(evo, 0, NV50_EVO_UPDATE, 1);
-		OUT_RING  (evo, 0);
-		FIRE_RING (evo);
+		OUT_RING(evo, 0);
+		FIRE_RING(evo);
 		crtc->cursor.visible = true;
 	}
 }
@@ -78,16 +78,16 @@ nv50_cursor_hide(struct nouveau_crtc *crtc, bool update)
 		return;
 	}
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, CURSOR_CTRL), 1);
-	OUT_RING  (evo, NV50_EVO_CRTC_CURSOR_CTRL_HIDE);
+	OUT_RING(evo, NV50_EVO_CRTC_CURSOR_CTRL_HIDE);
 	if (dev_priv->chipset != 0x50) {
 		BEGIN_RING(evo, 0, NV84_EVO_CRTC(crtc->index, CURSOR_DMA), 1);
-		OUT_RING  (evo, NV84_EVO_CRTC_CURSOR_DMA_HANDLE_NONE);
+		OUT_RING(evo, NV84_EVO_CRTC_CURSOR_DMA_HANDLE_NONE);
 	}
 
 	if (update) {
 		BEGIN_RING(evo, 0, NV50_EVO_UPDATE, 1);
-		OUT_RING  (evo, 0);
-		FIRE_RING (evo);
+		OUT_RING(evo, 0);
+		FIRE_RING(evo);
 		crtc->cursor.visible = false;
 	}
 }
@@ -119,7 +119,7 @@ nv50_cursor_set_offset(struct nouveau_crtc *crtc, uint32_t offset)
 		return;
 	}
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, CURSOR_OFFSET), 1);
-	OUT_RING  (evo, offset >> 8);
+	OUT_RING(evo, offset >> 8);
 }
 
 int

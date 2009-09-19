@@ -418,17 +418,17 @@ nouveau_bo_move_m2mf(struct ttm_buffer_object *bo, int evict, int no_wait,
 	if (ret)
 		return ret;
 	BEGIN_RING(chan, NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_DMA_SOURCE, 2);
-	OUT_RING  (chan, nouveau_bo_mem_ctxdma(nvbo, chan, old_mem));
-	OUT_RING  (chan, nouveau_bo_mem_ctxdma(nvbo, chan, new_mem));
+	OUT_RING(chan, nouveau_bo_mem_ctxdma(nvbo, chan, old_mem));
+	OUT_RING(chan, nouveau_bo_mem_ctxdma(nvbo, chan, new_mem));
 
 	if (dev_priv->card_type >= NV_50) {
 		ret = RING_SPACE(chan, 4);
 		if (ret)
 			return ret;
 		BEGIN_RING(chan, NvSubM2MF, 0x0200, 1);
-		OUT_RING  (chan, 1);
+		OUT_RING(chan, 1);
 		BEGIN_RING(chan, NvSubM2MF, 0x021c, 1);
-		OUT_RING  (chan, 1);
+		OUT_RING(chan, 1);
 	}
 
 	page_count = new_mem->num_pages;
@@ -440,24 +440,24 @@ nouveau_bo_move_m2mf(struct ttm_buffer_object *bo, int evict, int no_wait,
 			if (ret)
 				return ret;
 			BEGIN_RING(chan, NvSubM2MF, 0x0238, 2);
-			OUT_RING  (chan, upper_32_bits(src_offset));
-			OUT_RING  (chan, upper_32_bits(dst_offset));
+			OUT_RING(chan, upper_32_bits(src_offset));
+			OUT_RING(chan, upper_32_bits(dst_offset));
 		}
 		ret = RING_SPACE(chan, 11);
 		if (ret)
 			return ret;
 		BEGIN_RING(chan, NvSubM2MF,
 				 NV_MEMORY_TO_MEMORY_FORMAT_OFFSET_IN, 8);
-		OUT_RING  (chan, lower_32_bits(src_offset));
-		OUT_RING  (chan, lower_32_bits(dst_offset));
-		OUT_RING  (chan, PAGE_SIZE); /* src_pitch */
-		OUT_RING  (chan, PAGE_SIZE); /* dst_pitch */
-		OUT_RING  (chan, PAGE_SIZE); /* line_length */
-		OUT_RING  (chan, line_count);
-		OUT_RING  (chan, (1<<8)|(1<<0));
-		OUT_RING  (chan, 0);
+		OUT_RING(chan, lower_32_bits(src_offset));
+		OUT_RING(chan, lower_32_bits(dst_offset));
+		OUT_RING(chan, PAGE_SIZE); /* src_pitch */
+		OUT_RING(chan, PAGE_SIZE); /* dst_pitch */
+		OUT_RING(chan, PAGE_SIZE); /* line_length */
+		OUT_RING(chan, line_count);
+		OUT_RING(chan, (1<<8)|(1<<0));
+		OUT_RING(chan, 0);
 		BEGIN_RING(chan, NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_NOP, 1);
-		OUT_RING  (chan, 0);
+		OUT_RING(chan, 0);
 
 		page_count -= line_count;
 		src_offset += (PAGE_SIZE * line_count);

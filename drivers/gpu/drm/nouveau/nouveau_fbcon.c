@@ -70,11 +70,11 @@ nouveau_fbcon_sync(struct fb_info *info)
 	}
 
 	BEGIN_RING(chan, 0, 0x0104, 1);
-	OUT_RING  (chan, 0);
+	OUT_RING(chan, 0);
 	BEGIN_RING(chan, 0, 0x0100, 1);
-	OUT_RING  (chan, 0);
+	OUT_RING(chan, 0);
 	nouveau_bo_wr32(chan->notifier_bo, chan->m2mf_ntfy + 3, 0xffffffff);
-	FIRE_RING (chan);
+	FIRE_RING(chan);
 
 	ret = -EBUSY;
 	for (i = 0; i < 100000; i++) {

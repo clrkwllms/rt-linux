@@ -143,8 +143,8 @@ nouveau_fence_emit(struct nouveau_fence *fence)
 	spin_unlock_irqrestore(&chan->fence.lock, flags);
 
 	BEGIN_RING(chan, NvSubM2MF, USE_REFCNT ? 0x0050 : 0x0150, 1);
-	OUT_RING  (chan, fence->sequence);
-	FIRE_RING (chan);
+	OUT_RING(chan, fence->sequence);
+	FIRE_RING(chan);
 
 	return 0;
 }
