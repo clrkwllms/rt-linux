@@ -691,10 +691,12 @@ setPLL(struct nvbios *bios, uint32_t reg, uint32_t clk)
 		return nv50_pll_set(dev, reg, clk);
 
 	/* high regs (such as in the mac g5 table) are not -= 4 */
-	if ((ret = get_pll_limits(dev, reg > 0x405c ? reg : reg - 4, &pll_lim)))
+	ret = get_pll_limits(dev, reg > 0x405c ? reg : reg - 4, &pll_lim);
+	if (ret)
 		return ret;
 
-	if (!(clk = nouveau_calc_pll_mnp(dev, &pll_lim, clk, &pllvals)))
+	clk = nouveau_calc_pll_mnp(dev, &pll_lim, clk, &pllvals);
+	if (!clk)
 		return -ERANGE;
 
 	if (bios->execute) {
@@ -763,22 +765,27 @@ static uint32_t get_tmds_index_reg(struct drm_device *dev, uint8_t mlv)
 	 */
 
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	const int pramdac_offset[13] = {0, 0, 0x8, 0, 0x2000, 0, 0, 0, 0x2008, 0, 0, 0, 0x2000};
-	const uint32_t pramdac_table[4] = {0x6808b0, 0x6808b8, 0x6828b0, 0x6828b8};
+	const int pramdac_offset[13] = {
+		0, 0, 0x8, 0, 0x2000, 0, 0, 0, 0x2008, 0, 0, 0, 0x2000 };
+	const uint32_t pramdac_table[4] = {
+		0x6808b0, 0x6808b8, 0x6828b0, 0x6828b8 };
 
 	if (mlv >= 0x80) {
 		int dcb_entry, dacoffset;
 
 		/* note: dcb_entry_idx_from_crtchead needs pre-script set-up */
-		if ((dcb_entry = dcb_entry_idx_from_crtchead(dev)) == 0x7f)
+		dcb_entry = dcb_entry_idx_from_crtchead(dev);
+		if (dcb_entry == 0x7f)
 			return 0;
-		dacoffset = pramdac_offset[dev_priv->VBIOS.bdcb.dcb.entry[dcb_entry].or];
+		dacoffset = pramdac_offset[
+				dev_priv->VBIOS.bdcb.dcb.entry[dcb_entry].or];
 		if (mlv == 0x81)
 			dacoffset ^= 8;
 		return 0x6808b0 + dacoffset;
 	} else {
 		if (mlv > ARRAY_SIZE(pramdac_table)) {
-			NV_ERROR(dev, "Magic Lookup Value too big (%02X)\n", mlv);
+			NV_ERROR(dev, "Magic Lookup Value too big (%02X)\n",
+									mlv);
 			return 0;
 		}
 		return pramdac_table[mlv];
@@ -1431,7 +1438,8 @@ init_tmds(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 		      "Mask: 0x%02X, Data: 0x%02X\n",
 		offset, mlv, tmdsaddr, mask, data);
 
-	if (!(reg = get_tmds_index_reg(bios->dev, mlv)))
+	reg = get_tmds_index_reg(bios->dev, mlv);
+	if (!reg)
 		return false;
 
 	bios_wr32(bios, reg,
@@ -1473,7 +1481,8 @@ init_zm_tmds_group(struct nvbios *bios, uint16_t offset,
 	BIOSLOG(bios, "0x%04X: MagicLookupValue: 0x%02X, Count: 0x%02X\n",
 		offset, mlv, count);
 
-	if (!(reg = get_tmds_index_reg(bios->dev, mlv)))
+	reg = get_tmds_index_reg(bios->dev, mlv);
+	if (!reg)
 		return false;
 
 	for (i = 0; i < count; i++) {
@@ -3247,11 +3256,13 @@ static int parse_fp_mode_table(struct drm_device *dev, struct nvbios *bios)
 	if (!bios->is_mobile) /* !mobile only needs digital_min_front_porch */
 		return 0;
 
-	if ((ret = parse_lvds_manufacturer_table_header(dev, bios, &lth)))
+	ret = parse_lvds_manufacturer_table_header(dev, bios, &lth);
+	if (ret)
 		return ret;
 
 	if (lth.lvds_ver == 0x30 || lth.lvds_ver == 0x40) {
-		bios->fp.fpxlatetableptr = bios->fp.lvdsmanufacturerpointer + lth.headerlen + 1;
+		bios->fp.fpxlatetableptr = bios->fp.lvdsmanufacturerpointer +
+							lth.headerlen + 1;
 		bios->fp.xlatwidth = lth.recordlen;
 	}
 	if (bios->fp.fpxlatetableptr == 0x0) {
@@ -3261,7 +3272,8 @@ static int parse_fp_mode_table(struct drm_device *dev, struct nvbios *bios)
 
 	fpstrapping = get_fp_strap(dev, bios);
 
-	fpindex = bios->data[bios->fp.fpxlatetableptr + fpstrapping * bios->fp.xlatwidth];
+	fpindex = bios->data[bios->fp.fpxlatetableptr +
+					fpstrapping * bios->fp.xlatwidth];
 
 	if (fpindex > fpentries) {
 		NV_ERROR(dev, "Bad flat panel table index\n");
@@ -3371,12 +3383,15 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 	uint16_t lvdsofs;
 	int ret, chip_version = bios->pub.chip_version;
 
-	if ((ret = parse_lvds_manufacturer_table_header(dev, bios, &lth)))
+	ret = parse_lvds_manufacturer_table_header(dev, bios, &lth);
+	if (ret)
 		return ret;
 
 	switch (lth.lvds_ver) {
 	case 0x0a:	/* pre NV40 */
-		lvdsmanufacturerindex = bios->data[bios->fp.fpxlatemanufacturertableptr + fpstrapping];
+		lvdsmanufacturerindex = bios->data[
+					bios->fp.fpxlatemanufacturertableptr +
+					fpstrapping];
 
 		/* we're done if this isn't the EDID panel case */
 		if (!pxclk)
@@ -3388,7 +3403,9 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 			 * It seems the old style lvds script pointer is reused
 			 * to select 18/24 bit colour depth for EDID panels.
 			 */
-			lvdsmanufacturerindex = (bios->legacy.lvds_single_a_script_ptr & 1) ? 2 : 0;
+			lvdsmanufacturerindex =
+				(bios->legacy.lvds_single_a_script_ptr & 1) ?
+									2 : 0;
 			if (pxclk >= bios->fp.duallink_transition_clk)
 				lvdsmanufacturerindex++;
 		} else if (chip_version < 0x30) {
@@ -4419,7 +4436,8 @@ static int parse_bit_table(struct drm_device *dev, struct nvbios *bios, const ui
 	return -ENOSYS;
 }
 
-static int parse_bit_structure(struct drm_device *dev, struct nvbios *bios, const uint16_t bitoffset)
+static int parse_bit_structure(struct drm_device *dev, struct nvbios *bios,
+				const uint16_t bitoffset)
 {
 	int ret;
 
@@ -4429,14 +4447,17 @@ static int parse_bit_structure(struct drm_device *dev, struct nvbios *bios, cons
 	 * functions shouldn't be actually *doing* anything apart from pulling
 	 * data from the image into the bios struct, thus no interdependencies
 	 */
-	if ((ret = parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('i', i)))) /* info? */
+	ret = parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('i', i));
+	if (ret) /* info? */
 		return ret;
 	if (bios->major_version >= 0x60) /* g80+ */
 		parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('A', A));
-	if ((ret = parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('C', C))))
+	ret = parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('C', C));
+	if (ret)
 		return ret;
 	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('D', display));
-	if ((ret = parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('I', init))))
+	ret = parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('I', init));
+	if (ret)
 		return ret;
 	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('M', M)); /* memory? */
 	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('L', lvds));
@@ -5267,7 +5288,8 @@ static int load_nv17_hwsq_ucode_entry(struct drm_device *dev, struct nvbios *bio
 	return 0;
 }
 
-static int load_nv17_hw_sequencer_ucode(struct drm_device *dev, struct nvbios *bios)
+static int load_nv17_hw_sequencer_ucode(struct drm_device *dev,
+					struct nvbios *bios)
 {
 	/*
 	 * BMP based cards, from NV17, need a microcode loading to correctly
@@ -5279,30 +5301,34 @@ static int load_nv17_hw_sequencer_ucode(struct drm_device *dev, struct nvbios *b
 	 */
 
 	const uint8_t hwsq_signature[] = { 'H', 'W', 'S', 'Q' };
+	const int sz = sizeof(hwsq_signature);
 	int hwsq_offset;
 
-	if (!(hwsq_offset = findstr(bios->data, bios->length, hwsq_signature,
-				    sizeof(hwsq_signature))))
+	hwsq_offset = findstr(bios->data, bios->length, hwsq_signature, sz);
+	if (!hwsq_offset)
 		return 0;
 
 	/* always use entry 0? */
-	return load_nv17_hwsq_ucode_entry(dev, bios,
-					  hwsq_offset + sizeof(hwsq_signature), 0);
+	return load_nv17_hwsq_ucode_entry(dev, bios, hwsq_offset + sz, 0);
 }
 
 uint8_t *nouveau_bios_embedded_edid(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;
-	const uint8_t edid_sig[] = { 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00 };
-	uint16_t offset = 0, newoffset;
+	const uint8_t edid_sig[] = {
+			0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00 };
+	uint16_t offset = 0;
+	uint16_t newoffset;
 	int searchlen = NV_PROM_SIZE;
 
 	if (bios->fp.edid)
 		return bios->fp.edid;
 
 	while (searchlen) {
-		if (!(newoffset = findstr(&bios->data[offset], searchlen, edid_sig, 8)))
+		newoffset = findstr(&bios->data[offset], searchlen,
+								edid_sig, 8);
+		if (!newoffset)
 			return NULL;
 		offset += newoffset;
 		if (!nv_cksum(&bios->data[offset], EDID1_LEN))
@@ -5340,17 +5366,21 @@ static int nouveau_parse_vbios_struct(struct drm_device *dev)
 	const uint8_t bmp_signature[] = { 0xff, 0x7f, 'N', 'V', 0x0 };
 	int offset;
 
-	if ((offset = findstr(bios->data, bios->length, bit_signature, sizeof(bit_signature)))) {
+	offset = findstr(bios->data, bios->length,
+					bit_signature, sizeof(bit_signature));
+	if (offset) {
 		NV_TRACE(dev, "BIT BIOS found\n");
 		return parse_bit_structure(dev, bios, offset + 6);
 	}
-	if ((offset = findstr(bios->data, bios->length, bmp_signature, sizeof(bmp_signature)))) {
+
+	offset = findstr(bios->data, bios->length,
+					bmp_signature, sizeof(bmp_signature));
+	if (offset) {
 		NV_TRACE(dev, "BMP BIOS found\n");
 		return parse_bmp_structure(dev, bios, offset);
 	}
 
 	NV_ERROR(dev, "No known BIOS signature found\n");
-
 	return -ENODEV;
 }
 

@@ -233,10 +233,11 @@ nouveau_sgdma_init(struct drm_device *dev)
 		obj_size  = (aper_size >> NV_CTXDMA_PAGE_SHIFT) * 8;
 	}
 
-	if ((ret = nouveau_gpuobj_new(dev, NULL, obj_size, 16,
+	ret = nouveau_gpuobj_new(dev, NULL, obj_size, 16,
 				      NVOBJ_FLAG_ALLOW_NO_REFS |
 				      NVOBJ_FLAG_ZERO_ALLOC |
-				      NVOBJ_FLAG_ZERO_FREE, &gpuobj)))  {
+				      NVOBJ_FLAG_ZERO_FREE, &gpuobj);
+	if (ret) {
 		NV_ERROR(dev, "Error creating sgdma object: %d\n", ret);
 		return ret;
 	}

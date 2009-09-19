@@ -131,7 +131,8 @@ static void nv_crtc_calc_state_ext(struct drm_crtc *crtc, struct drm_display_mod
 	if (dev_priv->chipset > 0x40 && dot_clock <= (pll_lim.vco1.maxfreq / 2))
 		memset(&pll_lim.vco2, 0, sizeof(pll_lim.vco2));
 
-	if (!(vclk = nouveau_calc_pll_mnp(dev, &pll_lim, dot_clock, pv)))
+	vclk = nouveau_calc_pll_mnp(dev, &pll_lim, dot_clock, pv);
+	if (!vclk)
 		return;
 
 	state->pllsel &= PLLSEL_VPLL1_MASK | PLLSEL_VPLL2_MASK | PLLSEL_TV_MASK;

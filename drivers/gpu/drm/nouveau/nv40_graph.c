@@ -1498,9 +1498,10 @@ nv40_graph_create_context(struct nouveau_channel *chan)
 	 * until we're able to implement this properly (will happen at more
 	 * or less the same time we're able to write our own context programs.
 	 */
-	if ((ret = nouveau_gpuobj_new_ref(dev, chan, NULL, 0, 175*1024, 16,
+	ret = nouveau_gpuobj_new_ref(dev, chan, NULL, 0, 175*1024, 16,
 					  NVOBJ_FLAG_ZERO_ALLOC,
-					  &chan->ramin_grctx)))
+					  &chan->ramin_grctx);
+	if (ret)
 		return ret;
 
 	/* Initialise default context values */

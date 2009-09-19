@@ -520,18 +520,22 @@ nouveau_mem_init(struct drm_device *dev)
 	bar1_size = drm_get_resource_len(dev, 1) >> PAGE_SHIFT;
 	text_size = (256 * 1024) >> PAGE_SHIFT;
 	if (bar1_size < vram_size) {
-		if (dev_priv->card_type < NV_50 &&
-		    (ret = ttm_bo_init_mm(bdev, TTM_PL_PRIV0, bar1_size,
-					  vram_size - bar1_size))) {
-			NV_ERROR(dev, "Failed PRIV0 mm init: %d\n", ret);
-			return ret;
+		if (dev_priv->card_type < NV_50) {
+			ret = ttm_bo_init_mm(bdev, TTM_PL_PRIV0, bar1_size,
+						vram_size - bar1_size);
+			if (ret) {
+				NV_ERROR(dev, "Failed PRIV0 mm init: %d\n",
+									ret);
+				return ret;
+			}
 		}
 		vram_size = bar1_size;
 	}
 
 	/* mappable vram */
-	if ((ret = ttm_bo_init_mm(bdev, TTM_PL_VRAM, text_size,
-				  vram_size - text_size))) {
+	ret = ttm_bo_init_mm(bdev, TTM_PL_VRAM, text_size,
+						vram_size - text_size);
+	if (ret) {
 		NV_ERROR(dev, "Failed VRAM mm init: %d\n", ret);
 		return ret;
 	}
@@ -539,18 +543,22 @@ nouveau_mem_init(struct drm_device *dev)
 	/* GART */
 #if !defined(__powerpc__) && !defined(__ia64__)
 	if (drm_device_is_agp(dev) && dev->agp) {
-		if ((ret = nouveau_mem_init_agp(dev)))
+		ret = nouveau_mem_init_agp(dev);
+		if (ret)
 			NV_ERROR(dev, "Error initialising AGP: %d\n", ret);
 	}
 #endif
 
 	if (dev_priv->gart_info.type == NOUVEAU_GART_NONE) {
-		if ((ret = nouveau_sgdma_init(dev)))
-			NV_ERROR(dev, "Error initialising PCI SGDMA: %d\n", ret);
+		ret = nouveau_sgdma_init(dev);
+		if (ret)
+			NV_ERROR(dev, "Error initialising PCI SGDMA: %d\n",
+									ret);
 	}
 
-	if ((ret = ttm_bo_init_mm(bdev, TTM_PL_TT, 0,
-				  dev_priv->gart_info.aper_size >> PAGE_SHIFT))) {
+	ret = ttm_bo_init_mm(bdev, TTM_PL_TT, 0,
+				dev_priv->gart_info.aper_size >> PAGE_SHIFT);
+	if (ret) {
 		NV_ERROR(dev, "Failed TT mm init: %d\n", ret);
 		return ret;
 	}

@@ -441,9 +441,10 @@ int nv20_graph_create_context(struct nouveau_channel *chan)
 		break;
 	}
 
-	if ((ret = nouveau_gpuobj_new_ref(dev, chan, NULL, 0, ctx_size, 16,
+	ret = nouveau_gpuobj_new_ref(dev, chan, NULL, 0, ctx_size, 16,
 					  NVOBJ_FLAG_ZERO_ALLOC,
-					  &chan->ramin_grctx)))
+					  &chan->ramin_grctx);
+	if (ret)
 		return ret;
 
 	/* Initialise default context values */
@@ -542,10 +543,11 @@ int nv20_graph_init(struct drm_device *dev)
 	if (!dev_priv->ctx_table) {
 		/* Create Context Pointer Table */
 		dev_priv->ctx_table_size = 32 * 4;
-		if ((ret = nouveau_gpuobj_new_ref(dev, NULL, NULL, 0,
+		ret = nouveau_gpuobj_new_ref(dev, NULL, NULL, 0,
 						  dev_priv->ctx_table_size, 16,
 						  NVOBJ_FLAG_ZERO_ALLOC,
-						  &dev_priv->ctx_table)))
+						  &dev_priv->ctx_table);
+		if (ret)
 			return ret;
 	}
 
@@ -667,10 +669,11 @@ int nv30_graph_init(struct drm_device *dev)
 	if (!dev_priv->ctx_table) {
 		/* Create Context Pointer Table */
 		dev_priv->ctx_table_size = 32 * 4;
-		if ((ret = nouveau_gpuobj_new_ref(dev, NULL, NULL, 0,
+		ret = nouveau_gpuobj_new_ref(dev, NULL, NULL, 0,
 						  dev_priv->ctx_table_size, 16,
 						  NVOBJ_FLAG_ZERO_ALLOC,
-						  &dev_priv->ctx_table)))
+						  &dev_priv->ctx_table);
+		if (ret)
 			return ret;
 	}
 

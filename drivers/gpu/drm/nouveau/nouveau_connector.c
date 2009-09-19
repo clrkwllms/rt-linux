@@ -274,12 +274,16 @@ nouveau_connector_detect(struct drm_connector *connector)
 		return connector_status_connected;
 	}
 
-	if ((nv_encoder = find_encoder_by_type(connector, OUTPUT_ANALOG)) ||
-	    (nv_encoder = find_encoder_by_type(connector, OUTPUT_TV))) {
+	nv_encoder = find_encoder_by_type(connector, OUTPUT_ANALOG);
+	if (!nv_encoder)
+		nv_encoder = find_encoder_by_type(connector, OUTPUT_TV);
+	if (nv_encoder) {
 		struct drm_encoder *encoder = to_drm_encoder(nv_encoder);
-		struct drm_encoder_helper_funcs *helper = encoder->helper_private;
+		struct drm_encoder_helper_funcs *helper =
+						encoder->helper_private;
 
-		if (helper->detect(encoder, connector) == connector_status_connected) {
+		if (helper->detect(encoder, connector) ==
+						connector_status_connected) {
 			nouveau_connector_set_encoder(connector, nv_encoder);
 			return connector_status_connected;
 		}

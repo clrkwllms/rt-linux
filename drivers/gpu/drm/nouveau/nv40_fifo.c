@@ -43,11 +43,12 @@ nv40_fifo_create_context(struct nouveau_channel *chan)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	int ret;
 
-	if ((ret = nouveau_gpuobj_new_fake(dev, NV40_RAMFC(chan->id), ~0,
+	ret = nouveau_gpuobj_new_fake(dev, NV40_RAMFC(chan->id), ~0,
 						NV40_RAMFC__SIZE,
 						NVOBJ_FLAG_ZERO_ALLOC |
 						NVOBJ_FLAG_ZERO_FREE,
-						NULL, &chan->ramfc)))
+						NULL, &chan->ramfc);
+	if (ret)
 		return ret;
 
 	/* Fill entries that are seen filled in dumps of nvidia driver just

@@ -467,7 +467,8 @@ nouveau_hw_get_pllvals(struct drm_device *dev, enum pll_types plltype,
 
 	nouveau_hw_decode_pll(dev, reg1, pll1, pll2, pllvals);
 
-	if ((ret = get_pll_limits(dev, plltype, &pll_lim)))
+	ret = get_pll_limits(dev, plltype, &pll_lim);
+	if (ret)
 		return ret;
 
 	pllvals->refclk = pll_lim.refclk;
