@@ -405,8 +405,7 @@ nv_fix_nv40_hw_cursor(struct drm_device *dev, int head)
 	 * for changes to the CRTC CURCTL regs to take effect, whether changing
 	 * the pixmap location, or just showing/hiding the cursor
 	 */
-	volatile uint32_t curpos = NVReadRAMDAC(dev, head,
-						NV_PRAMDAC_CU_START_POS);
+	uint32_t curpos = NVReadRAMDAC(dev, head, NV_PRAMDAC_CU_START_POS);
 	NVWriteRAMDAC(dev, head, NV_PRAMDAC_CU_START_POS, curpos);
 }
 
