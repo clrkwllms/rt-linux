@@ -309,8 +309,10 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	info->fbops->fb_fillrect(info, &rect);
 
 	/* To allow resizeing without swapping buffers */
-	printk("allocated %dx%d fb: 0x%lx, bo %p\n", nouveau_fb->base.width,
-	       nouveau_fb->base.height, nvbo->bo.offset, nvbo);
+	NV_INFO(dev, "allocated %dx%d fb: 0x%lx, bo %p\n",
+						nouveau_fb->base.width,
+						nouveau_fb->base.height,
+						nvbo->bo.offset, nvbo);
 
 	mutex_unlock(&dev->struct_mutex);
 	return 0;

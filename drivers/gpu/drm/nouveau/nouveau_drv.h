@@ -1151,9 +1151,13 @@ static inline void nv_wo32(struct drm_device *dev, struct nouveau_gpuobj *obj,
 	nv_wi32(dev, obj->im_pramin->start + index * 4, val);
 }
 
-/* logging */
+/*
+ * Logging
+ * Argument d is (struct drm_device *).
+ */
 #define NV_PRINTK(level, d, fmt, arg...) \
-	printk(level "nouveau %s: " fmt, pci_name(d->pdev), ##arg)
+	printk(level "[" DRM_NAME "] " DRIVER_NAME " %s: " fmt, \
+					pci_name(d->pdev), ##arg)
 #ifndef NV_DEBUG_NOTRACE
 #define NV_DEBUG(d, fmt, arg...) do {                                          \
 	if (drm_debug) {                                                       \

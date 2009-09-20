@@ -95,7 +95,7 @@ int nouveau_hybrid_setup(struct drm_device *dev)
 		       &result))
 		return -ENODEV;
 
-	printk(KERN_INFO "nouveau: _DSM hardware status gave 0x%x\n", result);
+	NV_INFO(dev, "_DSM hardware status gave 0x%x\n", result);
 
 	if (result & 0x1) {	/* Stamina mode - disable the external GPU */
 		nvidia_dsm(pdev, NOUVEAU_DSM_LED, NOUVEAU_DSM_LED_STAMINA,
