@@ -5447,6 +5447,7 @@ nouveau_bios_init(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;
 	uint32_t saved_nv_pextdev_boot_0;
+	bool was_locked;
 	int ret;
 
 	dev_priv->vbios = &bios->pub;
@@ -5494,15 +5495,14 @@ nouveau_bios_init(struct drm_device *dev)
 	}
 
 	/* feature_byte on BMP is poor, but init always sets CR4B */
-	if (bios->major_version < 5) {
-		bool waslocked = NVLockVgaCrtcs(dev, false);
+	was_locked = NVLockVgaCrtcs(dev, false);
+	if (bios->major_version < 5)
 		bios->is_mobile = NVReadVgaCrtc(dev, 0, NV_CIO_CRE_4B) & 0x40;
-		NVLockVgaCrtcs(dev, waslocked);
-	}
 
 	/* all BIT systems need p_f_m_t for digital_min_front_porch */
 	if (bios->is_mobile || bios->major_version >= 5)
 		ret = parse_fp_mode_table(dev, bios);
+	NVLockVgaCrtcs(dev, was_locked);
 
 	/* allow subsequent scripts to execute */
 	bios->execute = true;
