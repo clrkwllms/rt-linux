@@ -554,6 +554,7 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 		format = NV50_EVO_CRTC_FB_DEPTH_16;
 		break;
 	case 24:
+	case 32:
 		format = NV50_EVO_CRTC_FB_DEPTH_24;
 		break;
 	case 30:
