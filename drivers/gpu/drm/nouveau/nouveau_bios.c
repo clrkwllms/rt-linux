@@ -5418,9 +5418,12 @@ nouveau_run_vbios_init(struct drm_device *dev)
 		parse_init_table(bios, bios->some_script_ptr, &iexec);
 	}
 
-	for (i = 0; i < bios->bdcb.dcb.entries; i++) {
-		nouveau_bios_run_display_table(dev, &bios->bdcb.dcb.entry[i],
-					       0, 0);
+	if (dev_priv->card_type >= NV_50) {
+		for (i = 0; i < bios->bdcb.dcb.entries; i++) {
+			nouveau_bios_run_display_table(dev,
+						       &bios->bdcb.dcb.entry[i],
+						       0, 0);
+		}
 	}
 
 	NVLockVgaCrtcs(dev, true);
