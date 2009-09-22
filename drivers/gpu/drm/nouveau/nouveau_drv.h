@@ -630,6 +630,7 @@ extern int nouveau_duallink;
 extern int nouveau_uscript_lvds;
 extern int nouveau_uscript_tmds;
 extern int nouveau_vram_pushbuf;
+extern int nouveau_vram_notify;
 extern int nouveau_fbpercrtc;
 extern char *nouveau_tv_norm;
 extern int nouveau_reg_debug;

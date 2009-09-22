@@ -36,7 +36,8 @@ nouveau_notifier_init_channel(struct nouveau_channel *chan)
 	struct nouveau_bo *ntfy = NULL;
 	int ret;
 
-	ret = nouveau_gem_new(dev, NULL, PAGE_SIZE, 0, TTM_PL_FLAG_VRAM,
+	ret = nouveau_gem_new(dev, NULL, PAGE_SIZE, 0, nouveau_vram_notify ?
+			      TTM_PL_FLAG_VRAM : TTM_PL_FLAG_TT,
 			      0, 0x0000, false, true, &ntfy);
 	if (ret)
 		return ret;
