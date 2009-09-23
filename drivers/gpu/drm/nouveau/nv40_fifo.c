@@ -30,70 +30,39 @@
 
 #define NV40_RAMFC(c) (dev_priv->ramfc_offset + ((c) * NV40_RAMFC__SIZE))
 #define NV40_RAMFC__SIZE 128
-#define NV40_RAMFC_DMA_PUT                                       0x00
-#define NV40_RAMFC_DMA_GET                                       0x04
-#define NV40_RAMFC_REF_CNT                                       0x08
-#define NV40_RAMFC_DMA_INSTANCE                                  0x0C
-#define NV40_RAMFC_DMA_DCOUNT /* ? */                            0x10
-#define NV40_RAMFC_DMA_STATE                                     0x14
-#define NV40_RAMFC_DMA_FETCH                                     0x18
-#define NV40_RAMFC_ENGINE                                        0x1C
-#define NV40_RAMFC_PULL1_ENGINE                                  0x20
-#define NV40_RAMFC_ACQUIRE_VALUE                                 0x24
-#define NV40_RAMFC_ACQUIRE_TIMESTAMP                             0x28
-#define NV40_RAMFC_ACQUIRE_TIMEOUT                               0x2C
-#define NV40_RAMFC_SEMAPHORE                                     0x30
-#define NV40_RAMFC_DMA_SUBROUTINE                                0x34
-#define NV40_RAMFC_GRCTX_INSTANCE /* guess */                    0x38
-#define NV40_RAMFC_DMA_TIMESLICE                                 0x3C
-#define NV40_RAMFC_UNK_40                                        0x40
-#define NV40_RAMFC_UNK_44                                        0x44
-#define NV40_RAMFC_UNK_48                                        0x48
-#define NV40_RAMFC_UNK_4C                                        0x4C
-#define NV40_RAMFC_UNK_50                                        0x50
-
-#define RAMFC_WR(offset, val) nv_wo32(dev, chan->ramfc->gpuobj, \
-					 NV40_RAMFC_##offset/4, (val))
-#define RAMFC_RD(offset)      nv_ro32(dev, chan->ramfc->gpuobj, \
-					 NV40_RAMFC_##offset/4)
 
 int
 nv40_fifo_create_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t fc = NV40_RAMFC(chan->id);
 	int ret;
 
 	ret = nouveau_gpuobj_new_fake(dev, NV40_RAMFC(chan->id), ~0,
-						NV40_RAMFC__SIZE,
-						NVOBJ_FLAG_ZERO_ALLOC |
-						NVOBJ_FLAG_ZERO_FREE,
-						NULL, &chan->ramfc);
+				      NV40_RAMFC__SIZE, NVOBJ_FLAG_ZERO_ALLOC |
+				      NVOBJ_FLAG_ZERO_FREE, NULL, &chan->ramfc);
 	if (ret)
 		return ret;
 
-	/* Fill entries that are seen filled in dumps of nvidia driver just
-	 * after channel's is put into DMA mode
-	 */
 	dev_priv->engine.instmem.prepare_access(dev, true);
-	RAMFC_WR(DMA_PUT       , chan->pushbuf_base);
-	RAMFC_WR(DMA_GET       , chan->pushbuf_base);
-	RAMFC_WR(DMA_INSTANCE  , chan->pushbuf->instance >> 4);
-	RAMFC_WR(DMA_FETCH     , NV_PFIFO_CACHE1_DMA_FETCH_TRIG_128_BYTES |
-				 NV_PFIFO_CACHE1_DMA_FETCH_SIZE_128_BYTES |
-				 NV_PFIFO_CACHE1_DMA_FETCH_MAX_REQS_8 |
+	nv_wi32(dev, fc +  0, chan->pushbuf_base);
+	nv_wi32(dev, fc +  4, chan->pushbuf_base);
+	nv_wi32(dev, fc + 12, chan->pushbuf->instance >> 4);
+	nv_wi32(dev, fc + 24, NV_PFIFO_CACHE1_DMA_FETCH_TRIG_128_BYTES |
+			      NV_PFIFO_CACHE1_DMA_FETCH_SIZE_128_BYTES |
+			      NV_PFIFO_CACHE1_DMA_FETCH_MAX_REQS_8 |
 #ifdef __BIG_ENDIAN
-				 NV_PFIFO_CACHE1_BIG_ENDIAN |
+			      NV_PFIFO_CACHE1_BIG_ENDIAN |
 #endif
-				 0x30000000 /* no idea.. */);
-	RAMFC_WR(DMA_SUBROUTINE, 0);
-	RAMFC_WR(GRCTX_INSTANCE, chan->ramin_grctx->instance >> 4);
-	RAMFC_WR(DMA_TIMESLICE , 0x0001FFFF);
+			      0x30000000 /* no idea.. */);
+	nv_wi32(dev, fc + 56, chan->ramin_grctx->instance >> 4);
+	nv_wi32(dev, fc + 60, 0x0001FFFF);
 	dev_priv->engine.instmem.finish_access(dev);
 
 	/* enable the fifo dma operation */
 	nv_wr32(dev, NV04_PFIFO_MODE,
-			nv_rd32(dev, NV04_PFIFO_MODE) | (1 << chan->id));
+		nv_rd32(dev, NV04_PFIFO_MODE) | (1 << chan->id));
 	return 0;
 }
 
@@ -103,7 +72,7 @@ nv40_fifo_destroy_context(struct nouveau_channel *chan)
 	struct drm_device *dev = chan->dev;
 
 	nv_wr32(dev, NV04_PFIFO_MODE,
-			nv_rd32(dev, NV04_PFIFO_MODE) & ~(1 << chan->id));
+		nv_rd32(dev, NV04_PFIFO_MODE) & ~(1 << chan->id));
 
 	if (chan->ramfc)
 		nouveau_gpuobj_ref_del(dev, &chan->ramfc);
@@ -179,51 +148,45 @@ nv40_fifo_load_context(struct nouveau_channel *chan)
 int
 nv40_fifo_save_context(struct nouveau_channel *chan)
 {
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
 	struct drm_device *dev = chan->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t tmp;
+	uint32_t fc = NV40_RAMFC(chan->id), tmp;
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
 
-	RAMFC_WR(DMA_PUT,        nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUT));
-	RAMFC_WR(DMA_GET,        nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_GET));
-	RAMFC_WR(REF_CNT,        nv_rd32(dev, NV10_PFIFO_CACHE1_REF_CNT));
-	RAMFC_WR(DMA_INSTANCE,   nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_INSTANCE));
-	RAMFC_WR(DMA_DCOUNT,     nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_DCOUNT));
-	RAMFC_WR(DMA_STATE,      nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_STATE));
-
+	nv_wi32(dev, fc + 0, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUT));
+	nv_wi32(dev, fc + 4, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_GET));
+	nv_wi32(dev, fc + 8, nv_rd32(dev, NV10_PFIFO_CACHE1_REF_CNT));
+	nv_wi32(dev, fc + 12, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_INSTANCE));
+	nv_wi32(dev, fc + 16, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_DCOUNT));
+	nv_wi32(dev, fc + 20, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_STATE));
 	tmp  = nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_FETCH);
 	tmp |= nv_rd32(dev, 0x2058) & 0x30000000;
-	RAMFC_WR(DMA_FETCH	  , tmp);
-
-	RAMFC_WR(ENGINE,         nv_rd32(dev, NV04_PFIFO_CACHE1_ENGINE));
-	RAMFC_WR(PULL1_ENGINE,   nv_rd32(dev, NV04_PFIFO_CACHE1_PULL1));
-	RAMFC_WR(ACQUIRE_VALUE,  nv_rd32(dev, NV10_PFIFO_CACHE1_ACQUIRE_VALUE));
+	nv_wi32(dev, fc + 24, tmp);
+	nv_wi32(dev, fc + 28, nv_rd32(dev, NV04_PFIFO_CACHE1_ENGINE));
+	nv_wi32(dev, fc + 32, nv_rd32(dev, NV04_PFIFO_CACHE1_PULL1));
+	nv_wi32(dev, fc + 36, nv_rd32(dev, NV10_PFIFO_CACHE1_ACQUIRE_VALUE));
 	tmp = nv_rd32(dev, NV10_PFIFO_CACHE1_ACQUIRE_TIMESTAMP);
-	RAMFC_WR(ACQUIRE_TIMESTAMP, tmp);
-	RAMFC_WR(ACQUIRE_TIMEOUT,
-			nv_rd32(dev, NV10_PFIFO_CACHE1_ACQUIRE_TIMEOUT));
-	RAMFC_WR(SEMAPHORE,      nv_rd32(dev, NV10_PFIFO_CACHE1_SEMAPHORE));
-
+	nv_wi32(dev, fc + 40, tmp);
+	nv_wi32(dev, fc + 44, nv_rd32(dev, NV10_PFIFO_CACHE1_ACQUIRE_TIMEOUT));
+	nv_wi32(dev, fc + 48, nv_rd32(dev, NV10_PFIFO_CACHE1_SEMAPHORE));
 	/* NVIDIA read 0x3228 first, then write DMA_GET here.. maybe something
 	 * more involved depending on the value of 0x3228?
 	 */
-	RAMFC_WR(DMA_SUBROUTINE, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_GET));
-
-	RAMFC_WR(GRCTX_INSTANCE, nv_rd32(dev, NV40_PFIFO_GRCTX_INSTANCE));
-
+	nv_wi32(dev, fc + 52, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_GET));
+	nv_wi32(dev, fc + 56, nv_rd32(dev, NV40_PFIFO_GRCTX_INSTANCE));
+	nv_wi32(dev, fc + 60, nv_rd32(dev, NV04_PFIFO_DMA_TIMESLICE) & 0x1ffff);
 	/* No idea what the below is for exactly, ripped from a mmio-trace */
-	RAMFC_WR(UNK_40,         nv_rd32(dev, NV40_PFIFO_UNK32E4));
-
+	nv_wi32(dev, fc + 64, nv_rd32(dev, NV40_PFIFO_UNK32E4));
 	/* NVIDIA do this next line twice.. bug? */
-	RAMFC_WR(UNK_44,         nv_rd32(dev, 0x32e8));
-	RAMFC_WR(UNK_4C,         nv_rd32(dev, 0x2088));
-	RAMFC_WR(UNK_50,         nv_rd32(dev, 0x3300));
+	nv_wi32(dev, fc + 68, nv_rd32(dev, 0x32e8));
+	nv_wi32(dev, fc + 76, nv_rd32(dev, 0x2088));
+	nv_wi32(dev, fc + 80, nv_rd32(dev, 0x3300));
 
 #if 0 /* no real idea which is PUT/GET in UNK_48.. */
 	tmp  = nv_rd32(dev, NV04_PFIFO_CACHE1_GET);
 	tmp |= (nv_rd32(dev, NV04_PFIFO_CACHE1_PUT) << 16);
-	RAMFC_WR(UNK_48           , tmp);
+	nv_wi32(dev, fc + 72, tmp);
 #endif
 
 	dev_priv->engine.instmem.finish_access(dev);
