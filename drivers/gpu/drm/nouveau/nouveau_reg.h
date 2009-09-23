@@ -579,28 +579,6 @@
 #define NV10_RAMFC_SEMAPHORE                                     0x2C
 #define NV10_RAMFC_DMA_SUBROUTINE                                0x30
 
-#define NV40_RAMFC_DMA_PUT                                       0x00
-#define NV40_RAMFC_DMA_GET                                       0x04
-#define NV40_RAMFC_REF_CNT                                       0x08
-#define NV40_RAMFC_DMA_INSTANCE                                  0x0C
-#define NV40_RAMFC_DMA_DCOUNT /* ? */                            0x10
-#define NV40_RAMFC_DMA_STATE                                     0x14
-#define NV40_RAMFC_DMA_FETCH                                     0x18
-#define NV40_RAMFC_ENGINE                                        0x1C
-#define NV40_RAMFC_PULL1_ENGINE                                  0x20
-#define NV40_RAMFC_ACQUIRE_VALUE                                 0x24
-#define NV40_RAMFC_ACQUIRE_TIMESTAMP                             0x28
-#define NV40_RAMFC_ACQUIRE_TIMEOUT                               0x2C
-#define NV40_RAMFC_SEMAPHORE                                     0x30
-#define NV40_RAMFC_DMA_SUBROUTINE                                0x34
-#define NV40_RAMFC_GRCTX_INSTANCE /* guess */                    0x38
-#define NV40_RAMFC_DMA_TIMESLICE                                 0x3C
-#define NV40_RAMFC_UNK_40                                        0x40
-#define NV40_RAMFC_UNK_44                                        0x44
-#define NV40_RAMFC_UNK_48                                        0x48
-#define NV40_RAMFC_UNK_4C                                        0x4C
-#define NV40_RAMFC_UNK_50                                        0x50
-
 /* This is a partial import from rules-ng, a few things may be duplicated.
  * Eventually we should completely import everything from rules-ng.
  * For the moment check rules-ng for docs.
