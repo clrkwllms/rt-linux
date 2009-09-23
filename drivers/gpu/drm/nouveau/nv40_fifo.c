@@ -88,66 +88,65 @@ nv40_fifo_destroy_context(struct nouveau_channel *chan)
 		nouveau_gpuobj_ref_del(dev, &chan->ramfc);
 }
 
-int
-nv40_fifo_load_context(struct nouveau_channel *chan)
+static void
+nv40_fifo_do_load_context(struct drm_device *dev, int chid)
 {
-	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t tmp, tmp2;
+	uint32_t fc = NV40_RAMFC(chid), tmp, tmp2;
 
 	dev_priv->engine.instmem.prepare_access(dev, false);
 
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_GET,      RAMFC_RD(DMA_GET));
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUT,      RAMFC_RD(DMA_PUT));
-	nv_wr32(dev, NV10_PFIFO_CACHE1_REF_CNT,      RAMFC_RD(REF_CNT));
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_INSTANCE, RAMFC_RD(DMA_INSTANCE));
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_DCOUNT,   RAMFC_RD(DMA_DCOUNT));
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_STATE,    RAMFC_RD(DMA_STATE));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUT, nv_ri32(dev, fc + 0));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_GET, nv_ri32(dev, fc + 4));
+	nv_wr32(dev, NV10_PFIFO_CACHE1_REF_CNT, nv_ri32(dev, fc + 8));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_INSTANCE, nv_ri32(dev, fc + 12));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_DCOUNT, nv_ri32(dev, fc + 16));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_STATE, nv_ri32(dev, fc + 20));
 
 	/* No idea what 0x2058 is.. */
-	tmp   = RAMFC_RD(DMA_FETCH);
+	tmp   = nv_ri32(dev, fc + 24);
 	tmp2  = nv_rd32(dev, 0x2058) & 0xFFF;
 	tmp2 |= (tmp & 0x30000000);
 	nv_wr32(dev, 0x2058, tmp2);
 	tmp  &= ~0x30000000;
 	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_FETCH, tmp);
 
-	nv_wr32(dev, NV04_PFIFO_CACHE1_ENGINE,  RAMFC_RD(ENGINE));
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL1,   RAMFC_RD(PULL1_ENGINE));
-	nv_wr32(dev, NV10_PFIFO_CACHE1_ACQUIRE_VALUE, RAMFC_RD(ACQUIRE_VALUE));
-	nv_wr32(dev, NV10_PFIFO_CACHE1_ACQUIRE_TIMESTAMP,
-						RAMFC_RD(ACQUIRE_TIMESTAMP));
-	nv_wr32(dev, NV10_PFIFO_CACHE1_ACQUIRE_TIMEOUT,
-						RAMFC_RD(ACQUIRE_TIMEOUT));
-	nv_wr32(dev, NV10_PFIFO_CACHE1_SEMAPHORE, RAMFC_RD(SEMAPHORE));
-	nv_wr32(dev, NV10_PFIFO_CACHE1_DMA_SUBROUTINE,
-						RAMFC_RD(DMA_SUBROUTINE));
-	nv_wr32(dev, NV40_PFIFO_GRCTX_INSTANCE, RAMFC_RD(GRCTX_INSTANCE));
-	nv_wr32(dev, 0x32e4, RAMFC_RD(UNK_40));
-	/* NVIDIA does this next line twice... */
-	nv_wr32(dev, 0x32e8, RAMFC_RD(UNK_44));
-	nv_wr32(dev, 0x2088, RAMFC_RD(UNK_4C));
-	nv_wr32(dev, 0x3300, RAMFC_RD(UNK_50));
-
-	/* not sure what part is PUT, and which is GET.. never seen a non-zero
-	 * value appear in a mmio-trace yet..
-	 */
-#if 0
-	tmp = nv_rd32(dev, UNK_84);
-	nv_wr32(dev, NV_PFIFO_CACHE1_GET, tmp /* ??? */);
-	nv_wr32(dev, NV_PFIFO_CACHE1_PUT, tmp /* ??? */);
-#endif
+	nv_wr32(dev, NV04_PFIFO_CACHE1_ENGINE, nv_ri32(dev, fc + 28));
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL1, nv_ri32(dev, fc + 32));
+	nv_wr32(dev, NV10_PFIFO_CACHE1_ACQUIRE_VALUE, nv_ri32(dev, fc + 36));
+	tmp = nv_ri32(dev, fc + 40);
+	nv_wr32(dev, NV10_PFIFO_CACHE1_ACQUIRE_TIMESTAMP, tmp);
+	nv_wr32(dev, NV10_PFIFO_CACHE1_ACQUIRE_TIMEOUT, nv_ri32(dev, fc + 44));
+	nv_wr32(dev, NV10_PFIFO_CACHE1_SEMAPHORE, nv_ri32(dev, fc + 48));
+	nv_wr32(dev, NV10_PFIFO_CACHE1_DMA_SUBROUTINE, nv_ri32(dev, fc + 52));
+	nv_wr32(dev, NV40_PFIFO_GRCTX_INSTANCE, nv_ri32(dev, fc + 56));
 
 	/* Don't clobber the TIMEOUT_ENABLED flag when restoring from RAMFC */
 	tmp  = nv_rd32(dev, NV04_PFIFO_DMA_TIMESLICE) & ~0x1FFFF;
-	tmp |= RAMFC_RD(DMA_TIMESLICE) & 0x1FFFF;
+	tmp |= nv_ri32(dev, fc + 60) & 0x1FFFF;
 	nv_wr32(dev, NV04_PFIFO_DMA_TIMESLICE, tmp);
 
+	nv_wr32(dev, 0x32e4, nv_ri32(dev, fc + 64));
+	/* NVIDIA does this next line twice... */
+	nv_wr32(dev, 0x32e8, nv_ri32(dev, fc + 68));
+	nv_wr32(dev, 0x2088, nv_ri32(dev, fc + 76));
+	nv_wr32(dev, 0x3300, nv_ri32(dev, fc + 80));
+
 	dev_priv->engine.instmem.finish_access(dev);
+}
+
+int
+nv40_fifo_load_context(struct nouveau_channel *chan)
+{
+	struct drm_device *dev = chan->dev;
+	uint32_t tmp;
+
+	nv40_fifo_do_load_context(dev, chan->id);
 
 	/* Set channel active, and in DMA mode */
 	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1,
-		NV40_PFIFO_CACHE1_PUSH1_DMA | chan->id);
+		     NV40_PFIFO_CACHE1_PUSH1_DMA | chan->id);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH, 1);
 
 	/* Reset DMA_CTL_AT_INFO to INVALID */
 	tmp = nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_CTL) & ~(1 << 31);
@@ -210,15 +209,112 @@ nv40_fifo_save_context(struct nouveau_channel *chan)
 	return 0;
 }
 
+static void
+nv40_fifo_init_reset(struct drm_device *dev)
+{
+	int i;
+
+	nv_wr32(dev, NV03_PMC_ENABLE,
+		nv_rd32(dev, NV03_PMC_ENABLE) & ~NV_PMC_ENABLE_PFIFO);
+	nv_wr32(dev, NV03_PMC_ENABLE,
+		nv_rd32(dev, NV03_PMC_ENABLE) |  NV_PMC_ENABLE_PFIFO);
+
+	nv_wr32(dev, 0x003224, 0x000f0078);
+	nv_wr32(dev, 0x003210, 0x00000000);
+	nv_wr32(dev, 0x003270, 0x00000000);
+	nv_wr32(dev, 0x003240, 0x00000000);
+	nv_wr32(dev, 0x003244, 0x00000000);
+	nv_wr32(dev, 0x003258, 0x00000000);
+	nv_wr32(dev, 0x002504, 0x00000000);
+	for (i = 0; i < 16; i++)
+		nv_wr32(dev, 0x002510 + (i * 4), 0x00000000);
+	nv_wr32(dev, 0x00250c, 0x0000ffff);
+	nv_wr32(dev, 0x002048, 0x00000000);
+	nv_wr32(dev, 0x003228, 0x00000000);
+	nv_wr32(dev, 0x0032e8, 0x00000000);
+	nv_wr32(dev, 0x002410, 0x00000000);
+	nv_wr32(dev, 0x002420, 0x00000000);
+	nv_wr32(dev, 0x002058, 0x00000001);
+	nv_wr32(dev, 0x00221c, 0x00000000);
+	/* something with 0x2084, read/modify/write, no change */
+	nv_wr32(dev, 0x002040, 0x000000ff);
+	nv_wr32(dev, 0x002500, 0x00000000);
+	nv_wr32(dev, 0x003200, 0x00000000);
+
+	nv_wr32(dev, NV04_PFIFO_DMA_TIMESLICE, 0x2101ffff);
+}
+
+static void
+nv40_fifo_init_ramxx(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	nv_wr32(dev, NV03_PFIFO_RAMHT, (0x03 << 24) /* search 128 */ |
+				       ((dev_priv->ramht_bits - 9) << 16) |
+				       (dev_priv->ramht_offset >> 8));
+	nv_wr32(dev, NV03_PFIFO_RAMRO, dev_priv->ramro_offset>>8);
+
+	switch (dev_priv->chipset) {
+	case 0x47:
+	case 0x49:
+	case 0x4b:
+		nv_wr32(dev, 0x2230, 1);
+		break;
+	default:
+		break;
+	}
+
+	switch (dev_priv->chipset) {
+	case 0x40:
+	case 0x41:
+	case 0x42:
+	case 0x43:
+	case 0x45:
+	case 0x47:
+	case 0x48:
+	case 0x49:
+	case 0x4b:
+		nv_wr32(dev, NV40_PFIFO_RAMFC, 0x30002);
+		break;
+	default:
+		nv_wr32(dev, 0x2230, 0);
+		nv_wr32(dev, NV40_PFIFO_RAMFC,
+			((nouveau_mem_fb_amount(dev) - 512 * 1024 +
+			  dev_priv->ramfc_offset) >> 16) | (3 << 16));
+		break;
+	}
+}
+
+static void
+nv40_fifo_init_intr(struct drm_device *dev)
+{
+	nv_wr32(dev, 0x002100, 0xffffffff);
+	nv_wr32(dev, 0x002140, 0xffffffff);
+}
+
 int
 nv40_fifo_init(struct drm_device *dev)
 {
-	int ret;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
+	int i;
 
-	ret = nv04_fifo_init(dev);
-	if (ret)
-		return ret;
+	nv40_fifo_init_reset(dev);
+	nv40_fifo_init_ramxx(dev);
 
-	nv_wr32(dev, NV04_PFIFO_DMA_TIMESLICE, 0x2101ffff);
+	nv40_fifo_do_load_context(dev, pfifo->channels - 1);
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1, pfifo->channels - 1);
+
+	nv40_fifo_init_intr(dev);
+	pfifo->enable(dev);
+	pfifo->reassign(dev, true);
+
+	for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+		if (dev_priv->fifos[i]) {
+			uint32_t mode = nv_rd32(dev, NV04_PFIFO_MODE);
+			nv_wr32(dev, NV04_PFIFO_MODE, mode | (1 << i));
+		}
+	}
+
 	return 0;
 }

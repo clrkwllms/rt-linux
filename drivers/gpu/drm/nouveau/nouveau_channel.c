@@ -222,8 +222,7 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	 * isn't entirely.. well.. correct.. setup PFIFO ourselves.  For any
 	 * other case, the GPU will handle this when it switches contexts.
 	 */
-	if ((pfifo->init == nv04_fifo_init || pfifo->init == nv40_fifo_init) &&
-	    dev_priv->fifo_alloc_count == 1) {
+	if (pfifo->init == nv04_fifo_init && dev_priv->fifo_alloc_count == 1) {
 		unsigned fbdev_flags = 0;
 
 		if (dev_priv->fbdev_info) {
