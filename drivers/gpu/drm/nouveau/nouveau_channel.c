@@ -323,7 +323,9 @@ nouveau_channel_free(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->engine;
+	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
+	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
+	struct nouveau_timer_engine *ptimer = &dev_priv->engine.timer;
 	unsigned fbdev_flags = 0;
 	uint64_t t_start;
 	bool timeout = false;
@@ -334,9 +336,9 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	nouveau_debugfs_channel_fini(chan);
 
 	/* Give the channel a chance to idle, wait 2s (hopefully) */
-	t_start = engine->timer.read(dev);
+	t_start = ptimer->read(dev);
 	while (!nouveau_channel_idle(chan)) {
-		if (engine->timer.read(dev) - t_start > 2000000000ULL) {
+		if (ptimer->read(dev) - t_start > 2000000000ULL) {
 			NV_ERROR(dev, "Failed to idle channel %d.  "
 				      "Prepare for strangeness..\n", chan->id);
 			timeout = true;
@@ -376,23 +378,12 @@ nouveau_channel_free(struct nouveau_channel *chan)
 		dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
 	}
 
-	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000000);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
-			nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) & ~0x1);
-	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000000);
-
-	engine->fifo.destroy_context(chan);
-
-	/* Cleanup PGRAPH state */
-	engine->graph.destroy_context(chan);
-
-	/* reenable the fifo caches */
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
-			nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000001);
+	pfifo->reassign(dev, false);
+	pfifo->disable(dev);
+	pfifo->destroy_context(chan);
+	pgraph->destroy_context(chan);
+	pfifo->enable(dev);
+	pfifo->reassign(dev, true);
 
 	if (dev_priv->fbdev_info)
 		dev_priv->fbdev_info->flags = fbdev_flags;
