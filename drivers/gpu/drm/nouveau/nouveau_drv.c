@@ -283,25 +283,6 @@ nouveau_pci_resume(struct pci_dev *pdev)
 		}
 	}
 
-	if (dev_priv->card_type < NV_10) {
-		struct nouveau_channel *chan = dev_priv->channel;
-		int ptr = chan->pushbuf_base + (chan->dma.cur << 2);
-
-		engine->graph.fifo_access(dev, false);
-		engine->fifo.reassign(dev, true);
-		engine->fifo.disable(dev);
-
-		nvchan_wr32(chan, chan->user_get, ptr);
-		nvchan_wr32(chan, chan->user_put, ptr);
-
-		engine->fifo.load_context(chan);
-		engine->graph.load_context(chan);
-
-		engine->fifo.enable(dev);
-		engine->fifo.reassign(dev, true);
-		engine->graph.fifo_access(dev, true);
-	}
-
 	NV_INFO(dev, "Restoring mode...\n");
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		struct nouveau_framebuffer *nouveau_fb;

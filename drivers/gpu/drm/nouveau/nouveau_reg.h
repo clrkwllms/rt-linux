@@ -556,15 +556,6 @@
 #define NV03_FIFO_CMD_JUMP_OFFSET_MASK                     0x1ffffffc
 #define NV03_FIFO_CMD_REWIND                               (NV03_FIFO_CMD_JUMP | (0 & NV03_FIFO_CMD_JUMP_OFFSET_MASK))
 
-/* RAMFC offsets */
-#define NV04_RAMFC_DMA_PUT                                       0x00
-#define NV04_RAMFC_DMA_GET                                       0x04
-#define NV04_RAMFC_DMA_INSTANCE                                  0x08
-#define NV04_RAMFC_DMA_STATE                                     0x0C
-#define NV04_RAMFC_DMA_FETCH                                     0x10
-#define NV04_RAMFC_ENGINE                                        0x14
-#define NV04_RAMFC_PULL1_ENGINE                                  0x18
-
 /* This is a partial import from rules-ng, a few things may be duplicated.
  * Eventually we should completely import everything from rules-ng.
  * For the moment check rules-ng for docs.

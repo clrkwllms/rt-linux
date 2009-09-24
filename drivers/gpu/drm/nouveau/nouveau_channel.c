@@ -218,46 +218,6 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		return ret;
 	}
 
-	/* If this is the first channel, and our PFIFO setup for a chipset
-	 * isn't entirely.. well.. correct.. setup PFIFO ourselves.  For any
-	 * other case, the GPU will handle this when it switches contexts.
-	 */
-	if (pfifo->init == nv04_fifo_init && dev_priv->fifo_alloc_count == 1) {
-		unsigned fbdev_flags = 0;
-
-		if (dev_priv->fbdev_info) {
-			fbdev_flags = dev_priv->fbdev_info->flags;
-			dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
-		}
-
-		pgraph->fifo_access(dev, false);
-		nouveau_wait_for_idle(dev);
-		pfifo->disable(dev);
-
-		/* setup channel's default get/put values
-		 */
-		nvchan_wr32(chan, chan->user_get, chan->pushbuf_base);
-		nvchan_wr32(chan, chan->user_put, chan->pushbuf_base);
-
-		ret = pfifo->load_context(chan);
-		if (ret) {
-			nouveau_channel_free(chan);
-			return ret;
-		}
-
-		ret = pgraph->load_context(chan);
-		if (ret) {
-			nouveau_channel_free(chan);
-			return ret;
-		}
-
-		pfifo->enable(dev);
-		pgraph->fifo_access(dev, true);
-
-		if (dev_priv->fbdev_info)
-			dev_priv->fbdev_info->flags = fbdev_flags;
-	}
-
 	pfifo->reassign(dev, true);
 
 	ret = nouveau_dma_init(chan);
