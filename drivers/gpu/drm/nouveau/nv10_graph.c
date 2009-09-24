@@ -659,6 +659,7 @@ int nv10_graph_load_context(struct nouveau_channel *chan)
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
+	uint32_t tmp;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(nv10_graph_ctx_regs); i++)
@@ -671,6 +672,10 @@ int nv10_graph_load_context(struct nouveau_channel *chan)
 
 	nv10_graph_load_pipe(chan);
 
+	nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10010100);
+	nv_wr32(dev, NV10_PGRAPH_CTX_USER, chan->id << 24);
+	tmp = nv_rd32(dev, NV10_PGRAPH_FFINTFC_ST2);
+	nv_wr32(dev, NV10_PGRAPH_FFINTFC_ST2, tmp & 0xcfffffff);
 	return 0;
 }
 
@@ -694,67 +699,40 @@ int nv10_graph_save_context(struct nouveau_channel *chan)
 	return 0;
 }
 
-void nv10_graph_context_switch(struct drm_device *dev)
+void
+nv10_graph_context_switch(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv;
-	struct nouveau_engine *engine;
-	struct nouveau_channel *next, *last;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_channel *chan = NULL;
+	uint32_t tmp;
 	int chid;
 
-	if (!dev) {
-		NV_DEBUG(dev, "Invalid drm_device\n");
-		return;
-	}
-	dev_priv = dev->dev_private;
-	if (!dev_priv) {
-		NV_DEBUG(dev, "Invalid drm_nouveau_private\n");
-		return;
-	}
-	if (!dev_priv->fifos) {
-		NV_DEBUG(dev, "Invalid drm_nouveau_private->fifos\n");
-		return;
-	}
-	engine = &dev_priv->engine;
-
-	chid = (nv_rd32(dev, NV04_PGRAPH_TRAPPED_ADDR) >> 20) &
-		(engine->fifo.channels - 1);
-	next = dev_priv->fifos[chid];
-
-	if (!next) {
-		NV_ERROR(dev, "Invalid next channel\n");
-		return;
-	}
-
-	chid = (nv_rd32(dev, NV10_PGRAPH_CTX_USER) >> 24) &
-		(engine->fifo.channels - 1);
-	last = dev_priv->fifos[chid];
-
-	if (!last) {
-		NV_INFO(dev, "WARNING: Invalid last channel, switch to %x\n",
-			next->id);
-	} else {
-		NV_DEBUG(dev, "NV: PGRAPH context switch interrupt channel %x -> %x\n",
-							last->id, next->id);
-	}
-
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x0);
-	if (last) {
-		nouveau_wait_for_idle(dev);
-		nv10_graph_save_context(last);
-	}
-
+	nv_wr32(dev, NV04_PGRAPH_FIFO, 0);
 	nouveau_wait_for_idle(dev);
 
-	nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10000000);
+	/* If previous context is valid, we need to save it */
+	if (nv_rd32(dev, NV10_PGRAPH_CTX_CONTROL) & 0x00010000) {
+		chid = nv_rd32(dev, NV10_PGRAPH_CTX_USER) >> 24;
+		if (chid < dev_priv->engine.fifo.channels)
+			chan = dev_priv->fifos[chid];
+	}
 
-	nouveau_wait_for_idle(dev);
+	if (chan) {
+		nv10_graph_save_context(chan);
 
-	nv10_graph_load_context(next);
+		nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10000000);
+		tmp  = nv_rd32(dev, NV10_PGRAPH_CTX_USER) & 0x00ffffff;
+		tmp |= (dev_priv->engine.fifo.channels - 1) << 24;
+		nv_wr32(dev, NV10_PGRAPH_CTX_USER, tmp);
+	}
 
-	nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10010100);
-	nv_wr32(dev, NV10_PGRAPH_FFINTFC_ST2,
-			nv_rd32(dev, NV10_PGRAPH_FFINTFC_ST2) & 0xCFFFFFFF);
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x1);
+	/* Load context for next channel */
+	chid = (nv_rd32(dev, NV04_PGRAPH_TRAPPED_ADDR) >> 20) & 0x1f;
+	chan = dev_priv->fifos[chid];
+	if (chan)
+		nv10_graph_load_context(chan);
+
+	nv_wr32(dev, NV04_PGRAPH_FIFO, 1);
 }
 
 #define NV_WRITE_CTX(reg, val) do { \
