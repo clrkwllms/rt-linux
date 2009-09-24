@@ -67,7 +67,7 @@ nv50_graph_init_regs__nv(struct drm_device *dev)
 	nv_wr32(dev, 0x400108, 0xffffffff);
 
 	nv_wr32(dev, 0x400824, 0x00004000);
-	nv_wr32(dev, 0x400500, 0x00000000);
+	nv_wr32(dev, 0x400500, 0x00010001);
 }
 
 static void

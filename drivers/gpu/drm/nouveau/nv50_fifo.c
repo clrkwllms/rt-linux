@@ -206,6 +206,8 @@ just_reset:
 	nv50_fifo_init_context_table(dev);
 	nv50_fifo_init_regs__nv(dev);
 	nv50_fifo_init_regs(dev);
+	dev_priv->engine.fifo.enable(dev);
+	dev_priv->engine.fifo.reassign(dev, true);
 
 	return 0;
 }

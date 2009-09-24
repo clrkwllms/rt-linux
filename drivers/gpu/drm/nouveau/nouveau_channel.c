@@ -212,7 +212,6 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 
 	/* disable the fifo caches */
 	pfifo->reassign(dev, false);
-	pfifo->disable(dev);
 
 	/* Create a graphics context for new channel */
 	ret = pgraph->create_context(chan);
@@ -234,6 +233,8 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	 */
 	if ((pfifo->init == nv04_fifo_init || pfifo->init == nv40_fifo_init) &&
 	    dev_priv->fifo_alloc_count == 1) {
+		pfifo->disable(dev);
+
 		/* setup channel's default get/put values
 		 */
 		nvchan_wr32(chan, chan->user_get, chan->pushbuf_base);
@@ -250,9 +251,10 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 			nouveau_channel_free(chan);
 			return ret;
 		}
+
+		pfifo->enable(dev);
 	}
 
-	pfifo->enable(dev);
 	pfifo->reassign(dev, true);
 	pgraph->fifo_access(dev, true);
 
