@@ -110,7 +110,8 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		      uint32_t vram_handle, uint32_t tt_handle)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->engine;
+	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
+	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
 	struct nouveau_channel *chan;
 	unsigned fbdev_flags = 0;
 	int channel, user;
@@ -124,13 +125,13 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	 * directly (woo, full userspace command submission !)
 	 * When there are no more contexts, you lost
 	 */
-	for (channel = 0; channel < engine->fifo.channels; channel++) {
+	for (channel = 0; channel < pfifo->channels; channel++) {
 		if (dev_priv->fifos[channel] == NULL)
 			break;
 	}
 
 	/* no more fifos. you lost. */
-	if (channel == engine->fifo.channels)
+	if (channel == pfifo->channels)
 		return -EINVAL;
 
 	dev_priv->fifos[channel] = kzalloc(sizeof(struct nouveau_channel),
@@ -206,25 +207,22 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
 	}
 
-	engine->graph.fifo_access(dev, false);
+	pgraph->fifo_access(dev, false);
 	nouveau_wait_for_idle(dev);
 
 	/* disable the fifo caches */
-	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000000);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
-			nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) & ~0x1);
-	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000000);
+	pfifo->reassign(dev, false);
+	pfifo->disable(dev);
 
 	/* Create a graphics context for new channel */
-	ret = engine->graph.create_context(chan);
+	ret = pgraph->create_context(chan);
 	if (ret) {
 		nouveau_channel_free(chan);
 		return ret;
 	}
 
 	/* Construct inital RAMFC for new channel */
-	ret = engine->fifo.create_context(chan);
+	ret = pfifo->create_context(chan);
 	if (ret) {
 		nouveau_channel_free(chan);
 		return ret;
@@ -234,37 +232,29 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	 * isn't entirely.. well.. correct.. setup PFIFO ourselves.  For any
 	 * other case, the GPU will handle this when it switches contexts.
 	 */
-	if ((dev_priv->engine.fifo.init == nv04_fifo_init ||
-	     dev_priv->engine.fifo.init == nv40_fifo_init) &&
+	if ((pfifo->init == nv04_fifo_init || pfifo->init == nv40_fifo_init) &&
 	    dev_priv->fifo_alloc_count == 1) {
 		/* setup channel's default get/put values
 		 */
 		nvchan_wr32(chan, chan->user_get, chan->pushbuf_base);
 		nvchan_wr32(chan, chan->user_put, chan->pushbuf_base);
 
-		ret = engine->fifo.load_context(chan);
+		ret = pfifo->load_context(chan);
 		if (ret) {
 			nouveau_channel_free(chan);
 			return ret;
 		}
 
-		ret = engine->graph.load_context(chan);
+		ret = pgraph->load_context(chan);
 		if (ret) {
 			nouveau_channel_free(chan);
 			return ret;
 		}
 	}
 
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
-			nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL1, 0x00000001);
-
-	/* reenable the fifo caches */
-	nv_wr32(dev, NV03_PFIFO_CACHES, 1);
-
-	engine->graph.fifo_access(dev, true);
+	pfifo->enable(dev);
+	pfifo->reassign(dev, true);
+	pgraph->fifo_access(dev, true);
 
 	if (dev_priv->fbdev_info)
 		dev_priv->fbdev_info->flags = fbdev_flags;

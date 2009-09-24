@@ -184,6 +184,34 @@ nv04_fifo_init(struct drm_device *dev)
 	return 0;
 }
 
+void
+nv04_fifo_disable(struct drm_device *dev)
+{
+	uint32_t tmp;
+
+	tmp = nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH, tmp & ~1);
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0);
+	tmp = nv_rd32(dev, NV03_PFIFO_CACHE1_PULL1);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, tmp & ~1);
+}
+
+void
+nv04_fifo_enable(struct drm_device *dev)
+{
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 1);
+	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 1);
+}
+
+bool
+nv04_fifo_reassign(struct drm_device *dev, bool enable)
+{
+	uint32_t reassign = nv_rd32(dev, NV03_PFIFO_CACHES);
+
+	nv_wr32(dev, NV03_PFIFO_CACHES, enable ? 1 : 0);
+	return (reassign == 1);
+}
+
 int
 nv04_fifo_channel_id(struct drm_device *dev)
 {

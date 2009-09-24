@@ -71,6 +71,9 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.channels		= 16;
 		engine->fifo.init		= nv04_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
+		engine->fifo.disable		= nv04_fifo_disable;
+		engine->fifo.enable		= nv04_fifo_enable;
+		engine->fifo.reassign		= nv04_fifo_reassign;
 		engine->fifo.channel_id		= nv04_fifo_channel_id;
 		engine->fifo.create_context	= nv04_fifo_create_context;
 		engine->fifo.destroy_context	= nv04_fifo_destroy_context;
@@ -106,6 +109,9 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.channels		= 32;
 		engine->fifo.init		= nv04_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
+		engine->fifo.disable		= nv04_fifo_disable;
+		engine->fifo.enable		= nv04_fifo_enable;
+		engine->fifo.reassign		= nv04_fifo_reassign;
 		engine->fifo.channel_id		= nv10_fifo_channel_id;
 		engine->fifo.create_context	= nv10_fifo_create_context;
 		engine->fifo.destroy_context	= nv10_fifo_destroy_context;
@@ -141,6 +147,9 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.channels		= 32;
 		engine->fifo.init		= nv04_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
+		engine->fifo.disable		= nv04_fifo_disable;
+		engine->fifo.enable		= nv04_fifo_enable;
+		engine->fifo.reassign		= nv04_fifo_reassign;
 		engine->fifo.channel_id		= nv10_fifo_channel_id;
 		engine->fifo.create_context	= nv10_fifo_create_context;
 		engine->fifo.destroy_context	= nv10_fifo_destroy_context;
@@ -176,6 +185,9 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.channels		= 32;
 		engine->fifo.init		= nv04_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
+		engine->fifo.disable		= nv04_fifo_disable;
+		engine->fifo.enable		= nv04_fifo_enable;
+		engine->fifo.reassign		= nv04_fifo_reassign;
 		engine->fifo.channel_id		= nv10_fifo_channel_id;
 		engine->fifo.create_context	= nv10_fifo_create_context;
 		engine->fifo.destroy_context	= nv10_fifo_destroy_context;
@@ -212,6 +224,9 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.channels		= 32;
 		engine->fifo.init		= nv40_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
+		engine->fifo.disable		= nv04_fifo_disable;
+		engine->fifo.enable		= nv04_fifo_enable;
+		engine->fifo.reassign		= nv04_fifo_reassign;
 		engine->fifo.channel_id		= nv10_fifo_channel_id;
 		engine->fifo.create_context	= nv40_fifo_create_context;
 		engine->fifo.destroy_context	= nv40_fifo_destroy_context;
@@ -250,6 +265,9 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.channels		= 128;
 		engine->fifo.init		= nv50_fifo_init;
 		engine->fifo.takedown		= nv50_fifo_takedown;
+		engine->fifo.disable		= nv04_fifo_disable;
+		engine->fifo.enable		= nv04_fifo_enable;
+		engine->fifo.reassign		= nv04_fifo_reassign;
 		engine->fifo.channel_id		= nv50_fifo_channel_id;
 		engine->fifo.create_context	= nv50_fifo_create_context;
 		engine->fifo.destroy_context	= nv50_fifo_destroy_context;
