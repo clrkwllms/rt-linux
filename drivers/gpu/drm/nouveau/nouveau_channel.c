@@ -207,9 +207,6 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
 	}
 
-	pgraph->fifo_access(dev, false);
-	nouveau_wait_for_idle(dev);
-
 	/* disable the fifo caches */
 	pfifo->reassign(dev, false);
 
@@ -233,6 +230,8 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	 */
 	if ((pfifo->init == nv04_fifo_init || pfifo->init == nv40_fifo_init) &&
 	    dev_priv->fifo_alloc_count == 1) {
+		pgraph->fifo_access(dev, false);
+		nouveau_wait_for_idle(dev);
 		pfifo->disable(dev);
 
 		/* setup channel's default get/put values
@@ -253,10 +252,10 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		}
 
 		pfifo->enable(dev);
+		pgraph->fifo_access(dev, true);
 	}
 
 	pfifo->reassign(dev, true);
-	pgraph->fifo_access(dev, true);
 
 	if (dev_priv->fbdev_info)
 		dev_priv->fbdev_info->flags = fbdev_flags;
