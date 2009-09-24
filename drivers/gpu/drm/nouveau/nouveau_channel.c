@@ -113,7 +113,6 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
 	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
 	struct nouveau_channel *chan;
-	unsigned fbdev_flags = 0;
 	int channel, user;
 	int ret;
 
@@ -202,11 +201,6 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		return ret;
 	}
 
-	if (dev_priv->fbdev_info) {
-		fbdev_flags = dev_priv->fbdev_info->flags;
-		dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
-	}
-
 	/* disable the fifo caches */
 	pfifo->reassign(dev, false);
 
@@ -230,6 +224,13 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	 */
 	if ((pfifo->init == nv04_fifo_init || pfifo->init == nv40_fifo_init) &&
 	    dev_priv->fifo_alloc_count == 1) {
+		unsigned fbdev_flags = 0;
+
+		if (dev_priv->fbdev_info) {
+			fbdev_flags = dev_priv->fbdev_info->flags;
+			dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
+		}
+
 		pgraph->fifo_access(dev, false);
 		nouveau_wait_for_idle(dev);
 		pfifo->disable(dev);
@@ -253,12 +254,12 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 
 		pfifo->enable(dev);
 		pgraph->fifo_access(dev, true);
+
+		if (dev_priv->fbdev_info)
+			dev_priv->fbdev_info->flags = fbdev_flags;
 	}
 
 	pfifo->reassign(dev, true);
-
-	if (dev_priv->fbdev_info)
-		dev_priv->fbdev_info->flags = fbdev_flags;
 
 	ret = nouveau_dma_init(chan);
 	if (!ret)
