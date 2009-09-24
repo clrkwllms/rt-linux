@@ -2195,20 +2195,6 @@ nv40_graph_init(struct drm_device *dev)
 		break;
 	}
 
-	/* per-context state, doesn't belong here */
-	nv_wr32(dev, 0x400B20, 0x00000000);
-	nv_wr32(dev, 0x400B04, 0xFFFFFFFF);
-
-	tmp = nv_rd32(dev, NV10_PGRAPH_SURFACE) & 0x0007ff00;
-	nv_wr32(dev, NV10_PGRAPH_SURFACE, tmp);
-	tmp = nv_rd32(dev, NV10_PGRAPH_SURFACE) | 0x00020100;
-	nv_wr32(dev, NV10_PGRAPH_SURFACE, tmp);
-
-	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_XMIN, 0);
-	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_YMIN, 0);
-	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_XMAX, 0x7fff);
-	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_YMAX, 0x7fff);
-
 	return 0;
 }
 
