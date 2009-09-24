@@ -875,6 +875,7 @@ void nv10_graph_destroy_context(struct nouveau_channel *chan)
 int nv10_graph_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t tmp;
 	int i;
 
 	nv_wr32(dev, NV03_PMC_ENABLE, nv_rd32(dev, NV03_PMC_ENABLE) &
@@ -915,8 +916,13 @@ int nv10_graph_init(struct drm_device *dev)
 	nv_wr32(dev, NV10_PGRAPH_CTX_SWITCH2, 0x00000000);
 	nv_wr32(dev, NV10_PGRAPH_CTX_SWITCH3, 0x00000000);
 	nv_wr32(dev, NV10_PGRAPH_CTX_SWITCH4, 0x00000000);
-	nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10010100);
 	nv_wr32(dev, NV10_PGRAPH_STATE      , 0xFFFFFFFF);
+
+	tmp  = nv_rd32(dev, NV10_PGRAPH_CTX_USER) & 0x00ffffff;
+	tmp |= (dev_priv->engine.fifo.channels - 1) << 24;
+	nv_wr32(dev, NV10_PGRAPH_CTX_USER, tmp);
+	nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10000100);
+	nv_wr32(dev, NV10_PGRAPH_FFINTFC_ST2, 0x08000000);
 
 	return 0;
 }
