@@ -119,7 +119,9 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->engine;
+	struct nouveau_instmem_engine *pinstmem = &dev_priv->engine.instmem;
+	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
+	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
 	struct drm_crtc *crtc;
 	uint32_t fbdev_flags;
 	int ret, i;
@@ -147,7 +149,7 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	ttm_bo_evict_mm(&dev_priv->ttm.bdev, TTM_PL_VRAM);
 
 	NV_INFO(dev, "Idling channels...\n");
-	for (i = 0; i < engine->fifo.channels; i++) {
+	for (i = 0; i < pfifo->channels; i++) {
 		struct nouveau_channel *chan = dev_priv->fifos[i];
 		struct nouveau_fence *fence = NULL;
 
@@ -167,23 +169,19 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 		}
 	}
 
-	engine->graph.fifo_access(dev, false);
+	pgraph->fifo_access(dev, false);
 	nouveau_wait_for_idle(dev);
+	pfifo->reassign(dev, false);
+	pfifo->disable(dev);
 
-	nv_wr32(dev, NV03_PFIFO_CACHES, 0x00000000);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH, nv_rd32(dev,
-		NV04_PFIFO_CACHE1_DMA_PUSH) & ~1);
-	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000000);
-
-	i = engine->fifo.channel_id(dev);
+	i = pfifo->channel_id(dev);
 	NV_INFO(dev, "Last active channel was %d\n", i);
-	if (i >= 0 && i < engine->fifo.channels && dev_priv->fifos[i]) {
+	if (i >= 0 && i < pfifo->channels && dev_priv->fifos[i]) {
 		struct nouveau_channel *chan = dev_priv->fifos[i];
 
 		NV_INFO(dev, "Saving state of channel %d...\n", chan->id);
-		engine->fifo.save_context(chan);
-		engine->graph.save_context(chan);
+		pfifo->save_context(chan);
+		pgraph->save_context(chan);
 	}
 
 	NV_INFO(dev, "Suspending GPU objects...\n");
@@ -193,7 +191,7 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 		goto out_abort;
 	}
 
-	ret = engine->instmem.suspend(dev);
+	ret = pinstmem->suspend(dev);
 	if (ret) {
 		NV_ERROR(dev, "... failed: %d\n", ret);
 		nouveau_gpuobj_suspend_cleanup(dev);
@@ -215,14 +213,9 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 
 out_abort:
 	NV_INFO(dev, "Re-enabling acceleration..\n");
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
-		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL1, 0x00000001);
-	nv_wr32(dev, NV03_PFIFO_CACHES, 1);
-
-	engine->graph.fifo_access(dev, true);
+	pfifo->enable(dev);
+	pfifo->reassign(dev, true);
+	pgraph->fifo_access(dev, true);
 	return ret;
 }
 
@@ -294,22 +287,20 @@ nouveau_pci_resume(struct pci_dev *pdev)
 		struct nouveau_channel *chan = dev_priv->channel;
 		int ptr = chan->pushbuf_base + (chan->dma.cur << 2);
 
+		engine->graph.fifo_access(dev, false);
+		engine->fifo.reassign(dev, true);
+		engine->fifo.disable(dev);
+
 		nvchan_wr32(chan, chan->user_get, ptr);
 		nvchan_wr32(chan, chan->user_put, ptr);
 
 		engine->fifo.load_context(chan);
 		engine->graph.load_context(chan);
+
+		engine->fifo.enable(dev);
+		engine->fifo.reassign(dev, true);
+		engine->graph.fifo_access(dev, true);
 	}
-
-	NV_INFO(dev, "Re-enabling acceleration..\n");
-	nv_wr32(dev, NV04_PFIFO_CACHE1_DMA_PUSH,
-		 nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	nv_wr32(dev, NV04_PFIFO_CACHE1_PULL1, 0x00000001);
-	nv_wr32(dev, NV03_PFIFO_CACHES, 1);
-
-	engine->graph.fifo_access(dev, true);
 
 	NV_INFO(dev, "Restoring mode...\n");
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
