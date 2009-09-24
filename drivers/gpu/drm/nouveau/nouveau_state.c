@@ -107,7 +107,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.load_context	= nv10_graph_load_context;
 		engine->graph.save_context	= nv10_graph_save_context;
 		engine->fifo.channels		= 32;
-		engine->fifo.init		= nv04_fifo_init;
+		engine->fifo.init		= nv10_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
 		engine->fifo.disable		= nv04_fifo_disable;
 		engine->fifo.enable		= nv04_fifo_enable;
@@ -145,7 +145,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.load_context	= nv20_graph_load_context;
 		engine->graph.save_context	= nv20_graph_save_context;
 		engine->fifo.channels		= 32;
-		engine->fifo.init		= nv04_fifo_init;
+		engine->fifo.init		= nv10_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
 		engine->fifo.disable		= nv04_fifo_disable;
 		engine->fifo.enable		= nv04_fifo_enable;
@@ -183,7 +183,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.load_context	= nv20_graph_load_context;
 		engine->graph.save_context	= nv20_graph_save_context;
 		engine->fifo.channels		= 32;
-		engine->fifo.init		= nv04_fifo_init;
+		engine->fifo.init		= nv10_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
 		engine->fifo.disable		= nv04_fifo_disable;
 		engine->fifo.enable		= nv04_fifo_enable;

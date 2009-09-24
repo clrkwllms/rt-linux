@@ -283,7 +283,7 @@ nouveau_pci_resume(struct pci_dev *pdev)
 		}
 	}
 
-	if (dev_priv->card_type < NV_40) {
+	if (dev_priv->card_type < NV_10) {
 		struct nouveau_channel *chan = dev_priv->channel;
 		int ptr = chan->pushbuf_base + (chan->dma.cur << 2);
 
