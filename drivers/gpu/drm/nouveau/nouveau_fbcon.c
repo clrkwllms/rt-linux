@@ -163,7 +163,8 @@ not_fb:
 static int
 nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 		     uint32_t fb_height, uint32_t surface_width,
-		     uint32_t surface_height, struct drm_framebuffer **pfb)
+		     uint32_t surface_height, uint32_t surface_depth,
+		     uint32_t surface_bpp, struct drm_framebuffer **pfb)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct fb_info *info;
@@ -179,10 +180,10 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	mode_cmd.width = surface_width;
 	mode_cmd.height = surface_height;
 
-	mode_cmd.bpp = 32;
+	mode_cmd.bpp = surface_bpp;
 	mode_cmd.pitch = mode_cmd.width * (mode_cmd.bpp >> 3);
 	mode_cmd.pitch = ALIGN(mode_cmd.pitch, 256);
-	mode_cmd.depth = 24;
+	mode_cmd.depth = surface_depth;
 
 	size = mode_cmd.pitch * mode_cmd.height;
 	size = ALIGN(size, PAGE_SIZE);

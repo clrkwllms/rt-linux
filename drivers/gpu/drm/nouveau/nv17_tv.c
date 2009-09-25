@@ -129,7 +129,8 @@ static int nv17_tv_get_modes(struct drm_encoder *encoder,
 		} else {
 			mode = drm_cvt_mode(encoder->dev, modes[i].hdisplay,
 				modes[i].vdisplay, 60, false,
-				output_mode->flags & DRM_MODE_FLAG_INTERLACE);
+				output_mode->flags & DRM_MODE_FLAG_INTERLACE,
+				false);
 		}
 
 		/* CVT modes are sometimes unsuitable... */

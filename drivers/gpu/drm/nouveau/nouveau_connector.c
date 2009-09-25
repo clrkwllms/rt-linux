@@ -431,7 +431,7 @@ nouveau_connector_scaler_modes_add(struct drm_connector *connector)
 		    mode->vdisplay <= native->vdisplay) {
 			m = drm_cvt_mode(dev, mode->hdisplay, mode->vdisplay,
 					 drm_mode_vrefresh(native), false,
-					 false);
+					 false, false);
 			if (!m)
 				continue;
 
