@@ -899,6 +899,7 @@ extern struct nouveau_pgraph_object_class nv04_graph_grclass[];
 extern int  nv04_graph_init(struct drm_device *);
 extern void nv04_graph_takedown(struct drm_device *);
 extern void nv04_graph_fifo_access(struct drm_device *, bool);
+extern struct nouveau_channel *nv04_graph_channel(struct drm_device *);
 extern int  nv04_graph_create_context(struct nouveau_channel *);
 extern void nv04_graph_destroy_context(struct nouveau_channel *);
 extern int  nv04_graph_load_context(struct nouveau_channel *);

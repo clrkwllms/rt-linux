@@ -64,7 +64,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.init		= nv04_graph_init;
 		engine->graph.takedown		= nv04_graph_takedown;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
-		engine->graph.channel		= NULL;
+		engine->graph.channel		= nv04_graph_channel;
 		engine->graph.create_context	= nv04_graph_create_context;
 		engine->graph.destroy_context	= nv04_graph_destroy_context;
 		engine->graph.load_context	= nv04_graph_load_context;
