@@ -122,6 +122,7 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	struct nouveau_instmem_engine *pinstmem = &dev_priv->engine.instmem;
 	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
 	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
+	struct nouveau_channel *chan;
 	struct drm_crtc *crtc;
 	uint32_t fbdev_flags;
 	int ret, i;
@@ -150,9 +151,9 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 
 	NV_INFO(dev, "Idling channels...\n");
 	for (i = 0; i < pfifo->channels; i++) {
-		struct nouveau_channel *chan = dev_priv->fifos[i];
 		struct nouveau_fence *fence = NULL;
 
+		chan = dev_priv->fifos[i];
 		if (!chan || (dev_priv->card_type >= NV_50 &&
 			      chan == dev_priv->fifos[0]))
 			continue;
@@ -175,12 +176,15 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	pfifo->disable(dev);
 
 	i = pfifo->channel_id(dev);
-	NV_INFO(dev, "Last active channel was %d\n", i);
 	if (i >= 0 && i < pfifo->channels && dev_priv->fifos[i]) {
-		struct nouveau_channel *chan = dev_priv->fifos[i];
-
-		NV_INFO(dev, "Saving state of channel %d...\n", chan->id);
+		chan = dev_priv->fifos[i];
+		NV_INFO(dev, "Active channel on PFIFO is %d...\n", chan->id);
 		pfifo->save_context(chan);
+	}
+
+	chan = pgraph->channel(dev);
+	if (chan) {
+		NV_INFO(dev, "Active channel on PGRAPH is %d\n", chan->id);
 		pgraph->save_context(chan);
 	}
 
