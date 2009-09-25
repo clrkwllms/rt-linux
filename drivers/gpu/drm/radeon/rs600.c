@@ -28,6 +28,7 @@
 #include "drmP.h"
 #include "radeon_reg.h"
 #include "radeon.h"
+#include "avivod.h"
 
 #include "rs600_reg_safe.h"
 
@@ -68,22 +69,35 @@ void rs600_gart_tlb_flush(struct radeon_device *rdev)
 	tmp = RREG32_MC(RS600_MC_PT0_CNTL);
 }
 
-int rs600_gart_enable(struct radeon_device *rdev)
+int rs600_gart_init(struct radeon_device *rdev)
 {
-	uint32_t tmp;
-	int i;
 	int r;
 
+	if (rdev->gart.table.vram.robj) {
+		WARN(1, "RS600 GART already initialized.\n");
+		return 0;
+	}
 	/* Initialize common gart structure */
 	r = radeon_gart_init(rdev);
 	if (r) {
 		return r;
 	}
 	rdev->gart.table_size = rdev->gart.num_gpu_pages * 8;
-	r = radeon_gart_table_vram_alloc(rdev);
-	if (r) {
-		return r;
+	return radeon_gart_table_vram_alloc(rdev);
+}
+
+int rs600_gart_enable(struct radeon_device *rdev)
+{
+	uint32_t tmp;
+	int r, i;
+
+	if (rdev->gart.table.vram.robj == NULL) {
+		dev_err(rdev->dev, "No VRAM object for PCIE GART.\n");
+		return -EINVAL;
 	}
+	r = radeon_gart_table_vram_pin(rdev);
+	if (r)
+		return r;
 	/* FIXME: setup default page */
 	WREG32_MC(RS600_MC_PT0_CNTL,
 		 (RS600_EFFECTIVE_L2_CACHE_SIZE(6) |
@@ -138,8 +152,17 @@ void rs600_gart_disable(struct radeon_device *rdev)
 	tmp = RREG32_MC(RS600_MC_CNTL1);
 	tmp &= ~RS600_ENABLE_PAGE_TABLES;
 	WREG32_MC(RS600_MC_CNTL1, tmp);
-	radeon_object_kunmap(rdev->gart.table.vram.robj);
-	radeon_object_unpin(rdev->gart.table.vram.robj);
+	if (rdev->gart.table.vram.robj) {
+		radeon_object_kunmap(rdev->gart.table.vram.robj);
+		radeon_object_unpin(rdev->gart.table.vram.robj);
+	}
+}
+
+void rs600_gart_fini(struct radeon_device *rdev)
+{
+	rs600_gart_disable(rdev);
+	radeon_gart_table_vram_free(rdev);
+	radeon_gart_fini(rdev);
 }
 
 #define R600_PTE_VALID     (1 << 0)
@@ -174,6 +197,8 @@ void rs600_mc_disable_clients(struct radeon_device *rdev)
 		printk(KERN_WARNING "Failed to wait GUI idle while "
 		       "programming pipes. Bad things might happen.\n");
 	}
+
+	radeon_avivo_vga_render_disable(rdev);
 
 	tmp = RREG32(AVIVO_D1VGA_CONTROL);
 	WREG32(AVIVO_D1VGA_CONTROL, tmp & ~AVIVO_DVGA_CONTROL_MODE_ENABLE);
@@ -235,9 +260,6 @@ int rs600_mc_init(struct radeon_device *rdev)
 
 void rs600_mc_fini(struct radeon_device *rdev)
 {
-	rs600_gart_disable(rdev);
-	radeon_gart_table_vram_free(rdev);
-	radeon_gart_fini(rdev);
 }
 
 
@@ -253,11 +275,9 @@ int rs600_irq_set(struct radeon_device *rdev)
 		tmp |= RADEON_SW_INT_ENABLE;
 	}
 	if (rdev->irq.crtc_vblank_int[0]) {
-		tmp |= AVIVO_DISPLAY_INT_STATUS;
 		mode_int |= AVIVO_D1MODE_INT_MASK;
 	}
 	if (rdev->irq.crtc_vblank_int[1]) {
-		tmp |= AVIVO_DISPLAY_INT_STATUS;
 		mode_int |= AVIVO_D2MODE_INT_MASK;
 	}
 	WREG32(RADEON_GEN_INT_CNTL, tmp);

@@ -171,16 +171,7 @@ bool radeon_fence_signaled(struct radeon_fence *fence)
 int r600_fence_wait(struct radeon_fence *fence,  bool intr, bool lazy)
 {
 	struct radeon_device *rdev;
-	unsigned long cur_jiffies;
-	unsigned long timeout;
 	int ret = 0;
-
-	cur_jiffies = jiffies;
-	timeout = HZ / 100;
-
-	if (time_after(fence->timeout, cur_jiffies)) {
-		timeout = fence->timeout - cur_jiffies;
-	}
 
 	rdev = fence->rdev;
 
@@ -190,7 +181,7 @@ int r600_fence_wait(struct radeon_fence *fence,  bool intr, bool lazy)
 		if (radeon_fence_signaled(fence))
 			break;
 
-		if (time_after_eq(jiffies, timeout)) {
+		if (time_after_eq(jiffies, fence->timeout)) {
 			ret = -EBUSY;
 			break;
 		}
@@ -199,7 +190,7 @@ int r600_fence_wait(struct radeon_fence *fence,  bool intr, bool lazy)
 			schedule_timeout(1);
 
 		if (intr && signal_pending(current)) {
-			ret = -ERESTART;
+			ret = -ERESTARTSYS;
 			break;
 		}
 	}
@@ -225,8 +216,12 @@ int radeon_fence_wait(struct radeon_fence *fence, bool intr)
 		return 0;
 	}
 
-	if (rdev->family >= CHIP_R600)
-		return r600_fence_wait(fence, intr, 0);
+	if (rdev->family >= CHIP_R600) {
+		r = r600_fence_wait(fence, intr, 0);
+		if (r == -ERESTARTSYS)
+			return -EBUSY;
+		return r;
+	}
 
 retry:
 	cur_jiffies = jiffies;

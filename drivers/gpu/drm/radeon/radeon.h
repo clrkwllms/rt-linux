@@ -49,8 +49,8 @@
 #include <linux/list.h>
 #include <linux/kref.h>
 
+#include "radeon_family.h"
 #include "radeon_mode.h"
-#include "radeon_share.h"
 #include "radeon_reg.h"
 
 /*
@@ -76,64 +76,7 @@ extern int radeon_tv;
 #define RADEON_IB_POOL_SIZE		16
 #define RADEON_DEBUGFS_MAX_NUM_FILES	32
 #define RADEONFB_CONN_LIMIT		4
-
-enum radeon_family {
-	CHIP_R100,
-	CHIP_RV100,
-	CHIP_RS100,
-	CHIP_RV200,
-	CHIP_RS200,
-	CHIP_R200,
-	CHIP_RV250,
-	CHIP_RS300,
-	CHIP_RV280,
-	CHIP_R300,
-	CHIP_R350,
-	CHIP_RV350,
-	CHIP_RV380,
-	CHIP_R420,
-	CHIP_R423,
-	CHIP_RV410,
-	CHIP_RS400,
-	CHIP_RS480,
-	CHIP_RS600,
-	CHIP_RS690,
-	CHIP_RS740,
-	CHIP_RV515,
-	CHIP_R520,
-	CHIP_RV530,
-	CHIP_RV560,
-	CHIP_RV570,
-	CHIP_R580,
-	CHIP_R600,
-	CHIP_RV610,
-	CHIP_RV630,
-	CHIP_RV620,
-	CHIP_RV635,
-	CHIP_RV670,
-	CHIP_RS780,
-	CHIP_RS880,
-	CHIP_RV770,
-	CHIP_RV730,
-	CHIP_RV710,
-	CHIP_RV740,
-	CHIP_LAST,
-};
-
-enum radeon_chip_flags {
-	RADEON_FAMILY_MASK = 0x0000ffffUL,
-	RADEON_FLAGS_MASK = 0xffff0000UL,
-	RADEON_IS_MOBILITY = 0x00010000UL,
-	RADEON_IS_IGP = 0x00020000UL,
-	RADEON_SINGLE_CRTC = 0x00040000UL,
-	RADEON_IS_AGP = 0x00080000UL,
-	RADEON_HAS_HIERZ = 0x00100000UL,
-	RADEON_IS_PCIE = 0x00200000UL,
-	RADEON_NEW_MEMMAP = 0x00400000UL,
-	RADEON_IS_PCI = 0x00800000UL,
-	RADEON_IS_IGPGART = 0x01000000UL,
-};
-
+#define RADEON_BIOS_NUM_SCRATCH		8
 
 /*
  * Errata workarounds.
@@ -399,10 +342,14 @@ struct radeon_ib {
 	unsigned long		idx;
 	uint64_t		gpu_addr;
 	struct radeon_fence	*fence;
-	volatile uint32_t	*ptr;
+	uint32_t	*ptr;
 	uint32_t		length_dw;
 };
 
+/*
+ * locking -
+ * mutex protects scheduled_ibs, ready, alloc_bm
+ */
 struct radeon_ib_pool {
 	struct mutex		mutex;
 	struct radeon_object	*robj;
@@ -468,7 +415,12 @@ struct radeon_cs_reloc {
 struct radeon_cs_chunk {
 	uint32_t		chunk_id;
 	uint32_t		length_dw;
+	int kpage_idx[2];
+	uint32_t                *kpage[2];
 	uint32_t		*kdata;
+	void __user *user_ptr;
+	int last_copied_page;
+	int last_page_index;
 };
 
 struct radeon_cs_parser {
@@ -491,7 +443,37 @@ struct radeon_cs_parser {
 	struct radeon_ib	*ib;
 	void			*track;
 	unsigned		family;
+	int parser_error;
 };
+
+extern int radeon_cs_update_pages(struct radeon_cs_parser *p, int pg_idx);
+extern int radeon_cs_finish_pages(struct radeon_cs_parser *p);
+
+
+static inline u32 radeon_get_ib_value(struct radeon_cs_parser *p, int idx)
+{
+	struct radeon_cs_chunk *ibc = &p->chunks[p->chunk_ib_idx];
+	u32 pg_idx, pg_offset;
+	u32 idx_value = 0;
+	int new_page;
+
+	pg_idx = (idx * 4) / PAGE_SIZE;
+	pg_offset = (idx * 4) % PAGE_SIZE;
+
+	if (ibc->kpage_idx[0] == pg_idx)
+		return ibc->kpage[0][pg_offset/4];
+	if (ibc->kpage_idx[1] == pg_idx)
+		return ibc->kpage[1][pg_offset/4];
+
+	new_page = radeon_cs_update_pages(p, pg_idx);
+	if (new_page < 0) {
+		p->parser_error = new_page;
+		return 0;
+	}
+
+	idx_value = ibc->kpage[new_page][pg_offset/4];
+	return idx_value;
+}
 
 struct radeon_cs_packet {
 	unsigned	idx;
@@ -597,6 +579,8 @@ struct radeon_asic {
 	void (*mc_fini)(struct radeon_device *rdev);
 	int (*wb_init)(struct radeon_device *rdev);
 	void (*wb_fini)(struct radeon_device *rdev);
+	int (*gart_init)(struct radeon_device *rdev);
+	void (*gart_fini)(struct radeon_device *rdev);
 	int (*gart_enable)(struct radeon_device *rdev);
 	void (*gart_disable)(struct radeon_device *rdev);
 	void (*gart_tlb_flush)(struct radeon_device *rdev);
@@ -640,9 +624,53 @@ struct radeon_asic {
 	void (*bandwidth_update)(struct radeon_device *rdev);
 };
 
+/*
+ * Asic structures
+ */
 struct r100_asic {
 	const unsigned	*reg_safe_bm;
 	unsigned	reg_safe_bm_size;
+};
+
+struct r300_asic {
+	const unsigned	*reg_safe_bm;
+	unsigned	reg_safe_bm_size;
+};
+
+struct r600_asic {
+	unsigned max_pipes;
+	unsigned max_tile_pipes;
+	unsigned max_simds;
+	unsigned max_backends;
+	unsigned max_gprs;
+	unsigned max_threads;
+	unsigned max_stack_entries;
+	unsigned max_hw_contexts;
+	unsigned max_gs_threads;
+	unsigned sx_max_export_size;
+	unsigned sx_max_export_pos_size;
+	unsigned sx_max_export_smx_size;
+	unsigned sq_num_cf_insts;
+};
+
+struct rv770_asic {
+	unsigned max_pipes;
+	unsigned max_tile_pipes;
+	unsigned max_simds;
+	unsigned max_backends;
+	unsigned max_gprs;
+	unsigned max_threads;
+	unsigned max_stack_entries;
+	unsigned max_hw_contexts;
+	unsigned max_gs_threads;
+	unsigned sx_max_export_size;
+	unsigned sx_max_export_pos_size;
+	unsigned sx_max_export_smx_size;
+	unsigned sq_num_cf_insts;
+	unsigned sx_num_of_sets;
+	unsigned sc_prim_fifo_size;
+	unsigned sc_hiz_tile_fifo_size;
+	unsigned sc_earlyz_tile_fifo_fize;
 };
 
 union radeon_asic_config {
@@ -690,6 +718,7 @@ typedef uint32_t (*radeon_rreg_t)(struct radeon_device*, uint32_t);
 typedef void (*radeon_wreg_t)(struct radeon_device*, uint32_t, uint32_t);
 
 struct radeon_device {
+	struct device			*dev;
 	struct drm_device		*ddev;
 	struct pci_dev			*pdev;
 	/* ASIC */
@@ -733,6 +762,7 @@ struct radeon_device {
 	struct radeon_asic		*asic;
 	struct radeon_gem		gem;
 	struct radeon_pm		pm;
+	uint32_t			bios_scratch[RADEON_BIOS_NUM_SCRATCH];
 	struct mutex			cs_mutex;
 	struct radeon_wb		wb;
 	struct radeon_dummy_page	dummy_page;
@@ -741,6 +771,7 @@ struct radeon_device {
 	bool				suspend;
 	bool				need_dma32;
 	bool				new_init_path;
+	bool				accel_working;
 	struct radeon_surface_reg surface_regs[RADEON_GEM_MAX_SURFACES];
 	const struct firmware *me_fw;	/* all family ME firmware */
 	const struct firmware *pfp_fw;	/* r6/700 PFP firmware */
@@ -906,6 +937,8 @@ static inline void radeon_ring_write(struct radeon_device *rdev, uint32_t v)
 #define radeon_mc_fini(rdev) (rdev)->asic->mc_fini((rdev))
 #define radeon_wb_init(rdev) (rdev)->asic->wb_init((rdev))
 #define radeon_wb_fini(rdev) (rdev)->asic->wb_fini((rdev))
+#define radeon_gpu_gart_init(rdev) (rdev)->asic->gart_init((rdev))
+#define radeon_gpu_gart_fini(rdev) (rdev)->asic->gart_fini((rdev))
 #define radeon_gart_enable(rdev) (rdev)->asic->gart_enable((rdev))
 #define radeon_gart_disable(rdev) (rdev)->asic->gart_disable((rdev))
 #define radeon_gart_tlb_flush(rdev) (rdev)->asic->gart_tlb_flush((rdev))
@@ -932,5 +965,89 @@ static inline void radeon_ring_write(struct radeon_device *rdev, uint32_t v)
 #define radeon_set_surface_reg(rdev, r, f, p, o, s) ((rdev)->asic->set_surface_reg((rdev), (r), (f), (p), (o), (s)))
 #define radeon_clear_surface_reg(rdev, r) ((rdev)->asic->clear_surface_reg((rdev), (r)))
 #define radeon_bandwidth_update(rdev) (rdev)->asic->bandwidth_update((rdev))
+
+/* Common functions */
+extern int radeon_gart_table_vram_pin(struct radeon_device *rdev);
+extern int radeon_modeset_init(struct radeon_device *rdev);
+extern void radeon_modeset_fini(struct radeon_device *rdev);
+extern bool radeon_card_posted(struct radeon_device *rdev);
+extern int radeon_clocks_init(struct radeon_device *rdev);
+extern void radeon_clocks_fini(struct radeon_device *rdev);
+extern void radeon_scratch_init(struct radeon_device *rdev);
+extern void radeon_surface_init(struct radeon_device *rdev);
+extern int radeon_cs_parser_init(struct radeon_cs_parser *p, void *data);
+
+/* r100,rv100,rs100,rv200,rs200,r200,rv250,rs300,rv280 */
+struct r100_mc_save {
+	u32	GENMO_WT;
+	u32	CRTC_EXT_CNTL;
+	u32	CRTC_GEN_CNTL;
+	u32	CRTC2_GEN_CNTL;
+	u32	CUR_OFFSET;
+	u32	CUR2_OFFSET;
+};
+extern void r100_cp_disable(struct radeon_device *rdev);
+extern int r100_cp_init(struct radeon_device *rdev, unsigned ring_size);
+extern void r100_cp_fini(struct radeon_device *rdev);
+extern void r100_pci_gart_tlb_flush(struct radeon_device *rdev);
+extern int r100_pci_gart_init(struct radeon_device *rdev);
+extern void r100_pci_gart_fini(struct radeon_device *rdev);
+extern int r100_pci_gart_enable(struct radeon_device *rdev);
+extern void r100_pci_gart_disable(struct radeon_device *rdev);
+extern int r100_pci_gart_set_page(struct radeon_device *rdev, int i, uint64_t addr);
+extern int r100_debugfs_mc_info_init(struct radeon_device *rdev);
+extern int r100_gui_wait_for_idle(struct radeon_device *rdev);
+extern void r100_ib_fini(struct radeon_device *rdev);
+extern int r100_ib_init(struct radeon_device *rdev);
+extern void r100_irq_disable(struct radeon_device *rdev);
+extern int r100_irq_set(struct radeon_device *rdev);
+extern void r100_mc_stop(struct radeon_device *rdev, struct r100_mc_save *save);
+extern void r100_mc_resume(struct radeon_device *rdev, struct r100_mc_save *save);
+extern void r100_vram_init_sizes(struct radeon_device *rdev);
+extern void r100_wb_disable(struct radeon_device *rdev);
+extern void r100_wb_fini(struct radeon_device *rdev);
+extern int r100_wb_init(struct radeon_device *rdev);
+
+/* r300,r350,rv350,rv370,rv380 */
+extern void r300_set_reg_safe(struct radeon_device *rdev);
+extern void r300_mc_program(struct radeon_device *rdev);
+extern void r300_vram_info(struct radeon_device *rdev);
+extern int rv370_pcie_gart_init(struct radeon_device *rdev);
+extern void rv370_pcie_gart_fini(struct radeon_device *rdev);
+extern int rv370_pcie_gart_enable(struct radeon_device *rdev);
+extern void rv370_pcie_gart_disable(struct radeon_device *rdev);
+
+/* r420,r423,rv410 */
+extern u32 r420_mc_rreg(struct radeon_device *rdev, u32 reg);
+extern void r420_mc_wreg(struct radeon_device *rdev, u32 reg, u32 v);
+extern int r420_debugfs_pipes_info_init(struct radeon_device *rdev);
+
+/* rv515 */
+extern void rv515_bandwidth_avivo_update(struct radeon_device *rdev);
+
+/* rs690, rs740 */
+extern void rs690_line_buffer_adjust(struct radeon_device *rdev,
+					struct drm_display_mode *mode1,
+					struct drm_display_mode *mode2);
+
+/* r600, rv610, rv630, rv620, rv635, rv670, rs780, rs880 */
+extern bool r600_card_posted(struct radeon_device *rdev);
+extern void r600_cp_stop(struct radeon_device *rdev);
+extern void r600_ring_init(struct radeon_device *rdev, unsigned ring_size);
+extern int r600_cp_resume(struct radeon_device *rdev);
+extern int r600_count_pipe_bits(uint32_t val);
+extern int r600_gart_clear_page(struct radeon_device *rdev, int i);
+extern int r600_mc_wait_for_idle(struct radeon_device *rdev);
+extern int r600_pcie_gart_init(struct radeon_device *rdev);
+extern void r600_pcie_gart_tlb_flush(struct radeon_device *rdev);
+extern int r600_ib_test(struct radeon_device *rdev);
+extern int r600_ring_test(struct radeon_device *rdev);
+extern int r600_wb_init(struct radeon_device *rdev);
+extern void r600_wb_fini(struct radeon_device *rdev);
+extern void r600_scratch_init(struct radeon_device *rdev);
+extern int r600_blit_init(struct radeon_device *rdev);
+extern void r600_blit_fini(struct radeon_device *rdev);
+extern int r600_cp_init_microcode(struct radeon_device *rdev);
+extern int r600_gpu_reset(struct radeon_device *rdev);
 
 #endif

@@ -32,7 +32,6 @@
 #include "radeon_drm.h"
 #include "radeon.h"
 #include "radeon_mode.h"
-#include "radeon_share.h"
 #include "r600d.h"
 #include "avivod.h"
 #include "atom.h"
@@ -114,23 +113,35 @@ void r600_pcie_gart_tlb_flush(struct radeon_device *rdev)
 	}
 }
 
+int r600_pcie_gart_init(struct radeon_device *rdev)
+{
+	int r;
+
+	if (rdev->gart.table.vram.robj) {
+		WARN(1, "R600 PCIE GART already initialized.\n");
+		return 0;
+	}
+	/* Initialize common gart structure */
+	r = radeon_gart_init(rdev);
+	if (r)
+		return r;
+	rdev->gart.table_size = rdev->gart.num_gpu_pages * 8;
+	return radeon_gart_table_vram_alloc(rdev);
+}
+
 int r600_pcie_gart_enable(struct radeon_device *rdev)
 {
 	u32 tmp;
 	int r, i;
 
-	/* Initialize common gart structure */
-	r = radeon_gart_init(rdev);
-	if (r) {
-		return r;
+	if (rdev->gart.table.vram.robj == NULL) {
+		dev_err(rdev->dev, "No VRAM object for PCIE GART.\n");
+		return -EINVAL;
 	}
-	rdev->gart.table_size = rdev->gart.num_gpu_pages * 8;
-	r = radeon_gart_table_vram_alloc(rdev);
-	if (r) {
+	r = radeon_gart_table_vram_pin(rdev);
+	if (r)
 		return r;
-	}
-	for (i = 0; i < rdev->gart.num_gpu_pages; i++)
-		r600_gart_clear_page(rdev, i);
+
 	/* Setup L2 cache */
 	WREG32(VM_L2_CNTL, ENABLE_L2_CACHE | ENABLE_L2_FRAGMENT_PROCESSING |
 				ENABLE_L2_PTE_CACHE_LRU_UPDATE_BY_WRITE |
@@ -176,10 +187,6 @@ void r600_pcie_gart_disable(struct radeon_device *rdev)
 	u32 tmp;
 	int i;
 
-	/* Clear ptes*/
-	for (i = 0; i < rdev->gart.num_gpu_pages; i++)
-		r600_gart_clear_page(rdev, i);
-	r600_pcie_gart_tlb_flush(rdev);
 	/* Disable all tables */
 	for (i = 0; i < 7; i++)
 		WREG32(VM_CONTEXT0_CNTL + (i * 4), 0);
@@ -205,6 +212,17 @@ void r600_pcie_gart_disable(struct radeon_device *rdev)
 	WREG32(MC_VM_L1_TLB_MCB_WR_SYS_CNTL, tmp);
 	WREG32(MC_VM_L1_TLB_MCB_RD_HDP_CNTL, tmp);
 	WREG32(MC_VM_L1_TLB_MCB_WR_HDP_CNTL, tmp);
+	if (rdev->gart.table.vram.robj) {
+		radeon_object_kunmap(rdev->gart.table.vram.robj);
+		radeon_object_unpin(rdev->gart.table.vram.robj);
+	}
+}
+
+void r600_pcie_gart_fini(struct radeon_device *rdev)
+{
+	r600_pcie_gart_disable(rdev);
+	radeon_gart_table_vram_free(rdev);
+	radeon_gart_fini(rdev);
 }
 
 int r600_mc_wait_for_idle(struct radeon_device *rdev)
@@ -321,6 +339,10 @@ static void r600_mc_resume(struct radeon_device *rdev)
 	WREG32(D1VGA_CONTROL, d1vga_control);
 	WREG32(D2VGA_CONTROL, d2vga_control);
 	WREG32(VGA_RENDER_CONTROL, vga_render_control);
+
+	/* we need to own VRAM, so turn off the VGA renderer here
+	 * to stop it overwriting our objects */
+	radeon_avivo_vga_render_disable(rdev);
 }
 
 int r600_mc_init(struct radeon_device *rdev)
@@ -1444,7 +1466,7 @@ bool r600_card_posted(struct radeon_device *rdev)
 	return false;
 }
 
-int r600_resume(struct radeon_device *rdev)
+int r600_startup(struct radeon_device *rdev)
 {
 	int r;
 
@@ -1454,6 +1476,14 @@ int r600_resume(struct radeon_device *rdev)
 	if (r)
 		return r;
 	r600_gpu_init(rdev);
+
+	r = radeon_object_pin(rdev->r600_blit.shader_obj, RADEON_GEM_DOMAIN_VRAM,
+			      &rdev->r600_blit.shader_gpu_addr);
+	if (r) {
+		DRM_ERROR("failed to pin blit object %d\n", r);
+		return r;
+	}
+
 	r = radeon_ring_init(rdev, rdev->cp.ring_size);
 	if (r)
 		return r;
@@ -1469,10 +1499,49 @@ int r600_resume(struct radeon_device *rdev)
 	return 0;
 }
 
+int r600_resume(struct radeon_device *rdev)
+{
+	int r;
+
+	if (radeon_gpu_reset(rdev)) {
+		/* FIXME: what do we want to do here ? */
+	}
+	/* post card */
+	if (rdev->is_atom_bios) {
+		atom_asic_init(rdev->mode_info.atom_context);
+	} else {
+		radeon_combios_asic_init(rdev->ddev);
+	}
+	/* Initialize clocks */
+	r = radeon_clocks_init(rdev);
+	if (r) {
+		return r;
+	}
+
+	r = r600_startup(rdev);
+	if (r) {
+		DRM_ERROR("r600 startup failed on resume\n");
+		return r;
+	}
+
+	r = radeon_ib_test(rdev);
+	if (r) {
+		DRM_ERROR("radeon: failled testing IB (%d).\n", r);
+		return r;
+	}
+	return r;
+}
+
+
 int r600_suspend(struct radeon_device *rdev)
 {
 	/* FIXME: we should wait for ring to be empty */
 	r600_cp_stop(rdev);
+	rdev->cp.ready = false;
+
+	r600_pcie_gart_disable(rdev);
+	/* unpin shaders bo */
+	radeon_object_unpin(rdev->r600_blit.shader_obj);
 	return 0;
 }
 
@@ -1517,6 +1586,7 @@ int r600_init(struct radeon_device *rdev)
 	r600_scratch_init(rdev);
 	/* Initialize surface registers */
 	radeon_surface_init(rdev);
+	radeon_get_clock_info(rdev->ddev);
 	r = radeon_clocks_init(rdev);
 	if (r)
 		return r;
@@ -1549,7 +1619,18 @@ int r600_init(struct radeon_device *rdev)
 		}
 	}
 
-	r = r600_resume(rdev);
+	r = r600_pcie_gart_init(rdev);
+	if (r)
+		return r;
+
+	rdev->accel_working = true;
+	r = r600_blit_init(rdev);
+	if (r) {
+		DRM_ERROR("radeon: failled blitter (%d).\n", r);
+		return r;
+	}
+
+	r = r600_startup(rdev);
 	if (r) {
 		if (rdev->flags & RADEON_IS_AGP) {
 			/* Retry with disabling AGP */
@@ -1557,22 +1638,19 @@ int r600_init(struct radeon_device *rdev)
 			rdev->flags &= ~RADEON_IS_AGP;
 			return r600_init(rdev);
 		}
-		return r;
+		rdev->accel_working = false;
 	}
-	r = radeon_ib_pool_init(rdev);
-	if (r) {
-		DRM_ERROR("radeon: failled initializing IB pool (%d).\n", r);
-		return r;
-	}
-	r = r600_blit_init(rdev);
-	if (r) {
-		DRM_ERROR("radeon: failled blitter (%d).\n", r);
-		return r;
-	}
-	r = radeon_ib_test(rdev);
-	if (r) {
-		DRM_ERROR("radeon: failled testing IB (%d).\n", r);
-			return r;
+	if (rdev->accel_working) {
+		r = radeon_ib_pool_init(rdev);
+		if (r) {
+			DRM_ERROR("radeon: failled initializing IB pool (%d).\n", r);
+			rdev->accel_working = false;
+		}
+		r = radeon_ib_test(rdev);
+		if (r) {
+			DRM_ERROR("radeon: failled testing IB (%d).\n", r);
+			rdev->accel_working = false;
+		}
 	}
 	return 0;
 }
@@ -1584,9 +1662,7 @@ void r600_fini(struct radeon_device *rdev)
 
 	r600_blit_fini(rdev);
 	radeon_ring_fini(rdev);
-	r600_pcie_gart_disable(rdev);
-	radeon_gart_table_vram_free(rdev);
-	radeon_gart_fini(rdev);
+	r600_pcie_gart_fini(rdev);
 	radeon_gem_fini(rdev);
 	radeon_fence_driver_fini(rdev);
 	radeon_clocks_fini(rdev);

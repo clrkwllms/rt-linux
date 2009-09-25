@@ -241,8 +241,11 @@ atombios_dac_setup(struct drm_encoder *encoder, int action)
 	struct radeon_encoder *radeon_encoder = to_radeon_encoder(encoder);
 	DAC_ENCODER_CONTROL_PS_ALLOCATION args;
 	int index = 0, num = 0;
-	/* fixme - fill in enc_priv for atom dac */
+	struct radeon_encoder_atom_dac *dac_info = radeon_encoder->enc_priv;
 	enum radeon_tv_std tv_std = TV_STD_NTSC;
+
+	if (dac_info->tv_std)
+		tv_std = dac_info->tv_std;
 
 	memset(&args, 0, sizeof(args));
 
@@ -296,8 +299,11 @@ atombios_tv_setup(struct drm_encoder *encoder, int action)
 	struct radeon_encoder *radeon_encoder = to_radeon_encoder(encoder);
 	TV_ENCODER_CONTROL_PS_ALLOCATION args;
 	int index = 0;
-	/* fixme - fill in enc_priv for atom dac */
+	struct radeon_encoder_atom_dac *dac_info = radeon_encoder->enc_priv;
 	enum radeon_tv_std tv_std = TV_STD_NTSC;
+
+	if (dac_info->tv_std)
+		tv_std = dac_info->tv_std;
 
 	memset(&args, 0, sizeof(args));
 
@@ -537,6 +543,7 @@ atombios_get_encoder_mode(struct drm_encoder *encoder)
 
 	switch (connector->connector_type) {
 	case DRM_MODE_CONNECTOR_DVII:
+	case DRM_MODE_CONNECTOR_HDMIB: /* HDMI-B is basically DL-DVI; analog works fine */
 		if (drm_detect_hdmi_monitor((struct edid *)connector->edid_blob_ptr))
 			return ATOM_ENCODER_MODE_HDMI;
 		else if (radeon_connector->use_digital)
@@ -546,7 +553,6 @@ atombios_get_encoder_mode(struct drm_encoder *encoder)
 		break;
 	case DRM_MODE_CONNECTOR_DVID:
 	case DRM_MODE_CONNECTOR_HDMIA:
-	case DRM_MODE_CONNECTOR_HDMIB:
 	default:
 		if (drm_detect_hdmi_monitor((struct edid *)connector->edid_blob_ptr))
 			return ATOM_ENCODER_MODE_HDMI;
@@ -1400,8 +1406,14 @@ radeon_add_atom_encoder(struct drm_device *dev, uint32_t encoder_id, uint32_t su
 	case ENCODER_OBJECT_ID_INTERNAL_KLDSCP_LVTMA:
 	case ENCODER_OBJECT_ID_INTERNAL_UNIPHY1:
 	case ENCODER_OBJECT_ID_INTERNAL_UNIPHY2:
-		drm_encoder_init(dev, encoder, &radeon_atom_enc_funcs, DRM_MODE_ENCODER_TMDS);
-		radeon_encoder->enc_priv = radeon_atombios_set_dig_info(radeon_encoder);
+		if (radeon_encoder->devices & (ATOM_DEVICE_LCD_SUPPORT)) {
+			radeon_encoder->rmx_type = RMX_FULL;
+			drm_encoder_init(dev, encoder, &radeon_atom_enc_funcs, DRM_MODE_ENCODER_LVDS);
+			radeon_encoder->enc_priv = radeon_atombios_get_lvds_info(radeon_encoder);
+		} else {
+			drm_encoder_init(dev, encoder, &radeon_atom_enc_funcs, DRM_MODE_ENCODER_TMDS);
+			radeon_encoder->enc_priv = radeon_atombios_set_dig_info(radeon_encoder);
+		}
 		drm_encoder_helper_add(encoder, &radeon_atom_dig_helper_funcs);
 		break;
 	}

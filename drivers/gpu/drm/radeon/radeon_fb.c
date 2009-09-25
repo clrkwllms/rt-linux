@@ -45,71 +45,9 @@ struct radeon_fb_device {
 	struct radeon_device		*rdev;
 };
 
-static int radeon_fb_check_var(struct fb_var_screeninfo *var,
-			       struct fb_info *info)
-{
-	int ret;
-	ret = drm_fb_helper_check_var(var, info);
-	if (ret)
-		return ret;
-
-	/* big endian override for radeon endian workaround */
-#ifdef __BIG_ENDIAN
-	{
-		int depth;
-		switch (var->bits_per_pixel) {
-		case 16:
-			depth = (var->green.length == 6) ? 16 : 15;
-			break;
-		case 32:
-			depth = (var->transp.length > 0) ? 32 : 24;
-			break;
-		default:
-			depth = var->bits_per_pixel;
-			break;
-		}
-		switch (depth) {
-		case 8:
-			var->red.offset = 0;
-			var->green.offset = 0;
-			var->blue.offset = 0;
-			var->red.length = 8;
-			var->green.length = 8;
-			var->blue.length = 8;
-			var->transp.length = 0;
-			var->transp.offset = 0;
-			break;
-		case 24:
-			var->red.offset = 8;
-			var->green.offset = 16;
-			var->blue.offset = 24;
-			var->red.length = 8;
-			var->green.length = 8;
-			var->blue.length = 8;
-			var->transp.length = 0;
-			var->transp.offset = 0;
-			break;
-		case 32:
-			var->red.offset = 8;
-			var->green.offset = 16;
-			var->blue.offset = 24;
-			var->red.length = 8;
-			var->green.length = 8;
-			var->blue.length = 8;
-			var->transp.length = 8;
-			var->transp.offset = 0;
-			break;
-		default:
-			return -EINVAL;
-		}
-	}
-#endif
-	return 0;
-}
-
 static struct fb_ops radeonfb_ops = {
 	.owner = THIS_MODULE,
-	.fb_check_var = radeon_fb_check_var,
+	.fb_check_var = drm_fb_helper_check_var,
 	.fb_set_par = drm_fb_helper_set_par,
 	.fb_setcolreg = drm_fb_helper_setcolreg,
 	.fb_fillrect = cfb_fillrect,
@@ -190,6 +128,7 @@ static struct drm_fb_helper_funcs radeon_fb_helper_funcs = {
 int radeonfb_create(struct drm_device *dev,
 		    uint32_t fb_width, uint32_t fb_height,
 		    uint32_t surface_width, uint32_t surface_height,
+		    uint32_t surface_depth, uint32_t surface_bpp,
 		    struct drm_framebuffer **fb_p)
 {
 	struct radeon_device *rdev = dev->dev_private;
@@ -206,13 +145,14 @@ int radeonfb_create(struct drm_device *dev,
 	void *fbptr = NULL;
 	unsigned long tmp;
 	bool fb_tiled = false; /* useful for testing */
+	u32 tiling_flags = 0;
 
 	mode_cmd.width = surface_width;
 	mode_cmd.height = surface_height;
-	mode_cmd.bpp = 32;
+	mode_cmd.bpp = surface_bpp;
 	/* need to align pitch with crtc limits */
 	mode_cmd.pitch = radeon_align_pitch(rdev, mode_cmd.width, mode_cmd.bpp, fb_tiled) * ((mode_cmd.bpp + 1) / 8);
-	mode_cmd.depth = 24;
+	mode_cmd.depth = surface_depth;
 
 	size = mode_cmd.pitch * mode_cmd.height;
 	aligned_size = ALIGN(size, PAGE_SIZE);
@@ -230,7 +170,22 @@ int radeonfb_create(struct drm_device *dev,
 	robj = gobj->driver_private;
 
 	if (fb_tiled)
-		radeon_object_set_tiling_flags(robj, RADEON_TILING_MACRO|RADEON_TILING_SURFACE, mode_cmd.pitch);
+		tiling_flags = RADEON_TILING_MACRO;
+
+#ifdef __BIG_ENDIAN
+	switch (mode_cmd.bpp) {
+	case 32:
+		tiling_flags |= RADEON_TILING_SWAP_32BIT;
+		break;
+	case 16:
+		tiling_flags |= RADEON_TILING_SWAP_16BIT;
+	default:
+		break;
+	}
+#endif
+
+	if (tiling_flags)
+		radeon_object_set_tiling_flags(robj, tiling_flags | RADEON_TILING_SURFACE, mode_cmd.pitch);
 	mutex_lock(&rdev->ddev->struct_mutex);
 	fb = radeon_framebuffer_create(rdev->ddev, &mode_cmd, gobj);
 	if (fb == NULL) {
@@ -258,6 +213,7 @@ int radeonfb_create(struct drm_device *dev,
 		goto out_unref;
 	}
 
+	rdev->fbdev_info = info;
 	rfbdev = info->par;
 	rfbdev->helper.funcs = &radeon_fb_helper_funcs;
 	rfbdev->helper.dev = dev;
@@ -312,45 +268,6 @@ int radeonfb_create(struct drm_device *dev,
 	DRM_INFO("fb depth is %d\n", fb->depth);
 	DRM_INFO("   pitch is %d\n", fb->pitch);
 
-#ifdef __BIG_ENDIAN
-	/* fill var sets defaults for this stuff - override
-	   on big endian */
-	switch (fb->depth) {
-	case 8:
-		info->var.red.offset = 0;
-		info->var.green.offset = 0;
-		info->var.blue.offset = 0;
-		info->var.red.length = 8; /* 8bit DAC */
-		info->var.green.length = 8;
-		info->var.blue.length = 8;
-		info->var.transp.offset = 0;
-		info->var.transp.length = 0;
-		break;
-	case 24:
-		info->var.red.offset = 8;
-		info->var.green.offset = 16;
-		info->var.blue.offset = 24;
-		info->var.red.length = 8;
-		info->var.green.length = 8;
-		info->var.blue.length = 8;
-		info->var.transp.offset = 0;
-		info->var.transp.length = 0;
-		break;
-	case 32:
-		info->var.red.offset = 8;
-		info->var.green.offset = 16;
-		info->var.blue.offset = 24;
-		info->var.red.length = 8;
-		info->var.green.length = 8;
-		info->var.blue.length = 8;
-		info->var.transp.offset = 0;
-		info->var.transp.length = 8;
-		break;
-	default:
-		break;
-	}
-#endif
-
 	fb->fbdev = info;
 	rfbdev->rfb = rfb;
 	rfbdev->rdev = rdev;
@@ -374,13 +291,26 @@ out:
 	return ret;
 }
 
+static char *mode_option;
+int radeon_parse_options(char *options)
+{
+	char *this_opt;
+
+	if (!options || !*options)
+		return 0;
+
+	while ((this_opt = strsep(&options, ",")) != NULL) {
+		if (!*this_opt)
+			continue;
+		mode_option = this_opt;
+	}
+	return 0;
+}
+
 int radeonfb_probe(struct drm_device *dev)
 {
-	int ret;
-	ret = drm_fb_helper_single_fb_probe(dev, &radeonfb_create);
-	return ret;
+	return drm_fb_helper_single_fb_probe(dev, &radeonfb_create);
 }
-EXPORT_SYMBOL(radeonfb_probe);
 
 int radeonfb_remove(struct drm_device *dev, struct drm_framebuffer *fb)
 {

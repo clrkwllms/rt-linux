@@ -34,6 +34,8 @@
 #include <linux/firmware.h>
 #include <linux/platform_device.h>
 
+#include "radeon_family.h"
+
 /* General customization:
  */
 
@@ -109,73 +111,10 @@
 #define DRIVER_MINOR		31
 #define DRIVER_PATCHLEVEL	0
 
-/*
- * Radeon chip families
- */
-enum radeon_family {
-	CHIP_R100,
-	CHIP_RV100,
-	CHIP_RS100,
-	CHIP_RV200,
-	CHIP_RS200,
-	CHIP_R200,
-	CHIP_RV250,
-	CHIP_RS300,
-	CHIP_RV280,
-	CHIP_R300,
-	CHIP_R350,
-	CHIP_RV350,
-	CHIP_RV380,
-	CHIP_R420,
-	CHIP_R423,
-	CHIP_RV410,
-	CHIP_RS400,
-	CHIP_RS480,
-	CHIP_RS600,
-	CHIP_RS690,
-	CHIP_RS740,
-	CHIP_RV515,
-	CHIP_R520,
-	CHIP_RV530,
-	CHIP_RV560,
-	CHIP_RV570,
-	CHIP_R580,
-	CHIP_R600,
-	CHIP_RV610,
-	CHIP_RV630,
-	CHIP_RV620,
-	CHIP_RV635,
-	CHIP_RV670,
-	CHIP_RS780,
-	CHIP_RS880,
-	CHIP_RV770,
-	CHIP_RV730,
-	CHIP_RV710,
-	CHIP_RV740,
-	CHIP_LAST,
-};
-
 enum radeon_cp_microcode_version {
 	UCODE_R100,
 	UCODE_R200,
 	UCODE_R300,
-};
-
-/*
- * Chip flags
- */
-enum radeon_chip_flags {
-	RADEON_FAMILY_MASK = 0x0000ffffUL,
-	RADEON_FLAGS_MASK = 0xffff0000UL,
-	RADEON_IS_MOBILITY = 0x00010000UL,
-	RADEON_IS_IGP = 0x00020000UL,
-	RADEON_SINGLE_CRTC = 0x00040000UL,
-	RADEON_IS_AGP = 0x00080000UL,
-	RADEON_HAS_HIERZ = 0x00100000UL,
-	RADEON_IS_PCIE = 0x00200000UL,
-	RADEON_NEW_MEMMAP = 0x00400000UL,
-	RADEON_IS_PCI = 0x00800000UL,
-	RADEON_IS_IGPGART = 0x01000000UL,
 };
 
 typedef struct drm_radeon_freelist {
@@ -471,6 +410,8 @@ extern int radeon_driver_open(struct drm_device *dev,
 			      struct drm_file *file_priv);
 extern long radeon_compat_ioctl(struct file *filp, unsigned int cmd,
 				unsigned long arg);
+extern long radeon_kms_compat_ioctl(struct file *filp, unsigned int cmd,
+				    unsigned long arg);
 
 extern int radeon_master_create(struct drm_device *dev, struct drm_master *master);
 extern void radeon_master_destroy(struct drm_device *dev, struct drm_master *master);
@@ -1096,6 +1037,9 @@ extern u32 radeon_get_scratch(drm_radeon_private_t *dev_priv, int index);
 #	define RADEON_CSQ_PRIPIO_INDBM		(3 << 28)
 #	define RADEON_CSQ_PRIBM_INDBM		(4 << 28)
 #	define RADEON_CSQ_PRIPIO_INDPIO		(15 << 28)
+
+#define R300_CP_RESYNC_ADDR		0x0778
+#define R300_CP_RESYNC_DATA		0x077c
 
 #define RADEON_AIC_CNTL			0x01d0
 #	define RADEON_PCIGART_TRANSLATE_EN	(1 << 0)
