@@ -336,7 +336,7 @@ valid_reg(struct nvbios *bios, uint32_t reg)
 	if (WITHIN(reg, NV_PFIFO_OFFSET, NV_PFIFO_SIZE))
 		return 1;
 	if (dev_priv->VBIOS.pub.chip_version >= 0x30 &&
-						WITHIN(reg, 0x4000, 0x600))
+	    (WITHIN(reg, 0x4000, 0x600) || reg == 0x00004600))
 		return 1;
 	if (dev_priv->VBIOS.pub.chip_version >= 0x40 &&
 						WITHIN(reg, 0xc000, 0x48))
