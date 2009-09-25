@@ -174,6 +174,28 @@ nv50_graph_fifo_access(struct drm_device *dev, bool enabled)
 		nv_wr32(dev, 0x400500, nv_rd32(dev, 0x400500) & ~mask);
 }
 
+struct nouveau_channel *
+nv50_graph_channel(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t inst;
+	int i;
+
+	inst = nv_rd32(dev, NV50_PGRAPH_CTXCTL_CUR);
+	if (!(inst & NV50_PGRAPH_CTXCTL_CUR_LOADED))
+		return NULL;
+	inst = (inst & NV50_PGRAPH_CTXCTL_CUR_INSTANCE) << 12;
+
+	for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+		struct nouveau_channel *chan = dev_priv->fifos[i];
+
+		if (chan && chan->ramin && chan->ramin->instance == inst)
+			return chan;
+	}
+
+	return NULL;
+}
+
 int
 nv50_graph_create_context(struct nouveau_channel *chan)
 {

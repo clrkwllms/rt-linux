@@ -747,6 +747,21 @@ nv10_graph_context_switch(struct drm_device *dev)
 		pgraph_ctx->nv17[offset] = val; \
 	} while (0)
 
+struct nouveau_channel *
+nv10_graph_channel(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	int chid = dev_priv->engine.fifo.channels;
+
+	if (nv_rd32(dev, NV10_PGRAPH_CTX_CONTROL) & 0x00010000)
+		chid = nv_rd32(dev, NV10_PGRAPH_CTX_USER) >> 24;
+
+	if (chid >= dev_priv->engine.fifo.channels)
+		return NULL;
+
+	return dev_priv->fifos[chid];
+}
+
 int nv10_graph_create_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;

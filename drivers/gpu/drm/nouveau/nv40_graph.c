@@ -1439,6 +1439,29 @@ nv4e_graph_context_init(struct drm_device *dev, struct nouveau_gpuobj *ctx)
 		nv_wo32(dev, ctx, i/4, 0x3f800000);
 }
 
+struct nouveau_channel *
+nv40_graph_channel(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t inst;
+	int i;
+
+	inst = nv_rd32(dev, NV40_PGRAPH_CTXCTL_CUR);
+	if (!(inst & NV40_PGRAPH_CTXCTL_CUR_LOADED))
+		return NULL;
+	inst = (inst & NV40_PGRAPH_CTXCTL_CUR_INSTANCE) << 4;
+
+	for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+		struct nouveau_channel *chan = dev_priv->fifos[i];
+
+		if (chan && chan->ramin_grctx &&
+		    chan->ramin_grctx->instance == inst)
+			return chan;
+	}
+
+	return NULL;
+}
+
 int
 nv40_graph_create_context(struct nouveau_channel *chan)
 {
