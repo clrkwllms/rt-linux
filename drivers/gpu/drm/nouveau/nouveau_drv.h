@@ -639,6 +639,7 @@ extern int nouveau_vram_notify;
 extern int nouveau_fbpercrtc;
 extern char *nouveau_tv_norm;
 extern int nouveau_reg_debug;
+extern char *nouveau_vbios;
 
 /* nouveau_state.c */
 extern void nouveau_preclose(struct drm_device *dev, struct drm_file *);

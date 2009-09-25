@@ -187,14 +187,14 @@ struct methods {
 static struct methods nv04_methods[] = {
 	{ "PROM", load_vbios_prom, false },
 	{ "PRAMIN", load_vbios_pramin, true },
-	{ "PCI ROM", load_vbios_pci, true },
+	{ "PCIROM", load_vbios_pci, true },
 	{ }
 };
 
 static struct methods nv50_methods[] = {
 	{ "PRAMIN", load_vbios_pramin, true },
 	{ "PROM", load_vbios_prom, false },
-	{ "PCI ROM", load_vbios_pci, true },
+	{ "PCIROM", load_vbios_pci, true },
 	{ }
 };
 
@@ -203,6 +203,26 @@ static bool NVShadowVBIOS(struct drm_device *dev, uint8_t *data)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct methods *methods, *method;
 	int testscore = 3;
+
+	if (nouveau_vbios) {
+		method = nv04_methods;
+		while (method->loadbios) {
+			if (!strcasecmp(nouveau_vbios, method->desc))
+				break;
+			method++;
+		}
+
+		if (method->loadbios) {
+			NV_INFO(dev, "Attempting to use BIOS image from %s\n",
+				method->desc);
+
+			method->loadbios(dev, data);
+			if (score_vbios(dev, data, method->rw))
+				return true;
+		}
+
+		NV_ERROR(dev, "VBIOS source \'%s\' invalid\n", nouveau_vbios);
+	}
 
 	if (dev_priv->card_type < NV_50)
 		methods = nv04_methods;
