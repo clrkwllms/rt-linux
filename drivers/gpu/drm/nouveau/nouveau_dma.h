@@ -27,7 +27,8 @@
 #ifndef __NOUVEAU_DMA_H__
 #define __NOUVEAU_DMA_H__
 
-/* There's a hw race condition where you can't jump to your PUT offset,
+/*
+ * There's a hw race condition where you can't jump to your PUT offset,
  * to avoid this we jump to offset + SKIPS and fill the difference with
  * NOPs.
  *
@@ -38,15 +39,17 @@
  */
 #define NOUVEAU_DMA_SKIPS (128 / 4)
 
-typedef enum {
+/* Hardcoded object assignments to subchannels (subchannel id). */
+enum {
 	NvSubM2MF	= 0,
 	NvSub2D		= 1,
 	NvSubCtxSurf2D  = 1,
 	NvSubGdiRect    = 2,
 	NvSubImageBlit  = 3
-} nouveau_subchannel_id_t;
+};
 
-typedef enum {
+/* Object handles. */
+enum {
 	NvM2MF		= 0x80000001,
 	NvDmaFB		= 0x80000002,
 	NvDmaTT		= 0x80000003,
@@ -65,7 +68,7 @@ typedef enum {
 	NvEvoVRAM	= 0x01000000,
 	NvEvoFB16	= 0x01000001,
 	NvEvoFB32	= 0x01000002
-} nouveau_object_handle_t;
+};
 
 #define NV_MEMORY_TO_MEMORY_FORMAT                                    0x00000039
 #define NV_MEMORY_TO_MEMORY_FORMAT_NAME                               0x00000000
