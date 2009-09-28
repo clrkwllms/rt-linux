@@ -369,20 +369,16 @@ void
 nv04_graph_context_switch(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
 	struct nouveau_channel *chan = NULL;
 	uint32_t tmp;
 	int chid;
 
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 0);
+	pgraph->fifo_access(dev, false);
 	nouveau_wait_for_idle(dev);
 
 	/* If previous context is valid, we need to save it */
-	if (nv_rd32(dev, NV04_PGRAPH_CTX_CONTROL) & 0x00010000) {
-		chid = nv_rd32(dev, NV04_PGRAPH_CTX_USER) >> 24;
-		if (chid < dev_priv->engine.fifo.channels)
-			chan = dev_priv->fifos[chid];
-	}
-
+	chan = pgraph->channel(dev);
 	if (chan) {
 		nv04_graph_save_context(chan);
 
@@ -398,7 +394,7 @@ nv04_graph_context_switch(struct drm_device *dev)
 	if (chan)
 		nv04_graph_load_context(chan);
 
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 1);
+	pgraph->fifo_access(dev, true);
 }
 
 int nv04_graph_create_context(struct nouveau_channel *chan)
