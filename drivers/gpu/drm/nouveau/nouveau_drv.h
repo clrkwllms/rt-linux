@@ -920,6 +920,7 @@ extern struct nouveau_channel *nv10_graph_channel(struct drm_device *);
 extern int  nv10_graph_create_context(struct nouveau_channel *);
 extern void nv10_graph_destroy_context(struct nouveau_channel *);
 extern int  nv10_graph_load_context(struct nouveau_channel *);
+extern int  nv10_graph_unload_context(struct drm_device *);
 extern int  nv10_graph_save_context(struct nouveau_channel *);
 extern void nv10_graph_context_switch(struct drm_device *);
 

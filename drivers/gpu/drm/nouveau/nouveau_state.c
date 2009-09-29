@@ -107,6 +107,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.destroy_context	= nv10_graph_destroy_context;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.load_context	= nv10_graph_load_context;
+		engine->graph.unload_context	= nv10_graph_unload_context;
 		engine->graph.save_context	= nv10_graph_save_context;
 		engine->fifo.channels		= 32;
 		engine->fifo.init		= nv10_fifo_init;
