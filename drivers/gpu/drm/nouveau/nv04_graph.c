@@ -371,22 +371,13 @@ nv04_graph_context_switch(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
 	struct nouveau_channel *chan = NULL;
-	uint32_t tmp;
 	int chid;
 
 	pgraph->fifo_access(dev, false);
 	nouveau_wait_for_idle(dev);
 
 	/* If previous context is valid, we need to save it */
-	chan = pgraph->channel(dev);
-	if (chan) {
-		nv04_graph_save_context(chan);
-
-		nv_wr32(dev, NV04_PGRAPH_CTX_CONTROL, 0x10000000);
-		tmp  = nv_rd32(dev, NV04_PGRAPH_CTX_USER) & 0x00ffffff;
-		tmp |= (dev_priv->engine.fifo.channels - 1) << 24;
-		nv_wr32(dev, NV04_PGRAPH_CTX_USER, tmp);
-	}
+	pgraph->unload_context(dev);
 
 	/* Load context for next channel */
 	chid = dev_priv->engine.fifo.channel_id(dev);
@@ -454,6 +445,28 @@ int nv04_graph_save_context(struct nouveau_channel *chan)
 		pgraph_ctx->nv04[i] = nv_rd32(dev, nv04_graph_ctx_regs[i]);
 
 	return 0;
+}
+
+int
+nv04_graph_unload_context(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
+	struct nouveau_channel *chan = NULL;
+	uint32_t tmp;
+	int ret;
+
+	chan = pgraph->channel(dev);
+	if (!chan)
+		return 0;
+
+	ret = nv04_graph_save_context(chan);
+
+	nv_wr32(dev, NV04_PGRAPH_CTX_CONTROL, 0x10000000);
+	tmp  = nv_rd32(dev, NV04_PGRAPH_CTX_USER) & 0x00ffffff;
+	tmp |= (dev_priv->engine.fifo.channels - 1) << 24;
+	nv_wr32(dev, NV04_PGRAPH_CTX_USER, tmp);
+	return ret;
 }
 
 int nv04_graph_init(struct drm_device *dev)

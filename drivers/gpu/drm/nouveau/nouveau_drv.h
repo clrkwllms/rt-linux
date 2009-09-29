@@ -871,6 +871,7 @@ extern int  nv04_fifo_channel_id(struct drm_device *);
 extern int  nv04_fifo_create_context(struct nouveau_channel *);
 extern void nv04_fifo_destroy_context(struct nouveau_channel *);
 extern int  nv04_fifo_load_context(struct nouveau_channel *);
+extern int  nv04_fifo_unload_context(struct drm_device *);
 extern int  nv04_fifo_save_context(struct nouveau_channel *);
 
 /* nv10_fifo.c */
@@ -909,6 +910,7 @@ extern struct nouveau_channel *nv04_graph_channel(struct drm_device *);
 extern int  nv04_graph_create_context(struct nouveau_channel *);
 extern void nv04_graph_destroy_context(struct nouveau_channel *);
 extern int  nv04_graph_load_context(struct nouveau_channel *);
+extern int  nv04_graph_unload_context(struct drm_device *);
 extern int  nv04_graph_save_context(struct nouveau_channel *);
 extern void nv04_graph_context_switch(struct drm_device *);
 
