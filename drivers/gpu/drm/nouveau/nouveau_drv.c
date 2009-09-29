@@ -178,19 +178,8 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	nouveau_wait_for_idle(dev);
 	pfifo->reassign(dev, false);
 	pfifo->disable(dev);
-
-	i = pfifo->channel_id(dev);
-	if (i >= 0 && i < pfifo->channels && dev_priv->fifos[i]) {
-		chan = dev_priv->fifos[i];
-		NV_INFO(dev, "Active channel on PFIFO is %d...\n", chan->id);
-		pfifo->save_context(chan);
-	}
-
-	chan = pgraph->channel(dev);
-	if (chan) {
-		NV_INFO(dev, "Active channel on PGRAPH is %d\n", chan->id);
-		pgraph->save_context(chan);
-	}
+	pfifo->unload_context(dev);
+	pgraph->unload_context(dev);
 
 	NV_INFO(dev, "Suspending GPU objects...\n");
 	ret = nouveau_gpuobj_suspend(dev);
