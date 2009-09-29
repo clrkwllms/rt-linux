@@ -143,11 +143,17 @@ nv10_fifo_load_context(struct nouveau_channel *chan)
 }
 
 int
-nv10_fifo_save_context(struct nouveau_channel *chan)
+nv10_fifo_unload_context(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
-	struct drm_device *dev = chan->dev;
-	uint32_t fc = NV10_RAMFC(chan->id), tmp;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
+	uint32_t fc, tmp;
+	int chid;
+
+	chid = pfifo->channel_id(dev);
+	if (chid < 0 || chid >= dev_priv->engine.fifo.channels)
+		return 0;
+	fc = NV10_RAMFC(chid);
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
 
@@ -174,32 +180,10 @@ nv10_fifo_save_context(struct nouveau_channel *chan)
 
 out:
 	dev_priv->engine.instmem.finish_access(dev);
-	return 0;
-}
-
-int
-nv10_fifo_unload_context(struct drm_device *dev)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
-	struct nouveau_channel *chan = NULL;
-	int chid, ret;
-
-	chid = pfifo->channel_id(dev);
-	if (chid < 0 || chid >= dev_priv->engine.fifo.channels)
-		return 0;
-
-	chan = dev_priv->fifos[chid];
-	if (!chan) {
-		NV_ERROR(dev, "Inactive channel on PFIFO: %d\n", chid);
-		return -EINVAL;
-	}
-
-	ret = pfifo->save_context(chan);
 
 	nv10_fifo_do_load_context(dev, pfifo->channels - 1);
 	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1, pfifo->channels - 1);
-	return ret;
+	return 0;
 }
 
 static void

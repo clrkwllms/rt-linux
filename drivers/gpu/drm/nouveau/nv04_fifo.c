@@ -166,37 +166,13 @@ nv04_fifo_load_context(struct nouveau_channel *chan)
 }
 
 int
-nv04_fifo_save_context(struct nouveau_channel *chan)
-{
-	struct drm_device *dev = chan->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t tmp;
-
-	dev_priv->engine.instmem.prepare_access(dev, true);
-
-	RAMFC_WR(DMA_PUT, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUT));
-	RAMFC_WR(DMA_GET, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_GET));
-
-	tmp  = nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_DCOUNT) << 16;
-	tmp |= nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_INSTANCE);
-	RAMFC_WR(DMA_INSTANCE, tmp);
-
-	RAMFC_WR(DMA_STATE, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_STATE));
-	RAMFC_WR(DMA_FETCH, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_FETCH));
-	RAMFC_WR(ENGINE, nv_rd32(dev, NV04_PFIFO_CACHE1_ENGINE));
-	RAMFC_WR(PULL1_ENGINE, nv_rd32(dev, NV04_PFIFO_CACHE1_PULL1));
-
-	dev_priv->engine.instmem.finish_access(dev);
-	return 0;
-}
-
-int
 nv04_fifo_unload_context(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
 	struct nouveau_channel *chan = NULL;
-	int chid, ret;
+	uint32_t tmp;
+	int chid;
 
 	chid = pfifo->channel_id(dev);
 	if (chid < 0 || chid >= dev_priv->engine.fifo.channels)
@@ -208,11 +184,21 @@ nv04_fifo_unload_context(struct drm_device *dev)
 		return -EINVAL;
 	}
 
-	ret = pfifo->save_context(chan);
+	dev_priv->engine.instmem.prepare_access(dev, true);
+	RAMFC_WR(DMA_PUT, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUT));
+	RAMFC_WR(DMA_GET, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_GET));
+	tmp  = nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_DCOUNT) << 16;
+	tmp |= nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_INSTANCE);
+	RAMFC_WR(DMA_INSTANCE, tmp);
+	RAMFC_WR(DMA_STATE, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_STATE));
+	RAMFC_WR(DMA_FETCH, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_FETCH));
+	RAMFC_WR(ENGINE, nv_rd32(dev, NV04_PFIFO_CACHE1_ENGINE));
+	RAMFC_WR(PULL1_ENGINE, nv_rd32(dev, NV04_PFIFO_CACHE1_PULL1));
+	dev_priv->engine.instmem.finish_access(dev);
 
 	nv04_fifo_do_load_context(dev, pfifo->channels - 1);
 	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1, pfifo->channels - 1);
-	return ret;
+	return 0;
 }
 
 static void

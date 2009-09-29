@@ -469,13 +469,18 @@ nv20_graph_load_context(struct nouveau_channel *chan)
 }
 
 int
-nv20_graph_save_context(struct nouveau_channel *chan)
+nv20_graph_unload_context(struct drm_device *dev)
 {
-	struct drm_device *dev = chan->dev;
-	uint32_t inst;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
+	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
+	struct nouveau_channel *chan;
+	uint32_t inst, tmp;
+	int ret;
 
-	if (!chan->ramin_grctx)
-		return -EINVAL;
+	chan = pgraph->channel(dev);
+	if (!chan)
+		return 0;
 	inst = chan->ramin_grctx->instance >> 4;
 
 	nv_wr32(dev, NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
@@ -483,24 +488,6 @@ nv20_graph_save_context(struct nouveau_channel *chan)
 		     NV20_PGRAPH_CHANNEL_CTX_XFER_SAVE);
 
 	nouveau_wait_for_idle(dev);
-	return 0;
-}
-
-int
-nv20_graph_unload_context(struct drm_device *dev)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
-	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
-	struct nouveau_channel *chan;
-	uint32_t tmp;
-	int ret;
-
-	chan = pgraph->channel(dev);
-	if (!chan)
-		return 0;
-
-	ret = nv20_graph_save_context(chan);
 
 	nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10000000);
 	tmp  = nv_rd32(dev, NV10_PGRAPH_CTX_USER) & 0x00ffffff;

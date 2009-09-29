@@ -1582,20 +1582,6 @@ nv40_graph_transfer_context(struct drm_device *dev, uint32_t inst, int save)
 	return 0;
 }
 
-/* Save current context (from PGRAPH) into the channel's context */
-int
-nv40_graph_save_context(struct nouveau_channel *chan)
-{
-	struct drm_device *dev = chan->dev;
-	uint32_t inst;
-
-	if (!chan->ramin_grctx)
-		return -EINVAL;
-	inst = chan->ramin_grctx->instance >> 4;
-
-	return nv40_graph_transfer_context(dev, inst, 1);
-}
-
 /* Restore the context for a specific channel into PGRAPH */
 int
 nv40_graph_load_context(struct nouveau_channel *chan)

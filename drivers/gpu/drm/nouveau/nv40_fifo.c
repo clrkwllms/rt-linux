@@ -149,14 +149,19 @@ nv40_fifo_load_context(struct nouveau_channel *chan)
 }
 
 int
-nv40_fifo_save_context(struct nouveau_channel *chan)
+nv40_fifo_unload_context(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
-	struct drm_device *dev = chan->dev;
-	uint32_t fc = NV40_RAMFC(chan->id), tmp;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
+	uint32_t fc, tmp;
+	int chid;
+
+	chid = pfifo->channel_id(dev);
+	if (chid < 0 || chid >= dev_priv->engine.fifo.channels)
+		return 0;
+	fc = NV40_RAMFC(chid);
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
-
 	nv_wi32(dev, fc + 0, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_PUT));
 	nv_wi32(dev, fc + 4, nv_rd32(dev, NV04_PFIFO_CACHE1_DMA_GET));
 	nv_wi32(dev, fc + 8, nv_rd32(dev, NV10_PFIFO_CACHE1_REF_CNT));
@@ -185,41 +190,17 @@ nv40_fifo_save_context(struct nouveau_channel *chan)
 	nv_wi32(dev, fc + 68, nv_rd32(dev, 0x32e8));
 	nv_wi32(dev, fc + 76, nv_rd32(dev, 0x2088));
 	nv_wi32(dev, fc + 80, nv_rd32(dev, 0x3300));
-
 #if 0 /* no real idea which is PUT/GET in UNK_48.. */
 	tmp  = nv_rd32(dev, NV04_PFIFO_CACHE1_GET);
 	tmp |= (nv_rd32(dev, NV04_PFIFO_CACHE1_PUT) << 16);
 	nv_wi32(dev, fc + 72, tmp);
 #endif
-
 	dev_priv->engine.instmem.finish_access(dev);
-	return 0;
-}
-
-int
-nv40_fifo_unload_context(struct drm_device *dev)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
-	struct nouveau_channel *chan = NULL;
-	int chid, ret;
-
-	chid = pfifo->channel_id(dev);
-	if (chid < 0 || chid >= dev_priv->engine.fifo.channels)
-		return 0;
-
-	chan = dev_priv->fifos[chid];
-	if (!chan) {
-		NV_ERROR(dev, "Inactive channel on PFIFO: %d\n", chid);
-		return -EINVAL;
-	}
-
-	ret = pfifo->save_context(chan);
 
 	nv40_fifo_do_load_context(dev, pfifo->channels - 1);
 	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1,
 		     NV40_PFIFO_CACHE1_PUSH1_DMA | (pfifo->channels - 1));
-	return ret;
+	return 0;
 }
 
 static void

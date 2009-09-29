@@ -435,32 +435,23 @@ int nv04_graph_load_context(struct nouveau_channel *chan)
 	return 0;
 }
 
-int nv04_graph_save_context(struct nouveau_channel *chan)
-{
-	struct drm_device *dev = chan->dev;
-	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(nv04_graph_ctx_regs); i++)
-		pgraph_ctx->nv04[i] = nv_rd32(dev, nv04_graph_ctx_regs[i]);
-
-	return 0;
-}
-
 int
 nv04_graph_unload_context(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
 	struct nouveau_channel *chan = NULL;
+	struct graph_state *ctx;
 	uint32_t tmp;
-	int ret;
+	int i, ret;
 
 	chan = pgraph->channel(dev);
 	if (!chan)
 		return 0;
+	ctx = chan->pgraph_ctx;
 
-	ret = nv04_graph_save_context(chan);
+	for (i = 0; i < ARRAY_SIZE(nv04_graph_ctx_regs); i++)
+		ctx->nv04[i] = nv_rd32(dev, nv04_graph_ctx_regs[i]);
 
 	nv_wr32(dev, NV04_PGRAPH_CTX_CONTROL, 0x10000000);
 	tmp  = nv_rd32(dev, NV04_PGRAPH_CTX_USER) & 0x00ffffff;

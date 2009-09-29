@@ -353,15 +353,6 @@ nv50_graph_do_save_context(struct drm_device *dev, uint32_t inst)
 }
 
 int
-nv50_graph_save_context(struct nouveau_channel *chan)
-{
-	uint32_t inst = chan->ramin->instance >> 12;
-
-	NV_DEBUG(chan->dev, "ch%d\n", chan->id);
-	return nv50_graph_do_save_context(chan->dev, inst);
-}
-
-int
 nv50_graph_unload_context(struct drm_device *dev)
 {
 	uint32_t inst;
