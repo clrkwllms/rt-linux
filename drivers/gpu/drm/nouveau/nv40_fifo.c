@@ -216,10 +216,9 @@ nv40_fifo_unload_context(struct drm_device *dev)
 
 	ret = pfifo->save_context(chan);
 
-	nv40_fifo_do_load_context(dev, dev_priv->engine.fifo.channels - 1);
+	nv40_fifo_do_load_context(dev, pfifo->channels - 1);
 	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1,
-		     NV40_PFIFO_CACHE1_PUSH1_DMA |
-		     (dev_priv->engine.fifo.channels - 1));
+		     NV40_PFIFO_CACHE1_PUSH1_DMA | (pfifo->channels - 1));
 	return ret;
 }
 
