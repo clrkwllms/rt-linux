@@ -103,7 +103,7 @@ nouveau_ttm_global_init(struct drm_nouveau_private *dev_priv)
 	dev_priv->ttm.bo_global_ref.mem_glob = global_ref->object;
 	global_ref = &dev_priv->ttm.bo_global_ref.ref;
 	global_ref->global_type = TTM_GLOBAL_TTM_BO;
-	global_ref->size = sizeof(struct ttm_mem_global);
+	global_ref->size = sizeof(struct ttm_bo_global);
 	global_ref->init = &ttm_bo_global_init;
 	global_ref->release = &ttm_bo_global_release;
 
