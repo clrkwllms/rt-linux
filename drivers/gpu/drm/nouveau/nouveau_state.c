@@ -267,6 +267,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.create_context	= nv50_graph_create_context;
 		engine->graph.destroy_context	= nv50_graph_destroy_context;
 		engine->graph.load_context	= nv50_graph_load_context;
+		engine->graph.unload_context	= nv50_graph_unload_context;
 		engine->graph.save_context	= nv50_graph_save_context;
 		engine->fifo.channels		= 128;
 		engine->fifo.init		= nv50_fifo_init;

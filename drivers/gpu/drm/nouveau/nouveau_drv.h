@@ -321,6 +321,7 @@ struct nouveau_pgraph_engine {
 	int  (*create_context)(struct nouveau_channel *);
 	void (*destroy_context)(struct nouveau_channel *);
 	int  (*load_context)(struct nouveau_channel *);
+	int  (*unload_context)(struct drm_device *);
 	int  (*save_context)(struct nouveau_channel *);
 };
 
@@ -948,6 +949,7 @@ extern struct nouveau_channel *nv50_graph_channel(struct drm_device *);
 extern int  nv50_graph_create_context(struct nouveau_channel *);
 extern void nv50_graph_destroy_context(struct nouveau_channel *);
 extern int  nv50_graph_load_context(struct nouveau_channel *);
+extern int  nv50_graph_unload_context(struct drm_device *);
 extern int  nv50_graph_save_context(struct nouveau_channel *);
 extern void nv50_graph_context_switch(struct drm_device *);
 
