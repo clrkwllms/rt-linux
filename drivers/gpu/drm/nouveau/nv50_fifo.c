@@ -320,9 +320,6 @@ nv50_fifo_destroy_context(struct nouveau_channel *chan)
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
 
-	if ((nv_rd32(dev, NV03_PFIFO_CACHE1_PUSH1) & 0xffff) == chan->id)
-		nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1, 127);
-
 	nouveau_gpuobj_ref_del(dev, &chan->ramfc);
 	nouveau_gpuobj_ref_del(dev, &chan->cache);
 
