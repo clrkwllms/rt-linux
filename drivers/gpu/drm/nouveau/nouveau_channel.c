@@ -277,8 +277,8 @@ nouveau_channel_idle(struct nouveau_channel *chan)
 }
 
 /* stops a fifo */
-static void
-__new_nouveau_channel_free(struct nouveau_channel *chan)
+void
+nouveau_channel_free(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -338,104 +338,6 @@ __new_nouveau_channel_free(struct nouveau_channel *chan)
 	nouveau_bo_ref(NULL, &chan->pushbuf_bo);
 	nouveau_gpuobj_channel_takedown(chan);
 	nouveau_notifier_takedown_channel(chan);
-	if (chan->user)
-		iounmap(chan->user);
-
-	dev_priv->fifos[chan->id] = NULL;
-	dev_priv->fifo_alloc_count--;
-	kfree(chan);
-}
-
-void
-nouveau_channel_free(struct nouveau_channel *chan)
-{
-	struct drm_device *dev = chan->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
-	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
-	struct nouveau_timer_engine *ptimer = &dev_priv->engine.timer;
-	unsigned fbdev_flags = 0;
-	uint64_t t_start;
-	bool timeout = false;
-	int ret;
-
-	if (pfifo->unload_context && pgraph->unload_context) {
-		__new_nouveau_channel_free(chan);
-		return;
-	}
-
-	NV_INFO(dev, "%s: freeing fifo %d\n", __func__, chan->id);
-
-	nouveau_debugfs_channel_fini(chan);
-
-	/* Give the channel a chance to idle, wait 2s (hopefully) */
-	t_start = ptimer->read(dev);
-	while (!nouveau_channel_idle(chan)) {
-		if (ptimer->read(dev) - t_start > 2000000000ULL) {
-			NV_ERROR(dev, "Failed to idle channel %d.  "
-				      "Prepare for strangeness..\n", chan->id);
-			timeout = true;
-			break;
-		}
-	}
-
-	/* Ensure all outstanding fences are signaled.  They should be if the
-	 * above attempts at idling were OK, but if we failed this'll tell TTM
-	 * we're done with the buffers.
-	 */
-	nouveau_fence_fini(chan);
-
-	/* Wait on a fence until channel goes idle, this ensures the engine
-	 * has finished with the last push buffer completely before we destroy
-	 * the channel.
-	 */
-	if (!timeout) {
-		struct nouveau_fence *fence = NULL;
-
-		ret = nouveau_fence_new(chan, &fence, true);
-		if (ret == 0) {
-			ret = nouveau_fence_wait(fence, NULL, false, false);
-			nouveau_fence_unref((void *)&fence);
-		}
-
-		if (ret) {
-			NV_ERROR(dev, "Failed to fence channel %d.  "
-				      "Prepare for strangeness..\n", chan->id);
-			timeout = true;
-		}
-	}
-
-	/* Ensure all outstanding fences are signaled.  They should be if the
-	 * above attempts at idling were OK, but if we failed this'll tell TTM
-	 * we're done with the buffers.
-	 */
-	nouveau_fence_fini(chan);
-
-	/* disable the fifo caches */
-	if (dev_priv->fbdev_info) {
-		fbdev_flags = dev_priv->fbdev_info->flags;
-		dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
-	}
-
-	pfifo->reassign(dev, false);
-	pfifo->disable(dev);
-	pfifo->destroy_context(chan);
-	pgraph->destroy_context(chan);
-	pfifo->enable(dev);
-	pfifo->reassign(dev, true);
-
-	if (dev_priv->fbdev_info)
-		dev_priv->fbdev_info->flags = fbdev_flags;
-
-	/* Deallocate push buffer */
-	nouveau_gpuobj_ref_del(dev, &chan->pushbuf);
-	nouveau_bo_ref(NULL, &chan->pushbuf_bo);
-
-	/* Destroy objects belonging to the channel */
-	nouveau_gpuobj_channel_takedown(chan);
-
-	nouveau_notifier_takedown_channel(chan);
-
 	if (chan->user)
 		iounmap(chan->user);
 
