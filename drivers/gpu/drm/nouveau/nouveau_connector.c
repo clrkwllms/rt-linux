@@ -27,7 +27,6 @@
 #include "drmP.h"
 #include "drm_edid.h"
 #include "drm_crtc_helper.h"
-#include "drm_fb_helper.h"
 #include "nouveau_reg.h"
 #include "nouveau_drv.h"
 #include "nouveau_encoder.h"
@@ -742,12 +741,6 @@ nouveau_connector_create(struct drm_device *dev, int index, int type)
 	}
 
 	drm_sysfs_connector_add(connector);
-
-	ret = drm_fb_helper_add_connector(connector);
-	if (ret) {
-		connector->funcs->destroy(connector);
-		return ret;
-	}
 
 	if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
 		ret = nouveau_connector_create_lvds(dev, connector);
