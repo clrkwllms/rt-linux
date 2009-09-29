@@ -279,6 +279,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.create_context	= nv50_fifo_create_context;
 		engine->fifo.destroy_context	= nv50_fifo_destroy_context;
 		engine->fifo.load_context	= nv50_fifo_load_context;
+		engine->fifo.unload_context	= nv50_fifo_unload_context;
 		engine->fifo.save_context	= nv50_fifo_save_context;
 		break;
 	default:

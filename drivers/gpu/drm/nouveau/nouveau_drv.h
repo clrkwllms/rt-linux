@@ -293,6 +293,7 @@ struct nouveau_fifo_engine {
 	int  (*create_context)(struct nouveau_channel *);
 	void (*destroy_context)(struct nouveau_channel *);
 	int  (*load_context)(struct nouveau_channel *);
+	int  (*unload_context)(struct drm_device *);
 	int  (*save_context)(struct nouveau_channel *);
 };
 
@@ -894,6 +895,7 @@ extern int  nv50_fifo_channel_id(struct drm_device *);
 extern int  nv50_fifo_create_context(struct nouveau_channel *);
 extern void nv50_fifo_destroy_context(struct nouveau_channel *);
 extern int  nv50_fifo_load_context(struct nouveau_channel *);
+extern int  nv50_fifo_unload_context(struct drm_device *);
 extern int  nv50_fifo_save_context(struct nouveau_channel *);
 
 /* nv04_graph.c */
