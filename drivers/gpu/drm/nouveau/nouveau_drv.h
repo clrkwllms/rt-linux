@@ -929,6 +929,7 @@ extern struct nouveau_pgraph_object_class nv30_graph_grclass[];
 extern int  nv20_graph_create_context(struct nouveau_channel *);
 extern void nv20_graph_destroy_context(struct nouveau_channel *);
 extern int  nv20_graph_load_context(struct nouveau_channel *);
+extern int  nv20_graph_unload_context(struct drm_device *);
 extern int  nv20_graph_save_context(struct nouveau_channel *);
 extern int  nv20_graph_init(struct drm_device *);
 extern void nv20_graph_takedown(struct drm_device *);
