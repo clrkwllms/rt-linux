@@ -886,6 +886,7 @@ extern int  nv40_fifo_init(struct drm_device *);
 extern int  nv40_fifo_create_context(struct nouveau_channel *);
 extern void nv40_fifo_destroy_context(struct nouveau_channel *);
 extern int  nv40_fifo_load_context(struct nouveau_channel *);
+extern int  nv40_fifo_unload_context(struct drm_device *);
 extern int  nv40_fifo_save_context(struct nouveau_channel *);
 
 /* nv50_fifo.c */
@@ -940,6 +941,7 @@ extern struct nouveau_channel *nv40_graph_channel(struct drm_device *);
 extern int  nv40_graph_create_context(struct nouveau_channel *);
 extern void nv40_graph_destroy_context(struct nouveau_channel *);
 extern int  nv40_graph_load_context(struct nouveau_channel *);
+extern int  nv40_graph_unload_context(struct drm_device *);
 extern int  nv40_graph_save_context(struct nouveau_channel *);
 
 /* nv50_graph.c */

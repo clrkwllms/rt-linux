@@ -1538,17 +1538,6 @@ nv40_graph_create_context(struct nouveau_channel *chan)
 void
 nv40_graph_destroy_context(struct nouveau_channel *chan)
 {
-	struct drm_device *dev = chan->dev;
-	uint32_t inst;
-
-	/* Mark context as unloaded if still active on PGRAPH */
-	inst = nv_rd32(dev, NV40_PGRAPH_CTXCTL_CUR);
-	if (inst & NV40_PGRAPH_CTXCTL_CUR_LOADED) {
-		inst &= NV40_PGRAPH_CTXCTL_CUR_INSTANCE;
-		if (inst == (chan->ramin_grctx->instance >> 4))
-			nv_wr32(dev, NV40_PGRAPH_CTXCTL_CUR, inst);
-	}
-
 	nouveau_gpuobj_ref_del(chan->dev, &chan->ramin_grctx);
 }
 
@@ -1638,6 +1627,23 @@ nv40_graph_load_context(struct nouveau_channel *chan)
 	 */
 	nv_wr32(dev, NV40_PFIFO_GRCTX_INSTANCE, inst);
 	return 0;
+}
+
+int
+nv40_graph_unload_context(struct drm_device *dev)
+{
+	uint32_t inst;
+	int ret;
+
+	inst = nv_rd32(dev, NV40_PGRAPH_CTXCTL_CUR);
+	if (!(inst & NV40_PGRAPH_CTXCTL_CUR_LOADED))
+		return 0;
+	inst &= NV40_PGRAPH_CTXCTL_CUR_INSTANCE;
+
+	ret = nv40_graph_transfer_context(dev, inst, 1);
+
+	nv_wr32(dev, NV40_PGRAPH_CTXCTL_CUR, inst);
+	return ret;
 }
 
 /* These blocks of "magic numbers" are actually a microcode that the GPU uses

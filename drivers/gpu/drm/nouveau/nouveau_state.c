@@ -225,6 +225,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.create_context	= nv40_graph_create_context;
 		engine->graph.destroy_context	= nv40_graph_destroy_context;
 		engine->graph.load_context	= nv40_graph_load_context;
+		engine->graph.unload_context	= nv40_graph_unload_context;
 		engine->graph.save_context	= nv40_graph_save_context;
 		engine->fifo.channels		= 32;
 		engine->fifo.init		= nv40_fifo_init;
@@ -236,6 +237,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.create_context	= nv40_fifo_create_context;
 		engine->fifo.destroy_context	= nv40_fifo_destroy_context;
 		engine->fifo.load_context	= nv40_fifo_load_context;
+		engine->fifo.unload_context	= nv40_fifo_unload_context;
 		engine->fifo.save_context	= nv40_fifo_save_context;
 		break;
 	case 0x50:
