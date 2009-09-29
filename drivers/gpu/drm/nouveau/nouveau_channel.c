@@ -277,6 +277,75 @@ nouveau_channel_idle(struct nouveau_channel *chan)
 }
 
 /* stops a fifo */
+static void
+__new_nouveau_channel_free(struct nouveau_channel *chan)
+{
+	struct drm_device *dev = chan->dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
+	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
+	unsigned long flags;
+	int ret;
+
+	NV_INFO(dev, "%s: freeing fifo %d\n", __func__, chan->id);
+
+	nouveau_debugfs_channel_fini(chan);
+
+	/* Give outstanding push buffers a chance to complete */
+	spin_lock_irqsave(&chan->fence.lock, flags);
+	nouveau_fence_update(chan);
+	spin_unlock_irqrestore(&chan->fence.lock, flags);
+	if (chan->fence.sequence != chan->fence.sequence_ack) {
+		struct nouveau_fence *fence = NULL;
+
+		ret = nouveau_fence_new(chan, &fence, true);
+		if (ret == 0) {
+			ret = nouveau_fence_wait(fence, NULL, false, false);
+			nouveau_fence_unref((void *)&fence);
+		}
+
+		if (ret)
+			NV_ERROR(dev, "Failed to idle channel %d.\n", chan->id);
+	}
+
+	/* Ensure all outstanding fences are signaled.  They should be if the
+	 * above attempts at idling were OK, but if we failed this'll tell TTM
+	 * we're done with the buffers.
+	 */
+	nouveau_fence_fini(chan);
+
+	/* Ensure the channel is no longer active on the GPU */
+	pfifo->reassign(dev, false);
+
+	if (pgraph->channel(dev) == chan) {
+		pgraph->fifo_access(dev, false);
+		pgraph->unload_context(dev);
+		pgraph->fifo_access(dev, true);
+	}
+	pgraph->destroy_context(chan);
+
+	if (pfifo->channel_id(dev) == chan->id) {
+		pfifo->disable(dev);
+		pfifo->unload_context(dev);
+		pfifo->enable(dev);
+	}
+	pfifo->destroy_context(chan);
+
+	pfifo->reassign(dev, true);
+
+	/* Release the channel's resources */
+	nouveau_gpuobj_ref_del(dev, &chan->pushbuf);
+	nouveau_bo_ref(NULL, &chan->pushbuf_bo);
+	nouveau_gpuobj_channel_takedown(chan);
+	nouveau_notifier_takedown_channel(chan);
+	if (chan->user)
+		iounmap(chan->user);
+
+	dev_priv->fifos[chan->id] = NULL;
+	dev_priv->fifo_alloc_count--;
+	kfree(chan);
+}
+
 void
 nouveau_channel_free(struct nouveau_channel *chan)
 {
@@ -289,6 +358,11 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	uint64_t t_start;
 	bool timeout = false;
 	int ret;
+
+	if (pfifo->unload_context && pgraph->unload_context) {
+		__new_nouveau_channel_free(chan);
+		return;
+	}
 
 	NV_INFO(dev, "%s: freeing fifo %d\n", __func__, chan->id);
 
@@ -304,6 +378,12 @@ nouveau_channel_free(struct nouveau_channel *chan)
 			break;
 		}
 	}
+
+	/* Ensure all outstanding fences are signaled.  They should be if the
+	 * above attempts at idling were OK, but if we failed this'll tell TTM
+	 * we're done with the buffers.
+	 */
+	nouveau_fence_fini(chan);
 
 	/* Wait on a fence until channel goes idle, this ensures the engine
 	 * has finished with the last push buffer completely before we destroy

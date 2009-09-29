@@ -1053,6 +1053,7 @@ extern void nouveau_bo_wr32(struct nouveau_bo *nvbo, unsigned index, u32 val);
 struct nouveau_fence;
 extern int nouveau_fence_init(struct nouveau_channel *);
 extern void nouveau_fence_fini(struct nouveau_channel *);
+extern void nouveau_fence_update(struct nouveau_channel *);
 extern int nouveau_fence_new(struct nouveau_channel *, struct nouveau_fence **,
 			     bool emit);
 extern int nouveau_fence_emit(struct nouveau_fence *);

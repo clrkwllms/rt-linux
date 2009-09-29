@@ -56,7 +56,7 @@ nouveau_fence_del(struct kref *ref)
 	kfree(fence);
 }
 
-static void
+void
 nouveau_fence_update(struct nouveau_channel *chan)
 {
 	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
