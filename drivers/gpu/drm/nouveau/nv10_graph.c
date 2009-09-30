@@ -801,40 +801,10 @@ int nv10_graph_create_context(struct nouveau_channel *chan)
 
 void nv10_graph_destroy_context(struct nouveau_channel *chan)
 {
-	struct drm_device *dev = chan->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->engine;
 	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
-	int chid;
 
 	kfree(pgraph_ctx);
 	chan->pgraph_ctx = NULL;
-
-	chid = (nv_rd32(dev, NV10_PGRAPH_CTX_USER) >> 24) &
-						(engine->fifo.channels - 1);
-
-	/* This code seems to corrupt the 3D pipe, but blob seems to do similar things ????
-	 */
-#if 0
-	/* does this avoid a potential context switch while we are written graph
-	 * reg, or we should mask graph interrupt ???
-	 */
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x0);
-	if (chid == chan->id) {
-		NV_INFO(dev, "cleanning a channel with graph in current context\n");
-		nouveau_wait_for_idle(dev);
-		NV_INFO(dev, "reseting current graph context\n");
-		/*
-		 * can't be call here because of dynamic mem alloc
-		 * nv10_graph_create_context(chan);
-		 */
-		nv10_graph_load_context(chan);
-	}
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x1);
-#else
-	if (chid == chan->id)
-		NV_INFO(dev, "cleaning a channel with graph in current context\n");
-#endif
 }
 
 int nv10_graph_init(struct drm_device *dev)
