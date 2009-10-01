@@ -2499,6 +2499,27 @@ init_zm_reg(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 }
 
 static bool
+init_87(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
+{
+	/*
+	 * INIT_87   opcode: 0x87 ('')
+	 *
+	 * offset      (8 bit): opcode
+	 * offset + 1  (8 bit): unknown
+	 * offset + 4 (32 bit): unknown entry 0
+	 *
+	 * Unknown function.  Stubbed here as one of my cards can resume
+	 * fine without it, but we'd still want to run the remainder
+	 * of the script instead of aborting.
+	 *
+	 * Starting from offset+4 there are BIT_M+2 32-bit entries.
+	 */
+
+	NV_WARN(bios->dev, "INIT_87 stubbed!\n");
+	return true;
+}
+
+static bool
 init_8e(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/*
@@ -2829,6 +2850,7 @@ static struct init_tbl_entry itbl_entry[] = {
 	{ "INIT_INDEX_IO"                     , 0x78, 6       , 0       , 0       , init_index_io                   },
 	{ "INIT_PLL"                          , 0x79, 7       , 0       , 0       , init_pll                        },
 	{ "INIT_ZM_REG"                       , 0x7A, 9       , 0       , 0       , init_zm_reg                     },
+	{ "INIT_87"                           , 0x87, 2       , 0       , 0       , init_87                         },
 	{ "INIT_8E"                           , 0x8E, 1       , 0       , 0       , init_8e                         },
 	/* INIT_RAM_RESTRICT_ZM_REG_GROUP's mult is loaded by M table in BIT */
 	{ "INIT_RAM_RESTRICT_ZM_REG_GROUP"    , 0x8F, 7       , 6       , 0       , init_ram_restrict_zm_reg_group  },
@@ -4328,10 +4350,14 @@ static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 	if (bitentry->length < 0x5)
 		return 0;
 
+	/* adjust length of INIT_87 */
+	for (i = 0; itbl_entry[i].name && (itbl_entry[i].id != 0x87); i++);
+	itbl_entry[i].length += bios->data[bitentry->offset + 2] * 4;
+
 	/* set up multiplier for INIT_RAM_RESTRICT_ZM_REG_GROUP */
-	for (i = 0; itbl_entry[i].name && (itbl_entry[i].id != 0x8f); i++)
-		;
+	for (; itbl_entry[i].name && (itbl_entry[i].id != 0x8f); i++);
 	itbl_entry[i].length_multiplier = bios->data[bitentry->offset + 2] * 4;
+
 	init_ram_restrict_zm_reg_group_blocklen = itbl_entry[i].length_multiplier;
 
 	bios->ram_restrict_tbl_ptr = ROM16(bios->data[bitentry->offset + 3]);
