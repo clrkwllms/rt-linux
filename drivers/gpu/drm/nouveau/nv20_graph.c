@@ -476,7 +476,6 @@ nv20_graph_unload_context(struct drm_device *dev)
 	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
 	struct nouveau_channel *chan;
 	uint32_t inst, tmp;
-	int ret;
 
 	chan = pgraph->channel(dev);
 	if (!chan)
@@ -493,7 +492,7 @@ nv20_graph_unload_context(struct drm_device *dev)
 	tmp  = nv_rd32(dev, NV10_PGRAPH_CTX_USER) & 0x00ffffff;
 	tmp |= (pfifo->channels - 1) << 24;
 	nv_wr32(dev, NV10_PGRAPH_CTX_USER, tmp);
-	return ret;
+	return 0;
 }
 
 static void

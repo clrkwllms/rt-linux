@@ -443,7 +443,7 @@ nv04_graph_unload_context(struct drm_device *dev)
 	struct nouveau_channel *chan = NULL;
 	struct graph_state *ctx;
 	uint32_t tmp;
-	int i, ret;
+	int i;
 
 	chan = pgraph->channel(dev);
 	if (!chan)
@@ -457,7 +457,7 @@ nv04_graph_unload_context(struct drm_device *dev)
 	tmp  = nv_rd32(dev, NV04_PGRAPH_CTX_USER) & 0x00ffffff;
 	tmp |= (dev_priv->engine.fifo.channels - 1) << 24;
 	nv_wr32(dev, NV04_PGRAPH_CTX_USER, tmp);
-	return ret;
+	return 0;
 }
 
 int nv04_graph_init(struct drm_device *dev)
