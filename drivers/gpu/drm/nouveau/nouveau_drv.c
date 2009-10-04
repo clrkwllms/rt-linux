@@ -30,6 +30,7 @@
 #include "nouveau_drv.h"
 #include "nouveau_hw.h"
 #include "nouveau_fb.h"
+#include "nouveau_fbcon.h"
 #include "nv50_display.h"
 
 #include "drm_pciids.h"
@@ -307,6 +308,8 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	acquire_console_sem();
 	fb_set_suspend(dev_priv->fbdev_info, 0);
 	release_console_sem();
+
+	nouveau_fbcon_zfill(dev);
 
 	drm_helper_resume_force_mode(dev);
 	dev_priv->fbdev_info->flags = fbdev_flags;

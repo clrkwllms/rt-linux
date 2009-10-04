@@ -40,6 +40,7 @@ struct nouveau_fbcon_par {
 int nouveau_fbcon_probe(struct drm_device *dev);
 int nouveau_fbcon_remove(struct drm_device *dev, struct drm_framebuffer *fb);
 void nouveau_fbcon_restore(void);
+void nouveau_fbcon_zfill(struct drm_device *dev);
 
 int nv04_fbcon_accel_init(struct fb_info *info);
 int nv50_fbcon_accel_init(struct fb_info *info);

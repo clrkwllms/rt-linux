@@ -160,6 +160,25 @@ not_fb:
 }
 #endif
 
+void
+nouveau_fbcon_zfill(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct fb_info *info = dev_priv->fbdev_info;
+	struct fb_fillrect rect;
+
+	/* Clear the entire fbcon.  The drm will program every connector
+	 * with it's preferred mode.  If the sizes differ, one display will
+	 * quite likely have garbage around the console.
+	 */
+	rect.dx = rect.dy = 0;
+	rect.width = info->var.xres_virtual;
+	rect.height = info->var.yres_virtual;
+	rect.color = 0;
+	rect.rop = ROP_COPY;
+	info->fbops->fb_fillrect(info, &rect);
+}
+
 static int
 nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 		     uint32_t fb_height, uint32_t surface_width,
@@ -174,7 +193,6 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	struct nouveau_bo *nvbo;
 	struct drm_mode_fb_cmd mode_cmd;
 	struct device *device = &dev->pdev->dev;
-	struct fb_fillrect rect;
 	int size, ret;
 
 	mode_cmd.width = surface_width;
@@ -298,16 +316,7 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 		break;
 	};
 
-	/* Clear the entire fbcon.  The drm will program every connector
-	 * with it's preferred mode.  If the sizes differ, one display will
-	 * quite likely have garbage around the console.
-	 */
-	rect.dx = rect.dy = 0;
-	rect.width = surface_width;
-	rect.height = surface_height;
-	rect.color = 0;
-	rect.rop = ROP_COPY;
-	info->fbops->fb_fillrect(info, &rect);
+	nouveau_fbcon_zfill(dev);
 
 	/* To allow resizeing without swapping buffers */
 	NV_INFO(dev, "allocated %dx%d fb: 0x%lx, bo %p\n",
