@@ -178,13 +178,13 @@ static int nv17_tv_mode_valid(struct drm_encoder *encoder,
 			return MODE_NO_DBLESCAN;
 
 	} else {
-		const int vsync_tolerance = 10;
+		const int vsync_tolerance = 600;
 
 		if (mode->clock > 70000)
 			return MODE_CLOCK_HIGH;
 
-		if (abs(drm_mode_vrefresh(mode) -
-			    tv_norm->tv_enc_mode.vrefresh) > vsync_tolerance)
+		if (abs(drm_mode_vrefresh(mode) * 1000 -
+			tv_norm->tv_enc_mode.vrefresh) > vsync_tolerance)
 			return MODE_VSYNC;
 
 		/* The encoder takes care of the actual interlacing */
