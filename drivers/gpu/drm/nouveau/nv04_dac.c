@@ -248,7 +248,7 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 		nvWriteMC(dev, NV_PBUS_POWERCTRL_4, saved_powerctrl_4 & 0xffffffcf);
 	}
 
-	if (nv_arch(dev) >= NV_30) {
+	if (dev_priv->chipset >= 0x34) {
 		saved_gpio_ext = NVReadCRTC(dev, 0, NV_PCRTC_GPIO_EXT);
 
 		NVWriteCRTC(dev, 0, NV_PCRTC_GPIO_EXT, (saved_gpio_ext & ~(3 << 20)) |
@@ -308,7 +308,7 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 		nvWriteMC(dev, NV_PBUS_POWERCTRL_4, saved_powerctrl_4);
 	nvWriteMC(dev, NV_PBUS_POWERCTRL_2, saved_powerctrl_2);
 
-	if (nv_arch(dev) >= NV_30)
+	if (dev_priv->chipset >= 0x34)
 		NVWriteRAMDAC(dev, 0, NV_PCRTC_GPIO_EXT, saved_gpio_ext);
 
 	if (present) {

@@ -237,7 +237,7 @@ static void  nv17_tv_dpms(struct drm_encoder *encoder, int mode)
 
 	nv_load_ptv(dev, regs, 200);
 
-	if (nv_arch(dev) >= NV_30) {
+	if (dev_priv->chipset >= 0x34) {
 		uint32_t *gpio_ext = &dev_priv->mode_reg.crtc_reg[0].gpio_ext;
 
 		*gpio_ext &= ~(3 << 20);
