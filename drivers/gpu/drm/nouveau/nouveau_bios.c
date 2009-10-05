@@ -5259,6 +5259,17 @@ fixup_legacy_connector(struct nvbios *bios)
 		if (dcb->entry[i].i2c_index == 0xf)
 			continue;
 
+		/*
+		 * Ignore the I2C index for on-chip TV-out, as there
+		 * are cards with bogus values (nv31m in bug 23212),
+		 * and it's otherwise useless.
+		 */
+		if (dcb->entry[i].type == OUTPUT_TV &&
+		    dcb->entry[i].location == DCB_LOC_ON_CHIP) {
+			dcb->entry[i].i2c_index = 0xf;
+			continue;
+		}
+
 		dcb->entry[i].connector = dcb->entry[i].i2c_index;
 		if (dcb->entry[i].connector > high)
 			high = dcb->entry[i].connector;
