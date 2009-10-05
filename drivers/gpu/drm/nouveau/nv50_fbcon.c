@@ -157,19 +157,30 @@ nv50_fbcon_accel_init(struct fb_info *info)
 	int ret, format;
 
 	switch (info->var.bits_per_pixel) {
+	case 8:
+		format = 0xf3;
+		break;
+	case 15:
+		format = 0xf8;
+		break;
 	case 16:
 		format = 0xe8;
 		break;
-	default:
+	case 32:
 		switch (info->var.transp.length) {
-		case 2:
+		case 0: /* depth 24 */
+		case 8: /* depth 32, just use 24.. */
+			format = 0xe6;
+			break;
+		case 2: /* depth 30 */
 			format = 0xd1;
 			break;
 		default:
-			format = 0xe6;
-			break;
+			return -EINVAL;
 		}
 		break;
+	default:
+		return -EINVAL;
 	}
 
 	ret = nouveau_gpuobj_gr_new(dev_priv->channel, 0x502d, &eng2d);
