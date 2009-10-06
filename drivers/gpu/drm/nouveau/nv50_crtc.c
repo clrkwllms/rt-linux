@@ -43,51 +43,21 @@ nv50_crtc_lut_load(struct drm_crtc *drm_crtc)
 {
 	struct nouveau_crtc *crtc = nouveau_crtc(drm_crtc);
 	struct drm_device *dev = crtc->base.dev;
-	uint32_t index = 0, i;
 	void __iomem *lut = nvbo_kmap_obj_iovirtual(crtc->lut.nvbo);
+	int i;
 
 	NV_DEBUG(dev, "\n");
 
-	/* 16 bits, red, green, blue, unused, total of 64 bits per index */
-	/* 10 bits lut, with 14 bits values. */
-	switch (crtc->lut.depth) {
-	case 15:
-		/* R5G5B5 */
-		for (i = 0; i < 32; i++) {
-			index = NV50_LUT_INDEX(i, 5);
-			writew(crtc->lut.r[i] >> 2, lut + 8*index + 0);
-			writew(crtc->lut.g[i] >> 2, lut + 8*index + 2);
-			writew(crtc->lut.b[i] >> 2, lut + 8*index + 4);
-		}
-		break;
-	case 16:
-		/* R5G6B5 */
-		for (i = 0; i < 32; i++) {
-			index = NV50_LUT_INDEX(i, 5);
-			writew(crtc->lut.r[i] >> 2, lut + 8*index + 0);
-			writew(crtc->lut.b[i] >> 2, lut + 8*index + 4);
-		}
+	for (i = 0; i < 256; i++) {
+		writew(crtc->lut.r[i] >> 2, lut + 8*i + 0);
+		writew(crtc->lut.g[i] >> 2, lut + 8*i + 2);
+		writew(crtc->lut.b[i] >> 2, lut + 8*i + 4);
+	}
 
-		/* Green has an extra bit. */
-		for (i = 0; i < 64; i++) {
-			index = NV50_LUT_INDEX(i, 6);
-			writew(crtc->lut.g[i] >> 2, lut + 8*index + 2);
-		}
-		break;
-	default:
-		/* R8G8B8 */
-		for (i = 0; i < 256; i++) {
-			writew(crtc->lut.r[i] >> 2, lut + 8*i + 0);
-			writew(crtc->lut.g[i] >> 2, lut + 8*i + 2);
-			writew(crtc->lut.b[i] >> 2, lut + 8*i + 4);
-		}
-
-		if (crtc->lut.depth == 30) {
-			writew(crtc->lut.r[i-1] >> 2, lut + 8*i + 0);
-			writew(crtc->lut.g[i-1] >> 2, lut + 8*i + 2);
-			writew(crtc->lut.b[i-1] >> 2, lut + 8*i + 4);
-		}
-		break;
+	if (crtc->lut.depth == 30) {
+		writew(crtc->lut.r[i - 1] >> 2, lut + 8*i + 0);
+		writew(crtc->lut.g[i - 1] >> 2, lut + 8*i + 2);
+		writew(crtc->lut.b[i - 1] >> 2, lut + 8*i + 4);
 	}
 }
 
