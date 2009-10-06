@@ -85,6 +85,7 @@ enum nouveau_encoder_type {
 	OUTPUT_TMDS = 2,
 	OUTPUT_LVDS = 3,
 	OUTPUT_DP = 6,
+	OUTPUT_ANY = -1
 };
 
 enum nouveau_or {

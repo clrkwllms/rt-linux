@@ -58,7 +58,7 @@ find_encoder_by_type(struct drm_connector *connector, int type)
 			continue;
 		nv_encoder = nouveau_encoder(obj_to_encoder(obj));
 
-		if (nv_encoder->dcb->type == type)
+		if (type == OUTPUT_ANY || nv_encoder->dcb->type == type)
 			return nv_encoder;
 	}
 
@@ -291,6 +291,32 @@ nouveau_connector_detect(struct drm_connector *connector)
 	}
 
 	return connector_status_disconnected;
+}
+
+static void
+nouveau_connector_force(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct nouveau_encoder *nv_encoder;
+	int type;
+
+	if (connector->connector_type == DRM_MODE_CONNECTOR_DVII) {
+		if (connector->force == DRM_FORCE_ON_DIGITAL)
+			type = OUTPUT_TMDS;
+		else
+			type = OUTPUT_ANALOG;
+	} else
+		type = OUTPUT_ANY;
+
+	nv_encoder = find_encoder_by_type(connector, type);
+	if (!nv_encoder) {
+		NV_ERROR(dev, "can't find encoder to force %s on!\n",
+			 drm_get_connector_name(connector));
+		connector->status = connector_status_disconnected;
+		return;
+	}
+
+	nouveau_connector_set_encoder(connector, nv_encoder);
 }
 
 static int
@@ -564,7 +590,8 @@ nouveau_connector_funcs = {
 	.detect = nouveau_connector_detect,
 	.destroy = nouveau_connector_destroy,
 	.fill_modes = drm_helper_probe_single_connector_modes,
-	.set_property = nouveau_connector_set_property
+	.set_property = nouveau_connector_set_property,
+	.force = nouveau_connector_force
 };
 
 static int
