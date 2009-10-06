@@ -121,8 +121,14 @@ nv04_fbcon_imageblit(struct fb_info *info, const struct fb_image *image)
 	width = (image->width + 31) & ~31;
 	dsize = (width * image->height) >> 5;
 
-	fg = ((uint32_t *) info->pseudo_palette)[image->fg_color];
-	bg = ((uint32_t *) info->pseudo_palette)[image->bg_color];
+	if (info->fix.visual == FB_VISUAL_TRUECOLOR ||
+	    info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
+		fg = ((uint32_t *) info->pseudo_palette)[image->fg_color];
+		bg = ((uint32_t *) info->pseudo_palette)[image->bg_color];
+	} else {
+		fg = image->fg_color;
+		bg = image->bg_color;
+	}
 
 	BEGIN_RING(chan, NvSubGdiRect, 0x0be4, 7);
 	OUT_RING(chan, (image->dy << 16) | (image->dx & 0xffff));
@@ -182,6 +188,11 @@ nv04_fbcon_accel_init(struct fb_info *info)
 	int ret;
 
 	switch (info->var.bits_per_pixel) {
+	case 8:
+		surface_fmt = 1;
+		pattern_fmt = 3;
+		rect_fmt = 3;
+		break;
 	case 16:
 		surface_fmt = 4;
 		pattern_fmt = 1;
