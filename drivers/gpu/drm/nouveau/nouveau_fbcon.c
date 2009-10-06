@@ -118,8 +118,19 @@ static void nouveau_fbcon_gamma_set(struct drm_crtc *crtc, u16 red, u16 green,
 	nv_crtc->lut.b[regno] = blue;
 }
 
+static void nouveau_fbcon_gamma_get(struct drm_crtc *crtc, u16 *red, u16 *green,
+				    u16 *blue, int regno)
+{
+	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
+
+	*red = nv_crtc->lut.r[regno];
+	*green = nv_crtc->lut.g[regno];
+	*blue = nv_crtc->lut.b[regno];
+}
+
 static struct drm_fb_helper_funcs nouveau_fbcon_helper_funcs = {
 	.gamma_set = nouveau_fbcon_gamma_set,
+	.gamma_get = nouveau_fbcon_gamma_get
 };
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -268,7 +279,7 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	info->screen_base = nvbo_kmap_obj_iovirtual(nouveau_fb->nvbo);
 	info->screen_size = size;
 
-	drm_fb_helper_fill_fix(info, fb->pitch);
+	drm_fb_helper_fill_fix(info, fb->pitch, fb->depth);
 	drm_fb_helper_fill_var(info, fb, fb_width, fb_height);
 
 	/* FIXME: we really shouldn't expose mmio space at all */
@@ -338,7 +349,7 @@ nouveau_fbcon_probe(struct drm_device *dev)
 {
 	NV_DEBUG(dev, "\n");
 
-	return drm_fb_helper_single_fb_probe(dev, nouveau_fbcon_create);
+	return drm_fb_helper_single_fb_probe(dev, 32, nouveau_fbcon_create);
 }
 
 int
