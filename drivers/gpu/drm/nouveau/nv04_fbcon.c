@@ -181,6 +181,29 @@ nv04_fbcon_accel_init(struct fb_info *info)
 	int surface_fmt, pattern_fmt, rect_fmt;
 	int ret;
 
+	switch (info->var.bits_per_pixel) {
+	case 16:
+		surface_fmt = 4;
+		pattern_fmt = 1;
+		rect_fmt = 1;
+		break;
+	case 32:
+		switch (info->var.transp.length) {
+		case 0: /* depth 24 */
+		case 8: /* depth 32 */
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		surface_fmt = 6;
+		pattern_fmt = 3;
+		rect_fmt = 3;
+		break;
+	default:
+		return -EINVAL;
+	}
+
 	ret = nv04_fbcon_grobj_new(dev, dev_priv->card_type >= NV_10 ?
 				   0x0062 : 0x0042, NvCtxSurf2D);
 	if (ret)
@@ -206,19 +229,6 @@ nv04_fbcon_accel_init(struct fb_info *info)
 				   0x009f : 0x005f, NvImageBlit);
 	if (ret)
 		return ret;
-
-	switch (info->var.bits_per_pixel) {
-	case 16:
-		surface_fmt = 4;
-		pattern_fmt = 1;
-		rect_fmt = 1;
-		break;
-	default:
-		surface_fmt = 6;
-		pattern_fmt = 3;
-		rect_fmt = 3;
-		break;
-	}
 
 	if (RING_SPACE(chan, 49)) {
 		NV_ERROR(dev, "GPU lockup - switching to software fbcon\n");
