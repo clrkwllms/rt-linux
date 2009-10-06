@@ -724,7 +724,6 @@ static void nv_crtc_destroy(struct drm_crtc *crtc)
 	kfree(nv_crtc);
 }
 
-#define DEPTH_SHIFT(val, w) ((val << (8 - w)) | (val >> ((w << 1) - 8)))
 static void
 nv_crtc_gamma_load(struct drm_crtc *crtc)
 {
@@ -735,35 +734,10 @@ nv_crtc_gamma_load(struct drm_crtc *crtc)
 	int i;
 
 	rgbs = (struct rgb *)dev_priv->mode_reg.crtc_reg[nv_crtc->index].DAC;
-
-	switch (nv_crtc->base.fb->depth) {
-	case 15:
-		/* R5G5B5 */
-		/* spread 5 bits per colour (32 colours) over 256 (per colour) registers */
-		for (i = 0; i < 32; i++) {
-			rgbs[DEPTH_SHIFT(i, 5)].r = nv_crtc->lut.r[i] >> 8;
-			rgbs[DEPTH_SHIFT(i, 5)].g = nv_crtc->lut.g[i] >> 8;
-			rgbs[DEPTH_SHIFT(i, 5)].b = nv_crtc->lut.b[i] >> 8;
-		}
-		break;
-	case 16:
-		/* R5G6B5 */
-		for (i = 0; i < 64; i++) {
-			/* set 64 regs for green's 6 bits of colour */
-			rgbs[DEPTH_SHIFT(i, 6)].g = nv_crtc->lut.g[i] >> 8;
-			if (i < 32) {
-				rgbs[DEPTH_SHIFT(i, 5)].r =  nv_crtc->lut.r[i] >> 8;
-				rgbs[DEPTH_SHIFT(i, 5)].b = nv_crtc->lut.b[i] >> 8;
-			}
-		}
-		break;
-	default:
-		/* R8G8B8 */
-		for (i = 0; i < 256; i++) {
-			rgbs[i].r = nv_crtc->lut.r[i] >> 8;
-			rgbs[i].g = nv_crtc->lut.g[i] >> 8;
-			rgbs[i].b = nv_crtc->lut.b[i] >> 8;
-		}
+	for (i = 0; i < 256; i++) {
+		rgbs[i].r = nv_crtc->lut.r[i] >> 8;
+		rgbs[i].g = nv_crtc->lut.g[i] >> 8;
+		rgbs[i].b = nv_crtc->lut.b[i] >> 8;
 	}
 
 	nouveau_hw_load_state_palette(dev, nv_crtc->index, &dev_priv->mode_reg);
