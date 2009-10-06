@@ -726,8 +726,9 @@ static void nv_crtc_destroy(struct drm_crtc *crtc)
 
 #define DEPTH_SHIFT(val, w) ((val << (8 - w)) | (val >> ((w << 1) - 8)))
 static void
-nv_crtc_gamma_load(struct nouveau_crtc *nv_crtc)
+nv_crtc_gamma_load(struct drm_crtc *crtc)
 {
+	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 	struct drm_device *dev = nv_crtc->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct rgb { uint8_t r, g, b; } __attribute__((packed)) *rgbs;
@@ -793,7 +794,7 @@ nv_crtc_gamma_set(struct drm_crtc *crtc, u16 *r, u16 *g, u16 *b, uint32_t size)
 		return;
 	}
 
-	nv_crtc_gamma_load(nv_crtc);
+	nv_crtc_gamma_load(crtc);
 }
 
 static int
@@ -820,7 +821,7 @@ nv04_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 
 	if (nv_crtc->lut.depth != drm_fb->depth) {
 		nv_crtc->lut.depth = drm_fb->depth;
-		nv_crtc_gamma_load(nv_crtc);
+		nv_crtc_gamma_load(crtc);
 	}
 
 	regp->CRTC[NV_CIO_CRE_PIXEL_INDEX] &= ~3;
@@ -974,6 +975,7 @@ static const struct drm_crtc_helper_funcs nv04_crtc_helper_funcs = {
 	.mode_fixup = nv_crtc_mode_fixup,
 	.mode_set = nv_crtc_mode_set,
 	.mode_set_base = nv04_crtc_mode_set_base,
+	.load_lut = nv_crtc_gamma_load,
 };
 
 int

@@ -38,9 +38,10 @@
 #include "nv50_display.h"
 
 #define NV50_LUT_INDEX(val, w) ((val << (8 - w)) | (val >> ((w << 1) - 8)))
-static int
-nv50_crtc_lut_load(struct nouveau_crtc *crtc)
+static void
+nv50_crtc_lut_load(struct drm_crtc *drm_crtc)
 {
+	struct nouveau_crtc *crtc = nouveau_crtc(drm_crtc);
 	struct drm_device *dev = crtc->base.dev;
 	uint32_t index = 0, i;
 	void __iomem *lut = nvbo_kmap_obj_iovirtual(crtc->lut.nvbo);
@@ -88,8 +89,6 @@ nv50_crtc_lut_load(struct nouveau_crtc *crtc)
 		}
 		break;
 	}
-
-	return 0;
 }
 
 int
@@ -444,7 +443,7 @@ nv50_crtc_gamma_set(struct drm_crtc *drm_crtc, u16 *r, u16 *g, u16 *b,
 		return;
 	}
 
-	nv50_crtc_lut_load(crtc);
+	nv50_crtc_lut_load(drm_crtc);
 }
 
 static void
@@ -618,7 +617,7 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 
 	if (crtc->lut.depth != fb->base.depth) {
 		crtc->lut.depth = fb->base.depth;
-		nv50_crtc_lut_load(crtc);
+		nv50_crtc_lut_load(drm_crtc);
 	}
 
 	if (update) {
@@ -737,6 +736,7 @@ static const struct drm_crtc_helper_funcs nv50_crtc_helper_funcs = {
 	.mode_fixup = nv50_crtc_mode_fixup,
 	.mode_set = nv50_crtc_mode_set,
 	.mode_set_base = nv50_crtc_mode_set_base,
+	.load_lut = nv50_crtc_lut_load,
 };
 
 int
