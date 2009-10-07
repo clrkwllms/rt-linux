@@ -114,8 +114,14 @@ nv50_fbcon_imageblit(struct fb_info *info, const struct fb_image *image)
 	dwords = (width * image->height) >> 5;
 
 	BEGIN_RING(chan, NvSub2D, 0x0814, 2);
-	OUT_RING(chan, palette[image->bg_color] | mask);
-	OUT_RING(chan, palette[image->fg_color] | mask);
+	if (info->fix.visual == FB_VISUAL_TRUECOLOR ||
+	    info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
+		OUT_RING(chan, palette[image->bg_color] | mask);
+		OUT_RING(chan, palette[image->fg_color] | mask);
+	} else {
+		OUT_RING(chan, image->bg_color);
+		OUT_RING(chan, image->fg_color);
+	}
 	BEGIN_RING(chan, NvSub2D, 0x0838, 2);
 	OUT_RING(chan, image->width);
 	OUT_RING(chan, image->height);
