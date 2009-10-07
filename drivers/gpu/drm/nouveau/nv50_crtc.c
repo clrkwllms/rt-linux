@@ -561,7 +561,7 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 			OUT_RING(evo, NvEvoVRAM);
 	}
 
-	ret = RING_SPACE(evo, 10);
+	ret = RING_SPACE(evo, 12);
 	if (ret)
 		return ret;
 
@@ -579,6 +579,10 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 		OUT_RING(evo, (fb->nvbo->tile_flags << 8) | format);
 	else
 		OUT_RING(evo, format);
+
+	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, CLUT_MODE), 1);
+	OUT_RING(evo, fb->base.depth == 8 ?
+		 NV50_EVO_CRTC_CLUT_MODE_OFF : NV50_EVO_CRTC_CLUT_MODE_ON);
 
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, COLOR_CTRL), 1);
 	OUT_RING(evo, NV50_EVO_CRTC_COLOR_CTRL_COLOR);
