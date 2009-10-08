@@ -325,7 +325,7 @@ static struct drm_driver driver = {
 	.lastclose = nouveau_lastclose,
 	.unload = nouveau_unload,
 	.preclose = nouveau_preclose,
-#if defined(CONFIG_DEBUG_FS)
+#if defined(CONFIG_DRM_NOUVEAU_DEBUG)
 	.debugfs_init = nouveau_debugfs_init,
 	.debugfs_cleanup = nouveau_debugfs_takedown,
 #endif

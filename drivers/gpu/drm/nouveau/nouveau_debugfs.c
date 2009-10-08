@@ -33,7 +33,6 @@
 #include "drmP.h"
 #include "nouveau_drv.h"
 
-#if defined(CONFIG_DEBUG_FS)
 static int
 nouveau_debugfs_channel_info(struct seq_file *m, void *data)
 {
@@ -154,4 +153,3 @@ nouveau_debugfs_takedown(struct drm_minor *minor)
 	drm_debugfs_remove_files(nouveau_debugfs_list, NOUVEAU_DEBUGFS_ENTRIES,
 				 minor);
 }
-#endif

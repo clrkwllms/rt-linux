@@ -176,6 +176,9 @@ config DRM_NOUVEAU_KMS
 	and you have a new enough userspace to support this. Running old
 	userspaces with this enabled will cause pain.
 
+	NOTICE: if you plan on using the text based console outside of X, enable
+	FRAMEBUFFER_CONSOLE or else the console will be unusable.
+
 config DRM_NOUVEAU_BACKLIGHT
 	bool "Support for backlight control"
 	depends on DRM_NOUVEAU
@@ -183,6 +186,14 @@ config DRM_NOUVEAU_BACKLIGHT
 	help
 	  Say Y here if you want to control the backlight of your display
 	  (e.g. a laptop panel).
+
+config DRM_NOUVEAU_DEBUG
+	bool "Build in Nouveau's debugfs support"
+	depends on DRM_NOUVEAU && DEBUG_FS
+	default y
+	help
+	  Say Y here if you want Nouveau to output debugging information
+	  via debugfs.
 
 menu "I2C encoder or helper chips"
      depends on DRM

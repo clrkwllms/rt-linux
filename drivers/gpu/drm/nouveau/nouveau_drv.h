@@ -765,7 +765,7 @@ extern int nouveau_sgdma_get_page(struct drm_device *, uint32_t offset,
 extern struct ttm_backend *nouveau_sgdma_init_ttm(struct drm_device *);
 
 /* nouveau_debugfs.c */
-#if defined(CONFIG_DEBUG_FS)
+#if defined(CONFIG_DRM_NOUVEAU_DEBUG)
 extern int  nouveau_debugfs_init(struct drm_minor *);
 extern void nouveau_debugfs_takedown(struct drm_minor *);
 extern int  nouveau_debugfs_channel_init(struct nouveau_channel *);
