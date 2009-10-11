@@ -190,7 +190,7 @@ struct nvbios {
 	} state;
 
 	struct {
-		int head;
+		struct dcb_entry *output;
 		uint16_t script_table_ptr;
 	} display;
 

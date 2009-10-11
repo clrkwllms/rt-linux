@@ -296,10 +296,15 @@ munge_reg(struct nvbios *bios, uint32_t reg)
 	if (nv_arch(bios->dev) < NV_50)
 		return reg;
 
-	if (reg & 0x40000000)
-		reg += bios->display.head * 0x800;
+	if (!(reg & 0x40000000))
+		return reg;
 
-	reg &= ~(0x40000000);
+	BUG_ON(!bios->display.output);
+
+	if (reg & 0x40000000)
+		reg += bios->display.output->or * 0x800;
+
+	reg &= ~0x40000000;
 	return reg;
 }
 
@@ -3653,7 +3658,7 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 		}
 	}
 
-	bios->display.head = ffs(dcbent->or) - 1;
+	bios->display.output = dcbent;
 
 	if (pxclk == 0) {
 		script = ROM16(otable[6]);
