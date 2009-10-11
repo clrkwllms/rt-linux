@@ -248,6 +248,10 @@ nouveau_connector_detect(struct drm_connector *connector)
 			NV_ERROR(dev, "DDC responded, but no EDID for %s\n",
 				 drm_get_connector_name(connector));
 			return connector_status_disconnected;
+		} else
+		if (connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
+			NV_ERROR(dev, "Detected DP connected, ignoring!\n");
+			return connector_status_disconnected;
 		}
 
 		/* Override encoder type for DVI-I based on whether EDID
