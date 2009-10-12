@@ -2808,6 +2808,84 @@ init_97(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 	return true;
 }
 
+static int
+nouveau_dp_auxch_rd(struct nouveau_i2c_chan *auxch, int cmd, int addr,
+		    uint8_t buf[16], int len)
+{
+	NV_ERROR(auxch->dev, "auxch_rd: stub!\n");
+	return -ENODEV;
+}
+
+static int
+nouveau_dp_auxch_wr(struct nouveau_i2c_chan *auxch, int cmd, int addr,
+		    uint8_t buf[16], int len)
+{
+	NV_ERROR(auxch->dev, "auxch_wr: stub!\n");
+	return -ENODEV;
+}
+
+static bool
+init_auxch(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
+{
+	/*
+	 * INIT_AUXCH   opcode: 0x98 ('')
+	 *
+	 * offset      (8  bit): opcode
+	 * offset + 1  (32 bit): address
+	 * offset + 5  (8  bit): count
+	 * offset + 6  (8  bit): mask 0
+	 * offset + 7  (8  bit): data 0
+	 *  ...
+	 *
+	 */
+
+	struct drm_device *dev = bios->dev;
+	struct nouveau_i2c_chan *auxch;
+	uint32_t addr = ROM32(bios->data[offset + 1]);
+	uint8_t len = bios->data[offset + 5];
+	uint8_t buf[16];
+	int ret, i;
+
+	if (len > 16) {
+		NV_ERROR(dev, "INIT_AUXCH: >16 byte xfer unimplemented!\n");
+		return false;
+	}
+
+	if (!bios->display.output) {
+		NV_ERROR(dev, "INIT_AUXCH: no active output\n");
+		return false;
+	}
+
+	auxch = init_i2c_device_find(dev, bios->display.output->i2c_index);
+	if (!auxch) {
+		NV_ERROR(dev, "INIT_AUXCH: couldn't get auxch %d\n",
+			 bios->display.output->i2c_index);
+		return false;
+	}
+
+	if (!iexec->execute)
+		return true;
+
+	ret = nouveau_dp_auxch_rd(auxch, 9, addr, buf, len);
+	if (ret) {
+		NV_ERROR(dev, "INIT_AUXCH: rd auxch fail %d\n", ret);
+		return false;
+	}
+
+	offset += 6;
+	for (i = 0; i < len; i++, offset += 2) {
+		buf[i] &= bios->data[offset + 0];
+		buf[i] |= bios->data[offset + 1];
+	}
+
+	ret = nouveau_dp_auxch_wr(auxch, 8, addr, buf, len);
+	if (ret) {
+		NV_ERROR(dev, "INIT_AUXCH: wr auxch fail %d\n", ret);
+		return false;
+	}
+
+	return true;
+}
 static struct init_tbl_entry itbl_entry[] = {
 	/* command name                       , id  , length  , offset  , mult    , command handler                 */
 	/* INIT_PROG (0x31, 15, 10, 4) removed due to no example of use */
@@ -2864,6 +2942,7 @@ static struct init_tbl_entry itbl_entry[] = {
 	{ "INIT_RESERVED"                     , 0x92, 1       , 0       , 0       , init_reserved                   },
 	{ "INIT_96"                           , 0x96, 17      , 0       , 0       , init_96                         },
 	{ "INIT_97"                           , 0x97, 13      , 0       , 0       , init_97                         },
+	{ "INIT_AUXCH"                        , 0x98, 6       , 5       , 2       , init_auxch                      },
 	{ NULL                                , 0   , 0       , 0       , 0       , NULL                            }
 };
 
