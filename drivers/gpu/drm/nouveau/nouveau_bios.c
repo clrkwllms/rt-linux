@@ -1672,6 +1672,7 @@ init_condition_time(struct nvbios *bios, uint16_t offset,
 
 	uint8_t cond = bios->data[offset + 1];
 	uint16_t retries = bios->data[offset + 2] * 50;
+	unsigned cnt;
 
 	if (!iexec->execute)
 		return true;
@@ -1682,19 +1683,23 @@ init_condition_time(struct nvbios *bios, uint16_t offset,
 	BIOSLOG(bios, "0x%04X: Condition: 0x%02X, Retries: 0x%02X\n",
 		offset, cond, retries);
 
-	for (; retries > 0; retries--)
+	for (cnt = 0; cnt < retries; cnt++) {
 		if (bios_condition_met(bios, offset, cond)) {
-			BIOSLOG(bios, "0x%04X: Condition met, continuing\n", offset);
+			BIOSLOG(bios, "0x%04X: Condition met, continuing\n",
+								offset);
 			break;
 		} else {
-			BIOSLOG(bios, "0x%04X: Condition not met, sleeping for 20ms\n", offset);
+			BIOSLOG(bios, "0x%04X: "
+				"Condition not met, sleeping for 20ms\n",
+								offset);
 			msleep(20);
 		}
+	}
 
 	if (!bios_condition_met(bios, offset, cond)) {
 		NV_WARN(bios->dev,
 			"0x%04X: Condition still not met after %dms, "
-			"skiping following opcodes\n", offset, 20 * retries);
+			"skipping following opcodes\n", offset, 20 * retries);
 		iexec->execute = false;
 	}
 
