@@ -2886,6 +2886,56 @@ init_auxch(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 
 	return true;
 }
+
+static bool
+init_zm_auxch(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
+{
+	/*
+	 * INIT_ZM_AUXCH   opcode: 0x99 ('')
+	 *
+	 * offset      (8  bit): opcode
+	 * offset + 1  (32 bit): address
+	 * offset + 5  (8  bit): count
+	 * offset + 6  (8  bit): data 0
+	 *  ...
+	 *
+	 */
+
+	struct drm_device *dev = bios->dev;
+	struct nouveau_i2c_chan *auxch;
+	uint32_t addr = ROM32(bios->data[offset + 1]);
+	uint8_t len = bios->data[offset + 5];
+	int ret;
+
+	if (len > 16) {
+		NV_ERROR(dev, "INIT_ZM_AUXCH: >16 byte xfer unimplemented!\n");
+		return false;
+	}
+
+	if (!bios->display.output) {
+		NV_ERROR(dev, "INIT_ZM_AUXCH: no active output\n");
+		return false;
+	}
+
+	auxch = init_i2c_device_find(dev, bios->display.output->i2c_index);
+	if (!auxch) {
+		NV_ERROR(dev, "INIT_ZM_AUXCH: couldn't get auxch %d\n",
+			 bios->display.output->i2c_index);
+		return false;
+	}
+
+	if (!iexec->execute)
+		return true;
+
+	ret = nouveau_dp_auxch_wr(auxch, 8, addr, &bios->data[offset + 6], len);
+	if (ret) {
+		NV_ERROR(dev, "INIT_ZM_AUXCH: wr auxch fail %d\n", ret);
+		return false;
+	}
+
+	return true;
+}
+
 static struct init_tbl_entry itbl_entry[] = {
 	/* command name                       , id  , length  , offset  , mult    , command handler                 */
 	/* INIT_PROG (0x31, 15, 10, 4) removed due to no example of use */
@@ -2943,6 +2993,7 @@ static struct init_tbl_entry itbl_entry[] = {
 	{ "INIT_96"                           , 0x96, 17      , 0       , 0       , init_96                         },
 	{ "INIT_97"                           , 0x97, 13      , 0       , 0       , init_97                         },
 	{ "INIT_AUXCH"                        , 0x98, 6       , 5       , 2       , init_auxch                      },
+	{ "INIT_ZM_AUXCH"                     , 0x99, 6       , 5       , 1       , init_zm_auxch                   },
 	{ NULL                                , 0   , 0       , 0       , 0       , NULL                            }
 };
 
