@@ -492,4 +492,5 @@ sys_call_table:
 	PTR	sys_rt_tgsigqueueinfo
 	PTR	sys_perf_counter_open
 	PTR	sys_accept4
+	PTR     sys_recvmmsg
 	.size	sys_call_table,.-sys_call_table
