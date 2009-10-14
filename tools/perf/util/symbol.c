@@ -19,6 +19,8 @@ enum dso_origin {
 	DSO__ORIG_NOT_FOUND,
 };
 
+extern char *cplus_demangle(const char *, int);
+
 static struct symbol *symbol__new(u64 start, u64 len,
 				  const char *name, unsigned int priv_size,
 				  u64 obj_start, int verbose)
@@ -631,7 +633,7 @@ static int dso__load_sym(struct dso *self, int fd, const char *name,
 		 * to it...
 		 */
 		name = elf_sym__name(&sym, symstrs);
-		demangled = bfd_demangle(NULL, name, DMGL_PARAMS | DMGL_ANSI);
+		demangled = cplus_demangle(name, DMGL_PARAMS | DMGL_ANSI);
 		if (demangled != NULL)
 			name = demangled;
 
