@@ -93,6 +93,8 @@ extern int sysctl_nr_trim_pages;
 extern int rcutorture_runnable;
 #endif /* #ifdef CONFIG_RCU_TORTURE_TEST */
 
+extern int sysctl_oom_kill;
+
 /* Constants used for minimum and  maximum */
 #ifdef CONFIG_DETECT_SOFTLOCKUP
 static int sixty = 60;
@@ -1014,6 +1016,16 @@ static struct ctl_table vm_table[] = {
 		.maxlen		= sizeof(sysctl_panic_on_oom),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= VM_OOM_KILL,
+		.procname	= "oom_kill_enabled",
+		.data		= &sysctl_oom_kill,
+		.maxlen		= sizeof(sysctl_oom_kill),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &zero,
 	},
 	{
 		.ctl_name	= CTL_UNNUMBERED,

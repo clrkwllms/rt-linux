@@ -135,6 +135,7 @@ static const struct trans_ctl_table trans_vm_table[] = {
 	{ VM_PANIC_ON_OOM,		"panic_on_oom" },
 	{ VM_VDSO_ENABLED,		"vdso_enabled" },
 	{ VM_MIN_SLAB,			"min_slab_ratio" },
+	{ VM_OOM_KILL,			"oom_kill_enabled" },
 
 	{}
 };
