@@ -3674,6 +3674,40 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 	return 0;
 }
 
+static uint8_t *
+bios_output_config_match(struct drm_device *dev, struct dcb_entry *dcbent,
+			 uint16_t record, int record_len, int record_nr)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
+	uint32_t entry;
+	uint16_t table;
+	int i, v;
+
+	for (i = 0; i < record_nr; i++, record += record_len) {
+		table = ROM16(bios->data[record]);
+		if (!table)
+			continue;
+		entry = ROM32(bios->data[table]);
+
+		v = (entry & 0x000f0000) >> 16;
+		if (!(v & dcbent->or))
+			continue;
+
+		v = (entry & 0x000000f0) >> 4;
+		if (v != dcbent->location)
+			continue;
+
+		v = (entry & 0x0000000f);
+		if (v != dcbent->type)
+			continue;
+
+		return &bios->data[table];
+	}
+
+	return NULL;
+}
+
 int
 nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 			       uint32_t sub, int pxclk)
@@ -3705,9 +3739,9 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 	struct init_exec iexec = {true, false};
 	struct nvbios *bios = &dev_priv->VBIOS;
 	uint8_t *table = &bios->data[bios->display.script_table_ptr];
-	uint8_t *entry, *otable = NULL;
+	uint8_t *otable = NULL;
 	uint16_t script;
-	int i;
+	int i = 0;
 
 	if (!bios->display.script_table_ptr) {
 		NV_ERROR(dev, "No pointer to output script table\n");
@@ -3759,23 +3793,10 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 
 	NV_DEBUG(dev, "Searching for output entry for %d %d %d\n",
 			dcbent->type, dcbent->location, dcbent->or);
-	entry = table + table[1];
-	for (i = 0; i < table[3]; i++, entry += table[2]) {
-		uint32_t match;
-
-		if (ROM16(entry[0]) == 0)
-			continue;
-		otable = &bios->data[ROM16(entry[0])];
-		match = ROM32(otable[0]);
-
-		NV_DEBUG(dev, " %d: 0x%08x\n", i, match);
-		if ((((match & 0x000f0000) >> 16)  & dcbent->or) &&
-		     ((match & 0x0000000f) >>  0) == dcbent->type &&
-		     ((match & 0x000000f0) >>  4) == dcbent->location)
-			break;
-	}
-
-	if (i == table[3]) {
+	otable = bios_output_config_match(dev, dcbent, table[1] +
+					  bios->display.script_table_ptr,
+					  table[2], table[3]);
+	if (!otable) {
 		NV_ERROR(dev, "Couldn't find matching output script table\n");
 		return 1;
 	}
