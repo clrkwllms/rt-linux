@@ -179,6 +179,11 @@ struct powernow_k8_data {
 #define EXT_VID_MASK 0x3f
 #define EXT_FID_MASK 0x3f
 
+/* Defines for disabling C1 clock ramping */
+#define NB_PCI_ADDR	0x18
+#define NB_PM_DEV	3
+#define NB_C1_REG	0x84
+#define NB_C1_MASK	0xfc
 
 /*
  * Version 1.4 of the PSB table. This table is constructed by BIOS and is
