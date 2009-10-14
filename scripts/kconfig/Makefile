@@ -28,6 +28,11 @@ oldconfig: $(obj)/conf
 silentoldconfig: $(obj)/conf
 	$< -s $(Kconfig)
 
+nonint_oldconfig: $(obj)/conf
+	$< -b $(Kconfig)
+loose_nonint_oldconfig: $(obj)/conf
+	$< -B $(Kconfig)
+
 # Create new linux.pot file
 # Adjust charset to UTF-8 in .po file to accept UTF-8 in Kconfig files
 # The symlink is used to repair a deficiency in arch/um
