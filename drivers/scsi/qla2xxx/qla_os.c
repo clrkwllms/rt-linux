@@ -3038,23 +3038,20 @@ qla2x00_timer(scsi_qla_host_t *vha)
 #define FW_ISP25XX	5
 #define FW_ISP81XX	6
 
-#define FW_FILE_ISP21XX	"ql2100_fw.bin"
-#define FW_FILE_ISP22XX	"ql2200_fw.bin"
-#define FW_FILE_ISP2300	"ql2300_fw.bin"
-#define FW_FILE_ISP2322	"ql2322_fw.bin"
-#define FW_FILE_ISP24XX	"ql2400_fw.bin"
-#define FW_FILE_ISP25XX	"ql2500_fw.bin"
 #define FW_FILE_ISP81XX	"ql8100_fw.bin"
 
 static DEFINE_MUTEX(qla_fw_lock);
 
+extern struct firmware ql2100_fw, ql2200_fw, ql2300_fw,
+	ql2322_fw, ql2400_fw, ql2500_fw;
+
 static struct fw_blob qla_fw_blobs[FW_BLOBS] = {
-	{ .name = FW_FILE_ISP21XX, .segs = { 0x1000, 0 }, },
-	{ .name = FW_FILE_ISP22XX, .segs = { 0x1000, 0 }, },
-	{ .name = FW_FILE_ISP2300, .segs = { 0x800, 0 }, },
-	{ .name = FW_FILE_ISP2322, .segs = { 0x800, 0x1c000, 0x1e000, 0 }, },
-	{ .name = FW_FILE_ISP24XX, },
-	{ .name = FW_FILE_ISP25XX, },
+	{ .name = "ql2100_fw.bin", .segs = { 0x1000, 0 }, .fw = &ql2100_fw },
+	{ .name = "ql2200_fw.bin", .segs = { 0x1000, 0 }, .fw = &ql2200_fw },
+	{ .name = "ql2300_fw.bin", .segs = { 0x800, 0 }, .fw = &ql2300_fw },
+	{ .name = "ql2322_fw.bin", .segs = { 0x800, 0x1c000, 0x1e000, 0 }, .fw = &ql2322_fw },
+	{ .name = "ql2400_fw.bin", .fw = &ql2400_fw },
+	{ .name = "ql2500_fw.bin", .fw = &ql2500_fw },
 	{ .name = FW_FILE_ISP81XX, },
 };
 
@@ -3096,18 +3093,6 @@ qla2x00_request_firmware(scsi_qla_host_t *vha)
 out:
 	mutex_unlock(&qla_fw_lock);
 	return blob;
-}
-
-static void
-qla2x00_release_firmware(void)
-{
-	int idx;
-
-	mutex_lock(&qla_fw_lock);
-	for (idx = 0; idx < FW_BLOBS; idx++)
-		if (qla_fw_blobs[idx].fw)
-			release_firmware(qla_fw_blobs[idx].fw);
-	mutex_unlock(&qla_fw_lock);
 }
 
 static pci_ers_result_t
@@ -3304,7 +3289,6 @@ static void __exit
 qla2x00_module_exit(void)
 {
 	pci_unregister_driver(&qla2xxx_pci_driver);
-	qla2x00_release_firmware();
 	kmem_cache_destroy(srb_cachep);
 	fc_release_transport(qla2xxx_transport_template);
 	fc_release_transport(qla2xxx_transport_vport_template);
@@ -3317,10 +3301,4 @@ MODULE_AUTHOR("QLogic Corporation");
 MODULE_DESCRIPTION("QLogic Fibre Channel HBA Driver");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(QLA2XXX_VERSION);
-MODULE_FIRMWARE(FW_FILE_ISP21XX);
-MODULE_FIRMWARE(FW_FILE_ISP22XX);
-MODULE_FIRMWARE(FW_FILE_ISP2300);
-MODULE_FIRMWARE(FW_FILE_ISP2322);
-MODULE_FIRMWARE(FW_FILE_ISP24XX);
-MODULE_FIRMWARE(FW_FILE_ISP25XX);
 MODULE_FIRMWARE(FW_FILE_ISP81XX);
