@@ -13,7 +13,10 @@
 
 #include <linux/module.h>
 #include <linux/rtc.h>
+#include <linux/miscdevice.h>
 #include "rtc-core.h"
+
+struct rtc_device *compat_rtc;
 
 static dev_t rtc_devt;
 
@@ -481,6 +484,47 @@ static const struct file_operations rtc_dev_fops = {
 	.fasync		= rtc_dev_fasync,
 };
 
+static int rtc_open(struct inode *inode, struct file *file)
+{
+	int err;
+	struct rtc_device *rtc = compat_rtc;
+	const struct rtc_class_ops *ops = rtc->ops;
+
+	if (test_and_set_bit_lock(RTC_DEV_BUSY, &rtc->flags))
+		return -EBUSY;
+
+	file->private_data = rtc;
+
+	err = ops->open ? ops->open(rtc->dev.parent) : 0;
+	if (err == 0) {
+		spin_lock_irq(&rtc->irq_lock);
+		rtc->irq_data = 0;
+		spin_unlock_irq(&rtc->irq_lock);
+		return 0;
+	}
+
+	/* something has gone wrong */
+	clear_bit_unlock(RTC_DEV_BUSY, &rtc->flags);
+	return err;
+}
+
+static const struct file_operations rtc_compat_fops = {
+	.owner        = THIS_MODULE,
+	.llseek        = no_llseek,
+	.read        = rtc_dev_read,
+	.unlocked_ioctl    = rtc_dev_ioctl,
+	.open        = rtc_open,
+	.release    = rtc_dev_release,
+	.fasync        = rtc_dev_fasync,
+	.poll        = rtc_dev_poll,
+};
+
+static struct miscdevice rtc_compat_dev = {
+	.minor        = RTC_MINOR,
+	.name        = "rtc",
+	.fops        = &rtc_compat_fops,
+};
+
 /* insertion/removal hooks */
 
 void rtc_dev_prepare(struct rtc_device *rtc)
@@ -506,6 +550,12 @@ void rtc_dev_prepare(struct rtc_device *rtc)
 
 void rtc_dev_add_device(struct rtc_device *rtc)
 {
+    if (compat_rtc == NULL)
+        if (misc_register(&rtc_compat_dev))
+            printk("rtc_dev_add_device: misc_register() failed for compat_rtc\n");
+        else
+            compat_rtc = rtc;
+
 	if (cdev_add(&rtc->char_dev, rtc->dev.devt, 1))
 		printk(KERN_WARNING "%s: failed to add char device %d:%d\n",
 			rtc->name, MAJOR(rtc_devt), rtc->id);
@@ -534,4 +584,6 @@ void __exit rtc_dev_exit(void)
 {
 	if (rtc_devt)
 		unregister_chrdev_region(rtc_devt, RTC_DEV_MAX);
+	if(compat_rtc)
+		misc_deregister(&rtc_compat_dev);
 }
