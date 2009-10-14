@@ -80,6 +80,10 @@ static LIST_HEAD(acpi_pci_roots);
 static struct acpi_pci_driver *sub_driver;
 static DEFINE_MUTEX(osc_lock);
 
+#if defined(CONFIG_X86)
+extern int pci_noseg;
+#endif
+
 int acpi_pci_register_driver(struct acpi_pci_driver *driver)
 {
 	int n = 0;
@@ -506,6 +510,13 @@ static int __devinit acpi_pci_root_add(struct acpi_device *device)
 	strcpy(acpi_device_name(device), ACPI_PCI_ROOT_DEVICE_NAME);
 	strcpy(acpi_device_class(device), ACPI_PCI_ROOT_CLASS);
 	device->driver_data = root;
+
+#if defined(CONFIG_X86)
+	if (root->segment && pci_noseg) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "pci=noseg enabled, forcing segment %d to 0\n", root->segment));
+		root->segment = 0;
+	}
+#endif
 
 	/*
 	 * All supported architectures that use ACPI have support for

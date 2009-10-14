@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/acpi.h>
 #include <linux/bitmap.h>
+#include <linux/dmi.h>
 #include <linux/sort.h>
 #include <asm/e820.h>
 #include <asm/pci_x86.h>
@@ -586,8 +587,39 @@ static int __init pci_parse_mcfg(struct acpi_table_header *header)
 	return 0;
 }
 
+static int __devinit disable_mmconf(struct dmi_system_id *d)
+{
+	pci_probe &= ~PCI_PROBE_MMCONF;
+	printk(KERN_INFO "%s detected: disabling PCI MMCONFIG\n", d->ident);
+	return 0;
+}
+
+/*
+ * Systems which cannot use PCI MMCONFIG at this time...
+ */
+static struct dmi_system_id __devinitdata nommconf_dmi_table[] = {
+	{
+		.callback = disable_mmconf,
+		.ident = "HP xw9300 Workstation",
+		.matches = {
+			DMI_MATCH(DMI_PRODUCT_NAME, "HP xw9300 Workstation"),
+		},
+	},
+	{
+		.callback = disable_mmconf,
+		.ident = "HP xw9400 Workstation",
+		.matches = {
+			DMI_MATCH(DMI_PRODUCT_NAME, "HP xw9400 Workstation"),
+		},
+	},
+
+	{}
+};
+
 static void __init __pci_mmcfg_init(int early)
 {
+	dmi_check_system(nommconf_dmi_table);
+
 	/* MMCONFIG disabled */
 	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
 		return;

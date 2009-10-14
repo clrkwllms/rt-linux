@@ -54,6 +54,10 @@ int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
 	return -EINVAL;
 }
 
+#ifdef CONFIG_X86
+int pci_noseg = 0;
+#endif;
+
 static int pci_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
 {
 	return raw_pci_read(pci_domain_nr(bus), bus->number,
@@ -172,6 +176,15 @@ static int __devinit set_bf_sort(const struct dmi_system_id *d)
 	}
 	return 0;
 }
+
+#ifdef CONFIG_X86
+static int __devinit disable_pci_seg(struct dmi_system_id *d)
+{
+	pci_noseg = 1;
+	printk(KERN_INFO "%s detected: disabling PCI segments\n", d->ident);
+	return 0;
+}
+#endif
 
 /*
  * Enable renumbering of PCI bus# ranges to reach all PCI busses (Cardbus)
@@ -370,6 +383,23 @@ static const struct dmi_system_id __devinitconst pciprobe_dmi_table[] = {
 			DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant DL585 G2"),
 		},
 	},
+#ifdef CONFIG_X86
+	{
+		.callback = disable_pci_seg,
+		.ident = "HP xw9300 Workstation",
+		.matches = {
+			DMI_MATCH(DMI_PRODUCT_NAME, "HP xw9300 Workstation"),
+		},
+	},
+	{
+		.callback = disable_pci_seg,
+		.ident = "HP xw9400 Workstation",
+		.matches = {
+			DMI_MATCH(DMI_PRODUCT_NAME, "HP xw9400 Workstation"),
+		},
+	},
+#endif
+
 	{}
 };
 
@@ -483,6 +513,12 @@ char * __devinit  pcibios_setup(char *str)
 	}
 	else if (!strcmp(str, "check_enable_amd_mmconf")) {
 		pci_probe |= PCI_CHECK_ENABLE_AMD_MMCONF;
+		return NULL;
+	}
+#endif
+#ifdef CONFIG_X86
+	else if (!strcmp(str, "noseg")) {
+		pci_noseg = 1;
 		return NULL;
 	}
 #endif
