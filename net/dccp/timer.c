@@ -202,7 +202,7 @@ static void dccp_delack_timer(unsigned long data)
 		icsk->icsk_ack.blocked = 1;
 		NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_DELAYEDACKLOCKED);
 		sk_reset_timer(sk, &icsk->icsk_delack_timer,
-			       jiffies + TCP_DELACK_MIN);
+			       jiffies + TCP_DELACK_MIN_DEFAULT);
 		goto out;
 	}
 
@@ -227,7 +227,7 @@ static void dccp_delack_timer(unsigned long data)
 			 * deflate ATO.
 			 */
 			icsk->icsk_ack.pingpong = 0;
-			icsk->icsk_ack.ato = TCP_ATO_MIN;
+			icsk->icsk_ack.ato = TCP_ATO_MIN_DEFAULT;
 		}
 		dccp_send_ack(sk);
 		NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_DELAYEDACKS);

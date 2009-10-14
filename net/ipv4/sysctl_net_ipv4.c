@@ -803,6 +803,24 @@ static struct ctl_table ipv4_net_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
 	},
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "tcp_delack_min",
+		.data		= &sysctl_tcp_delack_min,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_ms_jiffies,
+		.strategy	= &sysctl_jiffies
+	},
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "tcp_ato_min",
+		.data		= &sysctl_tcp_ato_min,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_ms_jiffies,
+		.strategy	= &sysctl_jiffies
+	},
 	{ }
 };
 

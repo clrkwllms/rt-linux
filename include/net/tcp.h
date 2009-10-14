@@ -119,12 +119,16 @@ extern void tcp_time_wait(struct sock *sk, int state, int timeo);
 
 #define TCP_DELACK_MAX	((unsigned)(HZ/5))	/* maximal time to delay before sending an ACK */
 #if HZ >= 100
-#define TCP_DELACK_MIN	((unsigned)(HZ/25))	/* minimal time to delay before sending an ACK */
-#define TCP_ATO_MIN	((unsigned)(HZ/25))
+#define TCP_DELACK_MIN_DEFAULT	((unsigned)(HZ/25))	/* minimal time to delay before sending an ACK */
+#define TCP_ATO_MIN_DEFAULT	((unsigned)(HZ/25))
 #else
-#define TCP_DELACK_MIN	4U
-#define TCP_ATO_MIN	4U
+#define TCP_DELACK_MIN_DEFAULT	4U
+#define TCP_ATO_MIN_DEFAULT	4U
 #endif
+
+#define TCP_DELACK_MIN sysctl_tcp_delack_min
+#define TCP_ATO_MIN sysctl_tcp_ato_min
+
 #define TCP_RTO_MAX	((unsigned)(120*HZ))
 #define TCP_RTO_MIN	((unsigned)(HZ/5))
 #define TCP_TIMEOUT_INIT ((unsigned)(3*HZ))	/* RFC 1122 initial RTO value	*/
@@ -237,6 +241,8 @@ extern int sysctl_tcp_base_mss;
 extern int sysctl_tcp_workaround_signed_windows;
 extern int sysctl_tcp_slow_start_after_idle;
 extern int sysctl_tcp_max_ssthresh;
+extern int sysctl_tcp_ato_min;
+extern int sysctl_tcp_delack_min;
 
 extern atomic_t tcp_memory_allocated;
 extern struct percpu_counter tcp_sockets_allocated;

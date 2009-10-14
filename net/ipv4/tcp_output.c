@@ -2399,8 +2399,8 @@ void tcp_send_delayed_ack(struct sock *sk)
 		 * directly.
 		 */
 		if (tp->srtt) {
-			int rtt = max(tp->srtt >> 3, TCP_DELACK_MIN);
-
+			int rtt = max_t(unsigned, tp->srtt >> 3,
+					TCP_DELACK_MIN);
 			if (rtt < max_ato)
 				max_ato = rtt;
 		}
