@@ -1561,6 +1561,9 @@ static void shrink_zone(int priority, struct zone *zone,
 
 	while (nr[LRU_INACTIVE_ANON] || nr[LRU_ACTIVE_FILE] ||
 					nr[LRU_INACTIVE_FILE]) {
+		if (test_thread_flag(TIF_MEMDIE))
+			return 0;
+
 		for_each_evictable_lru(l) {
 			if (nr[l]) {
 				nr_to_scan = min(nr[l], swap_cluster_max);
@@ -1621,6 +1624,8 @@ static void shrink_zones(int priority, struct zonelist *zonelist,
 	sc->all_unreclaimable = 1;
 	for_each_zone_zonelist_nodemask(zone, z, zonelist, high_zoneidx,
 					sc->nodemask) {
+		if (test_thread_flag(TIF_MEMDIE))
+			return 0;
 		if (!populated_zone(zone))
 			continue;
 		/*
@@ -1696,6 +1701,8 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 	}
 
 	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
+		if (test_thread_flag(TIF_MEMDIE))
+			goto out;
 		sc->nr_scanned = 0;
 		if (!priority)
 			disable_swap_token();
