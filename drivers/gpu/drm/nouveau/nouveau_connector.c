@@ -411,14 +411,40 @@ static struct drm_display_mode *
 nouveau_connector_native_mode(struct nouveau_connector *connector)
 {
 	struct drm_device *dev = connector->base.dev;
-	struct drm_display_mode *mode;
+	struct drm_display_mode *mode, *largest = NULL;
+	int high_w = 0, high_h = 0, high_v = 0;
 
+	/* Use preferred mode if there is one.. */
 	list_for_each_entry(mode, &connector->base.probed_modes, head) {
-		if (mode->type & DRM_MODE_TYPE_PREFERRED)
+		if (mode->type & DRM_MODE_TYPE_PREFERRED) {
+			NV_DEBUG(dev, "native mode from preferred\n");
 			return drm_mode_duplicate(dev, mode);
+		}
 	}
 
-	return NULL;
+	/* Otherwise, take the resolution with the largest width, then height,
+	 * then vertical refresh
+	 */
+	list_for_each_entry(mode, &connector->base.probed_modes, head) {
+		if (mode->hdisplay < high_w)
+			continue;
+
+		if (mode->hdisplay == high_w && mode->vdisplay < high_h)
+			continue;
+
+		if (mode->hdisplay == high_w && mode->vdisplay == high_h &&
+		    mode->vrefresh < high_v)
+			continue;
+
+		high_w = mode->hdisplay;
+		high_h = mode->vdisplay;
+		high_v = mode->vrefresh;
+		largest = mode;
+	}
+
+	NV_DEBUG(dev, "native mode from largest: %dx%d@%d\n",
+		      high_w, high_h, high_v);
+	return largest ? drm_mode_duplicate(dev, largest) : NULL;
 }
 
 struct moderec {
