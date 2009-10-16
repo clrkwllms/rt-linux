@@ -300,7 +300,7 @@ munge_reg(struct nvbios *bios, uint32_t reg)
 	BUG_ON(!bios->display.output);
 
 	if (reg & 0x40000000)
-		reg += bios->display.output->or * 0x800;
+		reg += (ffs(bios->display.output->or) - 1) * 0x800;
 
 	reg &= ~0x40000000;
 	return reg;
