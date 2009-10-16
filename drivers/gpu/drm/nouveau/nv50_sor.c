@@ -146,10 +146,14 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 
 	nv50_sor_dpms(drm_encoder, DRM_MODE_DPMS_ON);
 
-	if (to_drm_encoder(encoder)->encoder_type != DRM_MODE_ENCODER_LVDS) {
+	switch (encoder->dcb->type) {
+	case OUTPUT_TMDS:
 		mode_ctl |= NV50_EVO_SOR_MODE_CTRL_TMDS;
 		if (adjusted_mode->clock > 165000)
 			mode_ctl |= NV50_EVO_SOR_MODE_CTRL_TMDS_DUAL_LINK;
+		break;
+	default:
+		break;
 	}
 
 	if (crtc->index == 1)
