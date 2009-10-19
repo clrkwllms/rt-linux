@@ -515,6 +515,7 @@ nouveau_mem_init(struct drm_device *dev)
 
 	/* non-mappable vram */
 	dev_priv->fb_available_size = nouveau_mem_fb_amount(dev);
+	NV_INFO(dev, "%d MiB VRAM\n", (int)(dev_priv->fb_available_size >> 20));
 	dev_priv->fb_available_size -= dev_priv->ramin_rsvd_vram;
 	vram_size = dev_priv->fb_available_size >> PAGE_SHIFT;
 	bar1_size = drm_get_resource_len(dev, 1) >> PAGE_SHIFT;
@@ -556,8 +557,10 @@ nouveau_mem_init(struct drm_device *dev)
 									ret);
 	}
 
+	NV_INFO(dev, "%d MiB GART (aperture)\n",
+		(int)(dev_priv->gart_info.aper_size >> 20));
 	ret = ttm_bo_init_mm(bdev, TTM_PL_TT, 0,
-				dev_priv->gart_info.aper_size >> PAGE_SHIFT);
+			     dev_priv->gart_info.aper_size >> PAGE_SHIFT);
 	if (ret) {
 		NV_ERROR(dev, "Failed TT mm init: %d\n", ret);
 		return ret;
