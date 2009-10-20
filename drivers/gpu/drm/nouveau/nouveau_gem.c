@@ -334,6 +334,14 @@ retry:
 
 		if (unlikely(atomic_read(&nvbo->bo.cpu_writers) > 0)) {
 			nouveau_gem_pushbuf_backoff(list);
+
+			if (nvbo->cpu_filp == file_priv) {
+				NV_ERROR(dev, "bo %p mapped by process trying "
+					      "to validate it!\n", nvbo);
+				ret = -EINVAL;
+				goto out_unref;
+			}
+
 			ret = ttm_bo_wait_cpu(&nvbo->bo, false);
 			if (ret == -ERESTART)
 				ret = -EAGAIN;
