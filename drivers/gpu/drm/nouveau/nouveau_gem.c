@@ -335,6 +335,8 @@ retry:
 		if (unlikely(atomic_read(&nvbo->bo.cpu_writers) > 0)) {
 			nouveau_gem_pushbuf_backoff(list);
 			ret = ttm_bo_wait_cpu(&nvbo->bo, false);
+			if (ret == -ERESTART)
+				ret = -EAGAIN;
 			if (ret)
 				goto out_unref;
 			goto retry;
