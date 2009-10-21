@@ -369,7 +369,7 @@ nouveau_gpuobj_del(struct drm_device *dev, struct nouveau_gpuobj **pgpuobj)
 		return -EINVAL;
 	}
 
-	if (gpuobj->flags & NVOBJ_FLAG_ZERO_FREE) {
+	if (gpuobj->im_pramin && (gpuobj->flags & NVOBJ_FLAG_ZERO_FREE)) {
 		engine->instmem.prepare_access(dev, true);
 		for (i = 0; i < gpuobj->im_pramin->size; i += 4)
 			nv_wo32(dev, gpuobj, i/4, 0);
