@@ -111,6 +111,9 @@ nv50_graph_init_ctxctl(struct drm_device *dev)
 	case 0xa0:
 		voodoo = nva0_ctxprog;
 		break;
+	case 0xa8:
+		voodoo = nva8_ctxprog;
+		break;
 	case 0xaa:
 		voodoo = nvaa_ctxprog;
 		break;
@@ -253,6 +256,9 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 		break;
 	case 0xa0:
 		ctxvals = nva0_ctxvals;
+		break;
+	case 0xa8:
+		ctxvals = nva8_ctxvals;
 		break;
 	case 0xaa:
 		ctxvals = nvaa_ctxvals;
@@ -458,5 +464,6 @@ struct nouveau_pgraph_object_class nv50_graph_grclass[] = {
 	{ 0x5097, false, NULL }, /* tesla (nv50) */
 	{ 0x8297, false, NULL }, /* tesla (nv80/nv90) */
 	{ 0x8397, false, NULL }, /* tesla (nva0) */
+	{ 0x8597, false, NULL }, /* tesla (nva8) */
 	{}
 };
