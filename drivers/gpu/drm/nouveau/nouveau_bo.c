@@ -74,7 +74,7 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 		flags |= TTM_PL_FLAG_PRIV0;
 
 	/*
-	 * Some of the tile_flags have a periodic structure of 24*4096 bytes,
+	 * Some of the tile_flags have a periodic structure of N*4096 bytes,
 	 * align to to that as well as the page size. Overallocate memory to
 	 * avoid corruption of other buffer objects.
 	 */
@@ -83,8 +83,21 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 	case 0x2800:
 	case 0x4800:
 	case 0x7a00:
-		size += 6 * 4096;
-		align = 2 * 24 * 4096;
+		if (dev_priv->chipset >= 0xA0) {
+			/* This is guesswork.*/
+			size += 6 * 4096;
+			/* Guesswork as well, therefore not in units of 4096. */
+			align = 2 * 65536;
+		} else if (dev_priv->chipset >= 0x90) {
+			size += 4 * 4096;
+			/* Somewhat useless being smaller than a page. */
+			align = 8 * 4096;
+		} else {
+			size += 6 * 4096;
+			/* 24 * 4096 is the actual alignment requirement,
+			 * but we must also align to page size. */
+			align = 2 * 24 * 4096;
+		}
 		break;
 	default:
 		break;
