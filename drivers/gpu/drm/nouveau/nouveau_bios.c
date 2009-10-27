@@ -5710,13 +5710,17 @@ nouveau_bios_init(struct drm_device *dev)
 	bios->execute = false;
 
 	/* ... unless card isn't POSTed already */
-	if (dev_priv->card_type == NV_50) {
-		if (NVReadVgaCrtc(dev, 0, 0x00) == 0 &&
-		    NVReadVgaCrtc(dev, 0, 0x1a) == 0) {
-			NV_INFO(dev, "Adaptor not initialised, "
-				     "running VBIOS init tables\n");
-			bios->execute = true;
+	if (dev_priv->card_type >= NV_10 &&
+	    NVReadVgaCrtc(dev, 0, 0x00) == 0 &&
+	    NVReadVgaCrtc(dev, 0, 0x1a) == 0) {
+		NV_INFO(dev, "Adaptor not initialised\n");
+		if (dev_priv->card_type < NV_50) {
+			NV_ERROR(dev, "Unable to POST this chipset\n");
+			return -ENODEV;
 		}
+
+		NV_INFO(dev, "Running VBIOS init tables\n");
+		bios->execute = true;
 	}
 
 	bios_wr32(bios, NV_PEXTDEV_BOOT_0, saved_nv_pextdev_boot_0);
