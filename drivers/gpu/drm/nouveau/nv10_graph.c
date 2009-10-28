@@ -673,7 +673,8 @@ int nv10_graph_load_context(struct nouveau_channel *chan)
 	nv10_graph_load_pipe(chan);
 
 	nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10010100);
-	nv_wr32(dev, NV10_PGRAPH_CTX_USER, chan->id << 24);
+	tmp = nv_rd32(dev, NV10_PGRAPH_CTX_USER);
+	nv_wr32(dev, NV10_PGRAPH_CTX_USER, (tmp & 0xffffff) | chan->id << 24);
 	tmp = nv_rd32(dev, NV10_PGRAPH_FFINTFC_ST2);
 	nv_wr32(dev, NV10_PGRAPH_FFINTFC_ST2, tmp & 0xcfffffff);
 	return 0;
