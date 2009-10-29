@@ -604,7 +604,7 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 	struct drm_gem_object *gem;
 	struct nouveau_bo *pbbo;
 	struct list_head list;
-	int ret = 0, do_reloc = 0;
+	int i, ret = 0, do_reloc = 0;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 	NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(req->channel, file_priv, chan);
@@ -680,8 +680,8 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 	if (!PUSHBUF_CAL) {
 		uint32_t retaddy;
 
-		if (chan->dma.free < 4) {
-			ret = nouveau_dma_wait(chan, 4);
+		if (chan->dma.free < 4 + NOUVEAU_DMA_SKIPS) {
+			ret = nouveau_dma_wait(chan, 4 + NOUVEAU_DMA_SKIPS);
 			if (ret) {
 				NV_ERROR(dev, "jmp_space: %d\n", ret);
 				goto out;
@@ -738,7 +738,7 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 				  req->offset) | 2);
 		OUT_RING(chan, 0);
 	} else {
-		ret = RING_SPACE(chan, 2);
+		ret = RING_SPACE(chan, 2 + NOUVEAU_DMA_SKIPS);
 		if (ret) {
 			NV_ERROR(dev, "jmp_space: %d\n", ret);
 			goto out;
@@ -746,6 +746,10 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 		OUT_RING(chan, ((pbbo->bo.mem.mm_node->start << PAGE_SHIFT) +
 				  req->offset) | 0x20000000);
 		OUT_RING(chan, 0);
+
+		/* Space the jumps apart with NOPs. */
+		for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
+			OUT_RING(chan, 0);
 	}
 
 	ret = nouveau_fence_emit(fence);
