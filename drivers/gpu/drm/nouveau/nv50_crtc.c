@@ -165,15 +165,15 @@ struct nouveau_connector *
 nouveau_crtc_connector_get(struct nouveau_crtc *nv_crtc)
 {
 	struct drm_device *dev = nv_crtc->base.dev;
-	struct drm_connector *drm_connector;
+	struct drm_connector *connector;
 	struct drm_crtc *crtc = to_drm_crtc(nv_crtc);
 
 	/* The safest approach is to find an encoder with the right crtc, that
 	 * is also linked to a connector. */
-	list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
-		if (drm_connector->encoder)
-			if (drm_connector->encoder->crtc == crtc)
-				return nouveau_connector(drm_connector);
+	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
+		if (connector->encoder)
+			if (connector->encoder->crtc == crtc)
+				return nouveau_connector(connector);
 	}
 
 	return NULL;
@@ -182,7 +182,8 @@ nouveau_crtc_connector_get(struct nouveau_crtc *nv_crtc)
 static int
 nv50_crtc_set_scale(struct nouveau_crtc *nv_crtc, int scaling_mode, bool update)
 {
-	struct nouveau_connector *connector = nouveau_crtc_connector_get(nv_crtc);
+	struct nouveau_connector *nv_connector =
+		nouveau_crtc_connector_get(nv_crtc);
 	struct drm_device *dev = nv_crtc->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *evo = dev_priv->evo;
@@ -197,11 +198,11 @@ nv50_crtc_set_scale(struct nouveau_crtc *nv_crtc, int scaling_mode, bool update)
 	case DRM_MODE_SCALE_NONE:
 		break;
 	default:
-		if (!connector || !connector->native_mode) {
+		if (!nv_connector || !nv_connector->native_mode) {
 			NV_ERROR(dev, "No native mode, forcing panel scaling\n");
 			scaling_mode = DRM_MODE_SCALE_NONE;
 		} else {
-			native_mode = connector->native_mode;
+			native_mode = nv_connector->native_mode;
 		}
 		break;
 	}
@@ -445,19 +446,20 @@ nv50_crtc_dpms(struct drm_crtc *crtc, int mode)
 static void
 nv50_crtc_prepare(struct drm_crtc *crtc)
 {
-	struct drm_device *dev = crtc->dev;
-	struct drm_encoder *drm_encoder;
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
+	struct drm_device *dev = crtc->dev;
+	struct drm_encoder *encoder;
 
 	NV_DEBUG(dev, "index %d\n", nv_crtc->index);
 
 	/* Disconnect all unused encoders. */
-	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
-		if (!drm_helper_encoder_in_use(drm_encoder)) {
-			struct nouveau_encoder *encoder =
-				nouveau_encoder(drm_encoder);
-			encoder->disconnect(encoder);
-		}
+	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
+		struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
+
+		if (drm_helper_encoder_in_use(encoder))
+			continue;
+
+		nv_encoder->disconnect(nv_encoder);
 	}
 
 	nv50_crtc_blank(nv_crtc, true);
@@ -617,13 +619,13 @@ nv50_crtc_mode_set(struct drm_crtc *crtc, struct drm_display_mode *mode,
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *evo = dev_priv->evo;
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
-	struct nouveau_connector *connector = NULL;
+	struct nouveau_connector *nv_connector = NULL;
 	uint32_t hsync_dur,  vsync_dur, hsync_start_to_end, vsync_start_to_end;
 	uint32_t hunk1, vunk1, vunk2a, vunk2b;
 	int ret;
 
 	/* Find the connector attached to this CRTC */
-	connector = nouveau_crtc_connector_get(nv_crtc);
+	nv_connector = nouveau_crtc_connector_get(nv_crtc);
 
 	*nv_crtc->mode = *adjusted_mode;
 
@@ -692,8 +694,8 @@ nv50_crtc_mode_set(struct drm_crtc *crtc, struct drm_display_mode *mode,
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(nv_crtc->index, SCALE_CENTER_OFFSET), 1);
 	OUT_RING(evo, NV50_EVO_CRTC_SCALE_CENTER_OFFSET_VAL(0, 0));
 
-	nv_crtc->set_dither(nv_crtc, connector->use_dithering, false);
-	nv_crtc->set_scale(nv_crtc, connector->scaling_mode, false);
+	nv_crtc->set_dither(nv_crtc, nv_connector->use_dithering, false);
+	nv_crtc->set_scale(nv_crtc, nv_connector->scaling_mode, false);
 
 	return nv50_crtc_do_mode_set_base(crtc, x, y, old_fb, false);
 }
