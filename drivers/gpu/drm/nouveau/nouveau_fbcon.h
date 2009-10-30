@@ -27,8 +27,6 @@
 #ifndef __NOUVEAU_FBCON_H__
 #define __NOUVEAU_FBCON_H__
 
-#define NOUVEAUFB_CONN_LIMIT 4
-
 #include "drm_fb_helper.h"
 
 struct nouveau_fbcon_par {

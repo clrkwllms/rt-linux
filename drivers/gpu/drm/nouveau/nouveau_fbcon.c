@@ -263,8 +263,7 @@ nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	par = info->par;
 	par->helper.funcs = &nouveau_fbcon_helper_funcs;
 	par->helper.dev = dev;
-	ret = drm_fb_helper_init_crtc_count(&par->helper, 2,
-					    NOUVEAUFB_CONN_LIMIT);
+	ret = drm_fb_helper_init_crtc_count(&par->helper, 2, 4);
 	if (ret)
 		goto out_unref;
 	dev_priv->fbdev_info = info;

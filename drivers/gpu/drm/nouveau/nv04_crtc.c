@@ -31,7 +31,6 @@
 #include "nouveau_connector.h"
 #include "nouveau_crtc.h"
 #include "nouveau_fb.h"
-#include "nouveau_fbcon.h"
 #include "nouveau_hw.h"
 #include "nvreg.h"
 
@@ -958,9 +957,7 @@ nv04_crtc_create(struct drm_device *dev, int crtc_num)
 	struct nouveau_crtc *nv_crtc;
 	int ret, i;
 
-	nv_crtc = kzalloc(sizeof(*nv_crtc) +
-			  NOUVEAUFB_CONN_LIMIT * sizeof(struct drm_connector *),
-			  GFP_KERNEL);
+	nv_crtc = kzalloc(sizeof(*nv_crtc), GFP_KERNEL);
 	if (!nv_crtc)
 		return -ENOMEM;
 

@@ -33,7 +33,6 @@
 #include "nouveau_encoder.h"
 #include "nouveau_crtc.h"
 #include "nouveau_fb.h"
-#include "nouveau_fbcon.h"
 #include "nouveau_connector.h"
 #include "nv50_display.h"
 
@@ -724,9 +723,7 @@ nv50_crtc_create(struct drm_device *dev, int index)
 
 	NV_DEBUG(dev, "\n");
 
-	nv_crtc = kzalloc(sizeof(*nv_crtc) +
-		  NOUVEAUFB_CONN_LIMIT * sizeof(struct drm_connector *),
-		  GFP_KERNEL);
+	nv_crtc = kzalloc(sizeof(*nv_crtc), GFP_KERNEL);
 	if (!nv_crtc)
 		return -ENOMEM;
 
