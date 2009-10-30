@@ -35,30 +35,31 @@
 #include "nv50_display.h"
 
 static void
-nv50_sor_disconnect(struct nouveau_encoder *encoder)
+nv50_sor_disconnect(struct nouveau_encoder *nv_encoder)
 {
-	struct drm_device *dev = to_drm_encoder(encoder)->dev;
+	struct drm_device *dev = to_drm_encoder(nv_encoder)->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *evo = dev_priv->evo;
 	int ret;
 
-	NV_DEBUG(dev, "Disconnecting SOR %d\n", encoder->or);
+	NV_DEBUG(dev, "Disconnecting SOR %d\n", nv_encoder->or);
 
 	ret = RING_SPACE(evo, 2);
 	if (ret) {
 		NV_ERROR(dev, "no space while disconnecting SOR\n");
 		return;
 	}
-	BEGIN_RING(evo, 0, NV50_EVO_SOR(encoder->or, MODE_CTRL), 1);
+	BEGIN_RING(evo, 0, NV50_EVO_SOR(nv_encoder->or, MODE_CTRL), 1);
 	OUT_RING(evo, 0);
 }
 
-static void nv50_sor_dpms(struct drm_encoder *drm_encoder, int mode)
+static void
+nv50_sor_dpms(struct drm_encoder *encoder, int mode)
 {
-	struct drm_device *dev = drm_encoder->dev;
-	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
+	struct drm_device *dev = encoder->dev;
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 	uint32_t val;
-	int or = encoder->or;
+	int or = nv_encoder->or;
 
 	NV_DEBUG(dev, "or %d mode %d\n", or, mode);
 
@@ -87,28 +88,30 @@ static void nv50_sor_dpms(struct drm_encoder *drm_encoder, int mode)
 	}
 }
 
-static void nv50_sor_save(struct drm_encoder *drm_encoder)
+static void
+nv50_sor_save(struct drm_encoder *encoder)
 {
-	NV_ERROR(drm_encoder->dev, "!!\n");
+	NV_ERROR(encoder->dev, "!!\n");
 }
 
-static void nv50_sor_restore(struct drm_encoder *drm_encoder)
+static void
+nv50_sor_restore(struct drm_encoder *encoder)
 {
-	NV_ERROR(drm_encoder->dev, "!!\n");
+	NV_ERROR(encoder->dev, "!!\n");
 }
 
-static bool nv50_sor_mode_fixup(struct drm_encoder *drm_encoder,
-				struct drm_display_mode *mode,
-				struct drm_display_mode *adjusted_mode)
+static bool
+nv50_sor_mode_fixup(struct drm_encoder *encoder, struct drm_display_mode *mode,
+		    struct drm_display_mode *adjusted_mode)
 {
-	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 	struct nouveau_connector *connector;
 
-	NV_DEBUG(drm_encoder->dev, "or %d\n", encoder->or);
+	NV_DEBUG(encoder->dev, "or %d\n", nv_encoder->or);
 
-	connector = nouveau_encoder_connector_get(encoder);
+	connector = nouveau_encoder_connector_get(nv_encoder);
 	if (!connector) {
-		NV_ERROR(drm_encoder->dev, "Encoder has no connector\n");
+		NV_ERROR(encoder->dev, "Encoder has no connector\n");
 		return false;
 	}
 
@@ -122,31 +125,33 @@ static bool nv50_sor_mode_fixup(struct drm_encoder *drm_encoder,
 	return true;
 }
 
-static void nv50_sor_prepare(struct drm_encoder *drm_encoder)
+static void
+nv50_sor_prepare(struct drm_encoder *encoder)
 {
 }
 
-static void nv50_sor_commit(struct drm_encoder *drm_encoder)
+static void
+nv50_sor_commit(struct drm_encoder *encoder)
 {
 }
 
-static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
-			      struct drm_display_mode *mode,
-			      struct drm_display_mode *adjusted_mode)
+static void
+nv50_sor_mode_set(struct drm_encoder *encoder, struct drm_display_mode *mode,
+		  struct drm_display_mode *adjusted_mode)
 {
-	struct drm_nouveau_private *dev_priv = drm_encoder->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = encoder->dev->dev_private;
 	struct nouveau_channel *evo = dev_priv->evo;
-	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
-	struct drm_device *dev = drm_encoder->dev;
-	struct nouveau_crtc *crtc = nouveau_crtc(drm_encoder->crtc);
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
+	struct drm_device *dev = encoder->dev;
+	struct nouveau_crtc *crtc = nouveau_crtc(encoder->crtc);
 	uint32_t mode_ctl = 0;
 	int ret;
 
-	NV_DEBUG(dev, "or %d\n", encoder->or);
+	NV_DEBUG(dev, "or %d\n", nv_encoder->or);
 
-	nv50_sor_dpms(drm_encoder, DRM_MODE_DPMS_ON);
+	nv50_sor_dpms(encoder, DRM_MODE_DPMS_ON);
 
-	switch (encoder->dcb->type) {
+	switch (nv_encoder->dcb->type) {
 	case OUTPUT_TMDS:
 		mode_ctl |= NV50_EVO_SOR_MODE_CTRL_TMDS;
 		if (adjusted_mode->clock > 165000)
@@ -172,7 +177,7 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 		NV_ERROR(dev, "no space while connecting SOR\n");
 		return;
 	}
-	BEGIN_RING(evo, 0, NV50_EVO_SOR(encoder->or, MODE_CTRL), 1);
+	BEGIN_RING(evo, 0, NV50_EVO_SOR(nv_encoder->or, MODE_CTRL), 1);
 	OUT_RING(evo, mode_ctl);
 }
 
@@ -187,27 +192,30 @@ static const struct drm_encoder_helper_funcs nv50_sor_helper_funcs = {
 	.detect = NULL
 };
 
-static void nv50_sor_destroy(struct drm_encoder *drm_encoder)
+static void
+nv50_sor_destroy(struct drm_encoder *encoder)
 {
-	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *nv_encoder = nouveau_encoder(encoder);
 
-	NV_DEBUG(drm_encoder->dev, "\n");
-
-	if (!drm_encoder)
+	if (!encoder)
 		return;
 
-	drm_encoder_cleanup(to_drm_encoder(encoder));
+	NV_DEBUG(encoder->dev, "\n");
 
-	kfree(encoder);
+	drm_encoder_cleanup(encoder);
+
+	kfree(nv_encoder);
 }
 
 static const struct drm_encoder_funcs nv50_sor_encoder_funcs = {
 	.destroy = nv50_sor_destroy,
 };
 
-int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
+int
+nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 {
-	struct nouveau_encoder *encoder = NULL;
+	struct nouveau_encoder *nv_encoder = NULL;
+	struct drm_encoder *encoder;
 	bool dum;
 	int type;
 
@@ -235,20 +243,21 @@ int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 		return -EINVAL;
 	}
 
-	encoder = kzalloc(sizeof(*encoder), GFP_KERNEL);
-	if (!encoder)
+	nv_encoder = kzalloc(sizeof(*nv_encoder), GFP_KERNEL);
+	if (!nv_encoder)
 		return -ENOMEM;
+	encoder = to_drm_encoder(nv_encoder);
 
-	encoder->dcb = entry;
-	encoder->or = ffs(entry->or) - 1;
+	nv_encoder->dcb = entry;
+	nv_encoder->or = ffs(entry->or) - 1;
 
-	encoder->disconnect = nv50_sor_disconnect;
+	nv_encoder->disconnect = nv50_sor_disconnect;
 
-	drm_encoder_init(dev, to_drm_encoder(encoder), &nv50_sor_encoder_funcs, type);
-	drm_encoder_helper_add(to_drm_encoder(encoder), &nv50_sor_helper_funcs);
+	drm_encoder_init(dev, encoder, &nv50_sor_encoder_funcs, type);
+	drm_encoder_helper_add(encoder, &nv50_sor_helper_funcs);
 
-	to_drm_encoder(encoder)->possible_crtcs = entry->heads;
-	to_drm_encoder(encoder)->possible_clones = 0;
+	encoder->possible_crtcs = entry->heads;
+	encoder->possible_clones = 0;
 
 	return 0;
 }
