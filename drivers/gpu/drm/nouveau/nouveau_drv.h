@@ -529,6 +529,7 @@ struct drm_nouveau_private {
 		} type;
 		uint64_t aper_base;
 		uint64_t aper_size;
+		uint64_t aper_free;
 
 		struct nouveau_gpuobj *sg_ctxdma;
 		struct page *sg_dummy_page;

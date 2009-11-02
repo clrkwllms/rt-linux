@@ -133,6 +133,7 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 int
 nouveau_bo_pin(struct nouveau_bo *nvbo, uint32_t memtype)
 {
+	struct drm_nouveau_private *dev_priv = nouveau_bdev(nvbo->bo.bdev);
 	struct ttm_buffer_object *bo = &nvbo->bo;
 	int ret;
 
@@ -156,6 +157,19 @@ nouveau_bo_pin(struct nouveau_bo *nvbo, uint32_t memtype)
 
 	ret = ttm_buffer_object_validate(bo, bo->proposed_placement,
 					 false, false);
+	if (ret == 0) {
+		switch (bo->mem.mem_type) {
+		case TTM_PL_VRAM:
+		case TTM_PL_PRIV0:
+			dev_priv->fb_available_size -= bo->mem.size;
+			break;
+		case TTM_PL_TT:
+			dev_priv->gart_info.aper_free -= bo->mem.size;
+			break;
+		default:
+			break;
+		}
+	}
 	ttm_bo_unreserve(bo);
 out:
 	if (unlikely(ret))
@@ -166,6 +180,7 @@ out:
 int
 nouveau_bo_unpin(struct nouveau_bo *nvbo)
 {
+	struct drm_nouveau_private *dev_priv = nouveau_bdev(nvbo->bo.bdev);
 	struct ttm_buffer_object *bo = &nvbo->bo;
 	int ret;
 
@@ -180,6 +195,20 @@ nouveau_bo_unpin(struct nouveau_bo *nvbo)
 
 	ret = ttm_buffer_object_validate(bo, bo->proposed_placement,
 					 false, false);
+	if (ret == 0) {
+		switch (bo->mem.mem_type) {
+		case TTM_PL_VRAM:
+		case TTM_PL_PRIV0:
+			dev_priv->fb_available_size += bo->mem.size;
+			break;
+		case TTM_PL_TT:
+			dev_priv->gart_info.aper_free += bo->mem.size;
+			break;
+		default:
+			break;
+		}
+	}
+
 	ttm_bo_unreserve(bo);
 	return ret;
 }

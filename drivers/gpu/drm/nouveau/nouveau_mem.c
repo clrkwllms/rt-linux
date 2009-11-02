@@ -566,6 +566,8 @@ nouveau_mem_init(struct drm_device *dev)
 
 	NV_INFO(dev, "%d MiB GART (aperture)\n",
 		(int)(dev_priv->gart_info.aper_size >> 20));
+	dev_priv->gart_info.aper_free = dev_priv->gart_info.aper_size;
+
 	ret = ttm_bo_init_mm(bdev, TTM_PL_TT, 0,
 			     dev_priv->gart_info.aper_size >> PAGE_SHIFT);
 	if (ret) {
