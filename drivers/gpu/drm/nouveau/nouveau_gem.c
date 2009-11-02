@@ -780,6 +780,19 @@ out_next:
 	return ret;
 }
 
+int
+nouveau_gem_ioctl_pushbuf_call2(struct drm_device *dev, void *data,
+				struct drm_file *file_priv)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct drm_nouveau_gem_pushbuf_call *req = data;
+
+	req->vram_available = dev_priv->fb_available_size;
+	req->gart_available = dev_priv->gart_info.aper_free;
+
+	return nouveau_gem_ioctl_pushbuf_call(dev, data, file_priv);
+}
+
 static inline uint32_t
 domain_to_ttm(struct nouveau_bo *nvbo, uint32_t domain)
 {

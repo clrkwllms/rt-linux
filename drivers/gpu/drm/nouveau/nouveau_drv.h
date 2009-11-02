@@ -1076,6 +1076,8 @@ extern int nouveau_gem_ioctl_pushbuf(struct drm_device *, void *,
 				     struct drm_file *);
 extern int nouveau_gem_ioctl_pushbuf_call(struct drm_device *, void *,
 					  struct drm_file *);
+extern int nouveau_gem_ioctl_pushbuf_call2(struct drm_device *, void *,
+					   struct drm_file *);
 extern int nouveau_gem_ioctl_pin(struct drm_device *, void *,
 				 struct drm_file *);
 extern int nouveau_gem_ioctl_unpin(struct drm_device *, void *,
