@@ -552,9 +552,10 @@ nouveau_mem_init(struct drm_device *dev)
 
 	if (dev_priv->gart_info.type == NOUVEAU_GART_NONE) {
 		ret = nouveau_sgdma_init(dev);
-		if (ret)
-			NV_ERROR(dev, "Error initialising PCI SGDMA: %d\n",
-									ret);
+		if (ret) {
+			NV_ERROR(dev, "Error initialising PCI(E): %d\n", ret);
+			return ret;
+		}
 	}
 
 	NV_INFO(dev, "%d MiB GART (aperture)\n",
