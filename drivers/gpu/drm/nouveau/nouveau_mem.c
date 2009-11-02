@@ -513,13 +513,15 @@ nouveau_mem_init(struct drm_device *dev)
 	INIT_LIST_HEAD(&dev_priv->ttm.bo_list);
 	spin_lock_init(&dev_priv->ttm.bo_list_lock);
 
-	/* non-mappable vram */
 	dev_priv->fb_available_size = nouveau_mem_fb_amount(dev);
 	NV_INFO(dev, "%d MiB VRAM\n", (int)(dev_priv->fb_available_size >> 20));
+
+	/* remove reserved space at end of vram from available amount */
 	dev_priv->fb_available_size -= dev_priv->ramin_rsvd_vram;
+
+	/* non-mappable vram */
 	vram_size = dev_priv->fb_available_size >> PAGE_SHIFT;
 	bar1_size = drm_get_resource_len(dev, 1) >> PAGE_SHIFT;
-	text_size = (256 * 1024) >> PAGE_SHIFT;
 	if (bar1_size < vram_size) {
 		if (dev_priv->card_type < NV_50) {
 			ret = ttm_bo_init_mm(bdev, TTM_PL_PRIV0, bar1_size,
@@ -533,9 +535,13 @@ nouveau_mem_init(struct drm_device *dev)
 		vram_size = bar1_size;
 	}
 
+	/* remove reserved space at start of vram from available amount */
+	dev_priv->fb_available_size -= (256 * 1024);
+	text_size  = (256 * 1024) >> PAGE_SHIFT;
+	vram_size -= text_size;
+
 	/* mappable vram */
-	ret = ttm_bo_init_mm(bdev, TTM_PL_VRAM, text_size,
-						vram_size - text_size);
+	ret = ttm_bo_init_mm(bdev, TTM_PL_VRAM, text_size, vram_size);
 	if (ret) {
 		NV_ERROR(dev, "Failed VRAM mm init: %d\n", ret);
 		return ret;
