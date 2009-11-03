@@ -1683,6 +1683,9 @@ init_condition_time(struct nvbios *bios, uint16_t offset,
 	BIOSLOG(bios, "0x%04X: Condition: 0x%02X, Retries: 0x%02X\n",
 		offset, cond, retries);
 
+	if (!bios->execute) /* avoid 2s delays when "faking" execution */
+		retries = 1;
+
 	for (cnt = 0; cnt < retries; cnt++) {
 		if (bios_condition_met(bios, offset, cond)) {
 			BIOSLOG(bios, "0x%04X: Condition met, continuing\n",
