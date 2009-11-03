@@ -343,13 +343,15 @@ nv50_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 	struct nouveau_bo *cursor = NULL;
 	struct drm_gem_object *gem;
+	uint32_t offset;
 	int ret = 0, i;
 
 	if (width != 64 || height != 64)
 		return -EINVAL;
 
 	if (!buffer_handle) {
-		nv_crtc->cursor.hide(nv_crtc, true);
+		if (nv_crtc->cursor.visible)
+			nv_crtc->cursor.hide(nv_crtc, true);
 		return 0;
 	}
 
@@ -368,10 +370,15 @@ nv50_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
 
 	nouveau_bo_unmap(cursor);
 
-	nv_crtc->cursor.offset  = nv_crtc->cursor.nvbo->bo.offset;
-	nv_crtc->cursor.offset -= dev_priv->vm_vram_base;
-	nv_crtc->cursor.set_offset(nv_crtc, nv_crtc->cursor.offset);
-	nv_crtc->cursor.show(nv_crtc, true);
+	offset  = nv_crtc->cursor.nvbo->bo.offset;
+	offset -= dev_priv->vm_vram_base;
+	if (offset != nv_crtc->cursor.offset) {
+		nv_crtc->cursor.set_offset(nv_crtc, offset);
+		nv_crtc->cursor.offset = offset;
+	}
+
+	if (!nv_crtc->cursor.visible)
+		nv_crtc->cursor.show(nv_crtc, true);
 
 out:
 	mutex_lock(&dev->struct_mutex);
