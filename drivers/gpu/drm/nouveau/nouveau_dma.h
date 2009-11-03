@@ -27,6 +27,10 @@
 #ifndef __NOUVEAU_DMA_H__
 #define __NOUVEAU_DMA_H__
 
+#ifndef NOUVEAU_DMA_DEBUG
+#define NOUVEAU_DMA_DEBUG 0
+#endif
+
 /*
  * There's a hw race condition where you can't jump to your PUT offset,
  * to avoid this we jump to offset + SKIPS and fill the difference with
@@ -105,10 +109,11 @@ RING_SPACE(struct nouveau_channel *chan, int size)
 static inline void
 OUT_RING(struct nouveau_channel *chan, int data)
 {
-#ifdef NOUVEAU_DMA_DEBUG
-	NV_INFO(chan->dev, "Ch%d/0x%08x: 0x%08x\n",
-		chan->id, chan->dma.cur << 2, data);
-#endif
+	if (NOUVEAU_DMA_DEBUG) {
+		NV_INFO(chan->dev, "Ch%d/0x%08x: 0x%08x\n",
+			chan->id, chan->dma.cur << 2, data);
+	}
+
 	nouveau_bo_wr32(chan->pushbuf_bo, chan->dma.cur++, data);
 }
 
@@ -130,10 +135,11 @@ BEGIN_RING(struct nouveau_channel *chan, int subc, int mthd, int size)
 static inline void
 FIRE_RING(struct nouveau_channel *chan)
 {
-#ifdef NOUVEAU_DMA_DEBUG
-	NV_INFO(chan->dev, "Ch%d/0x%08x: PUSH!\n",
-		chan->id, chan->dma.cur << 2);
-#endif
+	if (NOUVEAU_DMA_DEBUG) {
+		NV_INFO(chan->dev, "Ch%d/0x%08x: PUSH!\n",
+			chan->id, chan->dma.cur << 2);
+	}
+
 	if (chan->dma.cur == chan->dma.put)
 		return;
 	chan->accel_done = true;
