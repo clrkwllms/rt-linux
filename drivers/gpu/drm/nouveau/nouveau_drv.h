@@ -1205,6 +1205,7 @@ enum {
 	NOUVEAU_REG_DEBUG_VGACRTC        = 0x40,
 	NOUVEAU_REG_DEBUG_RMVIO          = 0x80,
 	NOUVEAU_REG_DEBUG_VGAATTR        = 0x100,
+	NOUVEAU_REG_DEBUG_EVO            = 0x200,
 };
 
 #define NV_REG_DEBUG(type, dev, fmt, arg...) do { \

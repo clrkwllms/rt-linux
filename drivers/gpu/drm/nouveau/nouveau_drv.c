@@ -78,7 +78,7 @@ module_param_named(tv_norm, nouveau_tv_norm, charp, 0400);
 MODULE_PARM_DESC(reg_debug, "Register access debug bitmask:\n"
 		"\t\t0x1 mc, 0x2 video, 0x4 fb, 0x8 extdev,\n"
 		"\t\t0x10 crtc, 0x20 ramdac, 0x40 vgacrtc, 0x80 rmvio,\n"
-		"\t\t0x100 vgaattr. ");
+		"\t\t0x100 vgaattr, 0x200 EVO (G80+). ");
 int nouveau_reg_debug;
 module_param_named(reg_debug, nouveau_reg_debug, int, 0600);
 
