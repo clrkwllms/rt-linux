@@ -128,8 +128,8 @@ nouveau_debugfs_memory_info(struct seq_file *m, void *data)
 	struct drm_minor *minor = node->minor;
 	struct drm_device *dev = minor->dev;
 
-	seq_printf(m, "VRAM total: %dMiB\n",
-		   (int)(nouveau_mem_fb_amount(dev) >> 20));
+	seq_printf(m, "VRAM total: %dKiB\n",
+		   (int)(nouveau_mem_fb_amount(dev) >> 10));
 	return 0;
 }
 

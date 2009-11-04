@@ -75,6 +75,7 @@ nouveau_notifier_takedown_channel(struct nouveau_channel *chan)
 
 	nouveau_bo_unmap(chan->notifier_bo);
 	mutex_lock(&dev->struct_mutex);
+	nouveau_bo_unpin(chan->notifier_bo);
 	drm_gem_object_unreference(chan->notifier_bo->gem);
 	mutex_unlock(&dev->struct_mutex);
 	nouveau_mem_takedown(&chan->notifier_heap);

@@ -405,6 +405,7 @@ nv50_instmem_clear(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 	if (gpuobj && gpuobj->im_backing) {
 		if (gpuobj->im_bound)
 			dev_priv->engine.instmem.unbind(dev, gpuobj);
+		nouveau_bo_unpin(gpuobj->im_backing);
 		nouveau_bo_ref(NULL, &gpuobj->im_backing);
 		gpuobj->im_backing = NULL;
 	}
