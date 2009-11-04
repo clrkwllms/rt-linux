@@ -518,6 +518,7 @@ nouveau_mem_init(struct drm_device *dev)
 
 	/* remove reserved space at end of vram from available amount */
 	dev_priv->fb_available_size -= dev_priv->ramin_rsvd_vram;
+	dev_priv->fb_aper_free = dev_priv->fb_available_size;
 
 	/* non-mappable vram */
 	vram_size = dev_priv->fb_available_size >> PAGE_SHIFT;
@@ -536,7 +537,7 @@ nouveau_mem_init(struct drm_device *dev)
 	}
 
 	/* remove reserved space at start of vram from available amount */
-	dev_priv->fb_available_size -= (256 * 1024);
+	dev_priv->fb_aper_free -= (256 * 1024);
 	text_size  = (256 * 1024) >> PAGE_SHIFT;
 	vram_size -= text_size;
 

@@ -161,7 +161,7 @@ nouveau_bo_pin(struct nouveau_bo *nvbo, uint32_t memtype)
 		switch (bo->mem.mem_type) {
 		case TTM_PL_VRAM:
 		case TTM_PL_PRIV0:
-			dev_priv->fb_available_size -= bo->mem.size;
+			dev_priv->fb_aper_free -= bo->mem.size;
 			break;
 		case TTM_PL_TT:
 			dev_priv->gart_info.aper_free -= bo->mem.size;
@@ -199,7 +199,7 @@ nouveau_bo_unpin(struct nouveau_bo *nvbo)
 		switch (bo->mem.mem_type) {
 		case TTM_PL_VRAM:
 		case TTM_PL_PRIV0:
-			dev_priv->fb_available_size += bo->mem.size;
+			dev_priv->fb_aper_free += bo->mem.size;
 			break;
 		case TTM_PL_TT:
 			dev_priv->gart_info.aper_free += bo->mem.size;
