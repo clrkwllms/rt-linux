@@ -249,7 +249,7 @@ nouveau_connector_detect(struct drm_connector *connector)
 				 drm_get_connector_name(connector));
 			return connector_status_disconnected;
 		} else
-		if (connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
+		if (nv_encoder->dcb->type == OUTPUT_DP) {
 			NV_ERROR(dev, "Detected DP connected, ignoring!\n");
 			return connector_status_disconnected;
 		}
