@@ -1,0 +1,7 @@
+%pubring kernel.pub
+%secring kernel.sec
+Key-Type: DSA
+Key-Length: 512
+Name-Real: Red Hat, Inc.
+Name-Comment: Kernel Module GPG key
+%commit
