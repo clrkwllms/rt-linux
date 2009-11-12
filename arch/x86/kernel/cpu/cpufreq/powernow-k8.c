@@ -36,6 +36,7 @@
 #include <linux/sched.h>	/* for current / set_cpus_allowed() */
 #include <linux/io.h>
 #include <linux/delay.h>
+#include <asm/pci-direct.h>
 
 #include <asm/msr.h>
 
@@ -51,6 +52,8 @@
 static DEFINE_MUTEX(fidvid_mutex);
 
 static DEFINE_PER_CPU(struct powernow_k8_data *, powernow_data);
+static int *req_state = NULL;
+static int tscsync = 0;
 
 static int cpu_family = CPU_OPTERON;
 
@@ -193,6 +196,17 @@ static int write_new_fid(struct powernow_k8_data *data, u32 fid)
 	dprintk("writing fid 0x%x, lo 0x%x, hi 0x%x\n",
 		fid, lo, data->plllock * PLL_LOCK_CONVERSION);
 
+	if (tscsync) {
+		int i;
+		cpumask_t oldmask = current->cpus_allowed;
+		for_each_online_cpu(i) {
+			set_cpus_allowed(current, cpumask_of_cpu(i));
+			schedule();
+			wrmsr(MSR_FIDVID_CTL, lo & ~MSR_C_LO_INIT_FID_VID, data->plllock * PLL_LOCK_CONVERSION);
+		}
+		set_cpus_allowed(current, oldmask);
+		schedule();
+	}
 	do {
 		wrmsr(MSR_FIDVID_CTL, lo, data->plllock * PLL_LOCK_CONVERSION);
 		if (i++ > 100) {
@@ -241,6 +255,17 @@ static int write_new_vid(struct powernow_k8_data *data, u32 vid)
 	dprintk("writing vid 0x%x, lo 0x%x, hi 0x%x\n",
 		vid, lo, STOP_GRANT_5NS);
 
+	if (tscsync) {
+		int i;
+		cpumask_t oldmask = current->cpus_allowed;
+		for_each_online_cpu(i) {
+			set_cpus_allowed(current, cpumask_of_cpu(i));
+			schedule();
+			wrmsr(MSR_FIDVID_CTL, lo & ~MSR_C_LO_INIT_FID_VID, STOP_GRANT_5NS);
+		}
+		set_cpus_allowed(current, oldmask);
+		schedule();
+	}
 	do {
 		wrmsr(MSR_FIDVID_CTL, lo, STOP_GRANT_5NS);
 		if (i++ > 100) {
@@ -389,7 +414,8 @@ static int core_frequency_transition(struct powernow_k8_data *data, u32 reqfid)
 	u32 fid_interval, savevid = data->currvid;
 
 	if (data->currfid == reqfid) {
-		printk(KERN_ERR PFX "ph2 null fid transition 0x%x\n",
+		if (!tscsync)
+			printk(KERN_ERR PFX "ph2 null fid transition 0x%x\n",
 				data->currfid);
 		return 0;
 	}
@@ -1060,8 +1086,20 @@ static int transition_frequency_fidvid(struct powernow_k8_data *data,
 	u32 vid = 0;
 	int res, i;
 	struct cpufreq_freqs freqs;
+	struct cpumask *changing_cores;
 
 	dprintk("cpu %d transition to index %u\n", smp_processor_id(), index);
+
+	/* if all processors are transitioning in step, find the highest
+	 * current state and go to that
+	 */
+
+	if (tscsync && req_state) {
+		req_state[smp_processor_id()] = index;
+		for_each_online_cpu(i)
+			if (req_state[i] < index)
+				index = req_state[i];
+	}
 
 	/* fid/vid correctness check for k8 */
 	/* fid are the lower 8 bits of the index we stored into
@@ -1082,12 +1120,26 @@ static int transition_frequency_fidvid(struct powernow_k8_data *data,
 		return 0;
 	}
 
+	if ((fid < HI_FID_TABLE_BOTTOM) &&
+			(data->currfid < HI_FID_TABLE_BOTTOM)) {
+		if (tscsync && (data->currfid == fid))
+			return 0;
+		printk(KERN_ERR PFX
+			"ignoring illegal change in lo freq table-%x to 0x%x\n",
+				data->currfid, fid);
+		return 1;
+	}
+
 	dprintk("cpu %d, changing to fid 0x%x, vid 0x%x\n",
 		smp_processor_id(), fid, vid);
 	freqs.old = find_khz_freq_from_fid(data->currfid);
 	freqs.new = find_khz_freq_from_fid(fid);
 
-	for_each_cpu(i, data->available_cores) {
+	if (tscsync)
+		changing_cores = cpu_online_mask;
+	else
+		changing_cores = data->available_cores;
+	for_each_cpu(i, changing_cores) {
 		freqs.cpu = i;
 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 	}
@@ -1095,10 +1147,18 @@ static int transition_frequency_fidvid(struct powernow_k8_data *data,
 	res = transition_fid_vid(data, fid, vid);
 	freqs.new = find_khz_freq_from_fid(data->currfid);
 
-	for_each_cpu(i, data->available_cores) {
+	for_each_cpu(i, changing_cores) {
 		freqs.cpu = i;
 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 	}
+	if (tscsync)
+		for_each_online_cpu(i) {
+			struct powernow_k8_data *pndata = per_cpu(powernow_data, i);
+			if (pndata) {
+				pndata->currfid = data->currfid;
+				pndata->currvid = data->currvid;
+			}
+		}
 	return res;
 }
 
@@ -1176,8 +1236,8 @@ static int powernowk8_target(struct cpufreq_policy *pol,
 		dprintk("targ: curr fid 0x%x, vid 0x%x\n",
 		data->currfid, data->currvid);
 
-		if ((checkvid != data->currvid) ||
-		    (checkfid != data->currfid)) {
+		if (!tscsync &&((checkvid != data->currvid) ||
+		    (checkfid != data->currfid))) {
 			printk(KERN_INFO PFX
 				"error - out of sync, fix 0x%x 0x%x, "
 				"vid 0x%x 0x%x\n",
@@ -1191,7 +1251,6 @@ static int powernowk8_target(struct cpufreq_policy *pol,
 		goto err_out;
 
 	mutex_lock(&fidvid_mutex);
-
 	powernow_k8_acpi_pst_values(data, newstate);
 
 	if (cpu_family == CPU_HW_PSTATE)
@@ -1253,6 +1312,38 @@ static void __cpuinit powernowk8_cpu_init_on_cpu(void *_init_on_cpu)
 		fidvid_msr_init();
 
 	init_on_cpu->rc = 0;
+}
+
+/* On an MP system that is transitioning all cores in sync, adjust the
+ * vids for each frequency to the highest.  Otherwise, systems made up
+ * of different steppings may fail.
+ */
+static void sync_tables(int curcpu)
+{
+	int j;
+	struct powernow_k8_data *curr_pndata = per_cpu(powernow_data, curcpu);
+
+	BUG_ON(curr_pndata == NULL);
+	for (j = 0; j < curr_pndata->numps; j++) {
+		int i;
+		int maxvid = 0;
+		for_each_online_cpu(i) {
+			int testvid;
+			struct powernow_k8_data *pn = per_cpu(powernow_data, i);
+			if (!pn || !pn->powernow_table)
+				continue;
+			testvid = pn->powernow_table[j].index & 0xff00;
+			if (testvid > maxvid)
+				maxvid = testvid;
+		}
+		for_each_online_cpu(i) {
+			struct powernow_k8_data *pn = per_cpu(powernow_data, i);
+			if (!pn || !pn->powernow_table)
+				continue;
+			pn->powernow_table[j].index &= 0xff;
+			pn->powernow_table[j].index |= maxvid;
+		}
+	}
 }
 
 /* per CPU init entry point to the driver */
@@ -1349,6 +1440,13 @@ static int __cpuinit powernowk8_cpu_init(struct cpufreq_policy *pol)
 
 	per_cpu(powernow_data, pol->cpu) = data;
 
+	if (tscsync && (cpu_family == CPU_OPTERON)) {
+		u32 reg;
+		sync_tables(pol->cpu);
+		reg = read_pci_config(0, NB_PCI_ADDR + pol->cpu, NB_PM_DEV, NB_C1_REG);
+		/* turn off C1 clock ramping */
+		write_pci_config(0, NB_PCI_ADDR + pol->cpu, NB_PM_DEV, NB_C1_REG, reg & NB_C1_MASK);
+	}
 	return 0;
 
 err_out_exit_acpi:
@@ -1436,7 +1534,21 @@ static int __cpuinit powernowk8_init(void)
 			supported_cpus++;
 	}
 
+#ifndef CONFIG_SMP
+	tscsync = 0;
+#endif
+
 	if (supported_cpus == num_online_cpus()) {
+		if (tscsync) {
+			req_state = kmalloc(sizeof(int)*NR_CPUS, GFP_KERNEL);
+			if (!req_state) {
+				printk(KERN_ERR PFX "Unable to allocate memory!\n");
+				return -ENOMEM;
+			}
+			/* necessary for dual-cores (99=just a large number) */
+			for(i=0; i < NR_CPUS; i++)
+				req_state[i] = 99;
+		}
 		printk(KERN_INFO PFX "Found %d %s "
 			"processors (%d cpu cores) (" VERSION ")\n",
 			num_online_nodes(),
@@ -1451,6 +1563,8 @@ static int __cpuinit powernowk8_init(void)
 static void __exit powernowk8_exit(void)
 {
 	dprintk("exit\n");
+	if (tscsync)
+		kfree(req_state);
 
 	cpufreq_unregister_driver(&cpufreq_amd64_driver);
 }
@@ -1462,3 +1576,7 @@ MODULE_LICENSE("GPL");
 
 late_initcall(powernowk8_init);
 module_exit(powernowk8_exit);
+
+module_param(tscsync, int, 0);
+MODULE_PARM_DESC(tscsync, "enable tsc by synchronizing powernow-k8 changes");
+
