@@ -32,6 +32,8 @@ int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
 int sysctl_oom_dump_tasks;
 static DEFINE_SPINLOCK(zone_scan_lock);
+static DEFINE_SPINLOCK(oom_lock);
+int sysctl_oom_kill = 1;
 /* #define DEBUG */
 
 /**
@@ -584,6 +586,68 @@ rest_and_return:
 		schedule_timeout_uninterruptible(1);
 }
 
+int should_oom_kill(void)
+{
+	static unsigned long first, last, count, lastkill;
+	unsigned long since;
+	unsigned long now = jiffies;
+	int ret = 0;
+
+	spin_lock(&oom_lock);
+	since = now - last;
+	last = now;
+
+	/*
+	 * If it's been a long time since last failure,
+	 * we're not oom.
+	 */
+	if (since > 5*HZ)
+		goto reset;
+
+	/*
+	 * If we haven't tried for at least one second,
+	 * we're not really oom.
+	 */
+	since = now - first;
+	if (since < HZ)
+		goto out_unlock;
+
+	/*
+	 * If we have gotten only a few failures,
+	 * we're not really oom.
+	 */
+	if (++count < 10)
+		goto out_unlock;
+
+	/*
+	 * If we just killed a process, wait a while
+	 * to give that task a chance to exit. This
+	 * avoids killing multiple processes needlessly.
+	 */
+	since = now - lastkill;
+	if (since < HZ*5)
+		goto out_unlock;
+
+	/*
+	 * Ok, really out of memory. Kill something.
+	 */
+	lastkill = now;
+	ret = 1;
+
+reset:
+	/*
+	 * We dropped the lock above, so check to be sure the variable
+	 * first only ever increases to prevent false OOM's.
+	 */
+	if (time_after(now, first))
+		first = now;
+	count = 0;
+
+out_unlock:
+	spin_unlock(&oom_lock);
+	return ret;
+}
+
 /**
  * out_of_memory - kill the "best" process when we run out of memory
  * @zonelist: zonelist pointer
@@ -603,6 +667,21 @@ void out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask, int order)
 	blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
 	if (freed > 0)
 		/* Got some memory back in the last second. */
+		return;
+
+	if (!should_oom_kill())
+		return;
+
+	if (printk_ratelimit()) {
+		if (!sysctl_oom_kill)
+			printk("OOM killer disabled via /proc/sys/vm/oom_kill_enabled\n");
+		printk(KERN_WARNING "%s invoked oom-killer: "
+			"gfp_mask=0x%x, order=%d, oomkilladj=%d\n",
+			current->comm, gfp_mask, order, current->oomkilladj);
+		dump_stack();
+		show_mem();
+	}
+	if (!sysctl_oom_kill)
 		return;
 
 	if (sysctl_panic_on_oom == 2)
