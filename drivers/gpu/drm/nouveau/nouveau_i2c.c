@@ -176,6 +176,7 @@ nouveau_i2c_init(struct drm_device *dev, struct dcb_i2c_entry *entry, int index)
 		 "nouveau-%s-%d", pci_name(dev->pdev), index);
 	i2c->adapter.owner = THIS_MODULE;
 	i2c->adapter.algo_data = &i2c->algo;
+	i2c->adapter.dev.parent = &dev->pdev->dev;
 	i2c->dev = dev;
 
 	switch (entry->port_type) {
