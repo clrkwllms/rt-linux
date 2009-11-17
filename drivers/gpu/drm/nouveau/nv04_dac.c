@@ -220,7 +220,7 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 	struct dcb_entry *dcb = nouveau_encoder(encoder)->dcb;
 	uint32_t testval, regoffset = nv04_dac_output_offset(encoder);
 	uint32_t saved_powerctrl_2 = 0, saved_powerctrl_4 = 0, saved_routput,
-		saved_rtest_ctrl, temp, saved_gpio_ext = 0, routput;
+		saved_rtest_ctrl, saved_gpio0, saved_gpio1, temp, routput;
 	int head, present = 0;
 
 #define RGB_TEST_DATA(r, g, b) (r << 0 | g << 10 | b << 20)
@@ -248,12 +248,11 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 		nvWriteMC(dev, NV_PBUS_POWERCTRL_4, saved_powerctrl_4 & 0xffffffcf);
 	}
 
-	if (dev_priv->chipset >= 0x34) {
-		saved_gpio_ext = NVReadCRTC(dev, 0, NV_PCRTC_GPIO_EXT);
+	saved_gpio1 = nv17_gpio_get(dev, DCB_GPIO_TVDAC1);
+	saved_gpio0 = nv17_gpio_get(dev, DCB_GPIO_TVDAC0);
 
-		NVWriteCRTC(dev, 0, NV_PCRTC_GPIO_EXT, (saved_gpio_ext & ~(3 << 20)) |
-			    (dcb->type == OUTPUT_TV ? (1 << 20) : 0));
-	}
+	nv17_gpio_set(dev, DCB_GPIO_TVDAC1, dcb->type == OUTPUT_TV);
+	nv17_gpio_set(dev, DCB_GPIO_TVDAC0, dcb->type == OUTPUT_TV);
 
 	msleep(4);
 
@@ -291,7 +290,7 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 	temp = NVReadRAMDAC(dev, 0, NV_PRAMDAC_TEST_CONTROL + regoffset);
 
 	if (dcb->type == OUTPUT_TV)
-		present = (nv17_tv_detect(encoder, connector, (temp >> 28) & 0xe)
+		present = (nv17_tv_detect(encoder, connector, temp)
 			   == connector_status_connected);
 	else
 		present = temp & NV_PRAMDAC_TEST_CONTROL_SENSEB_ALLHI;
@@ -308,8 +307,8 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 		nvWriteMC(dev, NV_PBUS_POWERCTRL_4, saved_powerctrl_4);
 	nvWriteMC(dev, NV_PBUS_POWERCTRL_2, saved_powerctrl_2);
 
-	if (dev_priv->chipset >= 0x34)
-		NVWriteRAMDAC(dev, 0, NV_PCRTC_GPIO_EXT, saved_gpio_ext);
+	nv17_gpio_set(dev, DCB_GPIO_TVDAC1, saved_gpio1);
+	nv17_gpio_set(dev, DCB_GPIO_TVDAC0, saved_gpio0);
 
 	if (present) {
 		NV_INFO(dev, "Load detected on output %c\n", '@' + ffs(dcb->or));

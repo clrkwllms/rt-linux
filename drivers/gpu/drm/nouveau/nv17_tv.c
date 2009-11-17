@@ -39,9 +39,9 @@ enum drm_connector_status nv17_tv_detect(struct drm_encoder *encoder,
 {
 	struct nv17_tv_encoder *tv_enc = to_tv_enc(encoder);
 
-	tv_enc->pin_mask = pin_mask;
+	tv_enc->pin_mask = pin_mask >> 28 & 0xe;
 
-	switch (pin_mask) {
+	switch (tv_enc->pin_mask) {
 	case 0x2:
 	case 0x4:
 		tv_enc->subconnector = DRM_MODE_SUBCONNECTOR_Composite;
@@ -212,7 +212,6 @@ static bool nv17_tv_mode_fixup(struct drm_encoder *encoder,
 static void  nv17_tv_dpms(struct drm_encoder *encoder, int mode)
 {
 	struct drm_device *dev = encoder->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv17_tv_state *regs = &to_tv_enc(encoder)->state;
 	struct nv17_tv_norm_params *tv_norm = get_tv_norm(encoder);
 
@@ -237,15 +236,8 @@ static void  nv17_tv_dpms(struct drm_encoder *encoder, int mode)
 
 	nv_load_ptv(dev, regs, 200);
 
-	if (dev_priv->chipset >= 0x34) {
-		uint32_t *gpio_ext = &dev_priv->mode_reg.crtc_reg[0].gpio_ext;
-
-		*gpio_ext &= ~(3 << 20);
-		if (mode == DRM_MODE_DPMS_ON)
-			*gpio_ext |= 1 << 20;
-
-		NVWriteCRTC(dev, 0, NV_PCRTC_GPIO_EXT, *gpio_ext);
-	}
+	nv17_gpio_set(dev, DCB_GPIO_TVDAC1, mode == DRM_MODE_DPMS_ON);
+	nv17_gpio_set(dev, DCB_GPIO_TVDAC0, mode == DRM_MODE_DPMS_ON);
 
 	nv04_dac_update_dacclk(encoder, mode == DRM_MODE_DPMS_ON);
 }
