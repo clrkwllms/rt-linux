@@ -269,9 +269,9 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 
 	if (nv_arch(dev) >= NV_40) {
 		if (dcb->type == OUTPUT_TV)
-			routput |= 1 << 20;
+			routput |= 0x1a << 16;
 		else
-			routput &= ~(1 << 20);
+			routput &= ~(0x1a << 16);
 	}
 
 	NVWriteRAMDAC(dev, 0, NV_PRAMDAC_DACCLK + regoffset, routput);

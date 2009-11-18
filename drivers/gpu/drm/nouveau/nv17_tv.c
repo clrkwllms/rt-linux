@@ -292,7 +292,7 @@ static void nv17_tv_prepare(struct drm_encoder *encoder)
 	dacclk = (NVReadRAMDAC(dev, 0, dacclk_off) & ~0x30) | 0x1;
 
 	if (nv_arch(dev) == NV_40)
-		dacclk |= 1 << 20;
+		dacclk |= 0x1a << 16;
 
 	if (tv_norm->kind == CTV_ENC_MODE) {
 		dacclk |=  0x20;
