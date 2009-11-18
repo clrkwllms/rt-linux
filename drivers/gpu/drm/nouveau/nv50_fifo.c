@@ -413,7 +413,7 @@ nv50_fifo_unload_context(struct drm_device *dev)
 	struct nouveau_channel *chan = NULL;
 	int chid, get, put, ptr;
 
-	NV_DEBUG(chan->dev, "ch%d\n", chan->id);
+	NV_DEBUG(dev, "\n");
 
 	chid = pfifo->channel_id(dev);
 	if (chid < 0 || chid >= dev_priv->engine.fifo.channels)
@@ -424,6 +424,7 @@ nv50_fifo_unload_context(struct drm_device *dev)
 		NV_ERROR(dev, "Inactive channel on PFIFO: %d\n", chid);
 		return -EINVAL;
 	}
+	NV_DEBUG(dev, "ch%d\n", chan->id);
 	ramfc = chan->ramfc->gpuobj;
 	cache = chan->cache->gpuobj;
 
