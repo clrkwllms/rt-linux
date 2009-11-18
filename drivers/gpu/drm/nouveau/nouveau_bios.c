@@ -2513,23 +2513,56 @@ init_zm_reg(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 }
 
 static bool
-init_87(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
+init_ram_restrict_pll(struct nvbios *bios, uint16_t offset,
+		      struct init_exec *iexec)
 {
 	/*
-	 * INIT_87   opcode: 0x87 ('')
+	 * INIT_RAM_RESTRICT_PLL   opcode: 0x87 ('')
 	 *
 	 * offset      (8 bit): opcode
-	 * offset + 1  (8 bit): unknown
-	 * offset + 4 (32 bit): unknown entry 0
+	 * offset + 1  (8 bit): PLL type
+	 * offset + 2 (32 bit): frequency 0
 	 *
-	 * Unknown function.  Stubbed here as one of my cards can resume
-	 * fine without it, but we'd still want to run the remainder
-	 * of the script instead of aborting.
+	 * Uses the RAMCFG strap of PEXTDEV_BOOT as an index into the table at
+	 * ram_restrict_table_ptr.  The value read from there is used to select
+	 * a frequency from the table starting at 'frequency 0' to be
+	 * programmed into the PLL corresponding to 'type'.
 	 *
-	 * Starting from offset+4 there are BIT_M+2 32-bit entries.
+	 * The PLL limits table on cards using this opcode has a mapping of
+	 * 'type' to the relevant registers.
 	 */
 
-	NV_WARN(bios->dev, "INIT_87 stubbed!\n");
+	struct drm_device *dev = bios->dev;
+	uint32_t strap = (bios_rd32(bios, NV_PEXTDEV_BOOT_0) & 0x0000003c) >> 2;
+	uint8_t index = bios->data[bios->ram_restrict_tbl_ptr + strap];
+	uint8_t type = bios->data[offset + 1];
+	uint32_t freq = ROM32(bios->data[offset + 2 + (index * 4)]);
+	uint8_t *pll_limits = &bios->data[bios->pll_limit_tbl_ptr], *entry;
+	int i;
+
+	if (!iexec->execute)
+		return true;
+
+	if (!bios->pll_limit_tbl_ptr || (pll_limits[0] & 0xf0) != 0x30) {
+		NV_ERROR(dev, "PLL limits table not version 3.x\n");
+		return true; /* deliberate, allow default clocks to remain */
+	}
+
+	entry = pll_limits + pll_limits[1];
+	for (i = 0; i < pll_limits[3]; i++, entry += pll_limits[2]) {
+		if (entry[0] == type) {
+			uint32_t reg = ROM32(entry[3]);
+
+			BIOSLOG(bios, "0x%04X: "
+				      "Type %02x Reg 0x%08x Freq %dKHz\n",
+				offset, type, reg, freq);
+
+			setPLL(bios, reg, freq);
+			return true;
+		}
+	}
+
+	NV_ERROR(dev, "PLL type 0x%02x not found in PLL limits table", type);
 	return true;
 }
 
@@ -2976,7 +3009,8 @@ static struct init_tbl_entry itbl_entry[] = {
 	{ "INIT_INDEX_IO"                     , 0x78, 6       , 0       , 0       , init_index_io                   },
 	{ "INIT_PLL"                          , 0x79, 7       , 0       , 0       , init_pll                        },
 	{ "INIT_ZM_REG"                       , 0x7A, 9       , 0       , 0       , init_zm_reg                     },
-	{ "INIT_87"                           , 0x87, 2       , 0       , 0       , init_87                         },
+	/* INIT_RAM_RESTRICT_PLL's length is adjusted by the BIT M table */
+	{ "INIT_RAM_RESTRICT_PLL"             , 0x87, 2       , 0       , 0       , init_ram_restrict_pll           },
 	{ "INIT_GPIO"                         , 0x8E, 1       , 0       , 0       , init_gpio                       },
 	/* INIT_RAM_RESTRICT_ZM_REG_GROUP's mult is loaded by M table in BIT */
 	{ "INIT_RAM_RESTRICT_ZM_REG_GROUP"    , 0x8F, 7       , 6       , 0       , init_ram_restrict_zm_reg_group  },
