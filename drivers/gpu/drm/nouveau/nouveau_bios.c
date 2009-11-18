@@ -2593,7 +2593,7 @@ init_gpio(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 
 	const uint32_t nv50_gpio_reg[4] = { 0xe104, 0xe108, 0xe280, 0xe284 };
 	const uint32_t nv50_gpio_ctl[2] = { 0xe100, 0xe28c };
-	const uint8_t *gpio_table = &bios->data[bios->bdcb.init8e_table_ptr];
+	const uint8_t *gpio_table = &bios->data[bios->bdcb.gpio_table_ptr];
 	const uint8_t *gpio_entry;
 	int i;
 
@@ -2602,7 +2602,7 @@ init_gpio(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 		return false;
 	}
 
-	if (!bios->bdcb.init8e_table_ptr) {
+	if (!bios->bdcb.gpio_table_ptr) {
 		NV_WARN(bios->dev, "Invalid pointer to INIT_8E table\n");
 		return false;
 	}
@@ -5008,6 +5008,109 @@ read_dcb_i2c_entry(struct drm_device *dev, int dcb_version, uint8_t *i2ctable, i
 	return 0;
 }
 
+static struct dcb_gpio_entry *
+new_gpio_entry(struct nvbios *bios)
+{
+	struct parsed_dcb_gpio *gpio = &bios->bdcb.gpio;
+
+	return &gpio->entry[gpio->entries++];
+}
+
+static void
+parse_dcb30_gpio_entry(struct nvbios *bios, uint16_t offset)
+{
+	struct dcb_gpio_entry *gpio;
+	uint16_t ent = ROM16(bios->data[offset]);
+	uint8_t line = ent & 0x1f,
+		tag = ent >> 5 & 0x3f,
+		flags = ent >> 11 & 0x1f;
+
+	if (tag == 0x3f)
+		return;
+
+	gpio = new_gpio_entry(bios);
+
+	gpio->tag = tag;
+	gpio->line = line;
+	gpio->invert = flags != 4;
+}
+
+static void
+parse_dcb40_gpio_entry(struct nvbios *bios, uint16_t offset)
+{
+	struct dcb_gpio_entry *gpio;
+	uint32_t ent = ROM32(bios->data[offset]);
+	uint8_t line = ent & 0x1f,
+		tag = ent >> 8 & 0xff;
+
+	if (tag == 0xff)
+		return;
+
+	gpio = new_gpio_entry(bios);
+
+	/* Currently unused, we may need more fields parsed at some
+	 * point. */
+	gpio->tag = tag;
+	gpio->line = line;
+}
+
+static void
+parse_dcb_gpio_table(struct drm_device *dev, struct nvbios *bios)
+{
+	uint16_t gpio_table_ptr = bios->bdcb.gpio_table_ptr;
+	uint8_t *gpio_table = &bios->data[gpio_table_ptr];
+	int header_len = gpio_table[1],
+	    entries = gpio_table[2],
+	    entry_len = gpio_table[3];
+	void (*parse_entry)(struct nvbios *, uint16_t);
+	int i;
+
+	if (bios->bdcb.version >= 0x40) {
+		if (gpio_table_ptr && entry_len != 4) {
+			NV_WARN(dev, "Invalid DCB GPIO table entry length.\n");
+			return;
+		}
+
+		parse_entry = parse_dcb40_gpio_entry;
+
+	} else if (bios->bdcb.version >= 0x30) {
+		if (gpio_table_ptr && entry_len != 2) {
+			NV_WARN(dev, "Invalid DCB GPIO table entry length.\n");
+			return;
+		}
+
+		parse_entry = parse_dcb30_gpio_entry;
+
+	} else if (bios->bdcb.version >= 0x22) {
+		/*
+		 * DCBs older than v3.0 don't really have a GPIO
+		 * table, instead they keep some GPIO info at fixed
+		 * locations.
+		 */
+		uint16_t dcbptr = ROM16(bios->data[0x36]);
+		uint8_t *tvdac_gpio = &bios->data[dcbptr - 5];
+
+		if (tvdac_gpio[0] & 1) {
+			struct dcb_gpio_entry *gpio = new_gpio_entry(bios);
+
+			gpio->tag = DCB_GPIO_TVDAC0;
+			gpio->line = tvdac_gpio[1] >> 4;
+			gpio->invert = tvdac_gpio[0] & 2;
+		}
+	}
+
+	if (!gpio_table_ptr)
+		return;
+
+	if (entries > DCB_MAX_NUM_GPIO_ENTRIES) {
+		NV_WARN(dev, "Too many entries in the DCB GPIO table.\n");
+		entries = DCB_MAX_NUM_GPIO_ENTRIES;
+	}
+
+	for (i = 0; i < entries; i++)
+		parse_entry(bios, gpio_table_ptr + header_len + entry_len * i);
+}
+
 static struct dcb_entry *new_dcb_entry(struct parsed_dcb *dcb)
 {
 	struct dcb_entry *entry = &dcb->entry[dcb->entries];
@@ -5337,9 +5440,8 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 			recordlength = dcbtable[3];
 			i2ctabptr = ROM16(dcbtable[4]);
 			sig = ROM32(dcbtable[6]);
-			if (bdcb->version == 0x40)	/* G80 */
-				bdcb->init8e_table_ptr =
-					ROM16(dcbtable[10]);
+			bdcb->gpio_table_ptr = ROM16(dcbtable[10]);
+
 		} else {
 			i2ctabptr = ROM16(dcbtable[2]);
 			sig = ROM32(dcbtable[4]);
@@ -5403,6 +5505,8 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 		if (bdcb->version >= 0x30)
 			bdcb->i2c_default_indices = bdcb->i2c_table[4];
 	}
+
+	parse_dcb_gpio_table(dev, bios);
 
 	if (entries > DCB_MAX_NUM_ENTRIES)
 		entries = DCB_MAX_NUM_ENTRIES;
