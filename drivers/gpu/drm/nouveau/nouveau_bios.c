@@ -2534,82 +2534,66 @@ init_87(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 }
 
 static bool
-init_8e(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
+init_gpio(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/*
-	 * INIT_8E   opcode: 0x8E ('')
+	 * INIT_GPIO   opcode: 0x8E ('')
 	 *
 	 * offset      (8 bit): opcode
 	 *
-	 * The purpose of this opcode is unclear (being for nv50 cards), and
-	 * the literal functionality can be seen in the code below.
-	 *
-	 * A brief synopsis is that for each entry in a table pointed to by the
-	 * DCB table header, depending on the settings of various bits, various
-	 * other bits in registers 0xe100, 0xe104, and 0xe108, are set or
-	 * cleared.
+	 * Loop over all entries in the DCB GPIO table, and initialise
+	 * each GPIO according to various values listed in each entry
 	 */
 
-	uint8_t headerlen = bios->data[bios->bdcb.init8e_table_ptr + 1];
-	uint8_t entries = bios->data[bios->bdcb.init8e_table_ptr + 2];
-	uint8_t recordlen = bios->data[bios->bdcb.init8e_table_ptr + 3];
+	const uint32_t nv50_gpio_reg[4] = { 0xe104, 0xe108, 0xe280, 0xe284 };
+	const uint32_t nv50_gpio_ctl[2] = { 0xe100, 0xe28c };
+	const uint8_t *gpio_table = &bios->data[bios->bdcb.init8e_table_ptr];
+	const uint8_t *gpio_entry;
 	int i;
 
 	if (bios->bdcb.version != 0x40) {
 		NV_ERROR(bios->dev, "DCB table not version 4.0\n");
 		return false;
 	}
+
 	if (!bios->bdcb.init8e_table_ptr) {
 		NV_WARN(bios->dev, "Invalid pointer to INIT_8E table\n");
 		return false;
 	}
 
-	for (i = 0; i < entries; i++) {
-		uint32_t entry = ROM32(bios->data[bios->bdcb.init8e_table_ptr + headerlen + recordlen * i]);
-		int shift = (entry & 0x1f) * 4;
-		uint32_t mask;
-		uint32_t reg = 0xe104;
-		uint32_t data;
+	gpio_entry = gpio_table + gpio_table[1];
+	for (i = 0; i < gpio_table[2]; i++, gpio_entry += gpio_table[3]) {
+		uint32_t entry = ROM32(gpio_entry[0]), r, s, v;
+		int line = (entry & 0x0000001f);
 
-		if ((entry & 0xff00) == 0xff00)
+		BIOSLOG(bios, "0x%04X: Entry: 0x%08X\n", offset, entry);
+
+		if ((entry & 0x0000ff00) == 0x0000ff00)
 			continue;
 
-		if (shift >= 32) {
-			reg += 4;
-			shift -= 32;
-		}
-		shift %= 32;
-
-		mask = ~(3 << shift);
-		if (entry & (1 << 24))
-			data = (entry >> 21);
+		r = nv50_gpio_reg[line >> 3];
+		s = (line & 0x07) << 2;
+		v = bios_rd32(bios, r) & ~(0x00000003 << s);
+		if (entry & 0x01000000)
+			v |= (((entry & 0x60000000) >> 29) ^ 2) << s;
 		else
-			data = (entry >> 19);
-		data = ((data & 3) ^ 2) << shift;
+			v |= (((entry & 0x18000000) >> 27) ^ 2) << s;
+		bios_wr32(bios, r, v);
 
-		BIOSLOG(bios, "0x%04X: Entry: 0x%08X, Reg: 0x%08X, "
-			      "Shift: 0x%02X, Mask: 0x%08X, Data: 0x%08X\n",
-			offset, entry, reg, shift, mask, data);
-
-		bios_wr32(bios, reg, (bios_rd32(bios, reg) & mask) | data);
-
-		reg = 0xe100;
-		shift = entry & 0x1f;
-
-		mask = ~(1 << 16 | 1);
-		mask = mask << shift | mask >> (32 - shift);
-		data = 0;
-		if ((entry & (3 << 25)) == (1 << 25))
-			data |= 1;
-		if ((entry & (3 << 25)) == (2 << 25))
-			data |= 0x10000;
-		data <<= shift;
-
-		BIOSLOG(bios, "0x%04X: Entry: 0x%08X, Reg: 0x%08X, "
-			      "Shift: 0x%02X, Mask: 0x%08X, Data: 0x%08X\n",
-			offset, entry, reg, shift, mask, data);
-
-		bios_wr32(bios, reg, (bios_rd32(bios, reg) & mask) | data);
+		r = nv50_gpio_ctl[line >> 4];
+		s = (line & 0x0f);
+		v = bios_rd32(bios, r) & ~(0x00010001 << s);
+		switch ((entry & 0x06000000) >> 25) {
+		case 1:
+			v |= (0x00000001 << s);
+			break;
+		case 2:
+			v |= (0x00010000 << s);
+			break;
+		default:
+			break;
+		}
+		bios_wr32(bios, r, v);
 	}
 
 	return true;
@@ -2993,7 +2977,7 @@ static struct init_tbl_entry itbl_entry[] = {
 	{ "INIT_PLL"                          , 0x79, 7       , 0       , 0       , init_pll                        },
 	{ "INIT_ZM_REG"                       , 0x7A, 9       , 0       , 0       , init_zm_reg                     },
 	{ "INIT_87"                           , 0x87, 2       , 0       , 0       , init_87                         },
-	{ "INIT_8E"                           , 0x8E, 1       , 0       , 0       , init_8e                         },
+	{ "INIT_GPIO"                         , 0x8E, 1       , 0       , 0       , init_gpio                       },
 	/* INIT_RAM_RESTRICT_ZM_REG_GROUP's mult is loaded by M table in BIT */
 	{ "INIT_RAM_RESTRICT_ZM_REG_GROUP"    , 0x8F, 7       , 6       , 0       , init_ram_restrict_zm_reg_group  },
 	{ "INIT_COPY_ZM_REG"                  , 0x90, 9       , 0       , 0       , init_copy_zm_reg                },
