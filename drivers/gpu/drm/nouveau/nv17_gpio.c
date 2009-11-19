@@ -26,6 +26,7 @@
 
 #include "drmP.h"
 #include "nouveau_drv.h"
+#include "nouveau_hw.h"
 
 static struct dcb_gpio_entry *
 get_gpio_entry(struct drm_device *dev, enum dcb_gpio_tag tag)
@@ -80,7 +81,7 @@ nv17_gpio_get(struct drm_device *dev, enum dcb_gpio_tag tag)
 	if (!get_gpio_location(ent, &reg, &shift, &mask))
 		return -ENODEV;
 
-	value = nv_rd32(dev, reg) >> shift;
+	value = NVReadCRTC(dev, 0, reg) >> shift;
 
 	return (ent->invert ? 1 : 0) ^ (value & 1);
 }
@@ -100,7 +101,7 @@ nv17_gpio_set(struct drm_device *dev, enum dcb_gpio_tag tag, int state)
 	value = ((ent->invert ? 1 : 0) ^ (state ? 1 : 0)) << shift;
 	mask = ~(mask << shift);
 
-	nv_wr32(dev, reg, value | (nv_rd32(dev, reg) & mask));
+	NVWriteCRTC(dev, 0, reg, value | (NVReadCRTC(dev, 0, reg) & mask));
 
 	return 0;
 }
