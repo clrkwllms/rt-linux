@@ -4513,7 +4513,9 @@ static int parse_bit_lvds_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	return 0;
 }
 
-static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
+static int
+parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios,
+		      struct bit_entry *bitentry)
 {
 	/*
 	 * offset + 2  (8  bits): number of options in an
@@ -4525,6 +4527,8 @@ static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 	 * stuff that we don't use - their use currently unknown
 	 */
 
+	uint16_t rr_strap_xlat;
+	uint8_t rr_group_count;
 	int i;
 
 	/*
@@ -4534,17 +4538,24 @@ static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 	if (bitentry->length < 0x5)
 		return 0;
 
+	if (bitentry->id[1] < 2) {
+		rr_group_count = bios->data[bitentry->offset + 2];
+		rr_strap_xlat = ROM16(bios->data[bitentry->offset + 3]);
+	} else {
+		rr_group_count = bios->data[bitentry->offset + 0];
+		rr_strap_xlat = ROM16(bios->data[bitentry->offset + 1]);
+	}
+
 	/* adjust length of INIT_87 */
 	for (i = 0; itbl_entry[i].name && (itbl_entry[i].id != 0x87); i++);
-	itbl_entry[i].length += bios->data[bitentry->offset + 2] * 4;
+	itbl_entry[i].length += rr_group_count * 4;
 
 	/* set up multiplier for INIT_RAM_RESTRICT_ZM_REG_GROUP */
 	for (; itbl_entry[i].name && (itbl_entry[i].id != 0x8f); i++);
-	itbl_entry[i].length_multiplier = bios->data[bitentry->offset + 2] * 4;
+	itbl_entry[i].length_multiplier = rr_group_count * 4;
 
 	init_ram_restrict_zm_reg_group_blocklen = itbl_entry[i].length_multiplier;
-
-	bios->ram_restrict_tbl_ptr = ROM16(bios->data[bitentry->offset + 3]);
+	bios->ram_restrict_tbl_ptr = rr_strap_xlat;
 
 	return 0;
 }
