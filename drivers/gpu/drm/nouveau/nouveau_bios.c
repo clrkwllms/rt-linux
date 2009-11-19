@@ -2567,6 +2567,19 @@ init_ram_restrict_pll(struct nvbios *bios, uint16_t offset,
 }
 
 static bool
+init_8c(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
+{
+	/*
+	 * INIT_85   opcode: 0x8C ('')
+	 *
+	 * NOP so far....
+	 *
+	 */
+
+	return true;
+}
+
+static bool
 init_gpio(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/*
@@ -3011,6 +3024,7 @@ static struct init_tbl_entry itbl_entry[] = {
 	{ "INIT_ZM_REG"                       , 0x7A, 9       , 0       , 0       , init_zm_reg                     },
 	/* INIT_RAM_RESTRICT_PLL's length is adjusted by the BIT M table */
 	{ "INIT_RAM_RESTRICT_PLL"             , 0x87, 2       , 0       , 0       , init_ram_restrict_pll           },
+	{ "INIT_8C"                           , 0x8C, 1       , 0       , 0       , init_8c                         },
 	{ "INIT_GPIO"                         , 0x8E, 1       , 0       , 0       , init_gpio                       },
 	/* INIT_RAM_RESTRICT_ZM_REG_GROUP's mult is loaded by M table in BIT */
 	{ "INIT_RAM_RESTRICT_ZM_REG_GROUP"    , 0x8F, 7       , 6       , 0       , init_ram_restrict_zm_reg_group  },
