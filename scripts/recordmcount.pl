@@ -113,14 +113,14 @@ $P =~ s@.*/@@g;
 
 my $V = '0.1';
 
-if ($#ARGV != 11) {
-	print "usage: $P arch endian bits objdump objcopy cc ld nm rm mv is_module inputfile\n";
+if ($#ARGV < 12) {
+	print "usage: $P arch endian bits objdump objcopy cc ld nm rm mv is_module do_check inputfile\n";
 	print "version: $V\n";
 	exit(1);
 }
 
 my ($arch, $endian, $bits, $objdump, $objcopy, $cc,
-    $ld, $nm, $rm, $mv, $is_module, $inputfile) = @ARGV;
+    $ld, $nm, $rm, $mv, $is_module, $do_check, $inputfile) = @ARGV;
 
 # This file refers to mcount and shouldn't be ftraced, so lets' ignore it
 if ($inputfile =~ m,kernel/trace/ftrace\.o$,) {
@@ -143,6 +143,60 @@ $ld = "ld" if ((length $ld) == 0);
 $nm = "nm" if ((length $nm) == 0);
 $rm = "rm" if ((length $rm) == 0);
 $mv = "mv" if ((length $mv) == 0);
+
+# gcc can do stupid things with the stack pointer on x86_32.
+# It may pass a copy of the return address to mcount, which will
+# break the function graph tracer. If this happens then we need
+# to flag it and break the build.
+#
+# For x86_32, the parameter do_check will be negative if we only
+# want to perform the check, and positive if we should od the check.
+# If function graph tracing is not enabled, do_check will be zero.
+#
+
+my $check_next_line = 0;
+my $line_failed = 0;
+my $last_function;
+
+sub test_x86_32_prologue
+{
+    if ($check_next_line) {
+	if (!/push\s*\%ebp/) {
+	    $line_failed = 1;
+	}
+    }
+
+    if ($line_failed && /mcount/) {
+	print STDERR "\n********************************************************\n";
+	print STDERR "  Your version of GCC breaks the function graph tracer\n";
+	print STDERR "  Please disable CONFIG_FUNCTION_GRAPH_TRACER\n";
+	print STDERR "  Failed function was \"$last_function\"\n";
+	print STDERR "********************************************************\n\n";
+	exit -1;
+    }
+    $check_next_line = 0;
+
+    # check the first line after a function starts for
+    #  push %ebp
+    if (/^[0-9a-fA-F]+\s+<([a-zA-Z_].*)>:$/) {
+	$last_function = $1;
+	$check_next_line = 1;
+	$line_failed = 0;
+    }
+}
+
+if ($do_check < 0) {
+    # Only perform the check and quit
+    open(IN, "$objdump -dr $inputfile|") || die "error running $objdump";
+
+    while (<IN>) {
+	test_x86_32_prologue;
+    }
+    close (IN);
+    exit 0;
+}
+
+my $check = 0;
 
 #print STDERR "running: $P '$arch' '$objdump' '$objcopy' '$cc' '$ld' " .
 #    "'$nm' '$rm' '$mv' '$inputfile'\n";
@@ -199,6 +253,12 @@ if ($arch =~ /(x86(_64)?)|(i386)/) {
 	$arch = "x86_64";
     } else {
 	$arch = "i386";
+    }
+}
+
+if ($arch eq "i386") {
+    if ($do_check) {
+	$check = 1;
     }
 }
 
@@ -469,6 +529,12 @@ while (<IN>) {
 	    "\tDelete $inputfile and try again. If the same object file\n" .
 	    "\tstill causes an issue, then disable CONFIG_DYNAMIC_FTRACE.\n";
 	exit(-1);
+    }
+    # x86_32 may need to test the start of every function to see
+    # if GCC did not mess up the mcount prologue. All functions must
+    # start with push %ebp, otherwise it is broken.
+    if ($check) {
+	test_x86_32_prologue;
     }
 
     # is it a section?
