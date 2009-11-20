@@ -206,11 +206,34 @@ cmd_modversions =							\
 endif
 
 ifdef CONFIG_FTRACE_MCOUNT_RECORD
+
+ ifdef CONFIG_FUNCTION_GRAPH_TRACER
+  ifdef CONFIG_X86_32
+   rm_do_check = 1
+  else
+   rm_do_check = 0
+  endif
+ else
+  rm_do_check = 0
+ endif
+
 cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
 	"$(if $(CONFIG_CPU_BIG_ENDIAN),big,little)" \
 	"$(if $(CONFIG_64BIT),64,32)" \
 	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" \
-	"$(if $(part-of-module),1,0)" "$(@)";
+	"$(if $(part-of-module),1,0)" "$(rm_do_check)" "$(@)";
+
+else
+
+ ifdef CONFIG_X86_32
+ ifdef CONFIG_FUNCTION_GRAPH_TRACER
+   cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
+	"$(if $(CONFIG_64BIT),64,32)" \
+	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" \
+	"$(if $(part-of-module),1,0)" "-1" "$(@)";
+ endif
+ endif
+
 endif
 
 define rule_cc_o_c
