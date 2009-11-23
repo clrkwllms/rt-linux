@@ -104,7 +104,7 @@ nouveau_gem_info(struct drm_gem_object *gem, struct drm_nouveau_gem_info *rep)
 }
 
 static bool
-nouveau_gem_tile_mode_valid(struct drm_device *dev, uint32_t tile_flags) {
+nouveau_gem_tile_flags_valid(struct drm_device *dev, uint32_t tile_flags) {
 	switch (tile_flags) {
 	case 0x0000:
 	case 0x1800:
@@ -151,12 +151,7 @@ nouveau_gem_ioctl_new(struct drm_device *dev, void *data,
 	if (!flags || req->info.domain & NOUVEAU_GEM_DOMAIN_CPU)
 		flags |= TTM_PL_FLAG_SYSTEM;
 
-	if (req->info.tile_mode > 4) {
-		NV_ERROR(dev, "bad tile mode: %d\n", req->info.tile_mode);
-		return -EINVAL;
-	}
-
-	if (!nouveau_gem_tile_mode_valid(dev, req->info.tile_flags))
+	if (!nouveau_gem_tile_flags_valid(dev, req->info.tile_flags))
 		return -EINVAL;
 
 	ret = nouveau_gem_new(dev, chan, req->info.size, req->align, flags,
