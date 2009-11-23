@@ -106,10 +106,8 @@ static void nv_crtc_calc_state_ext(struct drm_crtc *crtc, struct drm_display_mod
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 	struct nv04_mode_state *state = &dev_priv->mode_reg;
 	struct nv04_crtc_reg *regp = &state->crtc_reg[nv_crtc->index];
-	struct drm_framebuffer *fb = crtc->fb;
 	struct nouveau_pll_vals *pv = &regp->pllvals;
 	struct pll_lims pll_lim;
-	int vclk, arb_burst, arb_fifo_lwm;
 
 	if (get_pll_limits(dev, nv_crtc->index ? VPLL2 : VPLL1, &pll_lim))
 		return;
@@ -130,8 +128,7 @@ static void nv_crtc_calc_state_ext(struct drm_crtc *crtc, struct drm_display_mod
 	if (dev_priv->chipset > 0x40 && dot_clock <= (pll_lim.vco1.maxfreq / 2))
 		memset(&pll_lim.vco2, 0, sizeof(pll_lim.vco2));
 
-	vclk = nouveau_calc_pll_mnp(dev, &pll_lim, dot_clock, pv);
-	if (!vclk)
+	if (!nouveau_calc_pll_mnp(dev, &pll_lim, dot_clock, pv))
 		return;
 
 	state->pllsel &= PLLSEL_VPLL1_MASK | PLLSEL_VPLL2_MASK | PLLSEL_TV_MASK;
@@ -151,13 +148,6 @@ static void nv_crtc_calc_state_ext(struct drm_crtc *crtc, struct drm_display_mod
 	else
 		NV_TRACE(dev, "vpll: n %d m %d log2p %d\n",
 			 pv->N1, pv->M1, pv->log2P);
-
-	nouveau_calc_arb(dev, vclk, fb->bits_per_pixel, &arb_burst, &arb_fifo_lwm);
-
-	regp->CRTC[NV_CIO_CRE_FF_INDEX] = arb_burst;
-	regp->CRTC[NV_CIO_CRE_FFLWM__INDEX] = arb_fifo_lwm & 0xff;
-	if (nv_arch(dev) >= NV_30)
-		regp->CRTC[NV_CIO_CRE_47] = arb_fifo_lwm >> 8;
 
 	nv_crtc->cursor.set_offset(nv_crtc, nv_crtc->cursor.offset);
 }
@@ -775,10 +765,12 @@ nv04_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 			struct drm_framebuffer *old_fb)
 {
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_device *dev = crtc->dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv04_crtc_reg *regp = &dev_priv->mode_reg.crtc_reg[nv_crtc->index];
 	struct drm_framebuffer *drm_fb = nv_crtc->base.fb;
 	struct nouveau_framebuffer *fb = nouveau_framebuffer(drm_fb);
+	int arb_burst, arb_lwm;
 	int ret;
 
 	ret = nouveau_bo_pin(fb->nvbo, TTM_PL_FLAG_VRAM);
@@ -797,13 +789,14 @@ nv04_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 		nv_crtc_gamma_load(crtc);
 	}
 
+	/* Update the framebuffer format. */
 	regp->CRTC[NV_CIO_CRE_PIXEL_INDEX] &= ~3;
 	regp->CRTC[NV_CIO_CRE_PIXEL_INDEX] |= (crtc->fb->depth + 1) / 8;
 	regp->ramdac_gen_ctrl &= ~NV_PRAMDAC_GENERAL_CONTROL_ALT_MODE_SEL;
 	if (crtc->fb->depth == 16)
 		regp->ramdac_gen_ctrl |= NV_PRAMDAC_GENERAL_CONTROL_ALT_MODE_SEL;
 	crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_PIXEL_INDEX);
-	NVWriteRAMDAC(crtc->dev, nv_crtc->index, NV_PRAMDAC_GENERAL_CONTROL,
+	NVWriteRAMDAC(dev, nv_crtc->index, NV_PRAMDAC_GENERAL_CONTROL,
 		      regp->ramdac_gen_ctrl);
 
 	regp->CRTC[NV_CIO_CR_OFFSET_INDEX] = drm_fb->pitch >> 3;
@@ -812,9 +805,25 @@ nv04_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 	crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_RPC0_INDEX);
 	crtc_wr_cio_state(crtc, regp, NV_CIO_CR_OFFSET_INDEX);
 
+	/* Update the framebuffer location. */
 	regp->fb_start = nv_crtc->fb.offset & ~3;
 	regp->fb_start += (y * drm_fb->pitch) + (x * drm_fb->bits_per_pixel / 8);
-	NVWriteCRTC(crtc->dev, nv_crtc->index, NV_PCRTC_START, regp->fb_start);
+	NVWriteCRTC(dev, nv_crtc->index, NV_PCRTC_START, regp->fb_start);
+
+	/* Update the arbitration parameters. */
+	nouveau_calc_arb(dev, crtc->mode.clock, drm_fb->bits_per_pixel,
+			 &arb_burst, &arb_lwm);
+
+	regp->CRTC[NV_CIO_CRE_FF_INDEX] = arb_burst;
+	regp->CRTC[NV_CIO_CRE_FFLWM__INDEX] = arb_lwm & 0xff;
+	crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_FF_INDEX);
+	crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_FFLWM__INDEX);
+
+	if (nv_arch(dev) >= NV_30) {
+		regp->CRTC[NV_CIO_CRE_47] = arb_lwm >> 8;
+		crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_47);
+	}
+
 	return 0;
 }
 
