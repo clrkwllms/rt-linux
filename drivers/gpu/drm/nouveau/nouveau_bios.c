@@ -5714,13 +5714,16 @@ uint8_t *nouveau_bios_embedded_edid(struct drm_device *dev)
 }
 
 void
-nouveau_bios_run_init_table(struct drm_device *dev, uint16_t table)
+nouveau_bios_run_init_table(struct drm_device *dev, uint16_t table,
+			    struct dcb_entry *dcbent)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;
 	struct init_exec iexec = { true, false };
 
+	bios->display.output = dcbent;
 	parse_init_table(bios, table, &iexec);
+	bios->display.output = NULL;
 }
 
 static bool NVInitVBIOS(struct drm_device *dev)
