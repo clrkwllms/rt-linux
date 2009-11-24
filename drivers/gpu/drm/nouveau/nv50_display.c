@@ -474,6 +474,12 @@ int nv50_display_create(struct drm_device *dev)
 	for (i = 0 ; i < dcb->entries; i++) {
 		struct dcb_entry *entry = &dcb->entry[i];
 
+		if (entry->location != DCB_LOC_ON_CHIP) {
+			NV_WARN(dev, "Off-chip encoder %d/%d unsupported\n",
+				entry->type, ffs(entry->or) - 1);
+			continue;
+		}
+
 		switch (entry->type) {
 		case OUTPUT_TMDS:
 		case OUTPUT_LVDS:
