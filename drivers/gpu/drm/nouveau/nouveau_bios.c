@@ -5062,7 +5062,7 @@ parse_dcb_gpio_table(struct drm_device *dev, struct nvbios *bios)
 	int header_len = gpio_table[1],
 	    entries = gpio_table[2],
 	    entry_len = gpio_table[3];
-	void (*parse_entry)(struct nvbios *, uint16_t);
+	void (*parse_entry)(struct nvbios *, uint16_t) = NULL;
 	int i;
 
 	if (bios->bdcb.version >= 0x40) {
