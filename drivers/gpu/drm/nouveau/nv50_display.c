@@ -580,7 +580,7 @@ nv50_display_irq_head(struct drm_device *dev, int *phead,
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t unk30 = nv_rd32(dev, NV50_PDISPLAY_UNK30_CTRL);
 	uint32_t dac = 0, sor = 0;
-	int head, i, or;
+	int head, i, or = 0, type = OUTPUT_ANY;
 
 	/* We're assuming that head 0 *or* head 1 will be active here,
 	 * and not both.  I'm not sure if the hw will even signal both
@@ -599,56 +599,60 @@ nv50_display_irq_head(struct drm_device *dev, int *phead,
 	/* This assumes CRTCs are never bound to multiple encoders, which
 	 * should be the case.
 	 */
-	for (i = 0; i < 3; i++) {
-		if (nv50_display_mode_ctrl(dev, false, i) & (1 << head))
-			dac |= (1 << i);
-	}
+	for (i = 0; i < 3 && type == OUTPUT_ANY; i++) {
+		uint32_t mc = nv50_display_mode_ctrl(dev, false, i);
+		if (!(mc & (1 << head)))
+			continue;
 
-	for (i = 0; i < 4; i++) {
-		if (nv50_display_mode_ctrl(dev, true, i) & (1 << head))
-			sor |= (1 << i);
-	}
-
-	NV_DEBUG(dev, "dac: 0x%08x, sor: 0x%08x\n", dac, sor);
-
-	if (dac && sor) {
-		NV_ERROR(dev, "multiple encoders: 0x%08x 0x%08x\n", dac, sor);
-		return -1;
-	} else
-	if (dac) {
-		or = ffs(dac) - 1;
-		if (dac & ~(1 << or)) {
-			NV_ERROR(dev, "multiple DAC: 0x%08x\n", dac);
+		switch ((mc >> 8) & 0xf) {
+		case 0: type = OUTPUT_ANALOG; break;
+		case 1: type = OUTPUT_TV; break;
+		default:
+			NV_ERROR(dev, "unknown dac mode_ctrl: 0x%08x\n", dac);
 			return -1;
 		}
-	} else
-	if (sor) {
-		or = ffs(sor) - 1;
-		if (sor & ~(1 << or)) {
-			NV_ERROR(dev, "multiple SOR: 0x%08x\n", sor);
+
+		or = i;
+	}
+
+	for (i = 0; i < 4 && type == OUTPUT_ANY; i++) {
+		uint32_t mc = nv50_display_mode_ctrl(dev, true, i);
+		if (!(mc & (1 << head)))
+			continue;
+
+		switch ((mc >> 8) & 0xf) {
+		case 0: type = OUTPUT_LVDS; break;
+		case 1: type = OUTPUT_TMDS; break;
+		case 2: type = OUTPUT_TMDS; break;
+		case 5: type = OUTPUT_TMDS; break;
+		case 8: type = OUTPUT_DP; break;
+		case 9: type = OUTPUT_DP; break;
+		default:
+			NV_ERROR(dev, "unknown sor mode_ctrl: 0x%08x\n", sor);
 			return -1;
 		}
-	} else {
-		NV_ERROR(dev, "no encoders!\n");
+
+		or = i;
+	}
+
+	NV_DEBUG(dev, "type %d, or %d\n", type, or);
+	if (type == OUTPUT_ANY) {
+		NV_ERROR(dev, "unknown encoder!!\n");
 		return -1;
 	}
 
 	for (i = 0; i < dev_priv->vbios->dcb->entries; i++) {
 		struct dcb_entry *dcbent = &dev_priv->vbios->dcb->entry[i];
 
-		if (dac && (dcbent->type != OUTPUT_ANALOG &&
-			    dcbent->type != OUTPUT_TV))
-			continue;
-		else
-		if (sor && (dcbent->type != OUTPUT_TMDS &&
-			    dcbent->type != OUTPUT_LVDS))
+		if (dcbent->type != type)
 			continue;
 
-		if (dcbent->or & (1 << or)) {
-			*phead = head;
-			*pdcbent = dcbent;
-			return 0;
-		}
+		if (!(dcbent->or & (1 << or)))
+			continue;
+
+		*phead = head;
+		*pdcbent = dcbent;
+		return 0;
 	}
 
 	NV_ERROR(dev, "no DCB entry for %d %d\n", dac != 0, or);
