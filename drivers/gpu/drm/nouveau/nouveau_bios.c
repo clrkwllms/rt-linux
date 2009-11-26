@@ -4660,6 +4660,14 @@ parse_bit_U_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	return 0;
 }
 
+static int
+parse_bit_displayport_tbl_entry(struct drm_device *dev, struct nvbios *bios,
+				struct bit_entry *bitentry)
+{
+	bios->display.dp_table_ptr = ROM16(bios->data[bitentry->offset]);
+	return 0;
+}
+
 struct bit_table {
 	const char id;
 	int (* const parse_fn)(struct drm_device *, struct nvbios *, struct bit_entry *);
@@ -4718,6 +4726,7 @@ static int parse_bit_structure(struct drm_device *dev, struct nvbios *bios,
 	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('L', lvds));
 	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('T', tmds));
 	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('U', U));
+	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('d', displayport));
 
 	return 0;
 }
