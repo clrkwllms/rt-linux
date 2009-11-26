@@ -4995,10 +4995,11 @@ read_dcb_i2c_entry(struct drm_device *dev, int dcb_version, uint8_t *i2ctable, i
 		 */
 		if (port_type == 4)	/* seen on C51 */
 			rdofs = wrofs = 1;
-		if (port_type == 5)	/* G80+ */
+		if (port_type >= 5)	/* G80+ */
 			rdofs = wrofs = 0;
 	}
-	if (dcb_i2c_ver >= 0x40 && port_type != 5)
+
+	if (dcb_i2c_ver >= 0x40 && port_type != 5 && port_type != 6)
 		NV_WARN(dev, "DCB I2C table has port type %d\n", port_type);
 
 	i2c->port_type = port_type;
