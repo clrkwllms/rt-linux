@@ -54,6 +54,10 @@ struct dcb_entry {
 		struct {
 			bool has_component_output;
 		} tvconf;
+		struct {
+			int link_nr;
+			int link_bw;
+		} dpconf;
 	};
 	bool i2c_upper_default;
 };

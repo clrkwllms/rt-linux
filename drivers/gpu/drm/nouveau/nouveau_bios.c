@@ -5249,6 +5249,20 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 
 		break;
 	}
+	case OUTPUT_DP:
+		entry->dpconf.link_bw = (conf & 0x00e00000) >> 21;
+		switch ((conf & 0x0f000000) >> 24) {
+		case 0xf:
+			entry->dpconf.link_nr = 4;
+			break;
+		case 0x3:
+			entry->dpconf.link_nr = 2;
+			break;
+		default:
+			entry->dpconf.link_nr = 1;
+			break;
+		}
+		break;
 	case 0xe:
 		/* weird g80 mobile type that "nv" treats as a terminator */
 		bdcb->dcb.entries--;
