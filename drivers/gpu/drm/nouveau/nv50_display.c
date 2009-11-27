@@ -183,7 +183,8 @@ nv50_display_init(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_timer_engine *ptimer = &dev_priv->engine.timer;
 	struct nouveau_channel *evo = dev_priv->evo;
-	uint32_t val, ram_amount;
+	struct drm_connector *connector;
+	uint32_t val, ram_amount, hpd_en[2];
 	uint64_t start;
 	int ret, i;
 
@@ -360,9 +361,29 @@ nv50_display_init(struct drm_device *dev)
 					     NV50_PDISPLAY_INTR_EN_CLK_UNK40));
 
 	/* enable hotplug interrupts */
-	nv_wr32(dev, NV50_PCONNECTOR_HOTPLUG_CTRL, 0x7FFF7FFF);
-	/* nv_wr32(dev, NV50_PCONNECTOR_HOTPLUG_INTR, 0x7FFF7FFF); */
+	hpd_en[0] = hpd_en[1] = 0;
+	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
+		struct nouveau_connector *conn = nouveau_connector(connector);
+		struct dcb_gpio_entry *gpio;
 
+		if (connector->connector_type != DRM_MODE_CONNECTOR_DVII &&
+		    connector->connector_type != DRM_MODE_CONNECTOR_DVID &&
+		    connector->connector_type != DRM_MODE_CONNECTOR_DisplayPort)
+			continue;
+
+		gpio = nouveau_bios_gpio_entry(dev, conn->dcb->gpio_tag);
+		if (!gpio)
+			continue;
+
+		hpd_en[gpio->line >> 4] |= (0x00010001 << (gpio->line & 0xf));
+	}
+
+	nv_wr32(dev, 0xe054, 0xffffffff);
+	nv_wr32(dev, 0xe050, hpd_en[0]);
+	if (dev_priv->chipset >= 0x90) {
+		nv_wr32(dev, 0xe074, 0xffffffff);
+		nv_wr32(dev, 0xe070, hpd_en[1]);
+	}
 
 	return 0;
 }
@@ -428,8 +449,12 @@ static int nv50_display_disable(struct drm_device *dev)
 	nv_wr32(dev, NV50_PDISPLAY_INTR_EN, 0x00000000);
 
 	/* disable hotplug interrupts */
-	nv_wr32(dev, NV50_PCONNECTOR_HOTPLUG_INTR, 0);
-
+	nv_wr32(dev, 0xe054, 0xffffffff);
+	nv_wr32(dev, 0xe050, 0x00000000);
+	if (dev_priv->chipset >= 0x90) {
+		nv_wr32(dev, 0xe074, 0xffffffff);
+		nv_wr32(dev, 0xe070, 0x00000000);
+	}
 	return 0;
 }
 
@@ -860,11 +885,56 @@ nv50_display_error_handler(struct drm_device *dev)
 	nv_wr32(dev, NV50_PDISPLAY_TRAPPED_ADDR, 0x90000000);
 }
 
+static void
+nv50_display_irq_hotplug(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct drm_connector *connector;
+	const uint32_t gpio_reg[4] = { 0xe104, 0xe108, 0xe280, 0xe284 };
+	uint32_t unplug_mask, plug_mask, change_mask;
+	uint32_t hpd0, hpd1 = 0;
+
+	hpd0 = nv_rd32(dev, 0xe054) & nv_rd32(dev, 0xe050);
+	if (dev_priv->chipset >= 0x90)
+		hpd1 = nv_rd32(dev, 0xe074) & nv_rd32(dev, 0xe070);
+
+	plug_mask   = (hpd0 & 0x0000ffff) | (hpd1 << 16);
+	unplug_mask = (hpd0 >> 16) | (hpd1 & 0xffff0000);
+	change_mask = plug_mask | unplug_mask;
+
+	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
+		struct nouveau_connector *nv_connector =
+			nouveau_connector(connector);
+		struct dcb_gpio_entry *gpio;
+		uint32_t reg;
+		bool plugged;
+
+		if (!nv_connector->dcb)
+			continue;
+
+		gpio = nouveau_bios_gpio_entry(dev, nv_connector->dcb->gpio_tag);
+		if (!gpio || !(change_mask & (1 << gpio->line)))
+			continue;
+
+		reg = nv_rd32(dev, gpio_reg[gpio->line >> 3]);
+		plugged = !!(reg & (4 << ((gpio->line & 7) << 2)));
+		NV_INFO(dev, "%splugged %s\n", plugged ? "" : "un",
+			drm_get_connector_name(connector)) ;
+	}
+
+	nv_wr32(dev, 0xe054, nv_rd32(dev, 0xe054));
+	if (dev_priv->chipset >= 0x90)
+		nv_wr32(dev, 0xe074, nv_rd32(dev, 0xe074));
+}
+
 void
 nv50_display_irq_handler(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t delayed = 0;
+
+	while (nv_rd32(dev, NV50_PMC_INTR_0) & NV50_PMC_INTR_0_HOTPLUG)
+		nv50_display_irq_hotplug(dev);
 
 	while (nv_rd32(dev, NV50_PMC_INTR_0) & NV50_PMC_INTR_0_DISPLAY) {
 		uint32_t intr0 = nv_rd32(dev, NV50_PDISPLAY_INTR_0);
