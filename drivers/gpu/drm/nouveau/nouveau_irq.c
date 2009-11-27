@@ -462,6 +462,14 @@ nouveau_pgraph_intr_notify(struct drm_device *dev, uint32_t nsource)
 		nouveau_graph_dump_trap_info(dev, "PGRAPH_NOTIFY", &trap);
 }
 
+static DEFINE_RATELIMIT_STATE(nouveau_ratelimit_state, 3 * HZ, 20);
+
+static int nouveau_ratelimit(void)
+{
+	return __ratelimit(&nouveau_ratelimit_state);
+}
+
+
 static inline void
 nouveau_pgraph_intr_error(struct drm_device *dev, uint32_t nsource)
 {
@@ -478,7 +486,7 @@ nouveau_pgraph_intr_error(struct drm_device *dev, uint32_t nsource)
 		unhandled = 1;
 	}
 
-	if (unhandled)
+	if (unhandled && nouveau_ratelimit())
 		nouveau_graph_dump_trap_info(dev, "PGRAPH_ERROR", &trap);
 }
 
