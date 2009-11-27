@@ -5329,18 +5329,14 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 		}
 		if (conf & mask) {
 			/*
-			 * I'm bored of getting this reported; left as a
-			 * reminder for someone to fix it.
+			 * Until we even try to use these on G8x, it's
+			 * useless reporting unknown bits.  They all are.
 			 */
-			if (bdcb->version >= 0x40) {
-				NV_WARN(dev, "G80+ LVDS not initialized by driver; ignoring conf bits\n");
+			if (bdcb->version >= 0x40)
 				break;
-			}
+
 			NV_ERROR(dev, "Unknown LVDS configuration bits, "
-					"please report\n");
-			/* cause output setting to fail, so message is seen */
-			bdcb->dcb.entries = 0;
-			return false;
+				      "please report\n");
 		}
 		break;
 		}
