@@ -5171,13 +5171,10 @@ parse_dcb_connector_table(struct nvbios *bios)
 		return;
 	}
 
-	/* Only parse for DCB 4.0 at the moment */
-	if (bios->bdcb.version != 0x40)
-		return;
-
 	NV_INFO(dev, "DCB connector table: VHER 0x%02x %d %d %d\n",
 		conntab[0], conntab[1], conntab[2], conntab[3]);
-	if (conntab[0] != 0x40 || (conntab[3] != 2 && conntab[3] != 4)) {
+	if ((conntab[0] != 0x30 && conntab[0] != 0x40) ||
+	    (conntab[3] != 2 && conntab[3] != 4)) {
 		NV_ERROR(dev, "  Unknown!  Please report.\n");
 		return;
 	}
