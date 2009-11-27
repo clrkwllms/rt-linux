@@ -718,6 +718,7 @@ nouveau_connector_create(struct drm_device *dev, int index, int type)
 	nv_connector = kzalloc(sizeof(*nv_connector), GFP_KERNEL);
 	if (!nv_connector)
 		return -ENOMEM;
+	nv_connector->dcb = nouveau_bios_connector_entry(dev, index);
 	connector = &nv_connector->base;
 
 	switch (type) {

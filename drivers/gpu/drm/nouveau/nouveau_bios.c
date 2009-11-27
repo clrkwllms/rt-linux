@@ -5139,6 +5139,23 @@ parse_dcb_gpio_table(struct nvbios *bios)
 		parse_entry(bios, gpio_table_ptr + header_len + entry_len * i);
 }
 
+struct dcb_connector_table_entry *
+nouveau_bios_connector_entry(struct drm_device *dev, int index)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
+	struct dcb_connector_table_entry *cte;
+
+	if (index >= bios->bdcb.connector.entries)
+		return NULL;
+
+	cte = &bios->bdcb.connector.entry[index];
+	if (cte->type == 0xff)
+		return NULL;
+
+	return cte;
+}
+
 static void
 parse_dcb_connector_table(struct nvbios *bios)
 {
