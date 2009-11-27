@@ -28,21 +28,6 @@
 #include "nouveau_drv.h"
 #include "nouveau_hw.h"
 
-static struct dcb_gpio_entry *
-get_gpio_entry(struct drm_device *dev, enum dcb_gpio_tag tag)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct parsed_dcb_gpio *gpio = &dev_priv->VBIOS.bdcb.gpio;
-	int i;
-
-	for (i = 0; i < gpio->entries; i++) {
-		if (gpio->entry[i].tag == tag)
-			return &gpio->entry[i];
-	}
-
-	return NULL;
-}
-
 static bool
 get_gpio_location(struct dcb_gpio_entry *ent, uint32_t *reg, uint32_t *shift,
 		  uint32_t *mask)
@@ -72,7 +57,7 @@ get_gpio_location(struct dcb_gpio_entry *ent, uint32_t *reg, uint32_t *shift,
 int
 nv17_gpio_get(struct drm_device *dev, enum dcb_gpio_tag tag)
 {
-	struct dcb_gpio_entry *ent = get_gpio_entry(dev, tag);
+	struct dcb_gpio_entry *ent = nouveau_bios_gpio_entry(dev, tag);
 	uint32_t reg, shift, mask, value;
 
 	if (!ent)
@@ -89,7 +74,7 @@ nv17_gpio_get(struct drm_device *dev, enum dcb_gpio_tag tag)
 int
 nv17_gpio_set(struct drm_device *dev, enum dcb_gpio_tag tag, int state)
 {
-	struct dcb_gpio_entry *ent = get_gpio_entry(dev, tag);
+	struct dcb_gpio_entry *ent = nouveau_bios_gpio_entry(dev, tag);
 	uint32_t reg, shift, mask, value;
 
 	if (!ent)

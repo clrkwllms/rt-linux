@@ -5026,6 +5026,23 @@ new_gpio_entry(struct nvbios *bios)
 	return &gpio->entry[gpio->entries++];
 }
 
+struct dcb_gpio_entry *
+nouveau_bios_gpio_entry(struct drm_device *dev, enum dcb_gpio_tag tag)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
+	int i;
+
+	for (i = 0; i < bios->bdcb.gpio.entries; i++) {
+		if (bios->bdcb.gpio.entry[i].tag != tag)
+			continue;
+
+		return &bios->bdcb.gpio.entry[i];
+	}
+
+	return NULL;
+}
+
 static void
 parse_dcb30_gpio_entry(struct nvbios *bios, uint16_t offset)
 {
