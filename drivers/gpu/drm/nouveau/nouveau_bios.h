@@ -30,6 +30,7 @@
 #define DCB_MAX_NUM_ENTRIES 16
 #define DCB_MAX_NUM_I2C_ENTRIES 16
 #define DCB_MAX_NUM_GPIO_ENTRIES 32
+#define DCB_MAX_NUM_CONNECTOR_ENTRIES 16
 
 #define DCB_LOC_ON_CHIP 0
 
@@ -90,6 +91,18 @@ struct parsed_dcb_gpio {
 	struct dcb_gpio_entry entry[DCB_MAX_NUM_GPIO_ENTRIES];
 };
 
+struct dcb_connector_table_entry {
+	uint32_t entry;
+	uint8_t type;
+	uint8_t index;
+	uint8_t gpio_tag;
+};
+
+struct dcb_connector_table {
+	int entries;
+	struct dcb_connector_table_entry entry[DCB_MAX_NUM_CONNECTOR_ENTRIES];
+};
+
 struct bios_parsed_dcb {
 	uint8_t version;
 
@@ -100,6 +113,8 @@ struct bios_parsed_dcb {
 
 	uint16_t gpio_table_ptr;
 	struct parsed_dcb_gpio gpio;
+	uint16_t connector_table_ptr;
+	struct dcb_connector_table connector;
 };
 
 enum nouveau_encoder_type {

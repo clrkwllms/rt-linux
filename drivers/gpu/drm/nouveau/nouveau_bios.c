@@ -5065,8 +5065,9 @@ parse_dcb40_gpio_entry(struct nvbios *bios, uint16_t offset)
 }
 
 static void
-parse_dcb_gpio_table(struct drm_device *dev, struct nvbios *bios)
+parse_dcb_gpio_table(struct nvbios *bios)
 {
+	struct drm_device *dev = bios->dev;
 	uint16_t gpio_table_ptr = bios->bdcb.gpio_table_ptr;
 	uint8_t *gpio_table = &bios->data[gpio_table_ptr];
 	int header_len = gpio_table[1],
@@ -5119,6 +5120,69 @@ parse_dcb_gpio_table(struct drm_device *dev, struct nvbios *bios)
 
 	for (i = 0; i < entries; i++)
 		parse_entry(bios, gpio_table_ptr + header_len + entry_len * i);
+}
+
+static void
+parse_dcb_connector_table(struct nvbios *bios)
+{
+	struct drm_device *dev = bios->dev;
+	struct dcb_connector_table *ct = &bios->bdcb.connector;
+	struct dcb_connector_table_entry *cte;
+	uint8_t *conntab = &bios->data[bios->bdcb.connector_table_ptr];
+	uint8_t *entry;
+	int i;
+
+	if (!bios->bdcb.connector_table_ptr) {
+		NV_DEBUG(dev, "No DCB connector table present\n");
+		return;
+	}
+
+	/* Only parse for DCB 4.0 at the moment */
+	if (bios->bdcb.version != 0x40)
+		return;
+
+	NV_INFO(dev, "DCB connector table: VHER 0x%02x %d %d %d\n",
+		conntab[0], conntab[1], conntab[2], conntab[3]);
+	if (conntab[0] != 0x40 || (conntab[3] != 2 && conntab[3] != 4)) {
+		NV_ERROR(dev, "  Unknown!  Please report.\n");
+		return;
+	}
+
+	ct->entries = conntab[2];
+
+	entry = conntab + conntab[1];
+	cte = &ct->entry[0];
+	for (i = 0; i < conntab[2]; i++, entry += conntab[3], cte++) {
+		if (conntab[3] == 2)
+			cte->entry = ROM16(entry[0]);
+		else
+			cte->entry = ROM32(entry[0]);
+		cte->type  = (cte->entry & 0x000000ff) >> 0;
+		cte->index = (cte->entry & 0x00000f00) >> 8;
+		switch (cte->entry & 0x00033000) {
+		case 0x00001000:
+			cte->gpio_tag = 0x07;
+			break;
+		case 0x00002000:
+			cte->gpio_tag = 0x08;
+			break;
+		case 0x00010000:
+			cte->gpio_tag = 0x51;
+			break;
+		case 0x00020000:
+			cte->gpio_tag = 0x52;
+			break;
+		default:
+			cte->gpio_tag = 0xff;
+			break;
+		}
+
+		if (cte->type == 0xff)
+			continue;
+
+		NV_INFO(dev, "  %d: 0x%08x: type 0x%02x idx %d tag 0x%02x\n",
+			i, cte->entry, cte->type, cte->index, cte->gpio_tag);
+	}
 }
 
 static struct dcb_entry *new_dcb_entry(struct parsed_dcb *dcb)
@@ -5465,7 +5529,7 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 			i2ctabptr = ROM16(dcbtable[4]);
 			sig = ROM32(dcbtable[6]);
 			bdcb->gpio_table_ptr = ROM16(dcbtable[10]);
-
+			bdcb->connector_table_ptr = ROM16(dcbtable[20]);
 		} else {
 			i2ctabptr = ROM16(dcbtable[2]);
 			sig = ROM32(dcbtable[4]);
@@ -5530,7 +5594,8 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 			bdcb->i2c_default_indices = bdcb->i2c_table[4];
 	}
 
-	parse_dcb_gpio_table(dev, bios);
+	parse_dcb_gpio_table(bios);
+	parse_dcb_connector_table(bios);
 
 	if (entries > DCB_MAX_NUM_ENTRIES)
 		entries = DCB_MAX_NUM_ENTRIES;
