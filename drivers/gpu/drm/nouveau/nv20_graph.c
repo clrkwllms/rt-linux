@@ -761,9 +761,11 @@ struct nouveau_pgraph_object_class nv30_graph_grclass[] = {
 	{ 0x004a, false, NULL }, /* gdirect */
 	{ 0x009f, false, NULL }, /* imageblit (nv12) */
 	{ 0x008a, false, NULL }, /* ifc */
+	{ 0x038a, false, NULL }, /* ifc (nv30) */
 	{ 0x0089, false, NULL }, /* sifm */
 	{ 0x0389, false, NULL }, /* sifm (nv30) */
 	{ 0x0062, false, NULL }, /* surf2d */
+	{ 0x0362, false, NULL }, /* surf2d (nv30) */
 	{ 0x0043, false, NULL }, /* rop */
 	{ 0x0012, false, NULL }, /* beta1 */
 	{ 0x0072, false, NULL }, /* beta4 */
