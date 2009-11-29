@@ -486,7 +486,9 @@ struct drm_nouveau_private {
 	void __iomem *ramin;
 	uint32_t ramin_size;
 
+	struct workqueue_struct *wq;
 	struct work_struct irq_work;
+
 	struct list_head vbl_waiting;
 
 	struct {

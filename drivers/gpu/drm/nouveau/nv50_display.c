@@ -962,7 +962,7 @@ nv50_display_irq_handler(struct drm_device *dev)
 		if (clock) {
 			nv_wr32(dev, NV03_PMC_INTR_EN_0, 0);
 			if (!work_pending(&dev_priv->irq_work))
-				schedule_work(&dev_priv->irq_work);
+				queue_work(dev_priv->wq, &dev_priv->irq_work);
 			delayed |= clock;
 			intr1 &= ~clock;
 		}

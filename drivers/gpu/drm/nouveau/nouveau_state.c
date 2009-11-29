@@ -541,6 +541,10 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	if (dev_priv->acpi_dsm)
 		nouveau_hybrid_setup(dev);
 
+	dev_priv->wq = create_workqueue("nouveau");
+	if (!dev_priv->wq)
+		return -EINVAL;
+
 	/* resource 0 is mmio regs */
 	/* resource 1 is linear FB */
 	/* resource 2 is RAMIN (mmio regs + 0x1000000) */
