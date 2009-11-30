@@ -663,9 +663,9 @@ nouveau_connector_create_lvds(struct drm_device *dev,
 	 * modeline is avalilable for the panel, set it as the panel's
 	 * native mode and exit.
 	 */
-	if (!nv_connector->edid &&
-	     nv_encoder->dcb->lvdsconf.use_straps_for_mode &&
-	     nouveau_bios_fp_mode(dev, &native)) {
+	if (!nv_connector->edid && nouveau_bios_fp_mode(dev, &native) &&
+	     (nv_encoder->dcb->lvdsconf.use_straps_for_mode ||
+	      dev_priv->VBIOS.pub.fp_no_ddc)) {
 		nv_connector->native_mode = drm_mode_duplicate(dev, &native);
 		goto out;
 	}
