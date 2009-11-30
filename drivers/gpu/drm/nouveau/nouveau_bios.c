@@ -5364,7 +5364,7 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 		}
 		break;
 	case OUTPUT_TMDS:
-		entry->tmdsconf.sor_link = (conf & 0x00000030) >> 6;
+		entry->tmdsconf.sor_link = (conf & 0x00000030) >> 4;
 		break;
 	case 0xe:
 		/* weird g80 mobile type that "nv" treats as a terminator */
