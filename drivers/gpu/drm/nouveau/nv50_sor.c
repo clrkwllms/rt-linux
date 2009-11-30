@@ -155,9 +155,13 @@ nv50_sor_mode_set(struct drm_encoder *encoder, struct drm_display_mode *mode,
 
 	switch (nv_encoder->dcb->type) {
 	case OUTPUT_TMDS:
-		mode_ctl |= NV50_EVO_SOR_MODE_CTRL_TMDS;
-		if (adjusted_mode->clock > 165000)
-			mode_ctl |= NV50_EVO_SOR_MODE_CTRL_TMDS_DUAL_LINK;
+		if (nv_encoder->dcb->tmdsconf.sor_link & 1) {
+			if (adjusted_mode->clock < 165000)
+				mode_ctl = 0x0100;
+			else
+				mode_ctl = 0x0500;
+		} else
+			mode_ctl = 0x0200;
 		break;
 	default:
 		break;

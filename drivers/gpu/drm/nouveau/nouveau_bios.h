@@ -59,6 +59,9 @@ struct dcb_entry {
 			int link_nr;
 			int link_bw;
 		} dpconf;
+		struct {
+			int sor_link;
+		} tmdsconf;
 	};
 	bool i2c_upper_default;
 };

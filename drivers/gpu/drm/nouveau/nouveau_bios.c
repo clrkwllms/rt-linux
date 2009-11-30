@@ -5363,11 +5363,15 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 			break;
 		}
 		break;
+	case OUTPUT_TMDS:
+		entry->tmdsconf.sor_link = (conf & 0x00000030) >> 6;
+		break;
 	case 0xe:
 		/* weird g80 mobile type that "nv" treats as a terminator */
 		bdcb->dcb.entries--;
 		return false;
 	}
+
 	/* unsure what DCB version introduces this, 3.0? */
 	if (conf & 0x100000)
 		entry->i2c_upper_default = true;
