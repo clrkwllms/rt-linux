@@ -701,7 +701,7 @@ nv50_display_script_select(struct drm_device *dev, struct dcb_entry *dcbent,
 			script |= 0x0100;
 
 		if (nouveau_uscript_lvds >= 0) {
-			NV_INFO(dev, "override script 0x%04x with 0x%04x"
+			NV_INFO(dev, "override script 0x%04x with 0x%04x "
 				     "for output LVDS-%d\n", script,
 				     nouveau_uscript_lvds, or);
 			script = nouveau_uscript_lvds;
@@ -713,7 +713,7 @@ nv50_display_script_select(struct drm_device *dev, struct dcb_entry *dcbent,
 			script |= 0x0100;
 
 		if (nouveau_uscript_tmds >= 0) {
-			NV_INFO(dev, "override script 0x%04x with 0x%04x"
+			NV_INFO(dev, "override script 0x%04x with 0x%04x "
 				     "for output TMDS-%d\n", script,
 				     nouveau_uscript_tmds, or);
 			script = nouveau_uscript_tmds;
