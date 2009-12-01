@@ -249,7 +249,9 @@ struct nvbios {
 		bool dual_link;
 		bool link_c_increment;
 		bool BITbit1;
+		bool if_is_24bit;
 		int duallink_transition_clk;
+		uint8_t strapless_is_24bit;
 		uint8_t *edid;
 
 		/* will need resetting after suspend */

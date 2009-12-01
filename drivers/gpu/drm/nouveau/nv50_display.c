@@ -697,8 +697,20 @@ nv50_display_script_select(struct drm_device *dev, struct dcb_entry *dcbent,
 	switch (dcbent->type) {
 	case OUTPUT_LVDS:
 		script = (mc >> 8) & 0xf;
-		if (pxclk >= bios->fp.duallink_transition_clk)
-			script |= 0x0100;
+		if (bios->pub.fp_no_ddc) {
+			if (bios->fp.dual_link)
+				script |= 0x0100;
+			if (bios->fp.if_is_24bit)
+				script |= 0x0200;
+		} else {
+			if (pxclk >= bios->fp.duallink_transition_clk) {
+				script |= 0x0100;
+				if (bios->fp.strapless_is_24bit & 2)
+					script |= 0x0200;
+			} else
+			if (bios->fp.strapless_is_24bit & 1)
+				script |= 0x0200;
+		}
 
 		if (nouveau_uscript_lvds >= 0) {
 			NV_INFO(dev, "override script 0x%04x with 0x%04x "

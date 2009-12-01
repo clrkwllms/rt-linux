@@ -3695,7 +3695,9 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 		bios->fp.duallink_transition_clk = ROM16(bios->data[bios->fp.lvdsmanufacturerpointer + 5]) * 10;
 		break;
 	case 0x40:
-		/* bios->fp.dual_link = bios->data[lvdsofs] & 1; */
+		bios->fp.dual_link = bios->data[lvdsofs] & 1;
+		bios->fp.if_is_24bit = bios->data[lvdsofs] & 2;
+		bios->fp.strapless_is_24bit = bios->data[bios->fp.lvdsmanufacturerpointer + 4];
 		bios->fp.duallink_transition_clk = ROM16(bios->data[bios->fp.lvdsmanufacturerpointer + 5]) * 10;
 		break;
 	}
