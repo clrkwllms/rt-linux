@@ -196,27 +196,31 @@ nv50_display_init(struct drm_device *dev)
 	 * that enables things.
 	 */
 	/* CRTC? */
-	nv_wr32(dev, 0x00610190 + 0 * 0x10, nv_rd32(dev, 0x00616100 + 0 * 0x800));
-	nv_wr32(dev, 0x00610190 + 1 * 0x10, nv_rd32(dev, 0x00616100 + 1 * 0x800));
-	nv_wr32(dev, 0x00610194 + 0 * 0x10, nv_rd32(dev, 0x00616104 + 0 * 0x800));
-	nv_wr32(dev, 0x00610194 + 1 * 0x10, nv_rd32(dev, 0x00616104 + 1 * 0x800));
-	nv_wr32(dev, 0x00610198 + 0 * 0x10, nv_rd32(dev, 0x00616108 + 0 * 0x800));
-	nv_wr32(dev, 0x00610198 + 1 * 0x10, nv_rd32(dev, 0x00616108 + 1 * 0x800));
-	nv_wr32(dev, 0x0061019c + 0 * 0x10, nv_rd32(dev, 0x0061610c + 0 * 0x800));
-	nv_wr32(dev, 0x0061019c + 1 * 0x10, nv_rd32(dev, 0x0061610c + 1 * 0x800));
+	for (i = 0; i < 2; i++) {
+		val = nv_rd32(dev, 0x00616100 + (i * 0x800));
+		nv_wr32(dev, 0x00610190 + (i * 0x10), val);
+		val = nv_rd32(dev, 0x00616104 + (i * 0x800));
+		nv_wr32(dev, 0x00610194 + (i * 0x10), val);
+		val = nv_rd32(dev, 0x00616108 + (i * 0x800));
+		nv_wr32(dev, 0x00610198 + (i * 0x10), val);
+		val = nv_rd32(dev, 0x0061610c + (i * 0x800));
+		nv_wr32(dev, 0x0061019c + (i * 0x10), val);
+	}
 	/* DAC */
-	nv_wr32(dev, 0x006101d0 + 0 * 0x4, nv_rd32(dev, 0x0061a000 + 0 * 0x800));
-	nv_wr32(dev, 0x006101d0 + 1 * 0x4, nv_rd32(dev, 0x0061a000 + 1 * 0x800));
-	nv_wr32(dev, 0x006101d0 + 2 * 0x4, nv_rd32(dev, 0x0061a000 + 2 * 0x800));
+	for (i = 0; i < 3; i++) {
+		val = nv_rd32(dev, 0x0061a000 + (i * 0x800));
+		nv_wr32(dev, 0x006101d0 + (i * 0x04), val);
+	}
 	/* SOR */
-	nv_wr32(dev, 0x006101e0 + 0 * 0x4, nv_rd32(dev, 0x0061c000 + 0 * 0x800));
-	nv_wr32(dev, 0x006101e0 + 1 * 0x4, nv_rd32(dev, 0x0061c000 + 1 * 0x800));
-	nv_wr32(dev, 0x006101e0 + 2 * 0x4, nv_rd32(dev, 0x0061c000 + 2 * 0x800));
-	nv_wr32(dev, 0x006101e0 + 3 * 0x4, nv_rd32(dev, 0x0061c000 + 3 * 0x800));
+	for (i = 0; i < 4; i++) {
+		val = nv_rd32(dev, 0x0061c000 + (i * 0x800));
+		nv_wr32(dev, 0x006101e0 + (i * 0x04), val);
+	}
 	/* Something not yet in use, tv-out maybe. */
-	nv_wr32(dev, 0x006101f0 + 0 * 0x4, nv_rd32(dev, 0x0061e000 + 0 * 0x800));
-	nv_wr32(dev, 0x006101f0 + 1 * 0x4, nv_rd32(dev, 0x0061e000 + 1 * 0x800));
-	nv_wr32(dev, 0x006101f0 + 2 * 0x4, nv_rd32(dev, 0x0061e000 + 2 * 0x800));
+	for (i = 0; i < 3; i++) {
+		val = nv_rd32(dev, 0x0061e000 + (i * 0x800));
+		nv_wr32(dev, 0x006101f0 + (i * 0x04), val);
+	}
 
 	for (i = 0; i < 3; i++) {
 		nv_wr32(dev, NV50_PDISPLAY_DAC_DPMS_CTRL(i), 0x00550000 |
