@@ -45,10 +45,14 @@ struct dcb_entry {
 	uint8_t or;
 	bool duallink_possible;
 	union {
+		struct sor_conf {
+			int link;
+		} sorconf;
 		struct {
 			int maxfreq;
 		} crtconf;
 		struct {
+			struct sor_conf sor;
 			bool use_straps_for_mode;
 			bool use_power_scripts;
 		} lvdsconf;
@@ -56,11 +60,12 @@ struct dcb_entry {
 			bool has_component_output;
 		} tvconf;
 		struct {
+			struct sor_conf sor;
 			int link_nr;
 			int link_bw;
 		} dpconf;
 		struct {
-			int sor_link;
+			struct sor_conf sor;
 		} tmdsconf;
 	};
 	bool i2c_upper_default;

@@ -291,18 +291,20 @@ static void still_alive(void)
 static uint32_t
 munge_reg(struct nvbios *bios, uint32_t reg)
 {
+	struct dcb_entry *dcbent = bios->display.output;
+
 	if (nv_arch(bios->dev) < NV_50)
 		return reg;
 
-	if (!(reg & 0x40000000))
-		return reg;
+	if (reg & 0x40000000) {
+		BUG_ON(!dcbent);
 
-	BUG_ON(!bios->display.output);
+		reg += (ffs(dcbent->or) - 1) * 0x800;
+		if ((reg & 0x20000000) && !(dcbent->sorconf.link & 1))
+			reg += 0x00000080;
+	}
 
-	if (reg & 0x40000000)
-		reg += (ffs(bios->display.output->or) - 1) * 0x800;
-
-	reg &= ~0x40000000;
+	reg &= ~0x60000000;
 	return reg;
 }
 
@@ -5352,6 +5354,7 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 		break;
 	}
 	case OUTPUT_DP:
+		entry->dpconf.sor.link = (conf & 0x00000030) >> 4;
 		entry->dpconf.link_bw = (conf & 0x00e00000) >> 21;
 		switch ((conf & 0x0f000000) >> 24) {
 		case 0xf:
@@ -5366,7 +5369,7 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 		}
 		break;
 	case OUTPUT_TMDS:
-		entry->tmdsconf.sor_link = (conf & 0x00000030) >> 4;
+		entry->tmdsconf.sor.link = (conf & 0x00000030) >> 4;
 		break;
 	case 0xe:
 		/* weird g80 mobile type that "nv" treats as a terminator */
