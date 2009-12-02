@@ -349,32 +349,23 @@ nv50_graph_load_context(struct nouveau_channel *chan)
 	return nv50_graph_do_load_context(chan->dev, inst);
 }
 
-static int
-nv50_graph_do_save_context(struct drm_device *dev, uint32_t inst)
+int
+nv50_graph_unload_context(struct drm_device *dev)
 {
-	uint32_t fifo = nv_rd32(dev, 0x400500);
+	uint32_t inst, fifo = nv_rd32(dev, 0x400500);
+
+	inst  = nv_rd32(dev, NV50_PGRAPH_CTXCTL_CUR);
+	if (!(inst & NV50_PGRAPH_CTXCTL_CUR_LOADED))
+		return 0;
+	inst &= NV50_PGRAPH_CTXCTL_CUR_INSTANCE;
 
 	nv_wr32(dev, 0x400500, fifo & ~1);
 	nv_wr32(dev, 0x400784, inst);
 	nv_wr32(dev, 0x400824, nv_rd32(dev, 0x400824) | 0x20);
 	nv_wr32(dev, 0x400304, nv_rd32(dev, 0x400304) | 0x01);
 	nouveau_wait_for_idle(dev);
-
 	nv_wr32(dev, 0x400500, fifo);
-	return 0;
-}
 
-int
-nv50_graph_unload_context(struct drm_device *dev)
-{
-	uint32_t inst;
-	int ret;
-
-	inst  = nv_rd32(dev, NV50_PGRAPH_CTXCTL_CUR);
-	if (!(inst & NV50_PGRAPH_CTXCTL_CUR_LOADED))
-		return 0;
-	inst &= NV50_PGRAPH_CTXCTL_CUR_INSTANCE;
-	ret = nv50_graph_do_save_context(dev, inst);
 	nv_wr32(dev, NV50_PGRAPH_CTXCTL_CUR, inst);
 	return 0;
 }
