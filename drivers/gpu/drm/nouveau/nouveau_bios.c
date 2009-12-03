@@ -5649,13 +5649,9 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 		if (configblock)
 			config = ROM32(dcbtable[headerlen + confofs + recordlength * i]);
 
-		/*
-		 * Should we allow discontinuous DCBs? Certainly DCB I2C
-		 * tables can be discontinuous.
-		 */
 		if ((connection & 0x0000000f) == 0x0000000f)
-			/* end of records */
-			break;
+			continue;
+
 		if (connection == 0x00000000)
 			/* seen on an NV11 with DCB v1.5 */
 			break;
