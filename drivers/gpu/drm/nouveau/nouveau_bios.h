@@ -183,6 +183,10 @@ struct pll_lims {
 	 */
 	uint8_t max_usable_log2p;
 	uint8_t log2p_bias;
+
+	uint8_t min_p;
+	uint8_t max_p;
+
 	int refclk;
 };
 

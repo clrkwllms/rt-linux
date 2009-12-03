@@ -4053,6 +4053,7 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 	case 0x20:
 	case 0x21:
 	case 0x30:
+	case 0x40:
 		headerlen = bios->data[bios->pll_limit_tbl_ptr + 1];
 		recordlen = bios->data[bios->pll_limit_tbl_ptr + 2];
 		entries = bios->data[bios->pll_limit_tbl_ptr + 3];
@@ -4201,7 +4202,7 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 					pll_lim->refclk = 25000;
 			}
 		}
-	} else if (pll_lim_ver) { /* ver 0x30 */
+	} else if (pll_lim_ver == 0x30) { /* ver 0x30 */
 		uint8_t *entry = &bios->data[bios->pll_limit_tbl_ptr + headerlen];
 		uint8_t *record = NULL;
 		int i;
@@ -4241,6 +4242,42 @@ int get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lims
 		pll_lim->max_usable_log2p = pll_lim->max_log2p = record[25];
 		pll_lim->log2p_bias = record[27];
 		pll_lim->refclk = ROM32(record[28]);
+	} else if (pll_lim_ver) { /* ver 0x40 */
+		uint8_t *entry = &bios->data[bios->pll_limit_tbl_ptr + headerlen];
+		uint8_t *record = NULL;
+		int i;
+
+		BIOSLOG(bios, "Loading PLL limits for register 0x%08x\n",
+			limit_match);
+
+		for (i = 0; i < entries; i++, entry += recordlen) {
+			if (ROM32(entry[3]) == limit_match) {
+				record = &bios->data[ROM16(entry[1])];
+				break;
+			}
+		}
+
+		if (!record) {
+			NV_ERROR(dev, "Register 0x%08x not found in PLL "
+				 "limits table", limit_match);
+			return -ENOENT;
+		}
+
+		pll_lim->vco1.minfreq = ROM16(record[0]) * 1000;
+		pll_lim->vco1.maxfreq = ROM16(record[2]) * 1000;
+		pll_lim->vco1.min_inputfreq = ROM16(record[4]) * 1000;
+		pll_lim->vco1.max_inputfreq = ROM16(record[6]) * 1000;
+		pll_lim->vco1.min_m = record[8];
+		pll_lim->vco1.max_m = record[9];
+		pll_lim->vco1.min_n = record[10];
+		pll_lim->vco1.max_n = record[11];
+		pll_lim->min_p = record[12];
+		pll_lim->max_p = record[13];
+		/* where did this go to?? */
+		if (limit_match == 0x00614100 || limit_match == 0x00614900)
+			pll_lim->refclk = 27000;
+		else
+			pll_lim->refclk = 100000;
 	}
 
 	/*
