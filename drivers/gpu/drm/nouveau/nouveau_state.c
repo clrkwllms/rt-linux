@@ -301,13 +301,6 @@ nouveau_card_init(struct drm_device *dev)
 	if (dev_priv->init_state == NOUVEAU_CARD_INIT_DONE)
 		return 0;
 
-	/* Determine exact chipset we're running on */
-	if (dev_priv->card_type < NV_10)
-		dev_priv->chipset = dev_priv->card_type;
-	else
-		dev_priv->chipset =
-			(nv_rd32(dev, NV03_PMC_BOOT_0) & 0x0ff00000) >> 20;
-
 	/* Initialise internal driver API hooks */
 	ret = nouveau_init_engine_ptrs(dev);
 	if (ret)
@@ -521,7 +514,6 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 {
 	struct drm_nouveau_private *dev_priv;
 	uint32_t reg0;
-	uint8_t architecture = 0;
 	resource_size_t mmio_start_offs;
 
 	dev_priv = kzalloc(sizeof(*dev_priv), GFP_KERNEL);
@@ -575,40 +567,37 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	/* We're dealing with >=NV10 */
 	if ((reg0 & 0x0f000000) > 0) {
 		/* Bit 27-20 contain the architecture in hex */
-		architecture = (reg0 & 0xff00000) >> 20;
+		dev_priv->chipset = (reg0 & 0xff00000) >> 20;
 	/* NV04 or NV05 */
 	} else if ((reg0 & 0xff00fff0) == 0x20004000) {
-		architecture = 0x04;
+		dev_priv->chipset = 0x04;
+	} else
+		dev_priv->chipset = 0xff;
+
+	switch (dev_priv->chipset & 0xf0) {
+	case 0x00:
+	case 0x10:
+	case 0x20:
+	case 0x30:
+		dev_priv->card_type = dev_priv->chipset & 0xf0;
+		break;
+	case 0x40:
+	case 0x60:
+		dev_priv->card_type = NV_40;
+		break;
+	case 0x50:
+	case 0x80:
+	case 0x90:
+	case 0xa0:
+		dev_priv->card_type = NV_50;
+		break;
+	default:
+		NV_INFO(dev, "Unsupported chipset 0x%08x\n", reg0);
+		return -EINVAL;
 	}
 
-	if (architecture >= 0x80)
-		dev_priv->card_type = NV_50;
-	else if (architecture >= 0x60)
-		dev_priv->card_type = NV_40;
-	else if (architecture >= 0x50)
-		dev_priv->card_type = NV_50;
-	else if (architecture >= 0x40)
-		dev_priv->card_type = NV_40;
-	else if (architecture >= 0x30)
-		dev_priv->card_type = NV_30;
-	else if (architecture >= 0x20)
-		dev_priv->card_type = NV_20;
-	else if (architecture >= 0x17)
-		dev_priv->card_type = NV_17;
-	else if (architecture >= 0x11)
-		dev_priv->card_type = NV_11;
-	else if (architecture >= 0x10)
-		dev_priv->card_type = NV_10;
-	else if (architecture >= 0x04)
-		dev_priv->card_type = NV_04;
-	else
-		dev_priv->card_type = NV_UNKNOWN;
-
-	NV_INFO(dev, "Detected an NV%d generation card (0x%08x)\n",
+	NV_INFO(dev, "Detected an NV%2x generation card (0x%08x)\n",
 		dev_priv->card_type, reg0);
-
-	if (dev_priv->card_type == NV_UNKNOWN)
-		return -EINVAL;
 
 	/* map larger RAMIN aperture on NV40 cards */
 	dev_priv->ramin  = NULL;

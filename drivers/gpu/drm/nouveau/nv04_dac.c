@@ -267,7 +267,7 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 	/* nv driver and nv31 use 0xfffffeee, nv34 and 6600 use 0xfffffece */
 	routput = (saved_routput & 0xfffffece) | head << 8;
 
-	if (nv_arch(dev) >= NV_40) {
+	if (dev_priv->card_type >= NV_40) {
 		if (dcb->type == OUTPUT_TV)
 			routput |= 0x1a << 16;
 		else

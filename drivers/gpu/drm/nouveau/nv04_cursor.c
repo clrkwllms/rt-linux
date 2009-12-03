@@ -54,7 +54,7 @@ nv04_cursor_set_offset(struct nouveau_crtc *nv_crtc, uint32_t offset)
 	crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_HCUR_ADDR0_INDEX);
 	crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_HCUR_ADDR1_INDEX);
 	crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_HCUR_ADDR2_INDEX);
-	if (nv_arch(dev) == NV_40)
+	if (dev_priv->card_type == NV_40)
 		nv_fix_nv40_hw_cursor(dev, nv_crtc->index);
 }
 

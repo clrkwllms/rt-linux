@@ -456,16 +456,12 @@ struct nv04_mode_state {
 };
 
 enum nouveau_card_type {
-	NV_UNKNOWN = 0,
-	NV_04      = 4,
-	NV_05      = 5,
-	NV_10      = 10,
-	NV_11      = 11,
-	NV_17      = 17,
-	NV_20      = 20,
-	NV_30      = 30,
-	NV_40      = 40,
-	NV_50      = 50,
+	NV_04      = 0x00,
+	NV_10      = 0x10,
+	NV_20      = 0x20,
+	NV_30      = 0x30,
+	NV_40      = 0x40,
+	NV_50      = 0x50,
 };
 
 struct drm_nouveau_private {
@@ -1228,39 +1224,13 @@ enum {
 		NV_PRINTK(KERN_DEBUG, dev, "%s: " fmt, __func__, ##arg); \
 } while (0)
 
-static inline enum nouveau_card_type
-nv_arch(struct drm_device *dev)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-
-	switch (dev_priv->chipset & 0xf0) {
-	case 0x00:
-		return NV_04;
-	case 0x10:
-		return NV_10;
-	case 0x20:
-		return NV_20;
-	case 0x30:
-		return NV_30;
-	case 0x40:
-	case 0x60:
-		return NV_40;
-	case 0x50:
-	case 0x80:
-	case 0x90:
-	case 0xa0:
-		return NV_50;
-	default:
-		return NV_UNKNOWN;
-	}
-}
-
 static inline bool
 nv_two_heads(struct drm_device *dev)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	const int impl = dev->pci_device & 0x0ff0;
 
-	if (nv_arch(dev) >= NV_10 && impl != 0x0100 &&
+	if (dev_priv->card_type >= NV_10 && impl != 0x0100 &&
 	    impl != 0x0150 && impl != 0x01a0 && impl != 0x0200)
 		return true;
 
@@ -1276,9 +1246,10 @@ nv_gf4_disp_arch(struct drm_device *dev)
 static inline bool
 nv_two_reg_pll(struct drm_device *dev)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	const int impl = dev->pci_device & 0x0ff0;
 
-	if (impl == 0x0310 || impl == 0x0340 || nv_arch(dev) >= NV_40)
+	if (impl == 0x0310 || impl == 0x0340 || dev_priv->card_type >= NV_40)
 		return true;
 	return false;
 }

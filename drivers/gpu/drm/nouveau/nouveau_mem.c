@@ -364,10 +364,11 @@ nouveau_mem_fb_amount_igp(struct drm_device *dev)
 uint64_t nouveau_mem_fb_amount(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t boot0;
+
 	switch (dev_priv->card_type) {
 	case NV_04:
-	case NV_05: {
-		uint32_t boot0 = nv_rd32(dev, NV03_BOOT_0);
+		boot0 = nv_rd32(dev, NV03_BOOT_0);
 		if (boot0 & 0x00000100)
 			return (((boot0 >> 12) & 0xf) * 2 + 2) * 1024 * 1024;
 
@@ -382,10 +383,7 @@ uint64_t nouveau_mem_fb_amount(struct drm_device *dev)
 			return 4 * 1024 * 1024;
 		}
 		break;
-	}
 	case NV_10:
-	case NV_11:
-	case NV_17:
 	case NV_20:
 	case NV_30:
 	case NV_40:

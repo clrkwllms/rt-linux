@@ -426,6 +426,7 @@ int
 nouveau_hw_get_pllvals(struct drm_device *dev, enum pll_types plltype,
 		       struct nouveau_pll_vals *pllvals)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	const uint32_t nv04_regs[MAX_PLL_TYPES] = { NV_PRAMDAC_NVPLL_COEFF,
 						    NV_PRAMDAC_MPLL_COEFF,
 						    NV_PRAMDAC_VPLL_COEFF,
@@ -438,7 +439,7 @@ nouveau_hw_get_pllvals(struct drm_device *dev, enum pll_types plltype,
 	struct pll_lims pll_lim;
 	int ret;
 
-	if (nv_arch(dev) < NV_40)
+	if (dev_priv->card_type < NV_40)
 		reg1 = nv04_regs[plltype];
 	else
 		reg1 = nv40_regs[plltype];
@@ -453,7 +454,7 @@ nouveau_hw_get_pllvals(struct drm_device *dev, enum pll_types plltype,
 		pll2 = nvReadMC(dev, reg2);
 	}
 
-	if (nv_arch(dev) == 0x40 && reg1 >= NV_PRAMDAC_VPLL_COEFF) {
+	if (dev_priv->card_type == 0x40 && reg1 >= NV_PRAMDAC_VPLL_COEFF) {
 		uint32_t ramdac580 = NVReadRAMDAC(dev, 0, NV_PRAMDAC_580);
 
 		/* check whether vpll has been forced into single stage mode */
@@ -657,7 +658,7 @@ nv_save_state_ramdac(struct drm_device *dev, int head,
 	struct nv04_crtc_reg *regp = &state->crtc_reg[head];
 	int i;
 
-	if (nv_arch(dev) >= NV_10)
+	if (dev_priv->card_type >= NV_10)
 		regp->nv10_cursync = NVReadRAMDAC(dev, head, NV_RAMDAC_NV10_CURSYNC);
 
 	nouveau_hw_get_pllvals(dev, head ? VPLL2 : VPLL1, &regp->pllvals);
@@ -710,10 +711,10 @@ nv_save_state_ramdac(struct drm_device *dev, int head,
 
 	regp->fp_margin_color = NVReadRAMDAC(dev, head, NV_PRAMDAC_FP_MARGIN_COLOR);
 
-	if (nv_arch(dev) >= NV_30)
+	if (dev_priv->card_type >= NV_30)
 		regp->ramdac_8c0 = NVReadRAMDAC(dev, head, NV_PRAMDAC_8C0);
 
-	if (nv_arch(dev) == NV_40) {
+	if (dev_priv->card_type == NV_40) {
 		regp->ramdac_a20 = NVReadRAMDAC(dev, head, NV_PRAMDAC_A20);
 		regp->ramdac_a24 = NVReadRAMDAC(dev, head, NV_PRAMDAC_A24);
 		regp->ramdac_a34 = NVReadRAMDAC(dev, head, NV_PRAMDAC_A34);
@@ -733,7 +734,7 @@ nv_load_state_ramdac(struct drm_device *dev, int head,
 	uint32_t pllreg = head ? NV_RAMDAC_VPLL2 : NV_PRAMDAC_VPLL_COEFF;
 	int i;
 
-	if (nv_arch(dev) >= NV_10)
+	if (dev_priv->card_type >= NV_10)
 		NVWriteRAMDAC(dev, head, NV_RAMDAC_NV10_CURSYNC, regp->nv10_cursync);
 
 	nouveau_hw_setpll(dev, pllreg, &regp->pllvals);
@@ -781,10 +782,10 @@ nv_load_state_ramdac(struct drm_device *dev, int head,
 
 	NVWriteRAMDAC(dev, head, NV_PRAMDAC_FP_MARGIN_COLOR, regp->fp_margin_color);
 
-	if (nv_arch(dev) >= NV_30)
+	if (dev_priv->card_type >= NV_30)
 		NVWriteRAMDAC(dev, head, NV_PRAMDAC_8C0, regp->ramdac_8c0);
 
-	if (nv_arch(dev) == NV_40) {
+	if (dev_priv->card_type == NV_40) {
 		NVWriteRAMDAC(dev, head, NV_PRAMDAC_A20, regp->ramdac_a20);
 		NVWriteRAMDAC(dev, head, NV_PRAMDAC_A24, regp->ramdac_a24);
 		NVWriteRAMDAC(dev, head, NV_PRAMDAC_A34, regp->ramdac_a34);
@@ -849,6 +850,7 @@ static void
 nv_save_state_ext(struct drm_device *dev, int head,
 		  struct nv04_mode_state *state)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv04_crtc_reg *regp = &state->crtc_reg[head];
 	int i;
 
@@ -863,7 +865,7 @@ nv_save_state_ext(struct drm_device *dev, int head,
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_FF_INDEX);
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_FFLWM__INDEX);
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_21);
-	if (nv_arch(dev) >= NV_30)
+	if (dev_priv->card_type >= NV_30)
 		rd_cio_state(dev, head, regp, NV_CIO_CRE_47);
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_49);
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_HCUR_ADDR0_INDEX);
@@ -871,14 +873,14 @@ nv_save_state_ext(struct drm_device *dev, int head,
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_HCUR_ADDR2_INDEX);
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_ILACE__INDEX);
 
-	if (nv_arch(dev) >= NV_10) {
+	if (dev_priv->card_type >= NV_10) {
 		regp->crtc_830 = NVReadCRTC(dev, head, NV_PCRTC_830);
 		regp->crtc_834 = NVReadCRTC(dev, head, NV_PCRTC_834);
 
-		if (nv_arch(dev) >= NV_30)
+		if (dev_priv->card_type >= NV_30)
 			regp->gpio_ext = NVReadCRTC(dev, head, NV_PCRTC_GPIO_EXT);
 
-		if (nv_arch(dev) == NV_40)
+		if (dev_priv->card_type == NV_40)
 			regp->crtc_850 = NVReadCRTC(dev, head, NV_PCRTC_850);
 
 		if (nv_two_heads(dev))
@@ -890,7 +892,7 @@ nv_save_state_ext(struct drm_device *dev, int head,
 
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_SCRATCH3__INDEX);
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_SCRATCH4__INDEX);
-	if (nv_arch(dev) >= NV_10) {
+	if (dev_priv->card_type >= NV_10) {
 		rd_cio_state(dev, head, regp, NV_CIO_CRE_EBR_INDEX);
 		rd_cio_state(dev, head, regp, NV_CIO_CRE_CSB);
 		rd_cio_state(dev, head, regp, NV_CIO_CRE_4B);
@@ -922,7 +924,7 @@ nv_load_state_ext(struct drm_device *dev, int head,
 	uint32_t reg900;
 	int i;
 
-	if (nv_arch(dev) >= NV_10) {
+	if (dev_priv->card_type >= NV_10) {
 		if (nv_two_heads(dev))
 			/* setting ENGINE_CTRL (EC) *must* come before
 			 * CIO_CRE_LCD, as writing CRE_LCD sets bits 16 & 17 in
@@ -944,10 +946,10 @@ nv_load_state_ext(struct drm_device *dev, int head,
 		NVWriteCRTC(dev, head, NV_PCRTC_830, regp->crtc_830);
 		NVWriteCRTC(dev, head, NV_PCRTC_834, regp->crtc_834);
 
-		if (nv_arch(dev) >= NV_30)
+		if (dev_priv->card_type >= NV_30)
 			NVWriteCRTC(dev, head, NV_PCRTC_GPIO_EXT, regp->gpio_ext);
 
-		if (nv_arch(dev) == NV_40) {
+		if (dev_priv->card_type == NV_40) {
 			NVWriteCRTC(dev, head, NV_PCRTC_850, regp->crtc_850);
 
 			reg900 = NVReadRAMDAC(dev, head, NV_PRAMDAC_900);
@@ -969,20 +971,20 @@ nv_load_state_ext(struct drm_device *dev, int head,
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_ENH_INDEX);
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_FF_INDEX);
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_FFLWM__INDEX);
-	if (nv_arch(dev) >= NV_30)
+	if (dev_priv->card_type >= NV_30)
 		wr_cio_state(dev, head, regp, NV_CIO_CRE_47);
 
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_49);
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_HCUR_ADDR0_INDEX);
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_HCUR_ADDR1_INDEX);
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_HCUR_ADDR2_INDEX);
-	if (nv_arch(dev) == NV_40)
+	if (dev_priv->card_type == NV_40)
 		nv_fix_nv40_hw_cursor(dev, head);
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_ILACE__INDEX);
 
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_SCRATCH3__INDEX);
 	wr_cio_state(dev, head, regp, NV_CIO_CRE_SCRATCH4__INDEX);
-	if (nv_arch(dev) >= NV_10) {
+	if (dev_priv->card_type >= NV_10) {
 		wr_cio_state(dev, head, regp, NV_CIO_CRE_EBR_INDEX);
 		wr_cio_state(dev, head, regp, NV_CIO_CRE_CSB);
 		wr_cio_state(dev, head, regp, NV_CIO_CRE_4B);
@@ -990,7 +992,7 @@ nv_load_state_ext(struct drm_device *dev, int head,
 	}
 	/* NV11 and NV20 stop at 0x52. */
 	if (nv_gf4_disp_arch(dev)) {
-		if (nv_arch(dev) == NV_10) {
+		if (dev_priv->card_type == NV_10) {
 			/* Not waiting for vertical retrace before modifying
 			   CRE_53/CRE_54 causes lockups. */
 			nouveau_wait_until(dev, 650000000, NV_PRMCIO_INP0__COLOR, 0x8, 0x8);

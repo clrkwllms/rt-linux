@@ -86,11 +86,12 @@ score_vbios(struct drm_device *dev, const uint8_t *data, const bool writeable)
 
 static void load_vbios_prom(struct drm_device *dev, uint8_t *data)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t pci_nv_20, save_pci_nv_20;
 	int pcir_ptr;
 	int i;
 
-	if (nv_arch(dev) >= NV_50)
+	if (dev_priv->card_type >= NV_50)
 		pci_nv_20 = 0x88050;
 	else
 		pci_nv_20 = NV_PBUS_PCI_NV_20;
@@ -129,10 +130,11 @@ out:
 
 static void load_vbios_pramin(struct drm_device *dev, uint8_t *data)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t old_bar0_pramin = 0;
 	int i;
 
-	if (nv_arch(dev) >= NV_50) {
+	if (dev_priv->card_type >= NV_50) {
 		uint32_t vbios_vram = (nv_rd32(dev, 0x619f04) & ~0xff) << 8;
 
 		if (!vbios_vram)
@@ -151,7 +153,7 @@ static void load_vbios_pramin(struct drm_device *dev, uint8_t *data)
 		data[i] = nv_rd08(dev, NV_PRAMIN_OFFSET + i);
 
 out:
-	if (nv_arch(dev) >= NV_50)
+	if (dev_priv->card_type >= NV_50)
 		nv_wr32(dev, 0x1700, old_bar0_pramin);
 }
 
@@ -291,9 +293,10 @@ static void still_alive(void)
 static uint32_t
 munge_reg(struct nvbios *bios, uint32_t reg)
 {
+	struct drm_nouveau_private *dev_priv = bios->dev->dev_private;
 	struct dcb_entry *dcbent = bios->display.output;
 
-	if (nv_arch(bios->dev) < NV_50)
+	if (dev_priv->card_type < NV_50)
 		return reg;
 
 	if (reg & 0x40000000) {
@@ -3398,8 +3401,11 @@ static int parse_lvds_manufacturer_table_header(struct drm_device *dev, struct n
 	return 0;
 }
 
-static int get_fp_strap(struct drm_device *dev, struct nvbios *bios)
+static int
+get_fp_strap(struct drm_device *dev, struct nvbios *bios)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
 	/*
 	 * The fp strap is normally dictated by the "User Strap" in
 	 * PEXTDEV_BOOT_0[20:16], but on BMP cards when bit 2 of the
@@ -3412,7 +3418,7 @@ static int get_fp_strap(struct drm_device *dev, struct nvbios *bios)
 	if (bios->major_version < 5 && bios->data[0x48] & 0x4)
 		return NVReadVgaCrtc5758(dev, 0, 0xf) & 0xf;
 
-	if (nv_arch(dev) >= NV_50)
+	if (dev_priv->card_type >= NV_50)
 		return (bios_rd32(bios, NV_PEXTDEV_BOOT_0) >> 24) & 0xf;
 	else
 		return (bios_rd32(bios, NV_PEXTDEV_BOOT_0) >> 16) & 0xf;

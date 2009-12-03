@@ -134,7 +134,7 @@ static void nv_crtc_calc_state_ext(struct drm_crtc *crtc, struct drm_display_mod
 	state->pllsel &= PLLSEL_VPLL1_MASK | PLLSEL_VPLL2_MASK | PLLSEL_TV_MASK;
 
 	/* The blob uses this always, so let's do the same */
-	if (nv_arch(dev) == NV_40)
+	if (dev_priv->card_type == NV_40)
 		state->pllsel |= NV_PRAMDAC_PLL_COEFF_SELECT_USE_VPLL2_TRUE;
 	/* again nv40 and some nv43 act more like nv3x as described above */
 	if (dev_priv->chipset < 0x41)
@@ -263,7 +263,7 @@ nv_crtc_mode_set_vga(struct drm_crtc *crtc, struct drm_display_mode *mode)
 		horizEnd = horizTotal - 2;
 		horizBlankEnd = horizTotal + 4;
 #if 0
-		if (dev->overlayAdaptor && nv_arch(dev) >= NV_10)
+		if (dev->overlayAdaptor && dev_priv->card_type >= NV_10)
 			/* This reportedly works around some video overlay bandwidth problems */
 			horizTotal += 2;
 #endif
@@ -540,17 +540,17 @@ nv_crtc_mode_set_regs(struct drm_crtc *crtc, struct drm_display_mode * mode)
 	regp->crtc_830 = mode->crtc_vdisplay - 3;
 	regp->crtc_834 = mode->crtc_vdisplay - 1;
 
-	if (nv_arch(dev) == NV_40)
+	if (dev_priv->card_type == NV_40)
 		/* This is what the blob does */
 		regp->crtc_850 = NVReadCRTC(dev, 0, NV_PCRTC_850);
 
-	if (nv_arch(dev) >= NV_30)
+	if (dev_priv->card_type >= NV_30)
 		regp->gpio_ext = NVReadCRTC(dev, 0, NV_PCRTC_GPIO_EXT);
 
 	regp->crtc_cfg = NV_PCRTC_CONFIG_START_ADDRESS_HSYNC;
 
 	/* Some misc regs */
-	if (nv_arch(dev) == NV_40) {
+	if (dev_priv->card_type == NV_40) {
 		regp->CRTC[NV_CIO_CRE_85] = 0xFF;
 		regp->CRTC[NV_CIO_CRE_86] = 0x1;
 	}
@@ -562,7 +562,7 @@ nv_crtc_mode_set_regs(struct drm_crtc *crtc, struct drm_display_mode * mode)
 
 	/* Generic PRAMDAC regs */
 
-	if (nv_arch(dev) >= NV_10)
+	if (dev_priv->card_type >= NV_10)
 		/* Only bit that bios and blob set. */
 		regp->nv10_cursync = (1 << 25);
 
@@ -611,7 +611,7 @@ nv_crtc_mode_set(struct drm_crtc *crtc, struct drm_display_mode *mode,
 
 	nv_crtc_mode_set_vga(crtc, adjusted_mode);
 	/* calculated in nv04_dfp_prepare, nv40 needs it written before calculating PLLs */
-	if (nv_arch(dev) == NV_40)
+	if (dev_priv->card_type == NV_40)
 		NVWriteRAMDAC(dev, 0, NV_PRAMDAC_SEL_CLK, dev_priv->mode_reg.sel_clk);
 	nv_crtc_mode_set_regs(crtc, adjusted_mode);
 	nv_crtc_calc_state_ext(crtc, mode, adjusted_mode->clock);
@@ -658,6 +658,7 @@ static void nv_crtc_restore(struct drm_crtc *crtc)
 static void nv_crtc_prepare(struct drm_crtc *crtc)
 {
 	struct drm_device *dev = crtc->dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 	struct drm_crtc_helper_funcs *funcs = crtc->helper_private;
 
@@ -670,7 +671,7 @@ static void nv_crtc_prepare(struct drm_crtc *crtc)
 
 	/* Some more preperation. */
 	NVWriteCRTC(dev, nv_crtc->index, NV_PCRTC_CONFIG, NV_PCRTC_CONFIG_START_ADDRESS_NON_VGA);
-	if (nv_arch(dev) == NV_40) {
+	if (dev_priv->card_type == NV_40) {
 		uint32_t reg900 = NVReadRAMDAC(dev, nv_crtc->index, NV_PRAMDAC_900);
 		NVWriteRAMDAC(dev, nv_crtc->index, NV_PRAMDAC_900, reg900 & ~0x10000);
 	}
@@ -819,7 +820,7 @@ nv04_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 	crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_FF_INDEX);
 	crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_FFLWM__INDEX);
 
-	if (nv_arch(dev) >= NV_30) {
+	if (dev_priv->card_type >= NV_30) {
 		regp->CRTC[NV_CIO_CRE_47] = arb_lwm >> 8;
 		crtc_wr_cio_state(crtc, regp, NV_CIO_CRE_47);
 	}

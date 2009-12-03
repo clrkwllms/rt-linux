@@ -291,7 +291,7 @@ static void nv17_tv_prepare(struct drm_encoder *encoder)
 	/* Set the DACCLK register */
 	dacclk = (NVReadRAMDAC(dev, 0, dacclk_off) & ~0x30) | 0x1;
 
-	if (nv_arch(dev) == NV_40)
+	if (dev_priv->card_type == NV_40)
 		dacclk |= 0x1a << 16;
 
 	if (tv_norm->kind == CTV_ENC_MODE) {
@@ -348,7 +348,7 @@ static void nv17_tv_mode_set(struct drm_encoder *encoder,
 			tv_regs->ptv_614 = 0x13;
 		}
 
-		if (nv_arch(dev) >= NV_30) {
+		if (dev_priv->card_type >= NV_30) {
 			tv_regs->ptv_500 = 0xe8e0;
 			tv_regs->ptv_504 = 0x1710;
 			tv_regs->ptv_604 = 0x0;

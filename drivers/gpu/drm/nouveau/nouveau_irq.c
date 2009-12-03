@@ -494,12 +494,9 @@ nouveau_pgraph_intr_context_switch(struct drm_device *dev)
 
 	switch (dev_priv->card_type) {
 	case NV_04:
-	case NV_05:
 		nv04_graph_context_switch(dev);
 		break;
 	case NV_10:
-	case NV_11:
-	case NV_17:
 		nv10_graph_context_switch(dev);
 		break;
 	default:

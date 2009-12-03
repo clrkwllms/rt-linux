@@ -195,6 +195,7 @@ static void
 nv04_update_arb(struct drm_device *dev, int VClk, int bpp,
 		int *burst, int *lwm)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv_fifo_info fifo_data;
 	struct nv_sim_state sim_data;
 	int MClk = nouveau_hw_get_clock(dev, MPLL);
@@ -223,7 +224,7 @@ nv04_update_arb(struct drm_device *dev, int VClk, int bpp,
 		sim_data.mem_page_miss = ((cfg1 >> 4) & 0xf) + ((cfg1 >> 31) & 0x1);
 	}
 
-	if (nv_arch(dev) == NV_04)
+	if (dev_priv->card_type == NV_04)
 		nv04_calc_arb(&fifo_data, &sim_data);
 	else
 		nv10_calc_arb(&fifo_data, &sim_data);
@@ -248,7 +249,9 @@ nv30_update_arb(int *burst, int *lwm)
 void
 nouveau_calc_arb(struct drm_device *dev, int vclk, int bpp, int *burst, int *lwm)
 {
-	if (nv_arch(dev) < NV_30)
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	if (dev_priv->card_type < NV_30)
 		nv04_update_arb(dev, vclk, bpp, burst, lwm);
 	else if ((dev->pci_device & 0xfff0) == 0x0240 /*CHIPSET_C51*/ ||
 		 (dev->pci_device & 0xfff0) == 0x03d0 /*CHIPSET_C512*/) {
