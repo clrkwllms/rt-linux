@@ -90,7 +90,6 @@ nv50_crtc_blank(struct nouveau_crtc *nv_crtc, bool blanked)
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, FB_DMA), 1);
 		OUT_RING(evo, NV50_EVO_CRTC_FB_DMA_HANDLE_NONE);
 	} else {
-		nv_crtc->cursor.set_offset(nv_crtc, nv_crtc->cursor.offset);
 		if (nv_crtc->cursor.visible)
 			nv_crtc->cursor.show(nv_crtc, false);
 		else
@@ -368,9 +367,8 @@ nv50_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
 
 	nouveau_bo_unmap(cursor);
 
-	nv_crtc->cursor.offset  = nv_crtc->cursor.nvbo->bo.offset;
-	nv_crtc->cursor.offset -= dev_priv->vm_vram_base;
-	nv_crtc->cursor.set_offset(nv_crtc, nv_crtc->cursor.offset);
+	nv_crtc->cursor.set_offset(nv_crtc, nv_crtc->cursor.nvbo->bo.offset -
+					    dev_priv->vm_vram_base);
 	nv_crtc->cursor.show(nv_crtc, true);
 
 out:
