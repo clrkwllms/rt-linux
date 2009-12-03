@@ -274,23 +274,6 @@ nv50_crtc_set_clock(struct drm_device *dev, int head, int pclk)
 	if (ret)
 		return ret;
 
-	/*XXX: need a vbios image from one of these cards to look at
-	 *     rather than just guessing.  P isn't log2P on these
-	 *     cards, it's uncertain at this stage what the PLL
-	 *     limits tables have to say about these chips.
-	 *
-	 *     getPLL_single will need some modifications to calculate
-	 *     this properly too.
-	 *
-	 *     for the moment, hacking up the PLL limits table with
-	 *     a log2 value matching nv's maximum.
-	 */
-	if (!limits.vco2.maxfreq) {
-		NV_ERROR(dev, "single-stage PLL, please report: %d!!\n",
-			 limits.max_usable_log2p);
-		limits.max_usable_log2p = 6;
-	}
-
 	ret = nouveau_calc_pll_mnp(dev, &limits, pclk, &pll);
 	if (ret <= 0)
 		return ret;
@@ -306,7 +289,7 @@ nv50_crtc_set_clock(struct drm_device *dev, int head, int pclk)
 		reg1 = nv_rd32(dev, pll_reg + 4) & 0xffc00000;
 		nv_wr32(dev, pll_reg, 0x50000610);
 		nv_wr32(dev, pll_reg + 4, reg1 |
-			(((1<<pll.log2P)-1) << 16) | (pll.M1 << 8) | pll.N1);
+			(pll.log2P << 16) | (pll.M1 << 8) | pll.N1);
 	}
 
 	return 0;

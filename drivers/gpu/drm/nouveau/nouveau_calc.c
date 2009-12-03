@@ -278,10 +278,12 @@ getMNP_single(struct drm_device *dev, struct pll_lims *pll_lim, int clk,
 	int minvco = pll_lim->vco1.minfreq, maxvco = pll_lim->vco1.maxfreq;
 	int minM = pll_lim->vco1.min_m, maxM = pll_lim->vco1.max_m;
 	int minN = pll_lim->vco1.min_n, maxN = pll_lim->vco1.max_n;
-	int minU = pll_lim->vco1.min_inputfreq, maxU = pll_lim->vco1.max_inputfreq;
-	int maxlog2P = pll_lim->max_usable_log2p;
+	int minU = pll_lim->vco1.min_inputfreq;
+	int maxU = pll_lim->vco1.max_inputfreq;
+	int minP = pll_lim->max_p ? pll_lim->min_p : 0;
+	int maxP = pll_lim->max_p ? pll_lim->max_p : pll_lim->max_usable_log2p;
 	int crystal = pll_lim->refclk;
-	int M, N, log2P, P;
+	int M, N, thisP, P;
 	int clkP, calcclk;
 	int delta, bestdelta = INT_MAX;
 	int bestclk = 0;
@@ -304,16 +306,18 @@ getMNP_single(struct drm_device *dev, struct pll_lims *pll_lim, int clk,
 		}
 	}
 
-	if ((clk << maxlog2P) < minvco) {
-		minvco = clk << maxlog2P;
+	P = pll_lim->max_p ? maxP : (1 << maxP);
+	if ((clk * P) < minvco) {
+		minvco = clk * maxP;
 		maxvco = minvco * 2;
 	}
+
 	if (clk + clk/200 > maxvco)	/* +0.5% */
 		maxvco = clk + clk/200;
 
 	/* NV34 goes maxlog2P->0, NV20 goes 0->maxlog2P */
-	for (log2P = 0; log2P <= maxlog2P; log2P++) {
-		P = 1 << log2P;
+	for (thisP = minP; thisP <= maxP; thisP++) {
+		P = pll_lim->max_p ? thisP : (1 << thisP);
 		clkP = clk * P;
 
 		if (clkP < minvco)
@@ -346,7 +350,7 @@ getMNP_single(struct drm_device *dev, struct pll_lims *pll_lim, int clk,
 				bestclk = calcclk;
 				bestpv->N1 = N;
 				bestpv->M1 = M;
-				bestpv->log2P = log2P;
+				bestpv->log2P = thisP;
 				if (delta == 0)	/* except this one */
 					return bestclk;
 			}
