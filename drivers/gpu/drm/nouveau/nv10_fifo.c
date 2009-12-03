@@ -217,11 +217,11 @@ nv10_fifo_init_ramxx(struct drm_device *dev)
 	nv_wr32(dev, NV03_PFIFO_RAMRO, dev_priv->ramro_offset>>8);
 
 	if (dev_priv->chipset < 0x17) {
+		nv_wr32(dev, NV03_PFIFO_RAMFC, dev_priv->ramfc_offset >> 8);
+	} else {
 		nv_wr32(dev, NV03_PFIFO_RAMFC, (dev_priv->ramfc_offset >> 8) |
 					       (1 << 16) /* 64 Bytes entry*/);
 		/* XXX nvidia blob set bit 18, 21,23 for nv20 & nv30 */
-	} else {
-		nv_wr32(dev, NV03_PFIFO_RAMFC, dev_priv->ramfc_offset >> 8);
 	}
 }
 
