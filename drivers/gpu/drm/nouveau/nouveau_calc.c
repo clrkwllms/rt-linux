@@ -288,18 +288,20 @@ getMNP_single(struct drm_device *dev, struct pll_lims *pll_lim, int clk,
 
 	/* this division verified for nv20, nv18, nv28 (Haiku), and nv34 */
 	/* possibly correlated with introduction of 27MHz crystal */
-	if (cv < 0x17 || cv == 0x1a || cv == 0x20) {
-		if (clk > 250000)
-			maxM = 6;
-		if (clk > 340000)
-			maxM = 2;
-	} else if (cv < 0x40) {
-		if (clk > 150000)
-			maxM = 6;
-		if (clk > 200000)
-			maxM = 4;
-		if (clk > 340000)
-			maxM = 2;
+	if (dev_priv->card_type < NV_50) {
+		if (cv < 0x17 || cv == 0x1a || cv == 0x20) {
+			if (clk > 250000)
+				maxM = 6;
+			if (clk > 340000)
+				maxM = 2;
+		} else if (cv < 0x40) {
+			if (clk > 150000)
+				maxM = 6;
+			if (clk > 200000)
+				maxM = 4;
+			if (clk > 340000)
+				maxM = 2;
+		}
 	}
 
 	if ((clk << maxlog2P) < minvco) {
