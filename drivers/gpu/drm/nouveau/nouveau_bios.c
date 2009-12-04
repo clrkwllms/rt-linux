@@ -2865,22 +2865,6 @@ init_97(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 	return true;
 }
 
-static int
-nouveau_dp_auxch_rd(struct nouveau_i2c_chan *auxch, int cmd, int addr,
-		    uint8_t buf[16], int len)
-{
-	NV_ERROR(auxch->dev, "auxch_rd: stub!\n");
-	return -ENODEV;
-}
-
-static int
-nouveau_dp_auxch_wr(struct nouveau_i2c_chan *auxch, int cmd, int addr,
-		    uint8_t buf[16], int len)
-{
-	NV_ERROR(auxch->dev, "auxch_wr: stub!\n");
-	return -ENODEV;
-}
-
 static bool
 init_auxch(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
@@ -2900,13 +2884,7 @@ init_auxch(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 	struct nouveau_i2c_chan *auxch;
 	uint32_t addr = ROM32(bios->data[offset + 1]);
 	uint8_t len = bios->data[offset + 5];
-	uint8_t buf[16];
 	int ret, i;
-
-	if (len > 16) {
-		NV_ERROR(dev, "INIT_AUXCH: >16 byte xfer unimplemented!\n");
-		return false;
-	}
 
 	if (!bios->display.output) {
 		NV_ERROR(dev, "INIT_AUXCH: no active output\n");
@@ -2923,22 +2901,24 @@ init_auxch(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 	if (!iexec->execute)
 		return true;
 
-	ret = nouveau_dp_auxch_rd(auxch, 9, addr, buf, len);
-	if (ret) {
-		NV_ERROR(dev, "INIT_AUXCH: rd auxch fail %d\n", ret);
-		return false;
-	}
-
 	offset += 6;
 	for (i = 0; i < len; i++, offset += 2) {
-		buf[i] &= bios->data[offset + 0];
-		buf[i] |= bios->data[offset + 1];
-	}
+		uint8_t data;
 
-	ret = nouveau_dp_auxch_wr(auxch, 8, addr, buf, len);
-	if (ret) {
-		NV_ERROR(dev, "INIT_AUXCH: wr auxch fail %d\n", ret);
-		return false;
+		ret = nouveau_dp_auxch(auxch, 9, addr, &data, 1);
+		if (ret) {
+			NV_ERROR(dev, "INIT_AUXCH: rd auxch fail %d\n", ret);
+			return false;
+		}
+
+		data &= bios->data[offset + 0];
+		data |= bios->data[offset + 1];
+
+		ret = nouveau_dp_auxch(auxch, 8, addr, &data, 1);
+		if (ret) {
+			NV_ERROR(dev, "INIT_AUXCH: wr auxch fail %d\n", ret);
+			return false;
+		}
 	}
 
 	return true;
@@ -2962,12 +2942,7 @@ init_zm_auxch(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 	struct nouveau_i2c_chan *auxch;
 	uint32_t addr = ROM32(bios->data[offset + 1]);
 	uint8_t len = bios->data[offset + 5];
-	int ret;
-
-	if (len > 16) {
-		NV_ERROR(dev, "INIT_ZM_AUXCH: >16 byte xfer unimplemented!\n");
-		return false;
-	}
+	int ret, i;
 
 	if (!bios->display.output) {
 		NV_ERROR(dev, "INIT_ZM_AUXCH: no active output\n");
@@ -2984,10 +2959,13 @@ init_zm_auxch(struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 	if (!iexec->execute)
 		return true;
 
-	ret = nouveau_dp_auxch_wr(auxch, 8, addr, &bios->data[offset + 6], len);
-	if (ret) {
-		NV_ERROR(dev, "INIT_ZM_AUXCH: wr auxch fail %d\n", ret);
-		return false;
+	offset += 6;
+	for (i = 0; i < len; i++, offset++) {
+		ret = nouveau_dp_auxch(auxch, 8, addr, &bios->data[offset], 1);
+		if (ret) {
+			NV_ERROR(dev, "INIT_ZM_AUXCH: wr auxch fail %d\n", ret);
+			return false;
+		}
 	}
 
 	return true;
