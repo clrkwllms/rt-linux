@@ -62,7 +62,7 @@ static int nouveau_dsm(struct drm_device *dev, int func, int arg, int *result)
 
 	err = acpi_evaluate_object(handle, "_DSM", &input, &output);
 	if (err) {
-		NV_ERROR(dev, "failed to evaluate _DSM: %d\n", err);
+		NV_INFO(dev, "failed to evaluate _DSM: %d\n", err);
 		return err;
 	}
 
