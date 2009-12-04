@@ -3745,6 +3745,32 @@ bios_output_config_match(struct drm_device *dev, struct dcb_entry *dcbent,
 	return NULL;
 }
 
+void *
+nouveau_bios_dp_table(struct drm_device *dev, struct dcb_entry *dcbent,
+		      int *length)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
+	uint8_t *table;
+
+	if (!bios->display.dp_table_ptr) {
+		NV_ERROR(dev, "No pointer to DisplayPort table\n");
+		return NULL;
+	}
+	table = &bios->data[bios->display.dp_table_ptr];
+
+	if (table[0] != 0x21) {
+		NV_ERROR(dev, "DisplayPort table version 0x%02x unknown\n",
+			 table[0]);
+		return NULL;
+	}
+
+	*length = table[4];
+	return bios_output_config_match(dev, dcbent,
+					bios->display.dp_table_ptr + table[1],
+					table[2], table[3]);
+}
+
 int
 nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 			       uint32_t sub, int pxclk)
