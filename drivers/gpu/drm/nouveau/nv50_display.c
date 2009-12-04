@@ -735,6 +735,9 @@ nv50_display_script_select(struct drm_device *dev, struct dcb_entry *dcbent,
 			script = nouveau_uscript_tmds;
 		}
 		break;
+	case OUTPUT_DP:
+		script = (mc >> 8) & 0xf;
+		break;
 	case OUTPUT_ANALOG:
 		script = 0xff;
 		break;
@@ -813,7 +816,8 @@ nv50_display_unk20_handler(struct drm_device *dev)
 
 	NV_DEBUG(dev, "head %d pxclk: %dKHz\n", head, pclk);
 
-	nouveau_bios_run_display_table(dev, dcbent, 0, -2);
+	if (dcbent->type != OUTPUT_DP)
+		nouveau_bios_run_display_table(dev, dcbent, 0, -2);
 
 	nv50_crtc_set_clock(dev, head, pclk);
 
@@ -919,8 +923,10 @@ nv50_display_irq_hotplug(struct drm_device *dev)
 	change_mask = plug_mask | unplug_mask;
 
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
+		struct drm_encoder_helper_funcs *helper;
 		struct nouveau_connector *nv_connector =
 			nouveau_connector(connector);
+		struct nouveau_encoder *nv_encoder;
 		struct dcb_gpio_entry *gpio;
 		uint32_t reg;
 		bool plugged;
@@ -936,6 +942,20 @@ nv50_display_irq_hotplug(struct drm_device *dev)
 		plugged = !!(reg & (4 << ((gpio->line & 7) << 2)));
 		NV_INFO(dev, "%splugged %s\n", plugged ? "" : "un",
 			drm_get_connector_name(connector)) ;
+
+		if (!connector->encoder || !connector->encoder->crtc ||
+		    !connector->encoder->crtc->enabled)
+			continue;
+		nv_encoder = nouveau_encoder(connector->encoder);
+		helper = connector->encoder->helper_private;
+
+		if (nv_encoder->dcb->type != OUTPUT_DP)
+			continue;
+
+		if (plugged)
+			helper->dpms(connector->encoder, DRM_MODE_DPMS_ON);
+		else
+			helper->dpms(connector->encoder, DRM_MODE_DPMS_OFF);
 	}
 
 	nv_wr32(dev, 0xe054, nv_rd32(dev, 0xe054));

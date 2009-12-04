@@ -248,9 +248,12 @@ nouveau_connector_detect(struct drm_connector *connector)
 			NV_ERROR(dev, "DDC responded, but no EDID for %s\n",
 				 drm_get_connector_name(connector));
 			return connector_status_disconnected;
-		} else
-		if (nv_encoder->dcb->type == OUTPUT_DP) {
-			NV_ERROR(dev, "Detected DP connected, ignoring!\n");
+		}
+
+		if (nv_encoder->dcb->type == OUTPUT_DP &&
+		    !nouveau_dp_detect(to_drm_encoder(nv_encoder))) {
+			NV_ERROR(dev, "Detected %s, but failed init\n",
+				 drm_get_connector_name(connector));
 			return connector_status_disconnected;
 		}
 
@@ -556,6 +559,7 @@ nouveau_connector_mode_valid(struct drm_connector *connector,
 	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct nouveau_encoder *nv_encoder = nv_connector->detected_encoder;
 	unsigned min_clock = 25000, max_clock = min_clock;
+	unsigned clock = mode->clock;
 
 	switch (nv_encoder->dcb->type) {
 	case OUTPUT_LVDS:
@@ -583,12 +587,20 @@ nouveau_connector_mode_valid(struct drm_connector *connector,
 	case OUTPUT_TV:
 		return get_slave_funcs(nv_encoder)->
 			mode_valid(to_drm_encoder(nv_encoder), mode);
+	case OUTPUT_DP:
+		if (nv_encoder->dp.link_bw == DP_LINK_BW_2_7)
+			max_clock = nv_encoder->dp.link_nr * 270000;
+		else
+			max_clock = nv_encoder->dp.link_nr * 162000;
+
+		clock *= 3;
+		break;
 	}
 
-	if (mode->clock < min_clock)
+	if (clock < min_clock)
 		return MODE_CLOCK_LOW;
 
-	if (mode->clock > max_clock)
+	if (clock > max_clock)
 		return MODE_CLOCK_HIGH;
 
 	return MODE_OK;

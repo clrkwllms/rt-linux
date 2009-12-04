@@ -859,6 +859,8 @@ int nouveau_ttm_mmap(struct file *, struct vm_area_struct *);
 /* nouveau_dp.c */
 int nouveau_dp_auxch(struct nouveau_i2c_chan *auxch, int cmd, int addr,
 		     uint8_t *data, int data_nr);
+bool nouveau_dp_detect(struct drm_encoder *);
+bool nouveau_dp_link_train(struct drm_encoder *);
 
 /* nv04_fb.c */
 extern int  nv04_fb_init(struct drm_device *);
