@@ -616,6 +616,40 @@
 #    define NV50_PCONNECTOR_I2C_PORT_4                      0x0000e240
 #    define NV50_PCONNECTOR_I2C_PORT_5                      0x0000e258
 
+#define NV50_AUXCH_DATA_OUT(i,n)             ((n) * 4 + (i) * 0x50 + 0x0000e4c0)
+#define NV50_AUXCH_DATA_OUT__SIZE                                             4
+#define NV50_AUXCH_DATA_IN(i,n)              ((n) * 4 + (i) * 0x50 + 0x0000e4d0)
+#define NV50_AUXCH_DATA_IN__SIZE                                              4
+#define NV50_AUXCH_ADDR(i)                             ((i) * 0x50 + 0x0000e4e0)
+#define NV50_AUXCH_CTRL(i)                             ((i) * 0x50 + 0x0000e4e4)
+#define NV50_AUXCH_CTRL_LINKSTAT                                     0x01000000
+#define NV50_AUXCH_CTRL_LINKSTAT_NOT_READY                           0x00000000
+#define NV50_AUXCH_CTRL_LINKSTAT_READY                               0x01000000
+#define NV50_AUXCH_CTRL_LINKEN                                       0x00100000
+#define NV50_AUXCH_CTRL_LINKEN_DISABLED                              0x00000000
+#define NV50_AUXCH_CTRL_LINKEN_ENABLED                               0x00100000
+#define NV50_AUXCH_CTRL_EXEC                                         0x00010000
+#define NV50_AUXCH_CTRL_EXEC_COMPLETE                                0x00000000
+#define NV50_AUXCH_CTRL_EXEC_IN_PROCESS                              0x00010000
+#define NV50_AUXCH_CTRL_CMD                                          0x0000f000
+#define NV50_AUXCH_CTRL_CMD_SHIFT                                            12
+#define NV50_AUXCH_CTRL_LEN                                          0x0000000f
+#define NV50_AUXCH_CTRL_LEN_SHIFT                                             0
+#define NV50_AUXCH_STAT(i)                             ((i) * 0x50 + 0x0000e4e8)
+#define NV50_AUXCH_STAT_STATE                                        0x10000000
+#define NV50_AUXCH_STAT_STATE_NOT_READY                              0x00000000
+#define NV50_AUXCH_STAT_STATE_READY                                  0x10000000
+#define NV50_AUXCH_STAT_REPLY                                        0x000f0000
+#define NV50_AUXCH_STAT_REPLY_AUX                                    0x00030000
+#define NV50_AUXCH_STAT_REPLY_AUX_ACK                                0x00000000
+#define NV50_AUXCH_STAT_REPLY_AUX_NACK                               0x00010000
+#define NV50_AUXCH_STAT_REPLY_AUX_DEFER                              0x00020000
+#define NV50_AUXCH_STAT_REPLY_I2C                                    0x000c0000
+#define NV50_AUXCH_STAT_REPLY_I2C_ACK                                0x00000000
+#define NV50_AUXCH_STAT_REPLY_I2C_NACK                               0x00040000
+#define NV50_AUXCH_STAT_REPLY_I2C_DEFER                              0x00080000
+#define NV50_AUXCH_STAT_COUNT                                        0x0000001f
+
 #define NV50_PBUS                                           0x00088000
 #define NV50_PBUS__LEN                                             0x1
 #define NV50_PBUS__ESIZE                                        0x1000

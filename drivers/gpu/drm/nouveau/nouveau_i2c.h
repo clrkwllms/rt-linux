@@ -26,13 +26,17 @@
 #include <linux/i2c.h>
 #include <linux/i2c-id.h>
 #include <linux/i2c-algo-bit.h>
+#include "nouveau_dp.h"
 
 struct dcb_i2c_entry;
 
 struct nouveau_i2c_chan {
-	struct drm_device *dev;
 	struct i2c_adapter adapter;
-	struct i2c_algo_bit_data algo;
+	struct drm_device *dev;
+	union {
+		struct i2c_algo_bit_data bit;
+		struct i2c_algo_dp_aux_data dp;
+	} algo;
 	unsigned rd;
 	unsigned wr;
 	unsigned data;
@@ -41,5 +45,8 @@ struct nouveau_i2c_chan {
 int nouveau_i2c_init(struct drm_device *, struct dcb_i2c_entry *, int index);
 void nouveau_i2c_fini(struct drm_device *, struct dcb_i2c_entry *);
 struct nouveau_i2c_chan *nouveau_i2c_find(struct drm_device *, int index);
+
+int nouveau_dp_i2c_aux_ch(struct i2c_adapter *, uint8_t *send, int send_bytes,
+			  uint8_t *recv, int recv_bytes);
 
 #endif /* __NOUVEAU_I2C_H__ */
