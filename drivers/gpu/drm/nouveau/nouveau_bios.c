@@ -4736,8 +4736,11 @@ struct bit_table {
 
 #define BIT_TABLE(id, funcid) ((struct bit_table){ id, parse_bit_##funcid##_tbl_entry })
 
-static int parse_bit_table(struct drm_device *dev, struct nvbios *bios, const uint16_t bitoffset, struct bit_table *table)
+static int
+parse_bit_table(struct nvbios *bios, const uint16_t bitoffset,
+		struct bit_table *table)
 {
+	struct drm_device *dev = bios->dev;
 	uint8_t maxentries = bios->data[bitoffset + 4];
 	int i, offset;
 	struct bit_entry bitentry;
@@ -4755,13 +4758,12 @@ static int parse_bit_table(struct drm_device *dev, struct nvbios *bios, const ui
 		return table->parse_fn(dev, bios, &bitentry);
 	}
 
-	NV_ERROR(dev, "BIT table '%c' not found\n", table->id);
-
+	NV_INFO(dev, "BIT table '%c' not found\n", table->id);
 	return -ENOSYS;
 }
 
-static int parse_bit_structure(struct drm_device *dev, struct nvbios *bios,
-				const uint16_t bitoffset)
+static int
+parse_bit_structure(struct nvbios *bios, const uint16_t bitoffset)
 {
 	int ret;
 
@@ -4771,23 +4773,23 @@ static int parse_bit_structure(struct drm_device *dev, struct nvbios *bios,
 	 * functions shouldn't be actually *doing* anything apart from pulling
 	 * data from the image into the bios struct, thus no interdependencies
 	 */
-	ret = parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('i', i));
+	ret = parse_bit_table(bios, bitoffset, &BIT_TABLE('i', i));
 	if (ret) /* info? */
 		return ret;
 	if (bios->major_version >= 0x60) /* g80+ */
-		parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('A', A));
-	ret = parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('C', C));
+		parse_bit_table(bios, bitoffset, &BIT_TABLE('A', A));
+	ret = parse_bit_table(bios, bitoffset, &BIT_TABLE('C', C));
 	if (ret)
 		return ret;
-	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('D', display));
-	ret = parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('I', init));
+	parse_bit_table(bios, bitoffset, &BIT_TABLE('D', display));
+	ret = parse_bit_table(bios, bitoffset, &BIT_TABLE('I', init));
 	if (ret)
 		return ret;
-	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('M', M)); /* memory? */
-	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('L', lvds));
-	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('T', tmds));
-	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('U', U));
-	parse_bit_table(dev, bios, bitoffset, &BIT_TABLE('d', displayport));
+	parse_bit_table(bios, bitoffset, &BIT_TABLE('M', M)); /* memory? */
+	parse_bit_table(bios, bitoffset, &BIT_TABLE('L', lvds));
+	parse_bit_table(bios, bitoffset, &BIT_TABLE('T', tmds));
+	parse_bit_table(bios, bitoffset, &BIT_TABLE('U', U));
+	parse_bit_table(bios, bitoffset, &BIT_TABLE('d', displayport));
 
 	return 0;
 }
@@ -5931,7 +5933,7 @@ static int nouveau_parse_vbios_struct(struct drm_device *dev)
 					bit_signature, sizeof(bit_signature));
 	if (offset) {
 		NV_TRACE(dev, "BIT BIOS found\n");
-		return parse_bit_structure(dev, bios, offset + 6);
+		return parse_bit_structure(bios, offset + 6);
 	}
 
 	offset = findstr(bios->data, bios->length,
