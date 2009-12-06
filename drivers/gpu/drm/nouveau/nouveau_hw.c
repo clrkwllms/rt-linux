@@ -711,7 +711,7 @@ nv_save_state_ramdac(struct drm_device *dev, int head,
 
 	regp->fp_margin_color = NVReadRAMDAC(dev, head, NV_PRAMDAC_FP_MARGIN_COLOR);
 
-	if (dev_priv->card_type >= NV_30)
+	if (nv_gf4_disp_arch(dev))
 		regp->ramdac_8c0 = NVReadRAMDAC(dev, head, NV_PRAMDAC_8C0);
 
 	if (dev_priv->card_type == NV_40) {
@@ -782,7 +782,7 @@ nv_load_state_ramdac(struct drm_device *dev, int head,
 
 	NVWriteRAMDAC(dev, head, NV_PRAMDAC_FP_MARGIN_COLOR, regp->fp_margin_color);
 
-	if (dev_priv->card_type >= NV_30)
+	if (nv_gf4_disp_arch(dev))
 		NVWriteRAMDAC(dev, head, NV_PRAMDAC_8C0, regp->ramdac_8c0);
 
 	if (dev_priv->card_type == NV_40) {
