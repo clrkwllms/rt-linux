@@ -2226,6 +2226,7 @@ struct nouveau_pgraph_object_class nv40_graph_grclass[] = {
 	{ 0x0089, false, NULL }, /* sifm */
 	{ 0x3089, false, NULL }, /* sifm (nv40) */
 	{ 0x0062, false, NULL }, /* surf2d */
+	{ 0x3062, false, NULL }, /* surf2d (nv40) */
 	{ 0x0043, false, NULL }, /* rop */
 	{ 0x0012, false, NULL }, /* beta1 */
 	{ 0x0072, false, NULL }, /* beta4 */
