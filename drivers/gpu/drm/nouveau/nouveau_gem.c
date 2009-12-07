@@ -225,6 +225,7 @@ nouveau_gem_set_domain(struct drm_gem_object *gem, uint32_t read_domains,
 }
 
 struct validate_op {
+	struct nouveau_fence *fence;
 	struct list_head vram_list;
 	struct list_head gart_list;
 	struct list_head both_list;
@@ -256,11 +257,17 @@ validate_fini_list(struct list_head *list, struct nouveau_fence *fence)
 }
 
 static void
-validate_fini(struct validate_op *op, struct nouveau_fence *fence)
+validate_fini(struct validate_op *op, bool success)
 {
-	validate_fini_list(&op->vram_list, fence);
-	validate_fini_list(&op->gart_list, fence);
-	validate_fini_list(&op->both_list, fence);
+	struct nouveau_fence *fence = op->fence;
+
+	if (unlikely(!success))
+		op->fence = NULL;
+
+	validate_fini_list(&op->vram_list, op->fence);
+	validate_fini_list(&op->gart_list, op->fence);
+	validate_fini_list(&op->both_list, op->fence);
+	nouveau_fence_unref((void *)&fence);
 }
 
 static int
@@ -422,6 +429,10 @@ nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
 	INIT_LIST_HEAD(&op->gart_list);
 	INIT_LIST_HEAD(&op->both_list);
 
+	ret = nouveau_fence_new(chan, &op->fence, false);
+	if (ret)
+		return ret;
+
 	if (nr_buffers == 0)
 		return 0;
 
@@ -537,7 +548,6 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 {
 	struct drm_nouveau_gem_pushbuf *req = data;
 	struct drm_nouveau_gem_pushbuf_bo *bo = NULL;
-	struct nouveau_fence *fence = NULL;
 	struct nouveau_channel *chan;
 	struct validate_op op;
 	uint32_t *pushbuf = NULL;
@@ -572,10 +582,6 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 	mutex_lock(&dev->struct_mutex);
 
 	/* Validate buffer list */
-	ret = nouveau_fence_new(chan, &fence, false);
-	if (ret)
-		goto out_unlock;
-
 	ret = nouveau_gem_pushbuf_validate(chan, file_priv, bo, req->buffers,
 					   req->nr_buffers, &op, &do_reloc);
 	if (ret)
@@ -600,31 +606,25 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 
 	OUT_RINGp(chan, pushbuf, req->nr_dwords);
 
-	ret = nouveau_fence_emit(fence);
+	ret = nouveau_fence_emit(op.fence);
 	if (ret) {
 		NV_ERROR(dev, "error fencing pushbuf: %d\n", ret);
 		WIND_RING(chan);
 		goto out;
 	}
 
-	validate_fini(&op, fence);
-
 	if (nouveau_gem_pushbuf_sync(chan)) {
-		ret = nouveau_fence_wait(fence, NULL, false, false);
+		ret = nouveau_fence_wait(op.fence, NULL, false, false);
 		if (ret) {
 			for (i = 0; i < req->nr_dwords; i++)
 				NV_ERROR(dev, "0x%08x\n", pushbuf[i]);
 			NV_ERROR(dev, "^^ above push buffer is fail :(\n");
 		}
 	}
+
 out:
-	if (unlikely(ret))
-		validate_fini(&op, NULL);
-	nouveau_fence_unref((void *)&fence);
-
-out_unlock:
+	validate_fini(&op, ret == 0);
 	mutex_unlock(&dev->struct_mutex);
-
 	kfree(pushbuf);
 	kfree(bo);
 	return ret;
@@ -639,7 +639,6 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_gem_pushbuf_call *req = data;
 	struct drm_nouveau_gem_pushbuf_bo *bo = NULL;
-	struct nouveau_fence *fence = NULL;
 	struct nouveau_channel *chan;
 	struct drm_gem_object *gem;
 	struct nouveau_bo *pbbo;
@@ -669,12 +668,6 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 	mutex_lock(&dev->struct_mutex);
 
 	/* Validate buffer list */
-	ret = nouveau_fence_new(chan, &fence, false);
-	if (ret) {
-		NV_ERROR(dev, "fence new\n");
-		goto out_unlock;
-	}
-
 	ret = nouveau_gem_pushbuf_validate(chan, file_priv, bo, req->buffers,
 					   req->nr_buffers, &op, &do_reloc);
 	if (ret) {
@@ -790,23 +783,16 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 			OUT_RING(chan, 0);
 	}
 
-	ret = nouveau_fence_emit(fence);
+	ret = nouveau_fence_emit(op.fence);
 	if (ret) {
 		NV_ERROR(dev, "error fencing pushbuf: %d\n", ret);
 		WIND_RING(chan);
 		goto out;
 	}
 
-	validate_fini(&op, fence);
-
-	FIRE_RING(chan);
 out:
-	if (unlikely(ret))
-		validate_fini(&op, NULL);
-	nouveau_fence_unref((void *)&fence);
-out_unlock:
+	validate_fini(&op, ret == 0);
 	mutex_unlock(&dev->struct_mutex);
-
 	kfree(bo);
 
 out_next:
