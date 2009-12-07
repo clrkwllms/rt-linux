@@ -619,11 +619,8 @@ nv50_display_irq_head(struct drm_device *dev, int *phead,
 	 */
 	NV_DEBUG(dev, "0x610030: 0x%08x\n", unk30);
 	head = ffs((unk30 >> 9) & 3) - 1;
-	if (head < 0) {
-		NV_ERROR(dev, "no active heads: 0x%08x\n",
-						nv_rd32(dev, 0x610030));
+	if (head < 0)
 		return -EINVAL;
-	}
 
 	/* This assumes CRTCs are never bound to multiple encoders, which
 	 * should be the case.
