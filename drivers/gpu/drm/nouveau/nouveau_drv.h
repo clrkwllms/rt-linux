@@ -68,8 +68,10 @@ struct nouveau_bo {
 	struct ttm_bo_kmap_obj kmap;
 	struct list_head head;
 
+	/* protected by ttm_bo_reserve() */
 	struct drm_file *reserved_by;
 	struct list_head entry;
+	int pbbo_index;
 
 	struct nouveau_channel *channel;
 
