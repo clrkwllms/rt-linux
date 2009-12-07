@@ -5706,12 +5706,16 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 		if (configblock)
 			config = ROM32(dcbtable[headerlen + confofs + recordlength * i]);
 
+		/* seen on an NV11 with DCB v1.5 */
+		if (connection == 0x00000000)
+			break;
+
+		/* seen on an NV17 with DCB v2.0 */
+		if (connection == 0xffffffff)
+			break;
+
 		if ((connection & 0x0000000f) == 0x0000000f)
 			continue;
-
-		if (connection == 0x00000000)
-			/* seen on an NV11 with DCB v1.5 */
-			break;
 
 		NV_TRACEWARN(dev, "Raw DCB entry %d: %08x %08x\n",
 			     dcb->entries, connection, config);
