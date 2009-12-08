@@ -446,7 +446,7 @@ nouveau_dp_auxch(struct nouveau_i2c_chan *auxch, int cmd, int addr,
 	uint32_t tmp, ctrl, stat = 0, data32[4] = {};
 	int ret = 0, i, index = auxch->rd;
 
-	NV_DEBUG(dev, "cmd %d addr 0x%x len %d\n", cmd, addr, data_nr);
+	NV_DEBUG(dev, "ch %d cmd %d addr 0x%x len %d\n", index, cmd, addr, data_nr);
 
 	tmp = nv_rd32(dev, NV50_AUXCH_CTRL(auxch->rd));
 	nv_wr32(dev, NV50_AUXCH_CTRL(auxch->rd), tmp | 0x00100000);
@@ -524,40 +524,46 @@ out:
 }
 
 int
-nouveau_dp_i2c_aux_ch(struct i2c_adapter *adapter,
-		      uint8_t *send, int send_bytes,
-		      uint8_t *recv, int recv_bytes)
+nouveau_dp_i2c_aux_ch(struct i2c_adapter *adapter, int mode,
+		      uint8_t write_byte, uint8_t *read_byte)
 {
+	struct i2c_algo_dp_aux_data *algo_data = adapter->algo_data;
 	struct nouveau_i2c_chan *auxch = (struct nouveau_i2c_chan *)adapter;
-	int ret = 0, cmd, addr;
-	uint8_t *status;
+	struct drm_device *dev = auxch->dev;
+	int ret = 0, cmd, addr = algo_data->address;
+	uint8_t *buf;
 
-	/* adjust receive info, we don't return status in buffer */
-	status = &recv[0];
-	recv++;
-	recv_bytes--;
-
-	/* adjust send info, we don't put cmd/addr etc into buffer */
-	cmd = send[0] >> 4;
-	addr = (send[1] << 8) | send[2];
-	send += 3;
-	send_bytes -= 3;
-
-	/* write command, adjust, we don't put length byte into buffer */
-	if (!recv_bytes && send_bytes) {
-		int len = send[0] + 1;
-
-		ret = nouveau_dp_auxch(auxch, cmd, addr, send + 1, len);
-		if (ret < 0)
-			return ret;
-	} else
-	if (recv_bytes) {
-		ret = nouveau_dp_auxch(auxch, cmd, addr, recv, recv_bytes);
-		if (ret < 0)
-			return ret;
+	if (mode == MODE_I2C_READ) {
+		cmd = AUX_I2C_READ;
+		buf = read_byte;
+	} else {
+		cmd = (mode & MODE_I2C_READ) ? AUX_I2C_READ : AUX_I2C_WRITE;
+		buf = &write_byte;
 	}
 
-	*status = ((ret & NV50_AUXCH_STAT_REPLY) >> 16) << 4;
-	return 0;
+	if (!(mode & MODE_I2C_STOP))
+		cmd |= AUX_I2C_MOT;
+
+	if (mode & MODE_I2C_START)
+		return 1;
+
+	for (;;) {
+		ret = nouveau_dp_auxch(auxch, cmd, addr, buf, 1);
+		if (ret < 0)
+			return ret;
+
+		switch (ret & NV50_AUXCH_STAT_REPLY_I2C) {
+		case NV50_AUXCH_STAT_REPLY_I2C_ACK:
+			return 1;
+		case NV50_AUXCH_STAT_REPLY_I2C_NACK:
+			return -EREMOTEIO;
+		case NV50_AUXCH_STAT_REPLY_I2C_DEFER:
+			udelay(100);
+			break;
+		default:
+			NV_ERROR(dev, "invalid auxch status: 0x%08x\n", ret);
+			return -EREMOTEIO;
+		}
+	}
 }
 
