@@ -65,6 +65,8 @@ struct nouveau_fpriv {
 
 struct nouveau_bo {
 	struct ttm_buffer_object bo;
+	struct ttm_placement placement;
+	u32 placements[3];
 	struct ttm_bo_kmap_obj kmap;
 	struct list_head head;
 
@@ -522,6 +524,7 @@ struct drm_nouveau_private {
 	/* base physical adresses */
 	uint64_t fb_phys;
 	uint64_t fb_available_size;
+	uint64_t fb_mappable_pages;
 	uint64_t fb_aper_free;
 
 	struct {
@@ -1061,6 +1064,7 @@ extern int nouveau_bo_pin(struct nouveau_bo *, uint32_t flags);
 extern int nouveau_bo_unpin(struct nouveau_bo *);
 extern int nouveau_bo_map(struct nouveau_bo *);
 extern void nouveau_bo_unmap(struct nouveau_bo *);
+extern void nouveau_bo_placement_set(struct nouveau_bo *, uint32_t memtype);
 extern u16 nouveau_bo_rd16(struct nouveau_bo *nvbo, unsigned index);
 extern void nouveau_bo_wr16(struct nouveau_bo *nvbo, unsigned index, u16 val);
 extern u32 nouveau_bo_rd32(struct nouveau_bo *nvbo, unsigned index);

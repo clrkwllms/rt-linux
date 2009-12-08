@@ -200,8 +200,7 @@ nouveau_gem_set_domain(struct drm_gem_object *gem, uint32_t read_domains,
 	} else {
 		if ((valid_domains & NOUVEAU_GEM_DOMAIN_VRAM) &&
 		    (read_domains & NOUVEAU_GEM_DOMAIN_VRAM) &&
-		    (bo->mem.mem_type == TTM_PL_VRAM ||
-		     bo->mem.mem_type == TTM_PL_PRIV0))
+		    bo->mem.mem_type == TTM_PL_VRAM)
 			flags = TTM_PL_FLAG_VRAM;
 		else
 		if ((valid_domains & NOUVEAU_GEM_DOMAIN_GART) &&
@@ -216,11 +215,7 @@ nouveau_gem_set_domain(struct drm_gem_object *gem, uint32_t read_domains,
 			flags = TTM_PL_FLAG_TT;
 	}
 
-	if ((flags & TTM_PL_FLAG_VRAM) && !nvbo->mappable)
-		flags |= TTM_PL_FLAG_PRIV0;
-
-	bo->proposed_placement &= ~TTM_PL_MASK_MEM;
-	bo->proposed_placement |= flags;
+	nouveau_bo_placement_set(nvbo, flags);
 	return 0;
 }
 
@@ -386,16 +381,14 @@ validate_list(struct nouveau_channel *chan, struct list_head *list,
 			return ret;
 
 		nvbo->channel = chan;
-		ret = ttm_buffer_object_validate(&nvbo->bo,
-						 nvbo->bo.proposed_placement,
-						 false, false);
+		ret = ttm_bo_validate(&nvbo->bo, &nvbo->placement,
+				      false, false);
 		nvbo->channel = NULL;
 		if (unlikely(ret))
 			return ret;
 
 		if (nvbo->bo.offset == b->presumed_offset &&
-		    (((nvbo->bo.mem.mem_type == TTM_PL_VRAM ||
-		       nvbo->bo.mem.mem_type == TTM_PL_PRIV0) &&
+		    ((nvbo->bo.mem.mem_type == TTM_PL_VRAM &&
 		      b->presumed_domain & NOUVEAU_GEM_DOMAIN_VRAM) ||
 		     (nvbo->bo.mem.mem_type == TTM_PL_TT &&
 		      b->presumed_domain & NOUVEAU_GEM_DOMAIN_GART)))
@@ -692,10 +685,8 @@ nouveau_gem_ioctl_pushbuf_call(struct drm_device *dev, void *data,
 		goto out;
 	}
 
-	pbbo->bo.proposed_placement &= ~TTM_PL_MASK_MEM;
-	pbbo->bo.proposed_placement |= (1 << chan->pushbuf_bo->bo.mem.mem_type);
-	ret = ttm_buffer_object_validate(&pbbo->bo, pbbo->bo.proposed_placement,
-					 false, false);
+	nouveau_bo_placement_set(pbbo, 1 << chan->pushbuf_bo->bo.mem.mem_type);
+	ret = ttm_bo_validate(&pbbo->bo, &pbbo->placement, false, false);
 	if (ret) {
 		NV_ERROR(dev, "validate pb: %d\n", ret);
 		ttm_bo_unreserve(&pbbo->bo);
@@ -826,12 +817,8 @@ domain_to_ttm(struct nouveau_bo *nvbo, uint32_t domain)
 {
 	uint32_t flags = 0;
 
-	if (domain & NOUVEAU_GEM_DOMAIN_VRAM) {
+	if (domain & NOUVEAU_GEM_DOMAIN_VRAM)
 		flags |= TTM_PL_FLAG_VRAM;
-		if (!nvbo->mappable)
-			flags |= TTM_PL_FLAG_PRIV0;
-	}
-
 	if (domain & NOUVEAU_GEM_DOMAIN_GART)
 		flags |= TTM_PL_FLAG_TT;
 

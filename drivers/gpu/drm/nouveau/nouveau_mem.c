@@ -479,7 +479,6 @@ nouveau_mem_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct ttm_bo_device *bdev = &dev_priv->ttm.bdev;
-	uint32_t vram_size, bar1_size, text_size;
 	int ret, dma_bits = 32;
 
 	dev_priv->fb_phys = drm_get_resource_start(dev, 1);
@@ -512,35 +511,21 @@ nouveau_mem_init(struct drm_device *dev)
 	spin_lock_init(&dev_priv->ttm.bo_list_lock);
 
 	dev_priv->fb_available_size = nouveau_mem_fb_amount(dev);
+
+	dev_priv->fb_mappable_pages = dev_priv->fb_available_size;
+	if (dev_priv->fb_mappable_pages > drm_get_resource_len(dev, 1))
+		dev_priv->fb_mappable_pages = drm_get_resource_len(dev, 1);
+	dev_priv->fb_mappable_pages >>= PAGE_SHIFT;
+
 	NV_INFO(dev, "%d MiB VRAM\n", (int)(dev_priv->fb_available_size >> 20));
 
 	/* remove reserved space at end of vram from available amount */
 	dev_priv->fb_available_size -= dev_priv->ramin_rsvd_vram;
 	dev_priv->fb_aper_free = dev_priv->fb_available_size;
 
-	/* non-mappable vram */
-	vram_size = dev_priv->fb_available_size >> PAGE_SHIFT;
-	bar1_size = drm_get_resource_len(dev, 1) >> PAGE_SHIFT;
-	if (bar1_size < vram_size) {
-		if (dev_priv->card_type < NV_50) {
-			ret = ttm_bo_init_mm(bdev, TTM_PL_PRIV0, bar1_size,
-						vram_size - bar1_size);
-			if (ret) {
-				NV_ERROR(dev, "Failed PRIV0 mm init: %d\n",
-									ret);
-				return ret;
-			}
-		}
-		vram_size = bar1_size;
-	}
-
-	/* remove reserved space at start of vram from available amount */
-	dev_priv->fb_aper_free -= (256 * 1024);
-	text_size  = (256 * 1024) >> PAGE_SHIFT;
-	vram_size -= text_size;
-
 	/* mappable vram */
-	ret = ttm_bo_init_mm(bdev, TTM_PL_VRAM, text_size, vram_size);
+	ret = ttm_bo_init_mm(bdev, TTM_PL_VRAM,
+			     dev_priv->fb_available_size >> PAGE_SHIFT);
 	if (ret) {
 		NV_ERROR(dev, "Failed VRAM mm init: %d\n", ret);
 		return ret;
@@ -567,7 +552,7 @@ nouveau_mem_init(struct drm_device *dev)
 		(int)(dev_priv->gart_info.aper_size >> 20));
 	dev_priv->gart_info.aper_free = dev_priv->gart_info.aper_size;
 
-	ret = ttm_bo_init_mm(bdev, TTM_PL_TT, 0,
+	ret = ttm_bo_init_mm(bdev, TTM_PL_TT,
 			     dev_priv->gart_info.aper_size >> PAGE_SHIFT);
 	if (ret) {
 		NV_ERROR(dev, "Failed TT mm init: %d\n", ret);
