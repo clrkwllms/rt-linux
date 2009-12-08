@@ -245,16 +245,6 @@ extern void drm_ut_debug_printk(unsigned int request_level,
 
 #endif
 
-#define DRM_PROC_LIMIT (PAGE_SIZE-80)
-
-#define DRM_PROC_PRINT(fmt, arg...)					\
-   len += sprintf(&buf[len], fmt , ##arg);				\
-   if (len > DRM_PROC_LIMIT) { *eof = 1; return len - offset; }
-
-#define DRM_PROC_PRINT_RET(ret, fmt, arg...)				\
-   len += sprintf(&buf[len], fmt , ##arg);				\
-   if (len > DRM_PROC_LIMIT) { ret; *eof = 1; return len - offset; }
-
 /*@}*/
 
 /***********************************************************************/
@@ -265,19 +255,8 @@ extern void drm_ut_debug_printk(unsigned int request_level,
 
 #define DRM_LEFTCOUNT(x) (((x)->rp + (x)->count - (x)->wp) % ((x)->count + 1))
 #define DRM_BUFCOUNT(x) ((x)->count - DRM_LEFTCOUNT(x))
-#define DRM_WAITCOUNT(dev,idx) DRM_BUFCOUNT(&dev->queuelist[idx]->waitlist)
 
 #define DRM_IF_VERSION(maj, min) (maj << 16 | min)
-/**
- * Get the private SAREA mapping.
- *
- * \param _dev DRM device.
- * \param _ctx context number.
- * \param _map output mapping.
- */
-#define DRM_GET_PRIV_SAREA(_dev, _ctx, _map) do {	\
-	(_map) = (_dev)->context_sareas[_ctx];		\
-} while(0)
 
 /**
  * Test that the hardware lock is held by the caller, returning otherwise.
@@ -297,18 +276,6 @@ do {										\
 } while (0)
 
 /**
- * Copy and IOCTL return string to user space
- */
-#define DRM_COPY( name, value )						\
-	len = strlen( value );						\
-	if ( len > name##_len ) len = name##_len;			\
-	name##_len = strlen( value );					\
-	if ( len && name ) {						\
-		if ( copy_to_user( name, value, len ) )			\
-			return -EFAULT;					\
-	}
-
-/**
  * Ioctl function type.
  *
  * \param inode device inode.
@@ -321,6 +288,9 @@ typedef int drm_ioctl_t(struct drm_device *dev, void *data,
 
 typedef int drm_ioctl_compat_t(struct file *filp, unsigned int cmd,
 			       unsigned long arg);
+
+#define DRM_IOCTL_NR(n)                _IOC_NR(n)
+#define DRM_MAJOR       226
 
 #define DRM_AUTH	0x1
 #define	DRM_MASTER	0x2
@@ -807,6 +777,15 @@ struct drm_driver {
 	/* Master routines */
 	int (*master_create)(struct drm_device *dev, struct drm_master *master);
 	void (*master_destroy)(struct drm_device *dev, struct drm_master *master);
+	/**
+	 * master_set is called whenever the minor master is set.
+	 * master_drop is called whenever the minor master is dropped.
+	 */
+
+	int (*master_set)(struct drm_device *dev, struct drm_file *file_priv,
+			  bool from_open);
+	void (*master_drop)(struct drm_device *dev, struct drm_file *file_priv,
+			    bool from_release);
 
 	int (*proc_init)(struct drm_minor *minor);
 	void (*proc_cleanup)(struct drm_minor *minor);
@@ -821,6 +800,9 @@ struct drm_driver {
 	 */
 	int (*gem_init_object) (struct drm_gem_object *obj);
 	void (*gem_free_object) (struct drm_gem_object *obj);
+
+	/* vga arb irq handler */
+	void (*vgaarb_irq)(struct drm_device *dev, bool state);
 
 	/* Driver private ops for this object */
 	struct vm_operations_struct *gem_vm_ops;
