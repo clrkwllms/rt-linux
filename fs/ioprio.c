@@ -226,6 +226,7 @@ SYSCALL_DEFINE2(ioprio_get, int, which, int, who)
 			if (!user)
 				break;
 
+			rcu_read_lock();
 			do_each_thread(g, p) {
 				if (__task_cred(p)->uid != user->uid)
 					continue;
@@ -237,6 +238,7 @@ SYSCALL_DEFINE2(ioprio_get, int, which, int, who)
 				else
 					ret = ioprio_best(ret, tmpio);
 			} while_each_thread(g, p);
+			rcu_read_unlock();
 
 			if (who)
 				free_uid(user);
