@@ -29,7 +29,7 @@
 #include "nouveau_drv.h"
 
 static struct vm_operations_struct nouveau_ttm_vm_ops;
-static struct vm_operations_struct *ttm_vm_ops;
+static const struct vm_operations_struct *ttm_vm_ops;
 
 static int
 nouveau_ttm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
