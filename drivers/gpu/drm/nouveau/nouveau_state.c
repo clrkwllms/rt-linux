@@ -24,11 +24,12 @@
  */
 
 #include <linux/swab.h>
-
 #include "drmP.h"
 #include "drm.h"
 #include "drm_sarea.h"
 #include "drm_crtc_helper.h"
+#include <linux/vgaarb.h>
+
 #include "nouveau_drv.h"
 #include "nouveau_drm.h"
 #include "nv50_display.h"
@@ -288,6 +289,16 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 	return 0;
 }
 
+static unsigned int
+nouveau_vga_set_decode(void *priv, bool state)
+{
+	if (state)
+		return VGA_RSRC_LEGACY_IO | VGA_RSRC_LEGACY_MEM |
+		       VGA_RSRC_NORMAL_IO | VGA_RSRC_NORMAL_MEM;
+	else
+		return VGA_RSRC_NORMAL_IO | VGA_RSRC_NORMAL_MEM;
+}
+
 int
 nouveau_card_init(struct drm_device *dev)
 {
@@ -300,6 +311,8 @@ nouveau_card_init(struct drm_device *dev)
 
 	if (dev_priv->init_state == NOUVEAU_CARD_INIT_DONE)
 		return 0;
+
+	vga_client_register(dev->pdev, dev, NULL, nouveau_vga_set_decode);
 
 	/* Initialise internal driver API hooks */
 	ret = nouveau_init_engine_ptrs(dev);
@@ -468,6 +481,8 @@ static void nouveau_card_takedown(struct drm_device *dev)
 
 		nouveau_gpuobj_late_takedown(dev);
 		nouveau_bios_takedown(dev);
+
+		vga_client_register(dev->pdev, NULL, NULL, NULL);
 
 		dev_priv->init_state = NOUVEAU_CARD_INIT_DOWN;
 	}
