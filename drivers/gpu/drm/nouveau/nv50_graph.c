@@ -27,7 +27,31 @@
 #include "drmP.h"
 #include "drm.h"
 #include "nouveau_drv.h"
-#include "nv50_grctx.h"
+
+MODULE_FIRMWARE("nouveau/nv50.ctxprog");
+MODULE_FIRMWARE("nouveau/nv50.ctxvals");
+MODULE_FIRMWARE("nouveau/nv84.ctxprog");
+MODULE_FIRMWARE("nouveau/nv84.ctxvals");
+MODULE_FIRMWARE("nouveau/nv86.ctxprog");
+MODULE_FIRMWARE("nouveau/nv86.ctxvals");
+MODULE_FIRMWARE("nouveau/nv92.ctxprog");
+MODULE_FIRMWARE("nouveau/nv92.ctxvals");
+MODULE_FIRMWARE("nouveau/nv94.ctxprog");
+MODULE_FIRMWARE("nouveau/nv94.ctxvals");
+MODULE_FIRMWARE("nouveau/nv96.ctxprog");
+MODULE_FIRMWARE("nouveau/nv96.ctxvals");
+MODULE_FIRMWARE("nouveau/nv98.ctxprog");
+MODULE_FIRMWARE("nouveau/nv98.ctxvals");
+MODULE_FIRMWARE("nouveau/nva0.ctxprog");
+MODULE_FIRMWARE("nouveau/nva0.ctxvals");
+MODULE_FIRMWARE("nouveau/nva5.ctxprog");
+MODULE_FIRMWARE("nouveau/nva5.ctxvals");
+MODULE_FIRMWARE("nouveau/nva8.ctxprog");
+MODULE_FIRMWARE("nouveau/nva8.ctxvals");
+MODULE_FIRMWARE("nouveau/nvaa.ctxprog");
+MODULE_FIRMWARE("nouveau/nvaa.ctxvals");
+MODULE_FIRMWARE("nouveau/nvac.ctxprog");
+MODULE_FIRMWARE("nouveau/nvac.ctxvals");
 
 #define IS_G80 ((dev_priv->chipset & 0xf0) == 0x50)
 
@@ -83,64 +107,13 @@ nv50_graph_init_regs(struct drm_device *dev)
 static int
 nv50_graph_init_ctxctl(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t *voodoo = NULL;
-
 	NV_DEBUG(dev, "\n");
 
-	switch (dev_priv->chipset) {
-	case 0x50:
-		voodoo = nv50_ctxprog;
-		break;
-	case 0x84:
-		voodoo = nv84_ctxprog;
-		break;
-	case 0x86:
-		voodoo = nv86_ctxprog;
-		break;
-	case 0x92:
-		voodoo = nv92_ctxprog;
-		break;
-	case 0x94:
-	case 0x96:
-		voodoo = nv94_ctxprog;
-		break;
-	case 0x98:
-		voodoo = nv98_ctxprog;
-		break;
-	case 0xa0:
-		voodoo = nva0_ctxprog;
-		break;
-	case 0xa5:
-		voodoo = nva5_ctxprog;
-		break;
-	case 0xa8:
-		voodoo = nva8_ctxprog;
-		break;
-	case 0xaa:
-		voodoo = nvaa_ctxprog;
-		break;
-	case 0xac:
-		voodoo = nvac_ctxprog;
-		break;
-	default:
-		NV_ERROR(dev, "no ctxprog for chipset NV%02x\n", dev_priv->chipset);
-		dev_priv->engine.graph.accel_blocked = true;
-		break;
-	}
-
-	if (voodoo) {
-		nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
-		while (*voodoo != ~0) {
-			nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_DATA, *voodoo);
-			voodoo++;
-		}
-	}
+	nv40_grctx_init(dev);
 
 	nv_wr32(dev, 0x400320, 4);
 	nv_wr32(dev, NV40_PGRAPH_CTXCTL_CUR, 0);
 	nv_wr32(dev, NV20_PGRAPH_CHANNEL_CTX_POINTER, 0);
-
 	return 0;
 }
 
@@ -167,6 +140,7 @@ void
 nv50_graph_takedown(struct drm_device *dev)
 {
 	NV_DEBUG(dev, "\n");
+	nv40_grctx_fini(dev);
 }
 
 void
@@ -209,11 +183,8 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gpuobj *ramin = chan->ramin->gpuobj;
 	struct nouveau_gpuobj *ctx;
-	uint32_t *ctxvals = NULL;
 	uint32_t grctx_size = 0x70000;
-	int hdr;
-	int ret;
-	int pos;
+	int hdr, ret;
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
 
@@ -235,60 +206,8 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 	nv_wo32(dev, ramin, (hdr + 0x14)/4, 0x00010000);
 	dev_priv->engine.instmem.finish_access(dev);
 
-	switch (dev_priv->chipset) {
-	case 0x50:
-		ctxvals = nv50_ctxvals;
-		break;
-	case 0x84:
-		ctxvals = nv84_ctxvals;
-		break;
-	case 0x86:
-		ctxvals = nv86_ctxvals;
-		break;
-	case 0x92:
-		ctxvals = nv92_ctxvals;
-		break;
-	case 0x94:
-		ctxvals = nv94_ctxvals;
-		break;
-	case 0x96:
-		ctxvals = nv96_ctxvals;
-		break;
-	case 0x98:
-		ctxvals = nv98_ctxvals;
-		break;
-	case 0xa0:
-		ctxvals = nva0_ctxvals;
-		break;
-	case 0xa5:
-		ctxvals = nva5_ctxvals;
-		break;
-	case 0xa8:
-		ctxvals = nva8_ctxvals;
-		break;
-	case 0xaa:
-		ctxvals = nvaa_ctxvals;
-		break;
-	case 0xac:
-		ctxvals = nvac_ctxvals;
-		break;
-	default:
-		break;
-	}
-
 	dev_priv->engine.instmem.prepare_access(dev, true);
-
-	if (ctxvals) {
-		pos = 0;
-		while (*ctxvals) {
-			int cnt = *ctxvals++;
-
-			while (cnt--)
-				nv_wo32(dev, ctx, pos++, *ctxvals);
-			ctxvals++;
-		}
-	}
-
+	nv40_grctx_vals_load(dev, ctx);
 	nv_wo32(dev, ctx, 0x00000/4, chan->ramin->instance >> 12);
 	if ((dev_priv->chipset & 0xf0) == 0xa0)
 		nv_wo32(dev, ctx, 0x00004/4, 0x00000000);

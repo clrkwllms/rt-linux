@@ -313,6 +313,8 @@ struct nouveau_pgraph_object_class {
 struct nouveau_pgraph_engine {
 	struct nouveau_pgraph_object_class *grclass;
 	bool accel_blocked;
+	void *ctxprog;
+	void *ctxvals;
 
 	int  (*init)(struct drm_device *);
 	void (*takedown)(struct drm_device *);
@@ -954,6 +956,9 @@ extern int  nv40_graph_create_context(struct nouveau_channel *);
 extern void nv40_graph_destroy_context(struct nouveau_channel *);
 extern int  nv40_graph_load_context(struct nouveau_channel *);
 extern int  nv40_graph_unload_context(struct drm_device *);
+extern int  nv40_grctx_init(struct drm_device *);
+extern void nv40_grctx_fini(struct drm_device *);
+extern void nv40_grctx_vals_load(struct drm_device *, struct nouveau_gpuobj *);
 
 /* nv50_graph.c */
 extern struct nouveau_pgraph_object_class nv50_graph_grclass[];
