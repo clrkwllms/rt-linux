@@ -331,6 +331,7 @@ create_mode:
 			    cmdline_mode->refresh_specified ? cmdline_mode->refresh : 60,
 			    cmdline_mode->rb, cmdline_mode->interlace,
 			    cmdline_mode->margins);
+	drm_mode_set_crtcinfo(mode, CRTC_INTERLACE_HALVE_V);
 	list_add(&mode->head, &connector->modes);
 	return mode;
 }
@@ -1018,6 +1019,9 @@ bool drm_helper_plugged_event(struct drm_device *dev)
 bool drm_helper_initial_config(struct drm_device *dev)
 {
 	int count = 0;
+
+	/* disable all the possible outputs/crtcs before entering KMS mode */
+	drm_helper_disable_unused_functions(dev);
 
 	drm_fb_helper_parse_command_line(dev);
 
