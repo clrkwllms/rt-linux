@@ -13,17 +13,6 @@ config DRM_NOUVEAU
 	help
 	  Choose this option for open-source nVidia support.
 
-config DRM_NOUVEAU_KMS
-	bool "Enable modesetting on nouveau by default"
-	depends on DRM_NOUVEAU
-	help
-	Choose this option if you want kernel modesetting enabled by default,
-	and you have a new enough userspace to support this. Running old
-	userspaces with this enabled will cause pain.
-
-	NOTICE: if you plan on using the text based console outside of X, enable
-	FRAMEBUFFER_CONSOLE or else the console will be unusable.
-
 config DRM_NOUVEAU_BACKLIGHT
 	bool "Support for backlight control"
 	depends on DRM_NOUVEAU

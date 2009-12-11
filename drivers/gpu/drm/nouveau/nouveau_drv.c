@@ -383,11 +383,7 @@ static int __init nouveau_init(void)
 			nouveau_modeset = 0;
 		else
 #endif
-#if defined(CONFIG_DRM_NOUVEAU_KMS)
 			nouveau_modeset = 1;
-#else
-			nouveau_modeset = 0;
-#endif
 	}
 
 	if (nouveau_modeset == 1)
