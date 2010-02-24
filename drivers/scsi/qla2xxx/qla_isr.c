@@ -2170,7 +2170,13 @@ qla2x00_request_irqs(struct qla_hw_data *ha, struct rsp_que *rsp)
 	/* If possible, enable MSI-X. */
 	if (!IS_QLA2432(ha) && !IS_QLA2532(ha) &&
 	    !IS_QLA8432(ha) && !IS_QLA8001(ha))
+#ifdef CONFIG_PREEMPT_RT
+		/* Observed IO timeouts with MSI iterrupts on -rt kernel. */
+		/* This code change forces the driver to use APIC interrupts. */
+		goto skip_msi;
+#else
 		goto skip_msix;
+#endif /* CONFIG_PREEMPT_RT */
 
 	if (IS_QLA2432(ha) && (ha->pdev->revision < QLA_MSIX_CHIP_REV_24XX ||
 		!QLA_MSIX_FW_MODE_1(ha->fw_attributes))) {
