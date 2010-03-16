@@ -42,48 +42,45 @@ static struct class *rmem_class;
 MODULE_AUTHOR("Theodore Ts'o");
 MODULE_LICENSE("GPL");
 
-struct page *rmem_vma_nopage(struct vm_area_struct *vma,
-                unsigned long address, int *type)
+int rmem_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
-	struct page *pageptr;
-	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
-	unsigned long physaddr = address - vma->vm_start + offset;
-	unsigned long pageframe = physaddr >> PAGE_SHIFT;
+	struct page * page;
 
-	if (!pfn_valid(pageframe))
-		return NOPAGE_SIGBUS;
-	pageptr = pfn_to_page(pageframe);
-	get_page(pageptr);
-	if (type)
-		*type = VM_FAULT_MINOR;
-	return pageptr;
+	if (!pfn_valid(vmf->pgoff))
+		return VM_FAULT_SIGBUS;
+
+	page = pfn_to_page(vmf->pgoff);
+	get_page(page);
+	vmf->page = page;
+
+	return 0;
 }
 
-static struct vm_operations_struct rmem_nopage_vm_ops = {
-	.nopage = rmem_vma_nopage,
+static struct vm_operations_struct rmem_fault_vm_ops = {
+	.fault = rmem_vma_fault,
 };
 
-static int rmem_nopage_mmap(struct file *filp, struct vm_area_struct *vma)
+static int rmem_fault_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 
 	if (offset >= __pa(high_memory) || (filp->f_flags & O_SYNC))
 		vma->vm_flags |= VM_IO;
 	vma->vm_flags |= VM_RESERVED;
-	vma->vm_ops = &rmem_nopage_vm_ops;
+	vma->vm_ops = &rmem_fault_vm_ops;
 #ifdef TAINT_USER
 	add_taint(TAINT_USER);
 #endif
 	return 0;
 }
 
-static struct file_operations rmem_nopage_ops = {
+static struct file_operations rmem_fault_ops = {
 	.owner   = THIS_MODULE,
-	.mmap    = rmem_nopage_mmap,
+	.mmap    = rmem_fault_mmap,
 };
 
 static struct cdev rmem_cdev = {
-	.kobj	=	{.k_name = "rmem", },
+	.kobj	=	{.name = "rmem", },
 	.owner	=	THIS_MODULE,
 };
 
@@ -106,7 +103,7 @@ static int __init rmem_init(void)
 	if (rmem_major == 0)
 		rmem_major = result;
 
-	cdev_init(&rmem_cdev, &rmem_nopage_ops);
+	cdev_init(&rmem_cdev, &rmem_fault_ops);
 	result = cdev_add(&rmem_cdev, dev, 1);
 	if (result) {
 		printk (KERN_NOTICE "Error %d adding /dev/rmem", result);
@@ -116,7 +113,7 @@ static int __init rmem_init(void)
 	}
 
 	rmem_class = class_create(THIS_MODULE, "rmem");
-	class_device_create(rmem_class, NULL, dev, NULL, "rmem");
+	device_create(rmem_class, NULL, dev, NULL, "rmem");
 
 	return 0;
 }
@@ -124,9 +121,12 @@ static int __init rmem_init(void)
 
 static void __exit rmem_cleanup(void)
 {
+	dev_t dev = MKDEV(rmem_major, 0);
+
 	cdev_del(&rmem_cdev);
-	unregister_chrdev_region(MKDEV(rmem_major, 0), 1);
+	device_destroy(rmem_class, dev);
 	class_destroy(rmem_class);
+	unregister_chrdev_region(MKDEV(rmem_major, 0), 1);
 }
 
 
