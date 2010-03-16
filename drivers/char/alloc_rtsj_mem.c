@@ -33,10 +33,11 @@ MODULE_DESCRIPTION("RTSJ alloc memory");
 MODULE_LICENSE("GPL");
 
 static void *mem = 0;
-int size = 0, addr = 0;
+int size = 0;
+unsigned long addr = 0;
 
 module_param(size, int, 0444);
-module_param(addr, int, 0444);
+module_param(addr, ulong, 0444);
 
 static void __exit shutdown_module(void)
 {
