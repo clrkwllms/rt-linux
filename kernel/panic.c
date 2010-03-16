@@ -164,6 +164,7 @@ static const struct tnt tnts[] = {
 	{ TAINT_OVERRIDDEN_ACPI_TABLE,	'A', ' ' },
 	{ TAINT_WARN,			'W', ' ' },
 	{ TAINT_CRAP,			'C', ' ' },
+	{ TAINT_UNSECURE_ADDRESS,	'J', ' ' },
 };
 
 /**
@@ -180,6 +181,7 @@ static const struct tnt tnts[] = {
  *  'A' - ACPI table overridden.
  *  'W' - Taint on warning.
  *  'C' - modules from drivers/staging are loaded.
+ *  'J' - RTSJ unsecure memory address module is loaded
  *
  *	The string is overwritten by the next call to print_tainted().
  */
