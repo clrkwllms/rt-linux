@@ -405,6 +405,7 @@ struct raid5_private_data {
 	int			recovery_disabled;
 	/* per cpu variables */
 	struct raid5_percpu {
+		spinlock_t	lock;	     /* Protection for -RT */
 		struct page	*spare_page; /* Used when checking P/Q in raid6 */
 		void		*scribble;   /* space for constructing buffer
 					      * lists and performing address
