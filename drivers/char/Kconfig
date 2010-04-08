@@ -1104,6 +1104,17 @@ config ALLOC_RTSJ_MEM
 	  The RTSJ TCK conformance test requires reserving some physical
 	  memory for testing /dev/rmem.
 
+config RMEM
+	tristate "Access to physical memory via /dev/rmem"
+	default m
+	help
+	  The /dev/mem device only allows mmap() memory available to
+	  I/O mapped memory; it does not allow access to "real"
+	  physical memory.  The /dev/rmem device is a hack which does
+	  allow access to physical memory.  We use this instead of
+	  patching /dev/mem because we don't expect this functionality
+	  to ever be accepted into mainline.
+
 config DEVPORT
 	bool
 	depends on !M68K
