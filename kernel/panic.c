@@ -24,7 +24,7 @@
 #include <linux/nmi.h>
 #include <linux/dmi.h>
 
-int panic_on_oops;
+int panic_on_oops = 1;
 static unsigned long tainted_mask;
 static int pause_on_oops;
 static int pause_on_oops_flag;
