@@ -1097,6 +1097,13 @@ config TELCLOCK
 	  /sys/devices/platform/telco_clock, with a number of files for
 	  controlling the behavior of this hardware.
 
+config ALLOC_RTSJ_MEM
+	tristate "RTSJ-specific hack to reserve memory"
+	default m
+	help
+	  The RTSJ TCK conformance test requires reserving some physical
+	  memory for testing /dev/rmem.
+
 config DEVPORT
 	bool
 	depends on !M68K
