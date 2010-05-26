@@ -11,28 +11,15 @@
  */
 static void __devinit pcibios_fixup_peer_bridges(void)
 {
-	int n, devfn;
+	int n;
 	long node;
 
 	if (pcibios_last_bus <= 0 || pcibios_last_bus > 0xff)
 		return;
 	DBG("PCI: Peer bridge fixup\n");
 
-	for (n=0; n <= pcibios_last_bus; n++) {
-		u32 l;
-		if (pci_find_bus(0, n))
-			continue;
-		node = get_mp_bus_to_node(n);
-		for (devfn = 0; devfn < 256; devfn += 8) {
-			if (!raw_pci_read(0, n, devfn, PCI_VENDOR_ID, 2, &l) &&
-			    l != 0x0000 && l != 0xffff) {
-				DBG("Found device at %02x:%02x [%04x]\n", n, devfn, l);
-				printk(KERN_INFO "PCI: Discovered peer bus %02x\n", n);
-				pci_scan_bus_on_node(n, &pci_root_ops, node);
-				break;
-			}
-		}
-	}
+	for (n=0; n <= pcibios_last_bus; n++)
+		pcibios_scan_specific_bus(n);
 }
 
 static int __init pci_legacy_init(void)
@@ -52,6 +39,32 @@ static int __init pci_legacy_init(void)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(pci_legacy_init);
+
+void pcibios_scan_specific_bus(int busn)
+{
+
+	int devfn;
+	u32 l;
+	struct pci_sysdata *sd;
+
+	sd = kzalloc(sizeof(&sd), GFP_KERNEL);
+	if (!sd)
+		panic("Cannot allocate PCI domain sysdata");
+	if (pci_find_bus(0, busn))
+		return;
+	for (devfn = 0; devfn < 256; devfn += 8) {
+		if (!raw_pci_ops->read(0, busn, devfn, PCI_VENDOR_ID, 2, &l) &&
+		    l != 0x0000 && l != 0xffff) {
+			DBG("Found device at %02x:%02x [%04x]\n", busn, devfn, l);
+			printk(KERN_INFO "PCI: Discovered peer bus %02x\n", busn);
+			if (!pci_scan_bus(busn, &pci_root_ops, sd))
+				kfree(sd);
+			break;
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(pcibios_scan_specific_bus);
 
 int __init pci_subsys_init(void)
 {
