@@ -1813,6 +1813,7 @@ static int i7core_register_mci(struct i7core_dev *i7core_dev,
 		debugf0("MC: " __FILE__
 			": %s(): failed edac_mce_register()\n", __func__);
 	}
+	return rc;
 
 fail:
 	edac_mc_free(mci);
