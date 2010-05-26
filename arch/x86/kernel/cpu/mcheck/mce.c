@@ -36,6 +36,7 @@
 #include <linux/mm.h>
 #include <linux/debugfs.h>
 #include <linux/jiffies.h>
+#include <linux/edac_mce.h>
 
 #include <asm/processor.h>
 #include <asm/hw_irq.h>
@@ -161,6 +162,14 @@ void mce_log(struct mce *mce)
 	for (;;) {
 		entry = rcu_dereference(mcelog.next);
 		for (;;) {
+			/* If edac_mce is enabled, it will check the error type
+			 * and will process it, if it is a known error.
+			 * Otherwise, the error will be sent through mcelog
+			 * interface
+			 */
+			if (edac_mce_parse(mce))
+				return;
+
 			/*
 			 * When the buffer fills up discard new entries.
 			 * Assume that the earlier errors are the more
@@ -194,6 +203,8 @@ void mce_log(struct mce *mce)
 
 static void print_mce(struct mce *m)
 {
+	edac_mce_parse(m);
+
 	pr_emerg("CPU %d: Machine Check Exception: %16Lx Bank %d: %016Lx\n",
 	       m->extcpu, m->mcgstatus, m->bank, m->status);
 
