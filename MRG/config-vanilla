@@ -1,0 +1,101 @@
+#
+# configuration information used by vanilla kernels
+#
+
+#
+# select full preemption
+#
+CONFIG_PREEMPT_NONE=y
+# CONFIG_PREEMPT_VOLUNTARY is not set
+# CONFIG_PREEMPT is not set
+
+#
+# allow preempting the Big Kernel Lock
+# CONFIG_PREEMPT_BKL is not set
+
+
+CONFIG_SLAB=y
+# CONFIG_SLUB is not set
+# CONFIG_SLOB is not set
+# CONFIG_SLUB_DEBUG_ON is not set
+CONFIG_SLABINFO=y
+
+# CONFIG_ACPI_DEBUG is not set
+# CONFIG_SND_DEBUG is not set
+# CONFIG_SND_VERBOSE_PRINTK is not set
+# CONFIG_DEBUG_SLAB is not set
+# CONFIG_DEBUG_PREEMPT is not set
+# CONFIG_DEBUG_RT_MUTEXES is not set
+# CONFIG_DEBUG_SPINLOCK is not set
+# CONFIG_DEBUG_LOCK_ALLOC is not set
+# CONFIG_PROVE_LOCKING is not set
+# CONFIG_LOCK_STAT is not set
+# CONFIG_DEBUG_VM is not set
+# CONFIG_DEBUG_SG is not set
+# CONFIG_FAULT_INJECTION is not set
+# CONFIG_DEBUG_STACK_USAGE is not set
+# CONFIG_DEBUG_MUTEXES is not set
+# CONFIG_RT_MUTEX_TESTER is not set
+# CONFIG_SAMPLES is not set
+
+# CONFIG_SCHEDSTATS is not set
+# CONFIG_DEBUG_SPINLOCK_SLEEP is not set
+# CONFIG_DEBUG_LIST is not set
+# CONFIG_ENABLE_MUST_CHECK is not set
+
+#
+# driver debugging stuff
+#
+# CONFIG_B43_DEBUG is not set
+# CONFIG_SKGE_DEBUG is not set
+# CONFIG_SKY2_DEBUG is not set
+# CONFIG_SSB_DEBUG is not set
+# CONFIG_RT2X00_DEBUG is not set
+# CONFIG_PREEMPT_SOFTIRQS is not set
+# CONFIG_PREEMPT_HARDIRQS is not set
+# CONFIG_SMI_DETECTOR is not set
+# CONFIG_ALLOC_RTSJ_MEM is not set
+# CONFIG_RMEM is not set
+# CONFIG_DEBUG_MEMORY_INIT is not set
+# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+# CONFIG_BACKTRACE_SELF_TEST is not set
+# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
+# CONFIG_SYSCTL_SYSCALL_CHECK is not set
+# CONFIG_IRQSOFF_TRACER is not set
+# CONFIG_SYSPROF_TRACER is not set
+# CONFIG_SCHED_TRACER is not set
+# CONFIG_CONTEXT_SWITCH_TRACER is not set
+# CONFIG_EVENT_TRACER is not set
+# CONFIG_FTRACE_SYSCALLS is not set
+# CONFIG_BOOT_TRACER is not set
+# CONFIG_TRACE_BRANCH_PROFILING is not set
+# CONFIG_POWER_TRACER is not set
+# CONFIG_STACK_TRACER is not set
+# CONFIG_HW_BRANCH_TRACER is not set
+# CONFIG_KMEMTRACE is not set
+# CONFIG_WORKQUEUE_TRACER is not set
+CONFIG_BLK_DEV_IO_TRACE=y
+# CONFIG_FTRACE_STARTUP_TEST is not set
+# CONFIG_MMIOTRACE is not set
+# CONFIG_DMA_API_DEBUG is not set
+# CONFIG_STRICT_DEVMEM is not set
+
+# CONFIG_NET_9P_RDMA is not set
+# CONFIG_WIMAX_I2400M_USB is not set
+# CONFIG_MISDN is not set
+# CONFIG_I2C_NFORCE2_S4985 is not set
+# CONFIG_MFD_WM8350_I2C is not set
+# CONFIG_USB_WHCI_HCD is not set
+# CONFIG_INFINIBAND_NES is not set
+CONFIG_FILE_LOCKING=y
+
+# CONFIG_MAXSMP is not set
+# CONFIG_SGI_XP is not set
+# CONFIG_SGI_GRU is not set
+# CONFIG_DEBUG_PAGEALLOC is not set
+
+CONFIG_DETECT_HUNG_TASK=y
+CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
+CONFIG_DETECT_SOFTLOCKUP=y
+CONFIG_TIMER_STATS=y
+

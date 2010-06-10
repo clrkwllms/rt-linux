@@ -1,0 +1,708 @@
+Date:	Thu, 29 Apr 2004 14:10:41 -0700 (PDT)
+From:	Linus Torvalds <torvalds@osdl.org>
+To:	Giuliano Colla
+cc:	Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+Subject: Re: [hsflinux] [PATCH] Blacklist binary-only modules lying about
+	their license
+Message-ID: <Pine.LNX.4.58.0404291404100.1629@ppc970.osdl.org>
+
+On Thu, 29 Apr 2004, Giuliano Colla wrote:
+> 
+> Let's try not to be ridiculous, please.
+
+It's not abotu being ridiculous. It's about honoring peoples copyrights.
+
+> As an end user, if I buy a full fledged modem, I get some amount of 
+> proprietary, non GPL, code  which executes within the board or the 
+> PCMCIA card of the modem. The GPL driver may even support the 
+> functionality of downloading a new version of *proprietary* code into 
+> the flash Eprom of the device. The GPL linux driver interfaces with it, 
+> and all is kosher.
+
+Indeed. Everything is kosher, because the other piece of hardware and 
+software has _nothing_ to do with the kernel. It's not linked into it, it 
+cannot reasonably corrupt internal kernel data structures with random 
+pointer bugs, and in general you can think of firmware as part of the 
+_hardware_, not the software of the machine.
+
+> On the other hand, I have the misfortune of being stuck with a 
+> soft-modem, roughly the *same* proprietary code is provided as a binary 
+> file, and a linux driver (source provided) interfaces with it. In that 
+> case the kernel is flagged as "tainted".
+
+It is flagged as tainted, because your argument that it is "the same code" 
+is totally BOGUS AND UNTRUE!
+
+In the binary kernel module case, a bug in the code corrupts random data 
+structures, or accesses kernel internals without holding the proper locks, 
+or does a million other things wrong, BECAUSE A KERNEL MODULE IS VERY 
+INTIMATELY LINKED WITH THE KERNEL.
+
+A kernel module is _not_ a separate work, and can in _no_ way be seen as 
+"part of the hardware". It's very much a part of the _kernel_. And the 
+kernel developers require that such code be GPL'd so that it can be fixed, 
+or if there's a valid argument that it's not a derived work and not GPL'd, 
+then the kernel developers who have to support the end result mess most 
+definitely do need to know about the taint.
+
+You are not the first (and sadly, you likely won't be the last) person to 
+equate binary kernel modules with binary firmware. And I tell you that 
+such a comparison is ABSOLUTE CRAPOLA. There's a damn big difference 
+between running firmware on another chip behind a PCI bus, and linking 
+into the kernel directly.
+
+And if you don't see that difference, then you are either terminally 
+stupid, or you have some ulterior reason to claim that they are the same 
+case even though they clearly are NOT.
+
+> Can you honestly tell apart the two cases, if you don't make a it a case 
+> of "religion war"?
+
+It has absolutely nothing to do with religion.
+
+		Linus
+
+Date:	Fri, 5 Dec 2003 09:19:52 -0800 (PST)
+From:	Linus Torvalds <torvalds@osdl.org>
+To:	Peter Chubb 
+cc:	linux-kernel@vger.kernel.org
+Subject: Re: Linux GPL and binary module exception clause?
+Message-ID: <Pine.LNX.4.58.0312050853200.9125@home.osdl.org>
+
+On Fri, 5 Dec 2003, Peter Chubb wrote:
+>
+> As I understand it, SCO is/was claiming that JFS and XFS are derived
+> works of the UNIX source base, because they were developed to match
+> the internal interfaces of UNIX, and with knowledge of the internals
+> of UNIX -- and they hold the copyrights of and are the licensor of UNIX.
+
+Yes, and I'm not claiming anything like that.
+
+I claim that a "binary linux kernel module" is a derived work of the
+kernel, and thus has to come with sources.
+
+But if you use those same sources (and _you_ wrote them) they do not
+contain any Linux code, they are _clearly_ not derived from Linux, and you
+can license and use your own code any way you want.
+
+You just can't make a binary module for Linux, and claim that that module
+isn't derived from the kernel. Because it generally is - the binary
+module not only included header files, but more importantly it clearly is
+_not_ a standalone work any more. So even if you made your own prototypes
+and tried hard to avoid kernel headers, it would _still_ be connected and
+dependent on the kernel.
+
+And note that I'm very much talking about just the _binary_. Your source
+code is still very much yours, and you have the right to distribute it
+separately any which way you want. You wrote it, you own the copyrights to
+it, and it is an independent work.
+
+But when you distribute it in a way that is CLEARLY tied to the GPL'd
+kernel (and a binary module is just one such clear tie - a "patch" to
+build it or otherwise tie it to the kernel is also such a tie, even if you
+distribute it as source under some other license), you're BY DEFINITION
+not an independent work any more.
+
+(But exactly because I'm not a black-and-white person, I reserve the right
+to make a balanced decision on any particular case. I have several times
+felt that the module author had a perfectly valid argument for why the
+"default assumption" of being derived wasn't the case. That's why things
+like the AFS module were accepted - but not liked - in the first place).
+
+This is why SCO's arguments are specious. IBM wrote their code, retained
+their copyrights to their code AND THEY SEVERED THE CONNECTION TO SCO'S
+CODE (and, arguably the connections didn't even exist in the first place,
+since apparently things like JFS were written for OS/2 as well, and the
+Linux port was based on that one - but that's a separate argument and
+independent of my point).
+
+See the definition of "derivative" in USC 17.1.101:
+
+	A "derivative work" is a work based upon one or more preexisting
+	works, such as a translation, musical arrangement, dramatization,
+	fictionalization, motion picture version, sound recording, art
+	reproduction, abridgment, condensation, or any other form in which
+	a work may be recast, transformed, or adapted. A work consisting
+	of editorial revisions, annotations, elaborations, or other
+	modifications which, as a whole, represent an original work of
+	authorship, is a "derivative work".
+
+And a binary module is an "elaboration" on the kernel. Sorry, but that is
+how it IS.
+
+In short: your code is yours. The code you write is automatically
+copyrighted by YOU, and as such you have the right to license and use it
+any way you want (well, modulo _other_ laws, of course - in the US your
+license can't be racist, for example, but that has nothing to do with
+copyright laws, and would fall under a totally different legal framework).
+
+But when you use that code to create an "elaboration" to the kernel, that
+makes it a derived work, and you cannot distribute it except as laid out
+by the GPL. A binary module is one such case, but even just a source patch
+is _also_ one such case. The lines you added are yours, but when you
+distribute it as an elaboration, you are bound by the restriction on
+derivative works.
+
+Or you had better have some other strong argument why it isn't. Which has
+been my point all along.
+
+			Linus
+
+
+Date:	Wed, 10 Dec 2003 09:10:18 -0800 (PST)
+From:	Linus Torvalds <torvalds@osdl.org>
+To:	Larry McVoy 
+Subject: Re: Linux GPL and binary module exception clause?
+
+On Wed, 10 Dec 2003, Larry McVoy wrote:
+>
+> Which is?  How is it that you can spend a page of text saying a judge doesn't
+> care about technicalities and then base the rest of your argument on the
+> distinction between a "plugin" and a "kernel module"?
+
+I'll stop arguing, since you obviously do not get it.
+
+I explained the technicalities to _you_, and you are a technical person.
+
+But if you want to explain something to a judge, you get a real lawyer,
+and you make sure that the lawyer tries to explain the issue in _non_
+technical terms. Because, quite frankly, the judge is not going to buy a
+technical discussion he or she doesn't understand.
+
+Just as an example, how do you explain to a judge how much code the Linux
+kernel contains? Do you say "it's 6 million lines of C code and header
+files and documentation, for a total of about 175MB of data"?
+
+Yeah, maybe you'd _mention_ that, but to actually _illustrate_ the point
+you'd say that if you printed it out, it would be a solid stack of papers
+100 feet high.  And you'd compare it to the height of the court building
+you're in, or something. Maybe you'd print out _one_ file, bind it as a
+book, and wave it around as one out of 15,000 files.
+
+But when _you_ ask me about how big the kernel is, I'd say "5 million
+lines". See the difference? It would be silly for me to tell you how many
+feet of paper the kernel would print out to, because we don't have those
+kinds of associations.
+
+Similarly, if you want to explain the notion of a kernel module, you'd
+compare it to maybe an extra chapter in a book. You'd make an analogy to
+something that never _ever_ mentions "linking".
+
+Just imagine: distributing a compiled binary-only kernel module that can
+be loaded into the kernel is not like distributing a new book: it's more
+like distributing a extra chapter to a book that somebody else wrote, that
+uses all the same characters and the plot, but more importantly it
+literally can only be read _together_ with the original work. It doesn't
+stand alone.
+
+In short, your honour, this extra chapter without any meaning on its own
+is a derived work of the book.
+
+In contrast, maybe you can re-write your code and distribute it as a
+short-story, which can be run on its own, and maybe the author has been
+influenced by another book, but the short-story could be bound AS IS, and
+a recipient would find it useful even without that other book. In that
+case, the short story is not a derived work - it's only inspired.
+
+Notice? This is actually _exactly_ what I've been arguing all along,
+except I've been arguing with a technical audience, so I've been using
+technical examples and terminology. But my argument is that just the fact
+that somebody compiled the code for Linux into a binary module that is
+useless without a particular version of the kernel DOES MAKE IT A DERIVED
+WORK.
+
+But also note how it's only the BINARY MODULE that is a derived work. Your
+source code is _not_ necessarily a derived work, and if you compile it for
+another operating system, I'd clearly not complain.
+
+This is the "stand-alone short story" vs "extra chapter without meaning
+outside the book" argument. See? One is a work in its own right, the other
+isn't.
+
+			Linus
+
+
+Please read the FAQ at  http://www.tux.org/lkml/
+Date:	Thu, 4 Dec 2003 22:43:42 -0800 (PST)
+From:	Linus Torvalds <torvalds@osdl.org>
+To:	David Schwartz 
+cc:	linux-kernel@vger.kernel.org
+Subject: RE: Linux GPL and binary module exception clause?
+
+On Thu, 4 Dec 2003, David Schwartz wrote:
+>
+> Yes, but they will cite the prohibition against *creating* derived
+> works.
+
+So?
+
+The same prohibition exists with the GPL. You are not allowed to create
+and distribute a derived work unless it is GPL'd.
+
+I don't see what you are arguing against. It is very clear: a kernel
+module is a derived work of the kernel by default. End of story.
+
+You can then try to prove (through development history etc) that there
+would be major reasons why it's not really derived. But your argument
+seems to be that _nothing_ is derived, which is clearly totally false, as
+you yourself admit when you replace "kernel" with "Harry Potter".
+
+		Linus
+
+Date:	Wed, 3 Dec 2003 16:00:21 -0800 (PST)
+From:	Linus Torvalds <torvalds@osdl.org>
+To:	Kendall Bennet
+cc:	linux-kernel@vger.kernel.org
+Subject: Re: Linux GPL and binary module exception clause?
+
+On Wed, 3 Dec 2003, Kendall Bennett wrote:
+>
+> I have heard many people reference the fact that the although the Linux
+> Kernel is under the GNU GPL license, that the code is licensed with an
+> exception clause that says binary loadable modules do not have to be
+> under the GPL.
+
+Nope. No such exception exists.
+
+There's a clarification that user-space programs that use the standard
+system call interfaces aren't considered derived works, but even that
+isn't an "exception" - it's just a statement of a border of what is
+clearly considered a "derived work". User programs are _clearly_ not
+derived works of the kernel, and as such whatever the kernel license is
+just doesn't matter.
+
+And in fact, when it comes to modules, the GPL issue is exactly the same.
+The kernel _is_ GPL. No ifs, buts and maybe's about it. As a result,
+anything that is a derived work has to be GPL'd. It's that simple.
+
+Now, the "derived work" issue in copyright law is the only thing that
+leads to any gray areas. There are areas that are not gray at all: user
+space is clearly not a derived work, while kernel patches clearly _are_
+derived works.
+
+But one gray area in particular is something like a driver that was
+originally written for another operating system (ie clearly not a derived
+work of Linux in origin). At exactly what point does it become a derived
+work of the kernel (and thus fall under the GPL)?
+
+THAT is a gray area, and _that_ is the area where I personally believe
+that some modules may be considered to not be derived works simply because
+they weren't designed for Linux and don't depend on any special Linux
+behaviour.
+
+Basically:
+ - anything that was written with Linux in mind (whether it then _also_
+   works on other operating systems or not) is clearly partially a derived
+   work.
+ - anything that has knowledge of and plays with fundamental internal
+   Linux behaviour is clearly a derived work. If you need to muck around
+   with core code, you're derived, no question about it.
+
+Historically, there's been things like the original Andrew filesystem
+module: a standard filesystem that really wasn't written for Linux in the
+first place, and just implements a UNIX filesystem. Is that derived just
+because it got ported to Linux that had a reasonably similar VFS interface
+to what other UNIXes did? Personally, I didn't feel that I could make that
+judgment call. Maybe it was, maybe it wasn't, but it clearly is a gray
+area.
+
+Personally, I think that case wasn't a derived work, and I was willing to
+tell the AFS guys so.
+
+Does that mean that any kernel module is automatically not a derived work?
+HELL NO! It has nothing to do with modules per se, except that non-modules
+clearly are derived works (if they are so central to the kenrel that you
+can't load them as a module, they are clearly derived works just by virtue
+of being very intimate - and because the GPL expressly mentions linking).
+
+So being a module is not a sign of not being a derived work. It's just
+one sign that _maybe_ it might have other arguments for why it isn't
+derived.
+
+		Linus
+
+
+Date:	Wed, 3 Dec 2003 16:23:33 -0800 (PST)
+From:	Linus Torvalds <torvalds@osdl.org>
+To:	Kendall Bennett
+cc:	linux-kernel@vger.kernel.org
+Subject: Re: Linux GPL and binary module exception clause?
+
+
+On Wed, 3 Dec 2003, Linus Torvalds wrote:
+>
+> So being a module is not a sign of not being a derived work. It's just
+> one sign that _maybe_ it might have other arguments for why it isn't
+> derived.
+
+Side note: historically, the Linux kernel module interfaces were really
+quite weak, and only exported a few tens of entry-points, and really
+mostly effectively only allowed character and block device drivers with
+standard interfaces, and loadable filesystems.
+
+So historically, the fact that you could load a module using nothing but
+these standard interfaces tended to be a much stronger argument for not
+being very tightly coupled with the kernel.
+
+That has changed, and the kernel module interfaces we have today are MUCH
+more extensive than they were back in '95 or so. These days modules are
+used for pretty much everything, including stuff that is very much
+"internal kernel" stuff and as a result the kind of historic "implied
+barrier" part of modules really has weakened, and as a result there is not
+avery strong argument for being an independent work from just the fact
+that you're a module.
+
+Similarly, historically there was a much stronger argument for things like
+AFS and some of the binary drivers (long forgotten now) for having been
+developed totally independently of Linux: they literally were developed
+before Linux even existed, by people who had zero knowledge of Linux. That
+tends to strengthen the argument that they clearly aren't derived.
+
+In contrast, these days it would be hard to argue that a new driver or
+filesystem was developed without any thought of Linux. I think the NVidia
+people can probably reasonably honestly say that the code they ported had
+_no_ Linux origin. But quite frankly, I'd be less inclined to believe that
+for some other projects out there..
+
+			Linus
+
+
+
+
+Date: Thu, 17 Oct 2002 10:08:19 -0700 (PDT)
+From: Linus Torvalds <torvalds@transmeta.com>
+To: Christoph Hellwig 
+Cc: <linux-kernel@vger.kernel.org>
+Subject: Re: [PATCH] make LSM register functions GPLonly exports
+In-Reply-To: <20021017175403.A32516@infradead.org>
+Message-ID: <Pine.LNX.4.44.0210170958340.6739-100000@home.transmeta.com>
+
+Note that if this fight ends up being a major issue, I'm just going to 
+remove LSM and let the security vendors do their own thing. So far
+
+ - I have not seen a lot of actual usage of the hooks
+ - seen a number of people who still worry that the hooks degrade 
+   performance in critical areas
+ - the worry that people use it for non-GPL'd modules is apparently real, 
+   considering Crispin's reply.
+
+I will re-iterate my stance on the GPL and kernel modules:
+
+  There is NOTHING in the kernel license that allows modules to be 
+  non-GPL'd. 
+
+  The _only_ thing that allows for non-GPL modules is copyright law, and 
+  in particular the "derived work" issue. A vendor who distributes non-GPL 
+  modules is _not_ protected by the module interface per se, and should 
+  feel very confident that they can show in a court of law that the code 
+  is not derived.
+
+  The module interface has NEVER been documented or meant to be a GPL 
+  barrier. The COPYING clearly states that the system call layer is such a 
+  barrier, so if you do your work in user land you're not in any way 
+  beholden to the GPL. The module interfaces are not system calls: there 
+  are system calls used to _install_ them, but the actual interfaces are
+  not.
+
+  The original binary-only modules were for things that were pre-existing 
+  works of code, ie drivers and filesystems ported from other operating 
+  systems, which thus could clearly be argued to not be derived works, and 
+  the original limited export table also acted somewhat as a barrier to 
+  show a level of distance.
+
+In short, Crispin: I'm going to apply the patch, and if you as a copyright 
+holder of that file disagree, I will simply remove all of he LSM code from 
+the kernel. I think it's very clear that a LSM module is a derived work, 
+and thus copyright law and the GPL are not in any way unclear about it. 
+
+If people think they can avoid the GPL by using function pointers, they 
+are WRONG. And they have always been wrong.
+
+			Linus
+
+------------------------------------------------------------------------
+Date: Fri, 19 Oct 2001 13:16:45 -0700 (PDT)
+From: Linus Torvalds <torvalds@transmeta.com>
+To: Barnes
+Subject: Re: GPL, Richard Stallman, and the Linux kernel
+
+[ This is not, of course, a legal document, but if you want to forward it
+  to anybody else, feel free to do so. And if you want to argue legal
+  points with me or point somehting out, I'm always interested. To a
+  point ;-]
+
+On Fri, 19 Oct 2001, Barnes wrote:
+>
+> I've been exchanging e-mail with Richard Stallman for a couple of
+> weeks about the finer points of the GPL.
+
+I feel your pain.
+
+> I've have spent time pouring through mailing list archives, usenet,
+> and web search engines to find out what's already been covered about
+> your statement of allowing dynamically loaded kernel modules with
+> proprietary code to co-exist with the Linux kernel.  So far I've
+> been unable to find anything beyond vague statements attributed to
+> you.  If these issues are addressed somewhere already, please refer
+> me.
+
+Well, it really boils down to the equivalent of "_all_ derived modules
+have to be GPL'd". An external module doesn't really change the GPL in
+that respect.
+
+There are (mainly historical) examples of UNIX device drivers and some
+UNIX filesystems that were pre-existing pieces of work, and which had
+fairly well-defined and clear interfaces and that I personally could not
+really consider any kind of "derived work" at all, and that were thus
+acceptable. The clearest example of this is probably the AFS (the Andrew
+Filesystem), but there have been various device drivers ported from SCO
+too.
+
+> Issue #1
+> ========
+> Currently the GPL version 2 license is the only license covering the
+> Linux kernel.  I cannot find any alternative license explaining the
+> loadable kernel module exception which makes your position difficult
+> to legally analyze.
+>
+> There is a note at the top of www.kernel.org/pub/linux/kernel/COPYING,
+> but that states "user programs" which would clearly not apply to
+> kernel modules.
+>
+> Could you clarify in writing what the exception precisely states?
+
+Well, there really is no exception. However, copyright law obviously
+hinges on the definition of "derived work", and as such anything can
+always be argued on that point.
+
+I personally consider anything a "derived work" that needs special hooks
+in the kernel to function with Linux (ie it is _not_ acceptable to make a
+small piece of GPL-code as a hook for the larger piece), as that obviously
+implies that the bigger module needs "help" from the main kernel.
+
+Similarly, I consider anything that has intimate knowledge about kernel
+internals to be a derived work.
+
+What is left in the gray area tends to be clearly separate modules: code
+that had a life outside Linux from the beginning, and that do something
+self-containted that doesn't really have any impact on the rest of the
+kernel. A device driver that was originally written for something else,
+and that doesn't need any but the standard UNIX read/write kind of
+interfaces, for example.
+
+> Issue #2
+> ========
+> I've found statements attributed to you that you think only 10% of
+> the code in the current kernel was written by you.  By not being the
+> sole copyright holder of the Linux kernel, a stated exception to
+> the GPL seems invalid unless all kernel copyright holders agreed on
+> this exception.  How does the exception cover GPL'd kernel code not
+> written by you?  Has everyone contributing to the kernel forfeited
+> their copyright to you or agreed with the exception?
+
+Well, see above about the lack of exception, and about the fundamental
+gray area in _any_ copyright issue. The "derived work" issue is obviously
+a gray area, and I know lawyers don't like them. Crazy people (even
+judges) have, as we know, claimed that even obvious spoofs of a work that
+contain nothing of the original work itself, can be ruled to be "derived".
+
+I don't hold views that extreme, but at the same time I do consider a
+module written for Linux and using kernel infrastructures to get its work
+done, even if not actually copying any existing Linux code, to be a
+derived work by default. You'd have to have a strong case to _not_
+consider your code a derived work..
+
+> Issue #3
+> ========
+> This issue is related to issue #1.  Exactly what is covered by the
+> exception?  For example, all code shipped with the Linux kernel
+> archive and typically installed under /usr/src/linux, all code under
+> /usr/src/linux except /usr/src/linux/drivers, or just the code in
+> the /usr/src/linux/kernel directory?
+
+See above, and I think you'll see my point.
+
+The "user program" exception is not an exception at all, for example, it's
+just a more clearly stated limitation on the "derived work" issue. If you
+use standard UNIX system calls (with accepted Linux extensions), your
+program obviously doesn't "derive" from the kernel itself.
+
+Whenever you link into the kernel, either directly or through a module,
+the case is just a _lot_ more muddy. But as stated, by default it's
+obviously derived - the very fact that you _need_ to do something as
+fundamental as linking against the kernel very much argues that your
+module is not a stand-alone thing, regardless of where the module source
+code itself has come from.
+
+> Issue #4
+> ========
+> This last issue is not so much a issue for the Linux kernel
+> exception, but a request for comment.
+>
+> Richard and I both agree that a "plug-in" and a "dynamically
+> loaded kernel module" are effectively the same under the GPL.
+
+Agreed.
+
+The Linux kernel modules had (a long time ago), a more limited interface,
+and not very many functions were actually exported. So five or six years
+ago, we could believably claim that "if you only use these N interfaces
+that are exported from the standard kernel, you've kind of implicitly
+proven that you do not need the kernel infrastructure".
+
+That was never really documented either (more of a guideline for me and
+others when we looked at the "derived work" issue), and as modules were
+more-and-more used not for external stuff, but just for dynamic loading of
+standard linux modules that were distributed as part of the kernel anyway,
+the "limited interfaces" argument is no longer a very good guideline for
+"derived work".
+
+So these days, we export many internal interfaces, not because we don't
+think that they would "taint" the linker, but simply because it's useful
+to do dynamic run-time loading of modules even with standard kernel
+modules that _are_ supposed to know a lot about kernel internals, and are
+obviously "derived works"..
+
+> However we disagree that a plug-in for a GPL'd program falls
+> under the GPL as asserted in the GPL FAQ found in the answer:
+> http://www.gnu.org/licenses/gpl-faq.html#GPLAndPlugins.
+
+I think you really just disagree on what is derived, and what is not.
+Richard is very extreme: _anything_ that links is derived, regardless of
+what the arguments against it are. I'm less extreme, and I bet you're even
+less so (at least you would like to argue so for your company).
+
+> My assertion is that plug-ins are written to an interface, not a
+> program.  Since interfaces are not GPL'd, a plug-in cannot be GPL'd
+> until the plug-in and program are placed together and run.  That is
+> done by the end user, not the plug-in creator.
+
+I agree, but also disrespectfully disagree ;)
+
+It's an issue of what a "plug-in" is - is it a way for the program to
+internally load more modules as it needs them, or is it _meant_ to be a
+public, published interface.
+
+For example, the "system call" interface could be considered a "plug-in
+interface", and running a user mode program under Linux could easily be
+construed as running a "plug-in" for the Linux kernel. No?
+
+And there, I obviously absolutely agree with you 100%: the interface is
+published, and it's _meant_ for external and independent users. It's an
+interface that we go to great lengths to preserve as well as we can, and
+it's an interface that is designed to be independent of kernel versions.
+
+But maybe somebody wrote his program with the intention to dynamically
+load "actors" as they were needed, as a way to maintain a good modularity,
+and to try to keep the problem spaces well-defined. In that case, the
+"plug-in" may technically follow all the same rules as the system call
+interface, even though the author doesn't intend it that way.
+
+So I think it's to a large degree a matter of intent, but it could
+arguably also be considered a matter of stability and documentation (ie
+"require recompilation of the plug-in between version changes"  would tend
+to imply that it's an internal interface, while "documented binary
+compatibility across many releases" implies a more stable external
+interface, and less of a derived work)
+
+Does that make sense to you?
+
+> I asked Richard to comment on several scenarios involving plug-ins
+> explain whether or not they were in violation of the GPL.  So far he
+> as only addressed one and has effectively admitted a hole.  This is
+> the one I asked that he's responded to:
+>     [A] non-GPL'd plug-in writer writes a plug-in for a non-GPL'd
+>     program.  Another author writes a GPL'd program making the
+>     first author's plug-ins compatible with his program.  Are now
+>     the plug-in author's plug-ins now retroactively required to be
+>     GPL'd?
+>
+> His response:
+>     No, because the plug-in was not written to extend this program.
+>
+> I find it suspicious that whether or not the GPL would apply to the
+> plug-in depends on the mindset of the author.
+
+The above makes no sense if you think of it as a "plug in" issue, but it
+makes sense if you think of it as a "derived work" issue, along with
+taking "intent" into account.
+
+I know lawyers tend to not like the notion of "intent", because it brings
+in another whole range of gray areas, but it's obviously a legal reality.
+
+Ok, enough blathering from me. I'd just like to finish off with a few
+comments, just to clarify my personal stand:
+
+ - I'm obviously not the only copyright holder of Linux, and I did so on
+   purpose for several reasons. One reason is just because I hate the
+   paperwork and other cr*p that goes along with copyright assignments.
+
+   Another is that I don't much like copyright assignments at all: the
+   author is the author, and he may be bound by my requirement for GPL,
+   but that doesn't mean that he should give his copyright to me.
+
+   A third reason, and the most relevant reason here, is that I want
+   people to _know_ that I cannot control the sources. I can write you a
+   note to say that "for use XXX, I do not consider module YYY to be a
+   derived work of my kernel", but that would not really matter that much.
+   Any other Linux copyright holder might still sue you.
+
+   This third reason is what makes people who otherwise might not trust me
+   realize that I cannot screw people over. I am bound by the same
+   agreement that I require of everybody else, and the only special status
+   I really have is a totally non-legal issue: people trust me.
+
+   (Yes, I realize that I probably would end up having more legal status
+   than most, even apart from the fact that I still am the largest single
+   copyright holder, if only because of appearances)
+
+ - I don't really care about copyright law itself. What I care about is my
+   own morals. Whether I'd ever sue somebody or not (and quite frankly,
+   it's the last thing I ever want to do - if I never end up talking to
+   lawyers in a professional context, I'll be perfectly happy. No
+   disrespect intended) will be entirely up to whether I consider what
+   people do to me "moral" or not. Which is why intent matters to me a
+   lot - both the intent of the person/corporation doign the infringement,
+   _and_ the intent of me and others in issues like the module export
+   interface.
+
+   Another way of putting this: I don't care about "legal loopholes" and
+   word-wrangling.
+
+ - Finally: I don't trust the FSF. I like the GPL a lot - although not
+   necessarily as a legal piece of paper, but more as an intent. Which
+   explains why, if you've looked at the Linux COPYING file, you may have
+   noticed the explicit comment about "only _this_ particular version of
+   the GPL covers the kernel by default".
+
+   That's because I agree with the GPL as-is, but I do not agree with the
+   FSF on many other matters. I don't like software patents much, for
+   example, but I do not want the code I write to be used as a weapon
+   against companies that have them. The FSF has long been discussing and
+   is drafting the "next generation" GPL, and they generally suggest that
+   people using the GPL should say "v2 or at your choice any later
+   version".
+
+   Linux doesn't do that. The Linux kernel is v2 ONLY, apart from a few
+   files where the author put in the FSF extension (and see above about
+   copyright assignments why I would never remove such an extension).
+
+The "v2 only" issue might change some day, but only after all documented
+copyright holders agree on it, and only after we've seen what the FSF
+suggests. From what I've seen so far from the FSF drafts, we're not likely
+to change our v2-only stance, but there might of course be legal reasons
+why we'd have to do something like it (ie somebody challenging the GPLv2
+in court, and part of it to be found unenforceable or similar would
+obviously mean that we'd have to reconsider the license).
+
+		Linus
+
+PS. Historically, binary-only modules have not worked well under Linux,
+quite regardless of any copyright issues. The kernel just develops too
+quickly for binary modules to work well, and nobody really supports them.
+Companies like Red Hat etc tend to refuse to have anything to do with
+binary modules, because if something goes wrong there is nothing they can
+do about it. So I just wanted to let you know that the _legal_ issue is
+just the beginning. Even though you probably don't personally care ;)
+
+
