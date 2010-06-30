@@ -225,13 +225,15 @@ static struct dentry *d_kill(struct dentry *dentry)
 {
 	struct dentry *parent;
 
-	list_del(&dentry->d_u.d_child);
-	if (dentry->d_parent && dentry != dentry->d_parent)
-		spin_unlock(&dentry->d_parent->d_lock);
 	if (IS_ROOT(dentry))
 		parent = NULL;
 	else
 		parent = dentry->d_parent;
+
+	dentry->d_parent = NULL;
+	list_del(&dentry->d_u.d_child);
+	if (parent)
+		spin_unlock(&parent->d_lock);
 	/*drops the locks, at that point nobody can reach this dentry */
 	dentry_iput(dentry);
 	d_free(dentry);
