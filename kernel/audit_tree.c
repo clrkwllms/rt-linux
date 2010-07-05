@@ -761,15 +761,15 @@ int audit_tag_tree(char *old, char *new)
 			continue;
 		}
 
-		vfsmount_read_lock();
+		spin_lock(&vfsmount_lock);
 		if (!is_under(mnt, dentry, &path)) {
-			vfsmount_read_unlock();
+			spin_unlock(&vfsmount_lock);
 			path_put(&path);
 			put_tree(tree);
 			mutex_lock(&audit_filter_mutex);
 			continue;
 		}
-		vfsmount_read_unlock();
+		spin_unlock(&vfsmount_lock);
 		path_put(&path);
 
 		list_for_each_entry(p, &list, mnt_list) {
