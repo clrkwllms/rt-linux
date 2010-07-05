@@ -185,6 +185,7 @@ static void set_dentry_child_flags(struct inode *inode, int watched)
 {
 	struct dentry *alias;
 
+	spin_lock(&dcache_lock);
 	spin_lock(&dcache_inode_lock);
 	list_for_each_entry(alias, &inode->i_dentry, d_alias) {
 		struct dentry *child;
@@ -204,6 +205,7 @@ static void set_dentry_child_flags(struct inode *inode, int watched)
 		spin_unlock(&alias->d_lock);
 	}
 	spin_unlock(&dcache_inode_lock);
+	spin_unlock(&dcache_lock);
 }
 
 /*
@@ -271,7 +273,6 @@ void inotify_d_instantiate(struct dentry *entry, struct inode *inode)
 	if (!inode)
 		return;
 
-	/* XXX: need parent lock in place of dcache_lock? */
 	spin_lock(&entry->d_lock);
 	parent = entry->d_parent;
 	if (parent->d_inode && inotify_inode_watched(parent->d_inode))
@@ -286,7 +287,6 @@ void inotify_d_move(struct dentry *entry)
 {
 	struct dentry *parent;
 
-	/* XXX: need parent lock in place of dcache_lock? */
 	parent = entry->d_parent;
 	if (inotify_inode_watched(parent->d_inode))
 		entry->d_flags |= DCACHE_INOTIFY_PARENT_WATCHED;

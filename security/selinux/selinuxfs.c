@@ -943,6 +943,7 @@ static void sel_remove_entries(struct dentry *de)
 {
 	struct list_head *node;
 
+	spin_lock(&dcache_lock);
 	spin_lock(&de->d_lock);
 	node = de->d_subdirs.next;
 	while (node != &de->d_subdirs) {
@@ -955,9 +956,11 @@ static void sel_remove_entries(struct dentry *de)
 			dget_locked_dlock(d);
 			spin_unlock(&de->d_lock);
 			spin_unlock(&d->d_lock);
+			spin_unlock(&dcache_lock);
 			d_delete(d);
 			simple_unlink(de->d_inode, d);
 			dput(d);
+			spin_lock(&dcache_lock);
 			spin_lock(&de->d_lock);
 		} else
 			spin_unlock(&d->d_lock);
@@ -965,6 +968,7 @@ static void sel_remove_entries(struct dentry *de)
 	}
 
 	spin_unlock(&de->d_lock);
+	spin_unlock(&dcache_lock);
 }
 
 #define BOOL_DIR_NAME "booleans"

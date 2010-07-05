@@ -59,6 +59,7 @@ rename_retry:
 
 	seq = read_seqbegin(&rename_lock);
 	rcu_read_lock();
+	spin_lock(&dcache_lock);
 	while (!IS_ROOT(dentry) && dentry != droot) {
 		namelen = dentry->d_name.len;
 		buflen -= namelen + 1;
@@ -69,6 +70,7 @@ rename_retry:
 		*--end = '/';
 		dentry = dentry->d_parent;
 	}
+	spin_unlock(&dcache_lock);
 	rcu_read_unlock();
 	if (read_seqretry(&rename_lock, seq))
 		goto rename_retry;
@@ -88,6 +90,7 @@ rename_retry:
 	memcpy(end, base, namelen);
 	return end;
 Elong_unlock:
+	spin_unlock(&dcache_lock);
 	rcu_read_unlock();
 	if (read_seqretry(&rename_lock, seq))
 		goto rename_retry;

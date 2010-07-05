@@ -17,10 +17,7 @@
 #include <linux/stat.h>
 #include <linux/param.h>
 #include <linux/time.h>
-#include <linux/spinlock.h>
 #include "autofs_i.h"
-
-DEFINE_SPINLOCK(autofs4_lock);
 
 static int autofs4_dir_symlink(struct inode *,struct dentry *,const char *);
 static int autofs4_dir_unlink(struct inode *,struct dentry *);
@@ -228,15 +225,15 @@ static int autofs4_dir_open(struct inode *inode, struct file *file)
 	 * autofs file system so just let the libfs routines handle
 	 * it.
 	 */
-	spin_lock(&autofs4_lock);
+	spin_lock(&dcache_lock);
 	spin_lock(&dentry->d_lock);
 	if (!d_mountpoint(dentry) && list_empty(&dentry->d_subdirs)) {
 		spin_unlock(&dentry->d_lock);
-		spin_unlock(&autofs4_lock);
+		spin_unlock(&dcache_lock);
 		return -ENOENT;
 	}
 	spin_unlock(&dentry->d_lock);
-	spin_unlock(&autofs4_lock);
+	spin_unlock(&dcache_lock);
 
 out:
 	return dcache_dir_open(inode, file);
@@ -305,9 +302,9 @@ static void *autofs4_follow_link(struct dentry *dentry, struct nameidata *nd)
 	/* We trigger a mount for almost all flags */
 	lookup_type = autofs4_need_mount(nd->flags);
 	spin_lock(&sbi->fs_lock);
-	spin_lock(&autofs4_lock);
+	spin_lock(&dcache_lock);
 	if (!(lookup_type || ino->flags & AUTOFS_INF_PENDING)) {
-		spin_unlock(&autofs4_lock);
+		spin_unlock(&dcache_lock);
 		spin_unlock(&sbi->fs_lock);
 		goto follow;
 	}
@@ -317,12 +314,13 @@ static void *autofs4_follow_link(struct dentry *dentry, struct nameidata *nd)
 	 * multi-mount with no root mount offset. So don't try to
 	 * mount it again.
 	 */
-	spin_lock(&autofs4_lock);
+	spin_lock(&dcache_lock);
 	spin_lock(&dentry->d_lock);
 	if (ino->flags & AUTOFS_INF_PENDING ||
 	    (!d_mountpoint(dentry) && list_empty(&dentry->d_subdirs))) {
 		ino->flags |= AUTOFS_INF_PENDING;
 		spin_unlock(&dentry->d_lock);
+		spin_unlock(&dcache_lock);
 		spin_unlock(&sbi->fs_lock);
 
 		status = try_to_fill_dentry(dentry);
@@ -330,7 +328,6 @@ static void *autofs4_follow_link(struct dentry *dentry, struct nameidata *nd)
 		spin_lock(&sbi->fs_lock);
 		ino->flags &= ~AUTOFS_INF_PENDING;
 		spin_unlock(&sbi->fs_lock);
-		spin_unlock(&autofs4_lock);
 
 		if (status)
 			goto out_error;
@@ -338,8 +335,8 @@ static void *autofs4_follow_link(struct dentry *dentry, struct nameidata *nd)
 		goto follow;
 	}
 	spin_unlock(&dentry->d_lock);
+	spin_unlock(&dcache_lock);
 	spin_unlock(&sbi->fs_lock);
-	spin_unlock(&autofs4_lock);
 follow:
 	/*
 	 * If there is no root mount it must be an autofs
@@ -390,7 +387,7 @@ static int autofs4_revalidate(struct dentry *dentry, struct nameidata *nd)
 	mutex_aquired = mutex_trylock(&dir->i_mutex);
 
 	spin_lock(&sbi->fs_lock);
-	spin_lock(&autofs4_lock);
+	spin_lock(&dcache_lock);
 	/* Pending dentry */
 	if (autofs4_ispending(dentry)) {
 		int status;
@@ -404,11 +401,11 @@ static int autofs4_revalidate(struct dentry *dentry, struct nameidata *nd)
 		ino->flags |= AUTOFS_INF_PENDING;
 		if (!mutex_aquired) {
 			autofs4_revalidate_drop(dentry, entry);
-			spin_unlock(&autofs4_lock);
+			spin_unlock(&dcache_lock);
 			spin_unlock(&sbi->fs_lock);
 			return 0;
 		}
-		spin_unlock(&autofs4_lock);
+		spin_unlock(&dcache_lock);
 		spin_unlock(&sbi->fs_lock);
 		mutex_unlock(&dir->i_mutex);
 		kfree(entry);
@@ -438,12 +435,10 @@ static int autofs4_revalidate(struct dentry *dentry, struct nameidata *nd)
 	}
 
 	/* Check for a non-mountpoint directory with no contents */
-	spin_lock(&autofs4_lock);
 	if (S_ISDIR(dentry->d_inode->i_mode) &&
 	    !d_mountpoint(dentry) && list_empty(&dentry->d_subdirs)) {
 		DPRINTK("dentry=%p %.*s, emptydir",
 			 dentry, dentry->d_name.len, dentry->d_name.name);
-		spin_unlock(&autofs4_lock);
 
 		if (autofs4_need_mount(flags) || current->link_count) {
 			int status;
@@ -457,11 +452,11 @@ static int autofs4_revalidate(struct dentry *dentry, struct nameidata *nd)
 			ino->flags |= AUTOFS_INF_PENDING;
 			if (!mutex_aquired) {
 				autofs4_revalidate_drop(dentry, entry);
-				spin_unlock(&autofs4_lock);
+				spin_unlock(&dcache_lock);
 				spin_unlock(&sbi->fs_lock);
 				return 0;
 			}
-			spin_unlock(&autofs4_lock);
+			spin_unlock(&dcache_lock);
 			spin_unlock(&sbi->fs_lock);
 			mutex_unlock(&dir->i_mutex);
 			kfree(entry);
@@ -482,7 +477,7 @@ static int autofs4_revalidate(struct dentry *dentry, struct nameidata *nd)
 			return status;
 		}
 	}
-	spin_unlock(&autofs4_lock);
+	spin_unlock(&dcache_lock);
 	spin_unlock(&sbi->fs_lock);
 
 	if (mutex_aquired)
@@ -556,7 +551,7 @@ static struct dentry *autofs4_lookup_active(struct dentry *dentry)
 	struct list_head *p, *head;
 
 restart:
-	spin_lock(&autofs4_lock);
+	spin_lock(&dcache_lock);
 	spin_lock(&sbi->lookup_lock);
 	head = &sbi->active_list;
 	list_for_each(p, head) {
@@ -578,7 +573,7 @@ restart:
 				dget_locked_dlock(active);
 				spin_unlock(&active->d_lock);
 				spin_unlock(&sbi->lookup_lock);
-				spin_unlock(&autofs4_lock);
+				spin_unlock(&dcache_lock);
 				autofs4_remove_rehash_entrys(ino);
 				dput(active);
 				goto restart;
@@ -601,13 +596,13 @@ restart:
 		dget_locked_dlock(active);
 		spin_unlock(&active->d_lock);
 		spin_unlock(&sbi->lookup_lock);
-		spin_unlock(&autofs4_lock);
+		spin_unlock(&dcache_lock);
 		return active;
 next:
 		spin_unlock(&active->d_lock);
 	}
 	spin_unlock(&sbi->lookup_lock);
-	spin_unlock(&autofs4_lock);
+	spin_unlock(&dcache_lock);
 
 	return NULL;
 }
@@ -622,7 +617,7 @@ static struct dentry *autofs4_lookup_expiring(struct dentry *dentry)
 	const unsigned char *str = name->name;
 	struct list_head *p, *head;
 
-	spin_lock(&autofs4_lock);
+	spin_lock(&dcache_lock);
 	spin_lock(&sbi->lookup_lock);
 	head = &sbi->expiring_list;
 	list_for_each(p, head) {
@@ -654,13 +649,13 @@ static struct dentry *autofs4_lookup_expiring(struct dentry *dentry)
 		dget_locked_dlock(expiring);
 		spin_unlock(&expiring->d_lock);
 		spin_unlock(&sbi->lookup_lock);
-		spin_unlock(&autofs4_lock);
+		spin_unlock(&dcache_lock);
 		return expiring;
 next:
 		spin_unlock(&expiring->d_lock);
 	}
 	spin_unlock(&sbi->lookup_lock);
-	spin_unlock(&autofs4_lock);
+	spin_unlock(&dcache_lock);
 
 	return NULL;
 }
@@ -921,15 +916,11 @@ static int autofs4_dir_unlink(struct inode *dir, struct dentry *dentry)
 
 	dir->i_mtime = CURRENT_TIME;
 
-	spin_lock(&autofs4_lock);
-	spin_lock(&sbi->lookup_lock);
-	if (list_empty(&ino->expiring))
-		list_add(&ino->expiring, &sbi->expiring_list);
-	spin_unlock(&sbi->lookup_lock);
+	spin_lock(&dcache_lock);
 	spin_lock(&dentry->d_lock);
 	__d_drop(dentry);
 	spin_unlock(&dentry->d_lock);
-	spin_unlock(&autofs4_lock);
+	spin_unlock(&dcache_lock);
 
 	return 0;
 }
@@ -946,11 +937,11 @@ static int autofs4_dir_rmdir(struct inode *dir, struct dentry *dentry)
 	if (!autofs4_oz_mode(sbi))
 		return -EACCES;
 
-	spin_lock(&autofs4_lock);
+	spin_lock(&dcache_lock);
 	spin_lock(&dentry->d_lock);
 	if (!list_empty(&dentry->d_subdirs)) {
 		spin_unlock(&dentry->d_lock);
-		spin_unlock(&autofs4_lock);
+		spin_unlock(&dcache_lock);
 		return -ENOTEMPTY;
 	}
 	spin_lock(&sbi->lookup_lock);
@@ -959,7 +950,7 @@ static int autofs4_dir_rmdir(struct inode *dir, struct dentry *dentry)
 	spin_unlock(&sbi->lookup_lock);
 	__d_drop(dentry);
 	spin_unlock(&dentry->d_lock);
-	spin_unlock(&autofs4_lock);
+	spin_unlock(&dcache_lock);
 
 	if (atomic_dec_and_test(&ino->count)) {
 		p_ino = autofs4_dentry_ino(dentry->d_parent);
