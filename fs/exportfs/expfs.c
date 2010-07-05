@@ -43,26 +43,24 @@ find_acceptable_alias(struct dentry *result,
 		void *context)
 {
 	struct dentry *dentry, *toput = NULL;
-	struct inode *inode;
 
 	if (acceptable(context, result))
 		return result;
 
-	inode = result->d_inode;
-	spin_lock(&inode->i_lock);
-	list_for_each_entry(dentry, &inode->i_dentry, d_alias) {
-		dget(dentry);
-		spin_unlock(&inode->i_lock);
+	spin_lock(&dcache_inode_lock);
+	list_for_each_entry(dentry, &result->d_inode->i_dentry, d_alias) {
+		dget_locked(dentry);
+		spin_unlock(&dcache_inode_lock);
 		if (toput)
 			dput(toput);
 		if (dentry != result && acceptable(context, dentry)) {
 			dput(result);
 			return dentry;
 		}
-		spin_lock(&inode->i_lock);
+		spin_lock(&dcache_inode_lock);
 		toput = dentry;
 	}
-	spin_unlock(&inode->i_lock);
+	spin_unlock(&dcache_inode_lock);
 
 	if (toput)
 		dput(toput);
