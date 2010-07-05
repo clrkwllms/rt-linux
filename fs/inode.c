@@ -347,12 +347,12 @@ static void dispose_list(struct list_head *head)
 			truncate_inode_pages(&inode->i_data, 0);
 		clear_inode(inode);
 
+		spin_lock(&sb_inode_list_lock);
 		spin_lock(&inode->i_lock);
 		__remove_inode_hash(inode);
-		spin_lock(&sb_inode_list_lock);
-		list_del_rcu(&inode->i_sb_list);
-		spin_unlock(&sb_inode_list_lock);
+		list_del_init(&inode->i_sb_list);
 		spin_unlock(&inode->i_lock);
+		spin_unlock(&sb_inode_list_lock);
 
 		wake_up_inode(inode);
 		destroy_inode(inode);
@@ -373,6 +373,14 @@ static int invalidate_list(struct list_head *head, struct list_head *dispose)
 	for (;;) {
 		struct list_head *tmp = next;
 		struct inode *inode;
+
+		/*
+		 * We can reschedule here without worrying about the list's
+		 * consistency because the per-sb list of inodes must not
+		 * change during umount anymore, and because iprune_sem keeps
+		 * shrink_icache_memory() away.
+		 */
+		cond_resched_lock(&sb_inode_list_lock);
 
 		next = next->next;
 		if (tmp == head)
@@ -416,17 +424,12 @@ int invalidate_inodes(struct super_block *sb)
 	int busy;
 	LIST_HEAD(throw_away);
 
-	/*
-	 * Don't need to worry about the list's consistency because the per-sb
-	 * list of inodes must not change during umount anymore, and because
-	 * iprune_sem keeps shrink_icache_memory() away.
-	 */
 	down_write(&iprune_sem);
-//	spin_lock(&sb_inode_list_lock); XXX: is this safe?
+	spin_lock(&sb_inode_list_lock);
 	inotify_unmount_inodes(&sb->s_inodes);
 	fsnotify_unmount_inodes(&sb->s_inodes);
 	busy = invalidate_list(&sb->s_inodes, &throw_away);
-//	spin_unlock(&sb_inode_list_lock);
+	spin_unlock(&sb_inode_list_lock);
 
 	dispose_list(&throw_away);
 	up_write(&iprune_sem);
@@ -652,8 +655,7 @@ __inode_add_to_lists(struct super_block *sb, struct inode_hash_bucket *b,
 			struct inode *inode)
 {
 	atomic_inc(&inodes_stat.nr_inodes);
-	spin_lock(&sb_inode_list_lock);
-	list_add_rcu(&inode->i_sb_list, &sb->s_inodes);
+	list_add(&inode->i_sb_list, &sb->s_inodes);
 	spin_unlock(&sb_inode_list_lock);
 	if (b) {
 		spin_lock(&b->lock);
@@ -678,6 +680,7 @@ void inode_add_to_lists(struct super_block *sb, struct inode *inode)
 {
 	struct inode_hash_bucket *b = inode_hashtable + hash(sb, inode->i_ino);
 
+	spin_lock(&sb_inode_list_lock);
 	spin_lock(&inode->i_lock);
 	__inode_add_to_lists(sb, b, inode);
 	spin_unlock(&inode->i_lock);
@@ -708,6 +711,7 @@ struct inode *new_inode(struct super_block *sb)
 
 	inode = alloc_inode(sb);
 	if (inode) {
+		spin_lock(&sb_inode_list_lock);
 		spin_lock(&inode->i_lock);
 		inode->i_ino = atomic_inc_return(&last_ino);
 		inode->i_state = 0;
@@ -774,6 +778,7 @@ static struct inode *get_new_inode(struct super_block *sb,
 		/* We released the lock, so.. */
 		old = find_inode(sb, b, test, data);
 		if (!old) {
+			spin_lock(&sb_inode_list_lock);
 			spin_lock(&inode->i_lock);
 			if (set(inode, data))
 				goto set_failed;
@@ -803,6 +808,7 @@ static struct inode *get_new_inode(struct super_block *sb,
 
 set_failed:
 	spin_unlock(&inode->i_lock);
+	spin_unlock(&sb_inode_list_lock);
 	destroy_inode(inode);
 	return NULL;
 }
@@ -823,6 +829,7 @@ static struct inode *get_new_inode_fast(struct super_block *sb,
 		/* We released the lock, so.. */
 		old = find_inode_fast(sb, b, ino);
 		if (!old) {
+			spin_lock(&sb_inode_list_lock);
 			spin_lock(&inode->i_lock);
 			inode->i_ino = ino;
 			inode->i_state = I_NEW;
@@ -1303,8 +1310,7 @@ void generic_delete_inode(struct inode *inode)
 		list_del_init(&inode->i_list);
 		spin_unlock(&wb_inode_list_lock);
 	}
-	spin_lock(&sb_inode_list_lock);
-	list_del_rcu(&inode->i_sb_list);
+	list_del_init(&inode->i_sb_list);
 	spin_unlock(&sb_inode_list_lock);
 	WARN_ON(inode->i_state & I_NEW);
 	inode->i_state |= I_FREEING;
@@ -1363,12 +1369,15 @@ int generic_detach_inode(struct inode *inode)
 		}
 		if (sb->s_flags & MS_ACTIVE) {
 			spin_unlock(&inode->i_lock);
+			spin_unlock(&sb_inode_list_lock);
 			return 0;
 		}
 		WARN_ON(inode->i_state & I_NEW);
 		inode->i_state |= I_WILL_FREE;
 		spin_unlock(&inode->i_lock);
+		spin_unlock(&sb_inode_list_lock);
 		write_inode_now(inode, 1);
+		spin_lock(&sb_inode_list_lock);
 		spin_lock(&inode->i_lock);
 		WARN_ON(inode->i_state & I_NEW);
 		inode->i_state &= ~I_WILL_FREE;
@@ -1380,8 +1389,7 @@ int generic_detach_inode(struct inode *inode)
 		spin_unlock(&wb_inode_list_lock);
 		atomic_dec(&inodes_stat.nr_unused);
 	}
-	spin_lock(&sb_inode_list_lock);
-	list_del_rcu(&inode->i_sb_list);
+	list_del_init(&inode->i_sb_list);
 	spin_unlock(&sb_inode_list_lock);
 	WARN_ON(inode->i_state & I_NEW);
 	inode->i_state |= I_FREEING;
@@ -1451,12 +1459,19 @@ void iput(struct inode *inode)
 	if (inode) {
 		BUG_ON(inode->i_state == I_CLEAR);
 
+retry:
 		spin_lock(&inode->i_lock);
-		inode->i_count--;
-		if (inode->i_count == 0)
+		if (inode->i_count == 1) {
+			if (!spin_trylock(&sb_inode_list_lock)) {
+				spin_unlock(&inode->i_lock);
+				goto retry;
+			}
+			inode->i_count--;
 			iput_final(inode);
-		else
+		} else {
+			inode->i_count--;
 			spin_unlock(&inode->i_lock);
+		}
 	}
 }
 EXPORT_SYMBOL(iput);
