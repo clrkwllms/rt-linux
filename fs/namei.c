@@ -1038,7 +1038,7 @@ return_base:
 		spin_unlock(&nd->path.dentry->d_lock);
 		return -EAGAIN;
 	}
-	atomic_inc(&nd->path.dentry->d_count);
+	nd->path.dentry->d_count++;
 	spin_unlock(&nd->path.dentry->d_lock);
 	return 0;
 }
@@ -2482,7 +2482,7 @@ void dentry_unhash(struct dentry *dentry)
 	dget(dentry);
 	shrink_dcache_parent(dentry);
 	spin_lock(&dentry->d_lock);
-	if (atomic_read(&dentry->d_count) == 2)
+	if (dentry->d_count == 2)
 		__d_drop(dentry);
 	spin_unlock(&dentry->d_lock);
 }
