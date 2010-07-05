@@ -752,7 +752,6 @@ void mntput_no_expire(struct vfsmount *mnt)
 {
 	int cpu = get_cpu();
 	put_cpu();
-repeat:
 	if (likely(mnt->mnt_flags & MNT_MOUNTED)) {
 		vfsmount_read_lock(cpu);
 		if (unlikely(!(mnt->mnt_flags & MNT_MOUNTED))) {
@@ -767,11 +766,9 @@ repeat:
 		return;
 	}
 
+repeat:
 	vfsmount_write_lock();
-	if (unlikely((mnt->mnt_flags & MNT_MOUNTED))) {
-		vfsmount_write_unlock();
-		goto repeat;
-	}
+	BUG_ON(mnt->mnt_flags & MNT_MOUNTED);
 	preempt_disable();
 	dec_mnt_count(mnt);
 	preempt_enable();
@@ -784,9 +781,7 @@ repeat:
 		__mntput(mnt);
 		return;
 	}
-	preempt_disable();
 	add_mnt_count(mnt, mnt->mnt_pinned + 1);
-	preempt_enable();
 	mnt->mnt_pinned = 0;
 	vfsmount_write_unlock();
 	acct_auto_close_mnt(mnt);
