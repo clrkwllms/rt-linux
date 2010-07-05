@@ -607,27 +607,26 @@ static struct inode *find_inode(struct super_block *sb,
 	struct inode *inode = NULL;
 
 repeat:
-	rcu_read_lock();
-	hlist_for_each_entry_rcu(inode, node, &b->head, i_hash) {
+	spin_lock(&b->lock);
+	hlist_for_each_entry(inode, node, &b->head, i_hash) {
 		if (inode->i_sb != sb)
 			continue;
-		spin_lock(&inode->i_lock);
-		if (hlist_unhashed(&inode->i_hash)) {
-			spin_unlock(&inode->i_lock);
-			continue;
+		if (!spin_trylock(&inode->i_lock)) {
+			spin_unlock(&b->lock);
+			goto repeat;
 		}
 		if (!test(inode, data)) {
 			spin_unlock(&inode->i_lock);
 			continue;
 		}
 		if (inode->i_state & (I_FREEING|I_CLEAR|I_WILL_FREE)) {
-			rcu_read_unlock();
+			spin_unlock(&b->lock);
 			__wait_on_freeing_inode(inode);
 			goto repeat;
 		}
 		break;
 	}
-	rcu_read_unlock();
+	spin_unlock(&b->lock);
 	return node ? inode : NULL;
 }
 
@@ -643,25 +642,24 @@ static struct inode *find_inode_fast(struct super_block *sb,
 	struct inode *inode = NULL;
 
 repeat:
-	rcu_read_lock();
-	hlist_for_each_entry_rcu(inode, node, &b->head, i_hash) {
+	spin_lock(&b->lock);
+	hlist_for_each_entry(inode, node, &b->head, i_hash) {
 		if (inode->i_ino != ino)
 			continue;
 		if (inode->i_sb != sb)
 			continue;
-		spin_lock(&inode->i_lock);
-		if (hlist_unhashed(&inode->i_hash)) {
-			spin_unlock(&inode->i_lock);
-			continue;
+		if (!spin_trylock(&inode->i_lock)) {
+			spin_unlock(&b->lock);
+			goto repeat;
 		}
 		if (inode->i_state & (I_FREEING|I_CLEAR|I_WILL_FREE)) {
-			rcu_read_unlock();
+			spin_unlock(&b->lock);
 			__wait_on_freeing_inode(inode);
 			goto repeat;
 		}
 		break;
 	}
-	rcu_read_unlock();
+	spin_unlock(&b->lock);
 	return node ? inode : NULL;
 }
 
@@ -945,14 +943,14 @@ static int test_inode_iunique(struct super_block *sb,
 	struct hlist_node *node;
 	struct inode *inode = NULL;
 
-	rcu_read_lock();
-	hlist_for_each_entry_rcu(inode, node, &b->head, i_hash) {
+	spin_lock(&b->lock);
+	hlist_for_each_entry(inode, node, &b->head, i_hash) {
 		if (inode->i_ino == ino && inode->i_sb == sb) {
-			rcu_read_unlock();
+			spin_unlock(&b->lock);
 			return 0;
 		}
 	}
-	rcu_read_unlock();
+	spin_unlock(&b->lock);
 	return 1;
 }
 
