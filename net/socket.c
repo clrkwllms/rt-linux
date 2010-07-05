@@ -368,9 +368,7 @@ static int sock_alloc_file(struct socket *sock, struct file **f, int flags)
 		  &socket_file_ops);
 	if (unlikely(!file)) {
 		/* drop dentry, keep inode */
-		spin_lock(&path.dentry->d_inode->i_lock);
-		path.dentry->d_inode->i_count++;
-		spin_unlock(&path.dentry->d_inode->i_lock);
+		atomic_inc(&path.dentry->d_inode->i_count);
 		path_put(&path);
 		put_unused_fd(fd);
 		return -ENFILE;

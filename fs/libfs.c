@@ -280,9 +280,7 @@ int simple_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	inc_nlink(inode);
-	spin_lock(&inode->i_lock);
-	inode->i_count++;
-	spin_unlock(&inode->i_lock);
+	atomic_inc(&inode->i_count);
 	dget(dentry);
 	d_instantiate(dentry, inode);
 	return 0;
