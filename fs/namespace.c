@@ -825,7 +825,7 @@ void mnt_unpin(struct vfsmount *mnt)
 	vfsmount_write_lock();
 	if (mnt->mnt_pinned) {
 		preempt_disable();
-		inc_mnt_count(mnt);
+		dec_mnt_count(mnt);
 		preempt_enable();
 		mnt->mnt_pinned--;
 	}
