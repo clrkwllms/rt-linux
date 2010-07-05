@@ -1754,14 +1754,10 @@ void d_delete(struct dentry * dentry)
 	/*
 	 * Are we the only user?
 	 */
-again:
+	spin_lock(&dcache_inode_lock);
 	spin_lock(&dentry->d_lock);
 	isdir = S_ISDIR(dentry->d_inode->i_mode);
 	if (dentry->d_count == 1) {
-		if (!spin_trylock(&dcache_inode_lock)) {
-			spin_unlock(&dentry->d_lock);
-			goto again;
-		}
 		dentry_iput(dentry);
 		fsnotify_nameremove(dentry, isdir);
 		return;
@@ -1771,6 +1767,7 @@ again:
 		__d_drop(dentry);
 
 	spin_unlock(&dentry->d_lock);
+	spin_unlock(&dcache_inode_lock);
 
 	fsnotify_nameremove(dentry, isdir);
 }
@@ -2082,14 +2079,13 @@ struct dentry *d_materialise_unique(struct dentry *dentry, struct inode *inode)
 
 	BUG_ON(!d_unhashed(dentry));
 
+	spin_lock(&dcache_inode_lock);
+
 	if (!inode) {
 		actual = dentry;
 		__d_instantiate(dentry, NULL);
-		d_rehash(actual);
-		goto out_nolock;
+		goto found_lock;
 	}
-
-	spin_lock(&dcache_inode_lock);
 
 	if (S_ISDIR(inode->i_mode)) {
 		struct dentry *alias;
@@ -2118,9 +2114,10 @@ struct dentry *d_materialise_unique(struct dentry *dentry, struct inode *inode)
 	actual = __d_instantiate_unique(dentry, inode);
 	if (!actual)
 		actual = dentry;
-	else
-		BUG_ON(!d_unhashed(actual));
+	else if (unlikely(!d_unhashed(actual)))
+		goto shouldnt_be_hashed;
 
+found_lock:
 	spin_lock(&actual->d_lock);
 found:
 	_d_rehash(actual);
@@ -2134,6 +2131,10 @@ out_nolock:
 
 	iput(inode);
 	return actual;
+
+shouldnt_be_hashed:
+	spin_unlock(&dcache_inode_lock);
+	BUG();
 }
 
 static int prepend(char **buffer, int *buflen, const char *str, int namelen)
