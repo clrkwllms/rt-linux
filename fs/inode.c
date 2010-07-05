@@ -86,7 +86,6 @@ static struct hlist_head *inode_hashtable __read_mostly;
  */
 DEFINE_SPINLOCK(inode_lock);
 DEFINE_SPINLOCK(sb_inode_list_lock);
-DEFINE_SPINLOCK(wb_inode_list_lock);
 DEFINE_SPINLOCK(inode_hash_lock);
 
 /*
@@ -295,11 +294,8 @@ void __iget(struct inode *inode)
 	if (inode->i_count > 1)
 		return;
 
-	if (!(inode->i_state & (I_DIRTY|I_SYNC))) {
-		spin_lock(&wb_inode_list_lock);
+	if (!(inode->i_state & (I_DIRTY|I_SYNC)))
 		list_move(&inode->i_list, &inode_in_use);
-		spin_unlock(&wb_inode_list_lock);
-	}
 	inodes_stat.nr_unused--;
 }
 
@@ -403,9 +399,7 @@ static int invalidate_list(struct list_head *head, struct list_head *dispose)
 		}
 		invalidate_inode_buffers(inode);
 		if (!inode->i_count) {
-			spin_lock(&wb_inode_list_lock);
 			list_move(&inode->i_list, dispose);
-			spin_unlock(&wb_inode_list_lock);
 			WARN_ON(inode->i_state & I_NEW);
 			inode->i_state |= I_FREEING;
 			spin_unlock(&inode->i_lock);
@@ -484,8 +478,6 @@ static void prune_icache(int nr_to_scan)
 
 	down_read(&iprune_sem);
 	spin_lock(&inode_lock);
-again:
-	spin_lock(&wb_inode_list_lock);
 	for (nr_scanned = 0; nr_scanned < nr_to_scan; nr_scanned++) {
 		struct inode *inode;
 
@@ -494,17 +486,13 @@ again:
 
 		inode = list_entry(inode_unused.prev, struct inode, i_list);
 
-		if (!spin_trylock(&inode->i_lock)) {
-			spin_unlock(&wb_inode_list_lock);
-			goto again;
-		}
+		spin_lock(&inode->i_lock);
 		if (inode->i_state || inode->i_count) {
 			list_move(&inode->i_list, &inode_unused);
 			spin_unlock(&inode->i_lock);
 			continue;
 		}
 		if (inode_has_buffers(inode) || inode->i_data.nrpages) {
-			spin_unlock(&wb_inode_list_lock);
 			__iget(inode);
 			spin_unlock(&inode->i_lock);
 			spin_unlock(&inode_lock);
@@ -513,16 +501,11 @@ again:
 								0, -1);
 			iput(inode);
 			spin_lock(&inode_lock);
-again2:
-			spin_lock(&wb_inode_list_lock);
 
 			if (inode != list_entry(inode_unused.next,
 						struct inode, i_list))
 				continue;	/* wrong inode or list_empty */
-			if (!spin_trylock(&inode->i_lock)) {
-				spin_unlock(&wb_inode_list_lock);
-				goto again2;
-			}
+			spin_lock(&inode->i_lock);
 			if (!can_unuse(inode)) {
 				spin_unlock(&inode->i_lock);
 				continue;
@@ -540,7 +523,6 @@ again2:
 	else
 		__count_vm_events(PGINODESTEAL, reap);
 	spin_unlock(&inode_lock);
-	spin_unlock(&wb_inode_list_lock);
 
 	dispose_list(&freeable);
 	up_read(&iprune_sem);
@@ -664,9 +646,7 @@ __inode_add_to_lists(struct super_block *sb, struct hlist_head *head,
 	spin_lock(&sb_inode_list_lock);
 	list_add(&inode->i_sb_list, &sb->s_inodes);
 	spin_unlock(&sb_inode_list_lock);
-	spin_lock(&wb_inode_list_lock);
 	list_add(&inode->i_list, &inode_in_use);
-	spin_unlock(&wb_inode_list_lock);
 	if (head) {
 		spin_lock(&inode_hash_lock);
 		hlist_add_head(&inode->i_hash, head);
@@ -1296,9 +1276,7 @@ void generic_delete_inode(struct inode *inode)
 {
 	const struct super_operations *op = inode->i_sb->s_op;
 
-	spin_lock(&wb_inode_list_lock);
 	list_del_init(&inode->i_list);
-	spin_unlock(&wb_inode_list_lock);
 	list_del_init(&inode->i_sb_list);
 	spin_unlock(&sb_inode_list_lock);
 	WARN_ON(inode->i_state & I_NEW);
@@ -1347,11 +1325,8 @@ int generic_detach_inode(struct inode *inode)
 	struct super_block *sb = inode->i_sb;
 
 	if (!hlist_unhashed(&inode->i_hash)) {
-		if (!(inode->i_state & (I_DIRTY|I_SYNC))) {
-			spin_lock(&wb_inode_list_lock);
+		if (!(inode->i_state & (I_DIRTY|I_SYNC)))
 			list_move(&inode->i_list, &inode_unused);
-			spin_unlock(&wb_inode_list_lock);
-		}
 		inodes_stat.nr_unused++;
 		if (sb->s_flags & MS_ACTIVE) {
 			spin_unlock(&inode->i_lock);
@@ -1375,9 +1350,7 @@ int generic_detach_inode(struct inode *inode)
 		hlist_del_init(&inode->i_hash);
 		spin_unlock(&inode_hash_lock);
 	}
-	spin_lock(&wb_inode_list_lock);
 	list_del_init(&inode->i_list);
-	spin_unlock(&wb_inode_list_lock);
 	list_del_init(&inode->i_sb_list);
 	spin_unlock(&sb_inode_list_lock);
 	WARN_ON(inode->i_state & I_NEW);
@@ -1449,17 +1422,17 @@ void iput(struct inode *inode)
 	if (inode) {
 		BUG_ON(inode->i_state == I_CLEAR);
 
-retry1:
+retry:
 		spin_lock(&inode->i_lock);
 		if (inode->i_count == 1) {
 			if (!spin_trylock(&inode_lock)) {
-retry2:
 				spin_unlock(&inode->i_lock);
-				goto retry1;
+				goto retry;
 			}
 			if (!spin_trylock(&sb_inode_list_lock)) {
 				spin_unlock(&inode_lock);
-				goto retry2;
+				spin_unlock(&inode->i_lock);
+				goto retry;
 			}
 			inode->i_count--;
 			iput_final(inode);
