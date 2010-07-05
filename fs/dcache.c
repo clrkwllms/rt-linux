@@ -2568,10 +2568,7 @@ resume:
 			spin_acquire(&this_parent->d_lock.dep_map, 0, 1, _RET_IP_);
 			goto repeat;
 		}
-		if (!(dentry->d_flags & DCACHE_GENOCIDE)) {
-			atomic_dec(&dentry->d_count);
-			dentry->d_flags |= DCACHE_GENOCIDE;
-		}
+		atomic_dec(&dentry->d_count);
 		spin_unlock(&dentry->d_lock);
 	}
 	if (this_parent != root) {
@@ -2579,10 +2576,7 @@ resume:
 		struct dentry *child;
 
 		tmp = this_parent->d_parent;
-		if (!(this_parent->d_flags & DCACHE_GENOCIDE)) {
-			atomic_dec(&this_parent->d_count);
-			this_parent->d_flags |= DCACHE_GENOCIDE;
-		}
+		atomic_dec(&this_parent->d_count);
 		rcu_read_lock();
 		spin_unlock(&this_parent->d_lock);
 		child = this_parent;
