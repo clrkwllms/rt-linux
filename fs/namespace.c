@@ -586,8 +586,7 @@ static void dentry_reset_mounted(struct vfsmount *mnt, struct dentry *dentry)
 {
 	if (!__lookup_mnt(mnt, dentry, 0)) {
 		spin_lock(&dentry->d_lock);
-		WARN_ON(dentry->d_mounted == 0);
-		dentry->d_mounted--;
+		dentry->d_flags &= ~DCACHE_MOUNTED;
 		spin_unlock(&dentry->d_lock);
 	}
 }
@@ -611,7 +610,7 @@ void mnt_set_mountpoint(struct vfsmount *mnt, struct dentry *dentry,
 	child_mnt->mnt_parent = mntget(mnt);
 	spin_lock(&dentry->d_lock);
 	child_mnt->mnt_mountpoint = dget_dlock(dentry);
-	dentry->d_mounted++;
+	dentry->d_flags |= DCACHE_MOUNTED;
 	spin_unlock(&dentry->d_lock);
 }
 
