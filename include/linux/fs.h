@@ -8,6 +8,7 @@
 
 #include <linux/limits.h>
 #include <linux/ioctl.h>
+#include <asm/atomic.h>
 
 /*
  * It's silly to have NR_OPEN bigger than NR_FILE, but you can change
