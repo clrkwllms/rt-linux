@@ -459,15 +459,13 @@ int seq_path_root(struct seq_file *m, struct path *path, struct path *root,
 	char *buf;
 	size_t size = seq_get_buf(m, &buf);
 	int res = -ENAMETOOLONG;
-	int cpu = get_cpu();
-	put_cpu();
 
 	if (size) {
 		char *p;
 
-		vfsmount_read_lock(cpu);
+		vfsmount_read_lock();
 		p = __d_path(path, root, buf, size);
-		vfsmount_read_unlock(cpu);
+		vfsmount_read_unlock();
 
 		res = PTR_ERR(p);
 		if (!IS_ERR(p)) {

@@ -60,20 +60,21 @@ static struct rw_semaphore namespace_sem;
 struct kobject *fs_kobj;
 EXPORT_SYMBOL_GPL(fs_kobj);
 
-void vfsmount_read_lock(int cpu)
+void vfsmount_read_lock(void)
 {
 	spinlock_t *lock;
 
-	lock = &per_cpu(vfsmount_lock, cpu);
+	lock = &get_cpu_var(vfsmount_lock);
 	spin_lock(lock);
 }
 
-void vfsmount_read_unlock(int cpu)
+void vfsmount_read_unlock(void)
 {
 	spinlock_t *lock;
 
-	lock = &per_cpu(vfsmount_lock, cpu);
+	lock = &__get_cpu_var(vfsmount_lock);
 	spin_unlock(lock);
+	put_cpu_var(vfsmount_lock);
 }
 
 void vfsmount_write_lock(void)
@@ -551,13 +552,11 @@ struct vfsmount *__lookup_mnt(struct vfsmount *mnt, struct dentry *dentry,
 struct vfsmount *lookup_mnt(struct path *path)
 {
 	struct vfsmount *child_mnt;
-	int cpu = get_cpu();
-	put_cpu();
 
-	vfsmount_read_lock(cpu);
+	vfsmount_read_lock();
 	if ((child_mnt = __lookup_mnt(path->mnt, path->dentry, 1)))
 		mntget(child_mnt);
-	vfsmount_read_unlock(cpu);
+	vfsmount_read_unlock();
 	return child_mnt;
 }
 
@@ -749,16 +748,14 @@ static inline void __mntput(struct vfsmount *mnt)
 
 void mntput_no_expire(struct vfsmount *mnt)
 {
-	int cpu = get_cpu();
-	put_cpu();
 	if (likely(mnt->mnt_flags & MNT_MOUNTED)) {
-		vfsmount_read_lock(cpu);
+		vfsmount_read_lock();
 		if (unlikely(!mnt->mnt_flags & MNT_MOUNTED)) {
-			vfsmount_read_unlock(cpu);
+			vfsmount_read_unlock();
 			goto repeat;
 		}
 		dec_mnt_count(mnt);
-		vfsmount_read_unlock(cpu);
+		vfsmount_read_unlock();
 
 		return;
 	}
