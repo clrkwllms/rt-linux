@@ -721,7 +721,7 @@ struct inode *new_inode(struct super_block *sb)
 	 * error if st_ino won't fit in target struct field. Use 32bit counter
 	 * here to attempt to avoid that.
 	 */
-	static atomic_t last_ino = ATOMIC_INIT(0);
+	static unsigned int last_ino;
 	struct inode *inode;
 
 	spin_lock_prefetch(&inode_lock);
@@ -731,7 +731,7 @@ struct inode *new_inode(struct super_block *sb)
 		spin_lock(&inode_lock);
 		spin_lock(&sb_inode_list_lock);
 		spin_lock(&inode->i_lock);
-		inode->i_ino = atomic_inc_return(&last_ino);
+		inode->i_ino = ++last_ino;
 		inode->i_state = 0;
 		__inode_add_to_lists(sb, NULL, inode);
 		spin_unlock(&inode->i_lock);
@@ -882,22 +882,6 @@ static struct inode *get_new_inode_fast(struct super_block *sb,
 	return inode;
 }
 
-static int test_inode_iunique(struct super_block * sb, struct hlist_head *head, unsigned long ino)
-{
-	struct hlist_node *node;
-	struct inode * inode = NULL;
-
-	spin_lock(&inode_hash_lock);
-	hlist_for_each_entry(inode, node, head, i_hash) {
-		if (inode->i_ino == ino && inode->i_sb == sb) {
-			spin_unlock(&inode_hash_lock);
-			return 0;
-		}
-	}
-	spin_unlock(&inode_hash_lock);
-	return 1;
-}
-
 /**
  *	iunique - get a unique inode number
  *	@sb: superblock
@@ -919,20 +903,20 @@ ino_t iunique(struct super_block *sb, ino_t max_reserved)
 	 * error if st_ino won't fit in target struct field. Use 32bit counter
 	 * here to attempt to avoid that.
 	 */
-	static DEFINE_SPINLOCK(unique_lock);
 	static unsigned int counter;
+	struct inode *inode;
 	struct hlist_head *head;
 	ino_t res;
 
 	spin_lock(&inode_lock);
-	spin_lock(&unique_lock);
 	do {
 		if (counter <= max_reserved)
 			counter = max_reserved + 1;
 		res = counter++;
 		head = inode_hashtable + hash(sb, res);
-	} while (!test_inode_iunique(sb, head, res));
-	spin_unlock(&unique_lock);
+		inode = find_inode_fast(sb, head, res);
+		spin_unlock(&inode->i_lock);
+	} while (inode != NULL);
 	spin_unlock(&inode_lock);
 
 	return res;
