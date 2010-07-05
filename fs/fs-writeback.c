@@ -650,8 +650,8 @@ again:
 		}
 
 		if (inode->i_state & (I_NEW | I_WILL_FREE)) {
-			requeue_io(inode);
 			spin_unlock(&inode->i_lock);
+			requeue_io(inode);
 			continue;
 		}
 
@@ -665,8 +665,8 @@ again:
 		}
 
 		if (pin_sb_for_writeback(wbc, inode, &pin_sb)) {
-			requeue_io(inode);
 			spin_unlock(&inode->i_lock);
+			requeue_io(inode);
 			continue;
 		}
 
@@ -817,7 +817,6 @@ retry:
 				goto retry;
 			}
 			inode_wait_for_writeback(inode);
-			spin_unlock(&inode->i_lock);
 		}
 		spin_unlock(&wb_inode_list_lock);
 	}
