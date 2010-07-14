@@ -94,6 +94,12 @@ extern void free_initmem(void);
 #ifndef CONFIG_DEBUG_RODATA
 static inline void mark_rodata_ro(void) { }
 #endif
+#ifdef CONFIG_ALLOC_RTSJ_MEM
+extern void alloc_rtsj_mem_early_setup(void);
+#else
+static inline void alloc_rtsj_mem_early_setup(void) { }
+#endif
+
 
 #ifdef CONFIG_TC
 extern void tc_init(void);
@@ -648,6 +654,7 @@ asmlinkage void __init start_kernel(void)
 		initrd_start = 0;
 	}
 #endif
+	alloc_rtsj_mem_early_setup();
 	page_cgroup_init();
 	enable_debug_pagealloc();
 	kmemtrace_init();
