@@ -425,7 +425,7 @@ static void path_rec_completion(int status,
 	if (!status) {
 		struct ib_ah_attr av;
 
-		if (!ib_init_ah_from_path(priv->ca, priv->port, pathrec, &av))
+		if (!ib_init_ah_from_path(priv->ca, priv->port, pathrec, &av, 0))
 			ah = ipoib_create_ah(dev, priv->pd, &av);
 	}
 
@@ -1362,6 +1362,8 @@ static void ipoib_add_one(struct ib_device *device)
 	}
 
 	for (p = s; p <= e; ++p) {
+		if (rdma_port_link_layer(device, p) != IB_LINK_LAYER_INFINIBAND)
+			continue;
 		dev = ipoib_add_port("ib%d", device, p);
 		if (!IS_ERR(dev)) {
 			priv = netdev_priv(dev);
@@ -1383,6 +1385,9 @@ static void ipoib_remove_one(struct ib_device *device)
 	dev_list = ib_get_client_data(device, &ipoib_client);
 
 	list_for_each_entry_safe(priv, tmp, dev_list, list) {
+		if (rdma_port_link_layer(device, priv->port) != IB_LINK_LAYER_INFINIBAND)
+			continue;
+
 		ib_unregister_event_handler(&priv->event_handler);
 
 		rtnl_lock();

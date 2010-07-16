@@ -452,6 +452,7 @@ ssize_t ib_uverbs_query_port(struct ib_uverbs_file *file,
 	resp.active_width    = attr.active_width;
 	resp.active_speed    = attr.active_speed;
 	resp.phys_state      = attr.phys_state;
+	resp.link_layer	     = attr.link_layer;
 
 	if (copy_to_user((void __user *) (unsigned long) cmd.response,
 			 &resp, sizeof resp))
@@ -1821,6 +1822,38 @@ err_put:
 
 err:
 	put_uobj_write(uobj);
+	return ret;
+}
+
+ssize_t ib_uverbs_get_eth_l2_addr(struct ib_uverbs_file *file, const char __user *buf,
+				  int in_len, int out_len)
+{
+	struct ib_uverbs_get_eth_l2_addr       cmd;
+	struct ib_uverbs_get_eth_l2_addr_resp  resp;
+	int              ret;
+	struct ib_pd    *pd;
+
+	if (out_len < sizeof resp)
+		return -ENOSPC;
+
+	if (copy_from_user(&cmd, buf, sizeof cmd))
+		return -EFAULT;
+
+	pd = idr_read_pd(cmd.pd_handle, file->ucontext);
+	if (!pd)
+		return -EINVAL;
+
+	ret = ib_get_eth_l2_addr(pd->device, cmd.port, (union ib_gid *)cmd.gid,
+				 cmd.sgid_idx, resp.mac, &resp.vlan_id);
+	put_pd_read(pd);
+	if (!ret) {
+		if (copy_to_user((void __user *) (unsigned long) cmd.response,
+				 &resp, sizeof resp))
+			return -EFAULT;
+
+		return in_len;
+	}
+
 	return ret;
 }
 

@@ -182,6 +182,25 @@ static int mlx4_set_port_vlan_table(struct mlx4_dev *dev, u8 port,
 	return err;
 }
 
+int mlx4_find_cached_vlan(struct mlx4_dev *dev, u8 port, u16 vid, int *idx)
+{
+	struct mlx4_vlan_table *table = &mlx4_priv(dev)->port[port].vlan_table;
+	int i;
+
+	for (i = 0; i < MLX4_MAX_VLAN_NUM; ++i) {
+		if (table->refs[i] &&
+		    (vid == (MLX4_VLAN_MASK &
+			      be32_to_cpu(table->entries[i])))) {
+			/* Vlan already registered, increase refernce count */
+			*idx = i;
+			return 0;
+		}
+	}
+
+	return -ENOENT;
+}
+EXPORT_SYMBOL_GPL(mlx4_find_cached_vlan);
+
 int mlx4_register_vlan(struct mlx4_dev *dev, u8 port, u16 vlan, int *index)
 {
 	struct mlx4_vlan_table *table = &mlx4_priv(dev)->port[port].vlan_table;
@@ -299,7 +318,7 @@ int mlx4_SET_PORT(struct mlx4_dev *dev, u8 port)
 	struct mlx4_cmd_mailbox *mailbox;
 	int err;
 
-	if (dev->caps.port_type[port] == MLX4_PORT_TYPE_ETH)
+	if (dev->caps.port_type[port] != MLX4_PORT_TYPE_IB)
 		return 0;
 
 	mailbox = mlx4_alloc_cmd_mailbox(dev);

@@ -94,6 +94,22 @@ rdma_node_get_transport(enum rdma_node_type node_type)
 }
 EXPORT_SYMBOL(rdma_node_get_transport);
 
+enum rdma_link_layer rdma_port_link_layer(struct ib_device *device, u8 port_num)
+{
+	if (device->get_link_layer)
+		return device->get_link_layer(device, port_num);
+
+	switch (rdma_node_get_transport(device->node_type)) {
+	case RDMA_TRANSPORT_IB:
+		return IB_LINK_LAYER_INFINIBAND;
+	case RDMA_TRANSPORT_IWARP:
+		return IB_LINK_LAYER_ETHERNET;
+	default:
+		return IB_LINK_LAYER_UNSPECIFIED;
+	}
+}
+EXPORT_SYMBOL(rdma_port_link_layer);
+
 /* Protection domains */
 
 struct ib_pd *ib_alloc_pd(struct ib_device *device)
@@ -904,3 +920,13 @@ int ib_detach_mcast(struct ib_qp *qp, union ib_gid *gid, u16 lid)
 	return qp->device->detach_mcast(qp, gid, lid);
 }
 EXPORT_SYMBOL(ib_detach_mcast);
+
+int ib_get_eth_l2_addr(struct ib_device *device, u8 port, union ib_gid *gid,
+		       int sgid_idx, u8 *mac, __u16 *vlan_id)
+{
+	if (!device->get_eth_l2_addr)
+		return -ENOSYS;
+
+	return device->get_eth_l2_addr(device, port, gid, sgid_idx, mac, vlan_id);
+}
+EXPORT_SYMBOL(ib_get_eth_l2_addr);
