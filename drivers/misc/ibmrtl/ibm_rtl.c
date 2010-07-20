@@ -3,8 +3,14 @@
 #include <linux/module.h>
 #include <linux/io.h>
 #include <linux/sysdev.h>
+#include <linux/dmi.h>
 
 #include "rtl.h"
+
+static int force;
+module_param(force, bool, 0);
+MODULE_PARM_DESC(force, "Force driver load, ignore DMI data");
+
 static unsigned int table_addr;
 
 int ibm_rtl_write(u8 value)
@@ -138,11 +144,97 @@ static void rtl_teardown_sysfs(void) {
 	return;;
 }
 
+static int dmi_check_cb(const struct dmi_system_id *id)
+{
+        printk("ibm_rtl: found IBM server '%s'\n", id->ident);
+        return 0;
+}
+
+static struct dmi_system_id __initdata ibm_rtl_dmi_table[] = {
+	{
+		.ident = "BladeCenter LS21",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "7971"),
+		},
+		.callback = dmi_check_cb
+	},
+	{
+		.ident = "BladeCenter LS22",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "7901"),
+		},
+		.callback = dmi_check_cb
+	},
+	{
+		.ident = "BladeCenter HS21 XM",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "7995"),
+		},
+		.callback = dmi_check_cb
+	},
+	{
+		.ident = "BladeCenter HS22",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "7870"),
+		},
+		.callback = dmi_check_cb
+	},
+	{
+		.ident = "BladeCenter HS22V",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "7871"),
+		},
+		.callback = dmi_check_cb
+	},
+	{
+		.ident = "System x3550 M2",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "7946"),
+		},
+		.callback = dmi_check_cb
+	},
+	{
+		.ident = "System x3650 M2",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "7947"),
+		},
+		.callback = dmi_check_cb
+	},
+	{
+		.ident = "System x3550 M3",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "7944"),
+		},
+		.callback = dmi_check_cb
+	},
+	{
+		.ident = "System x3650 M3",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "7945"),
+		},
+		.callback = dmi_check_cb
+	},
+	{ }
+};
+
 /* only allow the modules to load if the _RTL_ table can be found*/
 int init_module(void) {
 	unsigned long ebda_addr,ebda_size;
 	void __iomem *data, *d;
 	int ret,i;
+	
+	/* first ensure that we are running on IBM HW */
+	if (!force && !dmi_check_system(ibm_rtl_dmi_table))
+		return -ENODEV;
 
 	/*get the address for the RTL table from the EBDA */
 	ebda_addr = *(unsigned short *)phys_to_virt(0x40E);
