@@ -8,7 +8,7 @@ Summary: The Linux RT kernel
 %define realtime rt
 
 # mrgN
-%define iteration 35
+%define iteration 36
 
 # rtN
 %define rttag rt29
@@ -24,6 +24,7 @@ Summary: The Linux RT kernel
 %define buildtrace 0
 %define buildkabi 0
 %define buildperf 1
+%define buildfirmware 0
 
 %define _enable_debug_packages 1
 
@@ -101,6 +102,7 @@ Summary: The Linux RT kernel
 %define buildheaders 0
 %define builddebug 0
 %define buildperf 0
+%define buildfirmware 1
 %define all_arch_configs $RPM_SOURCE_DIR/kernel-%{rpmversion}-*.config
 %endif
 
@@ -240,6 +242,7 @@ Provides: kernel-rt-%{_target_cpu} = %{rpmversion}-%{pkg_release}
 Prereq: %{kernel_prereq}
 Conflicts: %{kernel_dot_org_conflicts}
 Conflicts: %{package_conflicts}
+Requires: kernel-rt-firmware, rt-setup
 
 #
 # prevent the x86 kernel-rt package from being picked up by yum
@@ -601,6 +604,7 @@ Conflicts: %{package_conflicts}
 # isn't required for the kernel proper to function
 AutoReq: no
 AutoProv: yes
+Requires: kernel-rt-firmware, rt-setup
 
 %description trace
 This package includes a version of the realtime Linux kernel with tracing
@@ -646,6 +650,7 @@ Conflicts: %{kernel_dot_org_conflicts}
 Conflicts: %{package_conflicts}
 AutoReq: no
 AutoProv: yes
+Requires: kernel-rt-firmware, rt-setup
 
 %description debug
 This package contains the realtime kernel and modules compiled with various
@@ -665,6 +670,17 @@ Prereq: /usr/bin/find
 This package provides kernel headers and makefiles sufficient to build modules
 against the debug kernel-rt package.
 
+
+%if %{buildfirmware}
+%package firmware
+Summary: Firmware files built with the kernel
+Group: System Environment/Kernel
+Provides: kernel-rt-firmware
+Provides: kernel-rt-firmware-%{_target_cpu} = %{rpmversion}-%{pkg_release}
+
+%description firmware
+Firmware files built with the kernel.
+%endif
 
 %prep
 patch_command='patch -p1 -F1 -s'
@@ -744,7 +760,7 @@ ApplyPatch linux-2.6-build-nonintconfig.patch
 mkdir configs
 
 # The change to the firmware dir must also bepresent on the vanilla kernel
-ApplyPatch firmware.patch
+# ApplyPatch firmware.patch
 
 # now move back up and get ready to work
 cd ..
@@ -1242,6 +1258,11 @@ make prefix=$RPM_BUILD_ROOT%{_prefix} -C tools/perf install
 tar xvjf %{SOURCE31} -C $RPM_BUILD_ROOT
 %endif
 
+if [ -d %{buildroot}/lib/firmware ]; then
+	rm -rf %{buildroot}/lib/firmware
+fi
+
+
 ###
 ### Special hacks for debuginfo subpackages.
 ###
@@ -1336,6 +1357,15 @@ rm -f $RPM_BUILD_ROOT%{_includedir}/asm*/io.h
 rm -f $RPM_BUILD_ROOT%{_includedir}/asm*/irq.h
 %endif
 
+%if %{buildfirmware}
+	cp configs/kernel*x86_64-rt.config .config
+	make INSTALL_MOD_PATH=%{buildroot} firmware_install
+	mv %{buildroot}/lib/firmware %{buildroot}/lib/zzzzz
+	mkdir %{buildroot}/lib/firmware
+	mv %{buildroot}/lib/zzzzz %{buildroot}/lib/firmware/%{version}-%{release}
+%endif
+
+
 ###
 ### clean
 ###
@@ -1427,7 +1457,6 @@ This is required to use SystemTap with %{name}-%{KVERREL}.
 /lib/modules/%{KVERREL}/extra
 /lib/modules/%{KVERREL}/updates
 /lib/modules/%{KVERREL}/weak-updates
-/lib/firmware/%{KVERREL}
 %ghost /boot/initrd-%{KVERREL}.img
 
 
@@ -1467,7 +1496,6 @@ This is required to use SystemTap with %{name}-%{KVERREL}.
 /lib/modules/%{KVERREL}debug/extra
 /lib/modules/%{KVERREL}debug/updates
 /lib/modules/%{KVERREL}debug/weak-updates
-/lib/firmware/%{KVERREL}debug
 %ghost /boot/initrd-%{KVERREL}debug.img
 
 %files debug-devel
@@ -1533,7 +1561,6 @@ This is required to use SystemTap with %{name}-vanilla-%{KVERREL}.
 /lib/modules/%{KVERREL}vanilla/extra
 /lib/modules/%{KVERREL}vanilla/updates
 /lib/modules/%{KVERREL}vanilla/weak-updates
-/lib/firmware/%{KVERREL}vanilla
 %ghost /boot/initrd-%{KVERREL}vanilla.img
 
 %files vanilla-devel
@@ -1578,12 +1605,18 @@ This is required to use SystemTap with %{name}-trace-%{KVERREL}.
 /lib/modules/%{KVERREL}trace/extra
 /lib/modules/%{KVERREL}trace/updates
 /lib/modules/%{KVERREL}trace/weak-updates
-/lib/firmware/%{KVERREL}trace
 %ghost /boot/initrd-%{KVERREL}trace.img
 
 %files trace-devel
 %defattr(-,root,root)
 %{_usrsrc}/kernels/%{KVERREL}-trace-%{_target_cpu}
+%endif
+
+# kernel-rt-firmware files
+%if %{buildfirmware}
+%files firmware
+%defattr(-,root,root)
+/lib/firmware/%{version}-%{release}
 %endif
 
 # only some architecture builds need kernel-doc
@@ -1597,6 +1630,10 @@ This is required to use SystemTap with %{name}-trace-%{KVERREL}.
 %endif
 
 %changelog
+* Tue Aug 17 2010 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.33.7-rt29-mrg36
+- Removed firmware.patch
+- Created the (noarch) kernel-rt-firmware package
+
 * Wed Aug 4 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg34
 - Rebased to v2.6.33.7-rt29
 
