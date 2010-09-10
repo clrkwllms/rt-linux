@@ -4666,6 +4666,7 @@ static void bnx2x_timer(unsigned long data)
 		rc = bnx2x_rx_int(fp, 1000);
 	}
 
+#ifndef CONFIG_PREEMPT_RT
 	if (!BP_NOMCP(bp)) {
 		int func = BP_FUNC(bp);
 		u32 drv_pulse;
@@ -4689,6 +4690,7 @@ static void bnx2x_timer(unsigned long data)
 				  drv_pulse, mcp_pulse);
 		}
 	}
+#endif /* CONFIG_PREEMPT_RT */
 
 	if (bp->state == BNX2X_STATE_OPEN)
 		bnx2x_stats_handle(bp, STATS_EVENT_UPDATE);
@@ -6667,6 +6669,7 @@ static int bnx2x_init_hw(struct bnx2x *bp, u32 load_code)
 		break;
 	}
 
+#ifndef CONFIG_PREEMPT_RT
 	if (!BP_NOMCP(bp)) {
 		int func = BP_FUNC(bp);
 
@@ -6675,6 +6678,7 @@ static int bnx2x_init_hw(struct bnx2x *bp, u32 load_code)
 				 DRV_PULSE_SEQ_MASK);
 		DP(BNX2X_MSG_MCP, "drv_pulse 0x%x\n", bp->fw_drv_pulse_wr_seq);
 	}
+#endif /* CONFIG_PREEMPT_RT */
 
 	/* this needs to be done before gunzip end */
 	bnx2x_zero_def_sb(bp);
@@ -7868,8 +7872,10 @@ static int bnx2x_nic_unload(struct bnx2x *bp, int unload_mode)
 	bnx2x_netif_stop(bp, 1);
 
 	del_timer_sync(&bp->timer);
+#ifndef CONFIG_PREEMPT_RT
 	SHMEM_WR(bp, func_mb[BP_FUNC(bp)].drv_pulse_mb,
 		 (DRV_PULSE_ALWAYS_ALIVE | bp->fw_drv_pulse_wr_seq));
+#endif /* CONFIG_PREEMPT_RT */
 	bnx2x_stats_handle(bp, STATS_EVENT_STOP);
 
 	/* Release IRQs */
