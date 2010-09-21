@@ -54,9 +54,6 @@
 static int drm_version(struct drm_device *dev, void *data,
 		       struct drm_file *file_priv);
 
-#define DRM_IOCTL_DEF(ioctl, _func, _flags) \
-	[DRM_IOCTL_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, .cmd_drv = 0}
-
 /** Ioctl table */
 static struct drm_ioctl_desc drm_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_IOCTL_VERSION, drm_version, 0),
@@ -448,7 +445,6 @@ long drm_ioctl(struct file *filp,
 	int retcode = -EINVAL;
 	char stack_kdata[128];
 	char *kdata = NULL;
-	unsigned int usize, asize;
 
 	dev = file_priv->minor->dev;
 	atomic_inc(&dev->ioctl_count);
@@ -464,18 +460,11 @@ long drm_ioctl(struct file *filp,
 	    ((nr < DRM_COMMAND_BASE) || (nr >= DRM_COMMAND_END)))
 		goto err_i1;
 	if ((nr >= DRM_COMMAND_BASE) && (nr < DRM_COMMAND_END) &&
-	    (nr < DRM_COMMAND_BASE + dev->driver->num_ioctls)) {
-		u32 drv_size;
+	    (nr < DRM_COMMAND_BASE + dev->driver->num_ioctls))
 		ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
-		drv_size = _IOC_SIZE(ioctl->cmd_drv);
-		usize = asize = _IOC_SIZE(cmd);
-		if (drv_size > asize)
-			asize = drv_size;
-	}
 	else if ((nr >= DRM_COMMAND_END) || (nr < DRM_COMMAND_BASE)) {
 		ioctl = &drm_ioctls[nr];
 		cmd = ioctl->cmd;
-		usize = asize = _IOC_SIZE(cmd);
 	} else
 		goto err_i1;
 
@@ -495,10 +484,10 @@ long drm_ioctl(struct file *filp,
 		retcode = -EACCES;
 	} else {
 		if (cmd & (IOC_IN | IOC_OUT)) {
-			if (asize <= sizeof(stack_kdata)) {
+			if (_IOC_SIZE(cmd) <= sizeof(stack_kdata)) {
 				kdata = stack_kdata;
 			} else {
-				kdata = kmalloc(asize, GFP_KERNEL);
+				kdata = kmalloc(_IOC_SIZE(cmd), GFP_KERNEL);
 				if (!kdata) {
 					retcode = -ENOMEM;
 					goto err_i1;
@@ -508,12 +497,12 @@ long drm_ioctl(struct file *filp,
 
 		if (cmd & IOC_IN) {
 			if (copy_from_user(kdata, (void __user *)arg,
-					   usize) != 0) {
+					   _IOC_SIZE(cmd)) != 0) {
 				retcode = -EFAULT;
 				goto err_i1;
 			}
 		} else
-			memset(kdata, 0, usize);
+			memset(kdata, 0, _IOC_SIZE(cmd));
 
 		if (ioctl->flags & DRM_UNLOCKED)
 			retcode = func(dev, kdata, file_priv);
@@ -525,7 +514,7 @@ long drm_ioctl(struct file *filp,
 
 		if (cmd & IOC_OUT) {
 			if (copy_to_user((void __user *)arg, kdata,
-					 usize) != 0)
+					 _IOC_SIZE(cmd)) != 0)
 				retcode = -EFAULT;
 		}
 	}
