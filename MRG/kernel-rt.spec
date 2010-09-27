@@ -8,7 +8,7 @@ Summary: The Linux RT kernel
 %define realtime rt
 
 # mrgN
-%define iteration 36
+%define iteration 42
 
 # rtN
 %define rttag rt29
@@ -310,6 +310,15 @@ Source28: config-x86-generic
 Source30: sanity_check.py
 Source31: perf-manpage.tar.bz2
 
+# Future Audit
+# Patch19: bz460217-nagle-tunables.patch
+# Patch23: aic94xx-inline-fw-rt.patch
+# Patch24: qla2xxx-inline-fw-rt.patch
+# Patch28: ibm-amd-edac-rh-v1-2.6.29_forward_port.patch
+# Patch50: perf-use-cplus_demangle.patch
+# bz465837-rtc-compat-rhel5.patch-ported-to-V2.patch
+# End Audit
+
 # START OF PATCH DEFINITIONS
 %if 0%{?rcrev}
 Patch2: patch-%{rpmversion}-%{rctag}-%{rttag}.bz2
@@ -320,177 +329,58 @@ Patch4: Allocate-RTSJ-memory-for-TCK-conformance-test.patch
 Patch5: Add-dev-rmem-device-driver-for-real-time-JVM-testing.patch
 Patch6: ibm-rmem-for-rtsj.patch
 Patch7: linux-2.6-dynticks-off-by-default.patch
-# Patch8: linux-2.6-rt-oomkill.patch
-# Patch9: RT-die.patch
-# Patch10: pci-nommconf-noseg.patch
-
-### 2.6.29.1-3
-Patch11: linux-2.6-panic-on-oops.patch
-
-### 2.6.29.1-4
-# Only a config change
-
-### 2.6.29.1-5
-# Patch12: RHEL-RT_AMD_TSC_sync_PN.patch
-# Patch14: bz465837-rtc-compat-rhel5.patch-ported-to-V2.patch
-# Patch15: bz467739-ibm-add-amd64_edac-driver.patch
-# Patch16: irq-tracer-fix.patch
-# Patch17: forward-port-of-limit-i386-ram-to-16gb.patch
-# Patch18: forward-port-of-quiet-plist-warning.patch
-
-### 2.6.29.1-6
-# Patch19: bz460217-nagle-tunables.patch
-Patch20: ibm-rtl-driver.patch
-Patch21: ibm-hs21-tmid-fix.patch
-# Patch22: ibm-qla-disable-msi-on-rt.patch
-
-### 2.6.29.1-7
-# Patch23: aic94xx-inline-fw-rt.patch
-# Patch24: qla2xxx-inline-fw-rt.patch
-# Patch26: ntp-logarithmic.patch
-
-### 2.6.29.1-8
-# Patch28: ibm-amd-edac-rh-v1-2.6.29_forward_port.patch
-# Patch30: net-link-workaround-silly-yield.patch
-
-### 2.6.29.1-11
-# rebased to 2.6.29.2
-# rebased rt to 2.6.29.2-rt10
-# Patch30: forward-port-from-bz465862-ib-fix-locking-order.patch
-# Patch31: jstultz-ntp.patch
-
-### 2.6.29.4-17
-# rebased rt to 2.6.29.4-rt15
-# Patch40: ftrace-function_profiler-bandaid.patch
-# Patch41: net-avoid-extra-wakeups-in-wait_for_packet.patch
-
-### 2.6.29.4-19
-# Patch42: ftrace-fix-profile-race.patch
-
-### 2.6.29.4-20
-# Patch43: bz503758-increase-hung_task_timeout_secs-on-rt.patch
-
-### 2.6.29.4-21
-# Rebased to 2.6.29.4-rt17
-# The following mrg patches are no longer necessary.
-# Patch32, Patch33, Patch34, Patch35, Patch36, Patch37, Patch38, Patch39
-# Patch40, Patch42
-
-### 2.6.29.4-22
-# Rebased to 2.6.29.4-rt18
-# The mrg patch smi-detector.patch is replaced by
-# the 2.6.29.4-rt18 hwlat_detector-a-system-hardware-latency-detector.patch
-
-### 2.6.29.5-26
-# Rebased to 2.6.29.5-rt22
-# Added mrg patch increase-max-lockdep-entries-chains.patch
-# Patch44: increase-max-lockdep-entries-chains.patch
-
-### 2.6.29.6-28
-# Patch45: hw_lat-simple-solution-001.patch
-
-### 2.6.31-rc5-3
-# Iteration 3
-
-### 2.6.31-rc5-4
-# Rebased to 2.6.31-rc5-rt1.2
-# Added these patches that are lined up for 2.6.31-rc5-rt1.3
-# Patch46: pre1.3-0002-add-hunks-dropped-in-rt-2.6.31-rc5-rt1.1-forward-por.patch
-# Patch47: pre1.3-0003-ARM-5627-1-Fix-restoring-of-lr-at-the-end-of-mcoun.patch
-# Patch48: pre1.3-0004-ARM-5613-1-implement-CALLER_ADDRESSx.patch
-# Patch49: pre1.3-0005-futex-detect-mismatched-requeue-targets.patch
-
-### 2.6.31-rc5-5
-# Patch50: perf-use-cplus_demangle.patch
-
-### 2.6.31-rc6-6
-# Rebased to 2.6.31-rc6-rt2
-# Remove the pre1.3 patches that either be included or dropped in the above
-
-### 2.6.31-rc6-rt4-7
-# new naming style (see above)
-# Rebased to 2.6.31-rc6-rt4
-# Removed bz503758 which increases hung_task_timeout_secs default on RT
-# Reason 1 - We can modify this in /etc/sysctl.conf instead of with a patch
-# Reason 2 - We are turning off hung_task_panic
-Patch23: firmware.patch
-
-### 2.6.31-rc6-rt5-9
-# PATCH52: timer-delay-waking-softirqs-from-the-jiffy-tick.patch
-
-### 2.6.31-rc6-rt5-10
-# Specfile changes related to firmware files install
-
-### 2.6.31-rc6-rt6-11
-# Rebased to 2.6.31-rc6-rt6
-# Dropped timer-delay-waking-softirqs-from-the-jiffy-tick.patch
-# because it already integrated in the rt6 version.
-
-### 2.6.31-rc7-rt7-12
-# Rebased to 2.6.31-rc7-rt7
-Patch24: scsi-fc-transport-removal-of-target-configurable.patch
-
-### 2.6.31-rt11-mrg20
-# Dropped forward-port-from-bz465862-ib-fix-locking-order.patch
-# Dropped forward-port-of-quiet-plist-warning.patch
-
-### 2.6.31-rt13-mrg21
-# Patch26: implement_logarithmic_time_accumulation.patch
-# Patch54: remove_xtime_cache.patch
-
-### 2.6.31-rt13-mrg22
-# PATCH55: bz523604-remove-pulse-code-from-the-bnx2x-driver.patch
-# PATCH56: bz517166-amd64_edac_trival_fix.patch
-# PATCH57: bz517166-patch-amd-csfix.patch
-
-### 2.6.31.2-rt13-mrg23
-# PATCH58: bz528136-ftrace-check-for-failure-for-all-conversions.patch 
-# PATCH59: bz528136-tracing-correct-module-boundaries-for-ftrace_releas.patch
-# PATCH60: bz524789-Add-support-for-i7core.patch
-# PATCH61: bz527421-smi-remediation-simple-fix.patch
-
-### 2.6.31.4-rt14-mrg24
-# Rebased to 2.6.31.4-rt14
-# Dropped implement_logarithmic_time_accumulation.patch
-# Dropped remove_xtime_cache.patch
-# Dropped bz528136-ftrace-check-for-failure-for-all-conversions.patch
-# Dropped bz528136-tracing-correct-module-boundaries-for-ftrace_releas.patch
-
-### 2.6.31.4-rt14-mrg25
-# PATCH62: bz528747-net-Introduce-recvmmsg-socket-syscall.patch
-
-### 2.6.31.4-rt14-mrg28
-# PATCH70: bz531589-net-Make-setsockopt-optlen-be-unsigned.patch
-
-### 2.6.31.4-rt14-mrg29
-# Updated bz529839-futex-comment-fixups.patch
-
-### 2.6.31.4-rt14-mrg30
-# Do not set CONFIG_SCHED_MC (bz527658)
-# Do not set CONFIG_SECURITY_DEFAULT_MMAP_MIN_ADDR
-
-### 2.6.33-rt4-mrg3
-# Patch23: mm-highmem.c-Fix-pkmap_count-undeclared.patch
+Patch8: linux-2.6-panic-on-oops.patch
+# Patch9: forward-port-of-limit-i386-ram-to-16gb.patch
+Patch10: ibm-rtl-driver.patch
+Patch11: ibm-hs21-tmid-fix.patch
+Patch12: scsi-fc-transport-removal-of-target-configurable.patch
+Patch13: bz523604-remove-pulse-code-from-the-bnx2x-driver.patch
 
 ### 2.6.33.2-rt13-mrg13
-Patch27: tracing-x86-Add-check-to-detect-GCC-messing-with-mco.patch
-# Patch27: lockdep-Make-MAX_STACK_TRACE_ENTRIES-configurable.patch
+Patch14: tracing-x86-Add-check-to-detect-GCC-messing-with-mco.patch
 
 ### 2.6.33.4-rt20-mrg19
-Patch30: i7core_edac-Bring-the-i7core_edac-up-to-date-with-li.patch
-Patch31: i7core_edac-Always-call-i7core_-ur-dimm_check_mc_ecc.patch
-Patch32: i7core_edac-i7core_register_mci-should-not-fall-thro.patch
-Patch33: i7core_edac-Add-support-for-Westmere-to-i7core_edac.patch
+Patch15: i7core_edac-Bring-the-i7core_edac-up-to-date-with-li.patch
+Patch16: i7core_edac-Always-call-i7core_-ur-dimm_check_mc_ecc.patch
+Patch17: i7core_edac-i7core_register_mci-should-not-fall-thro.patch
+Patch18: i7core_edac-Add-support-for-Westmere-to-i7core_edac.patch
 
 ### 2.6.33.5-rt23-mrg27
-Patch42: bnx2-backport.patch
-Patch43: bnx2x-FW-5.2.13.patch
+Patch19: bnx2-backport.patch
+Patch20: bnx2x-FW-5.2.13.patch
 
 ### 2.6.33.6-rt26-mrg29
 # Patch44: InfiniBand-Add-IBoE-support.patch
 
 ### 2.6.33.6-rt26-mrg31
-Patch62: bz612275-ibm_rtl-check_DMI_information_in_module_probe.patch
+Patch21: bz612275-ibm_rtl-check_DMI_information_in_module_probe.patch
+
+### 2.6.33.7-rt29-mrg37
+Patch22: bz625713-Fix-an-Oops-in-the-NFSv4-atomic-open-code.patch
+Patch23: bz625701-can-add-limit-for-nframes-and-clean-up-signed-unsign.patch
+Patch24: bz621436-drm-stop-information-leak-of-old-kernel-stack.patch
+Patch25: bz621436-drm-block-userspace-under-allocating-buffer-and-havi.patch
+Patch26: bz627807-KEYS-Fix-RCU-no-lock-warning-in-keyctl_session_to_pa.patch
+Patch27: bz627807-KEYS-Fix-bug-in-keyctl_session_to_parent-if-parent-h.patch
+
+### 2.6.33.7-rt29-mrg38
+Patch28: bz632070-niu-Fix-kernel-buffer-overflow-for-ETHTOOL_GRXCLSRLA.patch
+Patch29: bz631624-tracing-Do-not-allow-llseek-to-set_ftrace_filter.patch
+
+### 2.6.33.7-rt29-mrg39
+Patch30: bz626316-act_nat-use-stack-variable.patch
+Patch31: bz626316-net-sched-fix-some-kernel-memory-leaks.patch
+Patch32: bz628436-wireless-extensions-fix-kernel-heap-content-leak.patch
+Patch33: bz630553-ALSA-seq-oss-Fix-double-free-at-error-path-of-snd_se.patch
+Patch34: bz634450-x86-64-compat-Test-rax-for-the-syscall-number-not-ea.patch
+Patch35: bz634450-x86-64-compat-Retruncate-rax-after-ia32-syscall-entr.patch
+Patch36: bz629445-aio-check-for-multiplication-overflow-in-do_io_submi.patch
+Patch37: bz633142-drivers-net-usb-hso.c-prevent-reading-uninitialized-.patch
+Patch38: bz633147-drivers-net-eql.c-prevent-reading-uninitialized-stac.patch
+Patch39: bz633151-drivers-net-cxgb3-cxgb3_main.c-prevent-reading-unini.patch
+
+### 2.6.33.7-rt29-mrg40
+Patch40: bz634460-compat-Make-compat_alloc_user_space-incorporate-the.patch
 
 # END OF PATCH DEFINITIONS
 
@@ -555,6 +445,7 @@ glibc package.
 Summary: Tool to record and inspect hw/sw performance counters data 
 Group: Development/System
 BuildRequires: binutils-devel, elfutils-libelf-devel, elfutils-libelf
+BuildRequires: xmlto mlocate
 
 %description -n perf
 Performance counters are special hardware registers available on most modern
@@ -759,9 +650,6 @@ ApplyPatch linux-2.6-build-nonintconfig.patch
 # create a directory to hold the config files
 mkdir configs
 
-# The change to the firmware dir must also bepresent on the vanilla kernel
-# ApplyPatch firmware.patch
-
 # now move back up and get ready to work
 cd ..
 
@@ -795,155 +683,19 @@ ApplyPatch patch-%{rpmversion}-%{rctag}-%{rttag}.bz2
 ApplyPatch patch-%{rpmversion}-%{rttag}.bz2
 %endif
 
-# ApplyPatch smi-detector.patch
 ApplyPatch Allocate-RTSJ-memory-for-TCK-conformance-test.patch
 ApplyPatch Add-dev-rmem-device-driver-for-real-time-JVM-testing.patch
 ApplyPatch ibm-rmem-for-rtsj.patch
 ApplyPatch linux-2.6-dynticks-off-by-default.patch
-# ApplyPatch linux-2.6-rt-oomkill.patch
-# ApplyPatch RT-die.patch
-# ApplyPatch pci-nommconf-noseg.patch
-
-### 2.6.29.1-3
-ApplyPatch linux-2.6-panic-on-oops.patch
-
-### 2.6.29.1-5
-# ApplyPatch RHEL-RT_AMD_TSC_sync_PN.patch
-# ApplyPatch bz465837-rtc-compat-rhel5.patch-ported-to-V2.patch
-# ApplyPatch bz467739-ibm-add-amd64_edac-driver.patch
-# ApplyPatch irq-tracer-fix.patch
 # ApplyPatch forward-port-of-limit-i386-ram-to-16gb.patch
-# ApplyPatch forward-port-of-quiet-plist-warning.patch
-
-### 2.6.29.1-6
-# ApplyPatch bz460217-nagle-tunables.patch
+ApplyPatch linux-2.6-panic-on-oops.patch
 ApplyPatch ibm-rtl-driver.patch
 ApplyPatch ibm-hs21-tmid-fix.patch
-# ApplyPatch ibm-qla-disable-msi-on-rt.patch
-
-### 2.6.29.1-7
-# ApplyPatch aic94xx-inline-fw-rt.patch
-# ApplyPatch qla2xxx-inline-fw-rt.patch
-# ApplyPatch ntp-logarithmic.patch
-
-### 2.6.29.1-8
-# ApplyPatch ibm-amd-edac-rh-v1-2.6.29_forward_port.patch
-# ApplyPatch net-link-workaround-silly-yield.patch
-
-### 2.6.29.1-11
-# rebased to 2.6.29.2
-# rebased rt to 2.6.29.2-rt10
-# ApplyPatch forward-port-from-bz465862-ib-fix-locking-order.patch
-# ApplyPatch jstultz-ntp.patch
-
-### 2.6.29.4-17
-# rebased rt to 2.6.29.4-rt15
-# ApplyPatch ftrace-function_profiler-bandaid.patch
-# ApplyPatch net-avoid-extra-wakeups-in-wait_for_packet.patch
-
-### 2.6.29.4-19
-# ApplyPatch ftrace-fix-profile-race.patch
-
-### 2.6.29.4-20
-# ApplyPatch bz503758-increase-hung_task_timeout_secs-on-rt.patch
-
-### 2.6.29.5-26
-# Rebased to 2.6.29.5-rt22
-# Added mrg patch increase-max-lockdep-entries-chains.patch
-# ApplyPatch increase-max-lockdep-entries-chains.patch
-
-### 2.6.29.6-28
-# ApplyPatch hw_lat-simple-solution-001.patch
-
-### 2.6.31-rc5-3
-# Iteration 3
-
-### 2.6.31-rc5-4
-# Rebased to 2.6.31-rc5-rt1.2
-# Added these patches that are lined up for 2.6.31-rc5-rt1.3
-# ApplyPatch pre1.3-0002-add-hunks-dropped-in-rt-2.6.31-rc5-rt1.1-forward-por.patch
-# ApplyPatch pre1.3-0003-ARM-5627-1-Fix-restoring-of-lr-at-the-end-of-mcoun.patch
-# ApplyPatch pre1.3-0004-ARM-5613-1-implement-CALLER_ADDRESSx.patch
-# ApplyPatch pre1.3-0005-futex-detect-mismatched-requeue-targets.patch
-
-### 2.6.31-rc5-5
-# ApplyPatch perf-use-cplus_demangle.patch
-
-### 2.6.31-rc6-6
-# Rebased to 2.6.31-rc6-rt2
-# Remove the pre1.3 patches that either be included or dropped in the above
-
-### 2.6.31-rc6-rt4-7
-# new naming style (see above)
-# Rebased to 2.6.31-rc6-rt4
-# Removed bz503758 which increases hung_task_timeout_secs default on RT
-# Reason 1 - We can modify this in /etc/sysctl.conf instead of with a patch
-# Reason 2 - We are turning off hung_task_panic
-
-## The following patch is now applied in the very beginning of the prep
-## stage, also affecting the vanilla tree.
-## ApplyPatch firmware.patch
-
-### 2.6.31-rc6-rt5-9
-# ApplyPatch timer-delay-waking-softirqs-from-the-jiffy-tick.patch
-
-### 2.6.31-rc6-rt5-10
-# Specfile changes related to firmware files install
-
-### 2.6.31-rc6-rt6-11
-# Rebased to 2.6.31-rc6-rt6
-# Dropped timer-delay-waking-softirqs-from-the-jiffy-tick.patch
-# because it already integrated in the rt6 version.
-
-### 2.6.31-rc7-rt7-12
-# Rebased to 2.6.31-rc7-rt7
 ApplyPatch scsi-fc-transport-removal-of-target-configurable.patch
-
-### 2.6.31-rt11-mrg20
-# Dropped forward-port-from-bz465862-ib-fix-locking-order.patch
-# Dropped forward-port-of-quiet-plist-warning.patch
-
-### 2.6.31-rt13.2-mrg21
-# ApplyPatch implement_logarithmic_time_accumulation.patch
-# ApplyPatch remove_xtime_cache.patch
-
-### 2.6.31-rt13.2-mrg22
-# ApplyPatch bz523604-remove-pulse-code-from-the-bnx2x-driver.patch
-# ApplyPatch bz517166-amd64_edac_trival_fix.patch
-# ApplyPatch bz517166-patch-amd-csfix.patch
-
-### 2.6.31.2-rt13-mrg23
-# ApplyPatch bz528136-ftrace-check-for-failure-for-all-conversions.patch
-# ApplyPatch bz528136-tracing-correct-module-boundaries-for-ftrace_releas.patch
-# ApplyPatch bz524789-Add-support-for-i7core.patch
-# ApplyPatch bz527421-smi-remediation-simple-fix.patch
-
-### 2.6.31.4-rt14-mrg24
-# Rebased to 2.6.31.4-rt14
-# Dropped implement_logarithmic_time_accumulation.patch
-# Dropped remove_xtime_cache.patch
-# Dropped bz528136-ftrace-check-for-failure-for-all-conversions.patch
-# Dropped bz528136-tracing-correct-module-boundaries-for-ftrace_releas.patch
-
-### 2.6.31.4-rt14-mrg25
-# ApplyPatch bz528747-net-Introduce-recvmmsg-socket-syscall.patch
-
-### 2.6.31.4-rt14-mrg28
-# ApplyPatch bz531589-net-Make-setsockopt-optlen-be-unsigned.patch
-
-### 2.6.31.4-rt14-mrg29
-# Updated bz529839-futex-comment-fixups.patch
-
-### 2.6.31.4-rt14-mrg30
-# Do not set CONFIG_SCHED_MC (bz527658)
-# Do not set CONFIG_SECURITY_DEFAULT_MMAP_MIN_ADDR
-
-### 2.6.33-rt4-mrg3
-# ApplyPatch mm-highmem.c-Fix-pkmap_count-undeclared.patch
+ApplyPatch bz523604-remove-pulse-code-from-the-bnx2x-driver.patch
 
 ### 2.6.33.2-rt13-mrg13
 ApplyPatch tracing-x86-Add-check-to-detect-GCC-messing-with-mco.patch
-# ApplyPatch lockdep-Make-MAX_STACK_TRACE_ENTRIES-configurable.patch
 
 ### 2.6.33.4-rt20-mrg19
 ApplyPatch i7core_edac-Bring-the-i7core_edac-up-to-date-with-li.patch
@@ -960,6 +712,33 @@ ApplyPatch bnx2x-FW-5.2.13.patch
 
 ### 2.6.33.6-rt26-mrg31
 ApplyPatch bz612275-ibm_rtl-check_DMI_information_in_module_probe.patch
+
+### 2.6.33.7-rt29-mrg37
+ApplyPatch bz625713-Fix-an-Oops-in-the-NFSv4-atomic-open-code.patch
+ApplyPatch bz625701-can-add-limit-for-nframes-and-clean-up-signed-unsign.patch
+ApplyPatch bz621436-drm-stop-information-leak-of-old-kernel-stack.patch
+ApplyPatch bz621436-drm-block-userspace-under-allocating-buffer-and-havi.patch
+ApplyPatch bz627807-KEYS-Fix-RCU-no-lock-warning-in-keyctl_session_to_pa.patch
+ApplyPatch bz627807-KEYS-Fix-bug-in-keyctl_session_to_parent-if-parent-h.patch
+
+### 2.6.33.7-rt29-mrg38
+ApplyPatch bz632070-niu-Fix-kernel-buffer-overflow-for-ETHTOOL_GRXCLSRLA.patch
+ApplyPatch bz631624-tracing-Do-not-allow-llseek-to-set_ftrace_filter.patch
+
+### 2.6.33.7-rt29-mrg39
+ApplyPatch bz626316-act_nat-use-stack-variable.patch
+ApplyPatch bz626316-net-sched-fix-some-kernel-memory-leaks.patch
+ApplyPatch bz628436-wireless-extensions-fix-kernel-heap-content-leak.patch
+ApplyPatch bz630553-ALSA-seq-oss-Fix-double-free-at-error-path-of-snd_se.patch
+ApplyPatch bz634450-x86-64-compat-Test-rax-for-the-syscall-number-not-ea.patch
+ApplyPatch bz634450-x86-64-compat-Retruncate-rax-after-ia32-syscall-entr.patch
+ApplyPatch bz629445-aio-check-for-multiplication-overflow-in-do_io_submi.patch
+ApplyPatch bz633142-drivers-net-usb-hso.c-prevent-reading-uninitialized-.patch
+ApplyPatch bz633147-drivers-net-eql.c-prevent-reading-uninitialized-stac.patch
+ApplyPatch bz633151-drivers-net-cxgb3-cxgb3_main.c-prevent-reading-unini.patch
+
+### 2.6.33.7-rt29-mrg40
+ApplyPatch bz634460-compat-Make-compat_alloc_user_space-incorporate-the.patch
 
 # END OF PATCH APPLICATIONS
 
@@ -1250,11 +1029,14 @@ BuildKernel %make_target %kernel_image vanilla True
 
 # Perf
 %if %{buildperf}
+pushd tools/perf
 # Build the perf binary and doc and install it.
-chmod 755 tools/perf/util/generate-cmdlist.sh
-make prefix=$RPM_BUILD_ROOT%{_prefix} -C tools/perf install
 # make prefix=$RPM_BUILD_ROOT%{_prefix} -C tools/perf install-man
+make -s %{?_smp_mflags} V=1 DESTDIR=$RPM_BUILD_ROOT prefix=/usr install
+
 # Perf docs are now created elsewhere and packed in a .tar.gz file
+# Note I've added the BuildRequires so that we could build this now too
+popd
 tar xvjf %{SOURCE31} -C $RPM_BUILD_ROOT
 %endif
 
@@ -1476,8 +1258,8 @@ This is required to use SystemTap with %{name}-%{KVERREL}.
 %files -n perf
 %defattr(-,root,root)
 %{_bindir}/perf
-%{_mandir}/man1
-%{_libexecdir}/perf-core
+%{_mandir}/man1/*
+%{_libexecdir}/perf-core/*
 %endif
 
 %if %{builddebug}
@@ -1630,11 +1412,47 @@ This is required to use SystemTap with %{name}-trace-%{KVERREL}.
 %endif
 
 %changelog
+* Sun Sep 26 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg42
+- Changes to perf
+
+* Tue Sep 21 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg41
+- CONFIG_HIGHMEM4G=y, and CONFIG_HIGHMEM64G is not set
+
+* Mon Sep 20 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg40
+- Added bz634460-compat-Make-compat_alloc_user_space-incorporate-the.patch
+
+* Mon Sep 13 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg39
+- Added bz626316-act_nat-use-stack-variable.patch
+- Added bz626316-net-sched-fix-some-kernel-memory-leaks.patch
+- Added bz628436-wireless-extensions-fix-kernel-heap-content-leak.patch
+- Added bz630553-ALSA-seq-oss-Fix-double-free-at-error-path-of-snd_se.patch
+- Added bz634450-x86-64-compat-Test-rax-for-the-syscall-number-not-ea.patch
+- Added bz634450-x86-64-compat-Retruncate-rax-after-ia32-syscall-entr.patch
+- Added bz629445-aio-check-for-multiplication-overflow-in-do_io_submi.patch
+- Added bz633142-drivers-net-usb-hso.c-prevent-reading-uninitialized-.patch
+- Added bz633147-drivers-net-eql.c-prevent-reading-uninitialized-stac.patch
+- Added bz633151-drivers-net-cxgb3-cxgb3_main.c-prevent-reading-unini.patch
+
+* Thu Sep 9 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg38
+- Added bz632070-niu-Fix-kernel-buffer-overflow-for-ETHTOOL_GRXCLSRLA.patch
+- Added bz631624-tracing-Do-not-allow-llseek-to-set_ftrace_filter.patch
+- Reenabled forward-port-of-limit-i386-ram-to-16gb.patch
+- Updated and reenabled bz523604-remove-pulse-code-from-the-bnx2x-driver.patch
+
+* Thu Aug 26 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg37
+- Added bz625713-Fix-an-Oops-in-the-NFSv4-atomic-open-code.patch
+- Added bz625701-can-add-limit-for-nframes-and-clean-up-signed-unsign.patch
+- Added bz621436-drm-stop-information-leak-of-old-kernel-stack.patch
+- Added bz621436-drm-block-userspace-under-allocating-buffer-and-havi.patch
+- Added bz627807-KEYS-Fix-RCU-no-lock-warning-in-keyctl_session_to_pa.patch
+- Added bz627807-KEYS-Fix-bug-in-keyctl_session_to_parent-if-parent-h.patch
+- Turned off CONFIG_LLC
+
 * Tue Aug 17 2010 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.33.7-rt29-mrg36
 - Removed firmware.patch
 - Created the (noarch) kernel-rt-firmware package
 
-* Wed Aug 4 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg34
+* Wed Aug 4 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg35
 - Rebased to v2.6.33.7-rt29
 
 * Mon Aug 2 2010 John Kacur <jkacur@redhat.com> - 2.6.33.6-rt28-mrg34
@@ -1701,7 +1519,6 @@ This is required to use SystemTap with %{name}-trace-%{KVERREL}.
 - Removed bz585096-KEYS-find_keyring_by_name-can-gain-access-to-a-freed.patch
 - Removed perf_events-fix-errors-path-in-perf_output_begin.patch
 - Removed trace-Update-the-comm-field-in-the-right-variable-i.patch
-- Removed ibm-qla-disable-msi-on-rt.patch
 
 * Tue Jul 13 2010 John Kacur <jkacur@redhat.com> - 2.6.33.5-rt23-mrg27
 - Added the bnx2-backport.patch
@@ -1842,323 +1659,3 @@ This is required to use SystemTap with %{name}-trace-%{KVERREL}.
 - Removed many patches, most because they are already in 2.6.33-rc8,
 	- some because they need review, and may no-longer apply.
 
-* Thu Dec 3 2009 John Kacur <jkacur@redhat.com> - 2.6.31.6-rt19-mrg32
-- Fixed the configuration files to properly disable the following
-	CONFIG_DETECT_SOFTLOCKUP is not set
-	CONFIG_DETECT_HUNG_TASK is not set
-	CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
-	CONFIG_TIMER_STATS is not set
-
-* Wed Nov 4 2009 John Kacur <jkacur@redhat.com> - 2.6.31.4-rt14-mrg30
-- bz527658 do not set CONFIG_SCHED_MC
-- do not set CONFIG_SECURITY_DEFAULT_MMAP_MIN_ADDR=0 (we want the default 4096)
-- (note the above change is cosmetic, since putting it to 0 had not effect)
-
-* Tue Nov 3 2009 John Kacur <jkacur@redhat.com> - 2.6.31.4-rt14-mrg29
-- Updated Updates-from-Jon-Masters-for-hwlat_detector.c.patch
-- Updated bz529839-futex-comment-fixups.patch
-
-* Thu Oct 29 2009 John Kacur <jkacur@redhat.com> - 2.6.31.4-rt14-mrg28
-- Added bz531589-net-Make-setsockopt-optlen-be-unsigned.patch
-- Added bz531595-futex-Fix-spurious-wakeup-for-requeue_pi-really.patch
-- Added bz531611-netlink-fix-typo-in-initialization.patch
-- Added bz531630-drm-r128-Add-test-for-initialisation-to-all-ioctls.patch
-- Added bz531633-AF_UNIX-Fix-deadlock-on-connecting-to-shutdown-sock.patch
-- Added bz531656-fs-pipe.c-null-pointer-dereference.patch
-- Added bz531665-KEYS-get_instantiation_keyring-should-inc-the-key.patch
-
-* Thu Oct 22 2009 John Kacur <jkacur@redhat.com> - 2.6.31.4-rt14-mrg27
-- Added bz529832-futex-Detect-mismatched-requeue-targets.patch
-- Added bz529839-futex-comment-fixups.patch
-- Added bz529855-futex-Move-drop_futex_key_refs-out-of-spinlock.patch
-- Added bz529856-futex-Check-for-NULL-keys-in-match_futex.patch
-- Added bz527658-Sched_load_balance.patch
-- Added Updates-from-Jon-Masters-for-hwlat_detector.c.patch
-- Edited the config files to add CONFIG_EDAC_AMD64=m
-
-* Fri Oct 16 2009 John Kacur <jkacur@redhat.com> - 2.6.31.4-rt14-mrg26
-- Added bz529365-preempt_disable_rt-should-be-paired-with-preempt_rt.patch
-
-* Wed Oct 14 2009 John Kacur <jkacur@redhat.com> - 2.6.31.4-rt14-mrg25
-- Added bz528747-net-Introduce-recvmmsg-socket-syscall.patch
-
-* Wed Oct 14 2009 John Kacur <jkacur@redhat.com> - 2.6.31.4-rt14-mrg24
-- Rebased to 2.6.31.4-rt14
-- The following patches were dropped because they are included in 2.6.31.4-rt14
-- 	Dropped implement_logarithmic_time_accumulation.patch
-- 	Dropped remove_xtime_cache.patch
--	bz528136-ftrace-check-for-failure-for-all-conversions.patch
--	bz528136-tracing-correct-module-boundaries-for-ftrace_releas.patch
-
-* Fri Oct 9 2009 John Kacur <jkacur@redhat.com> - 2.6.31.2-rt13-mrg23
-- Added bz528136-ftrace-check-for-failure-for-all-conversions.patch
-- Added bz528136-tracing-correct-module-boundaries-for-ftrace_releas.patch
-- Added bz524789-Add-support-for-i7core.patch
-- For bz526232, Added CONFIG_EDAC_MCE=y, CONFIG_EDAC_I7CORE=m to config-generic
-- Added bz527421-smi-remediation-simple-fix.patch
-
-* Thu Oct 8 2009 John Kacur <jkacur@redhat.com> - 2.6.31.2-rt13-mrg22
-- Added bz523604-remove-pulse-code-from-the-bnx2x-driver.patch
-- For bz526232, disabled DECNET, IPX, DEV_APPLETALK, ATALK, NCP_FS, CODA
-- For bz526232, enabled CONFIG_X86_GENERICARCH
-- Added bz517166-amd64_edac_trival_fix.patch
-- Added bz517166-patch-amd-csfix.patch
-
-* Tue Oct 6 2009 John Kacur <jkacur@redhat.com> - 2.6.31.2-rt13-mrg21
-- implement_logarithmic_time_accumulation.patch replaces ntp-logarithmic.patch
-- Added remove_xtime_cache.patch
-
-* Tue Sep 29 2009 John Kacur <jkacur@redhat.com> - 2.6.31-rt11-mrg20 
-- Dropped forward-port-from-bz465862-ib-fix-locking-order.patch
-- Dropped forward-port-of-quiet-plist-warning.patch
-- disabled CONFIG_DETECT_HUNG_TASK, CONFIG_BOOTPARAM_HUNG_TASK_PANIC,
-- CONFIG_DETECT_SOFTLOCKUP, CONFIG_TIMER_STATS in production kernel
-
-* Sat Sep 19 2009 John Kacur <jkacur@redhat.com> - 2.6.31-rt11-mrg19
-- Rebased to 2.6.31-rt11
-
-* Tue Sep 15 2009 John Kacur <jkacur@redhat.com> - 2.6.31-rt10-mrg18
-- Rebased to 2.6.31-rt10
-
-* Thu Sep 10 2009 John Kacur <jkacur@redhat.com> - 2.6.31-rt9.2-mrg17
-- Rebased to 2.6.31-rt9.2
-
-* Wed Sep 9 2009 John Kacur <jkacur@redhat.com> - 2.6.31-rc9-rt9.1-mrg16
-- Rebased to 2.6.31-rc9-rt9.1
-
-* Mon Aug 31 2009 Clark Williams <williams@redhat.com> - 2.6.31-rc8-rt9-mrg15
-- turned off CONFIG_CALGARY_IOMMU_ENABLED_BY_DEFAULT per IBM request
-
-* Fri Aug 28 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.31-rc8-rt9-mrg14
-- Rebased to 2.6.31-rc8-rt9
-
-* Wed Aug 26 2009 Luis Claudio R. Gonçalves <lgoncalv@redhat.com> - 2.6.31-rc7-rt8-mrg13
-- Rebased to 2.6.31-rc7-rt8
-
-* Tue Aug 25 2009 <jkacur@redhat.com> - 2.6.31-rc7-rt7-12
-- Rebased to 2.6.31-rc7-rt7
-- Ported jvrao's scsi-fc-transport-removal-of-target-configurable.patch
-- via lclaudio's MRGV1 version to MRGV2 (bz514541)
-
-* Mon Aug 24 2009 <jkacur@redhat.com> - 2.6.31-rc6-rt6-11
-- Rebased to 2.6.31-rc6-rt6
-- Dropped timer-delay-waking-softirqs-from-the-jiffy-tick.patch
-- because it already integrated in the rt6 version.
-
-* Sun Aug 23 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.31-rc6-rt5-10
-- Fixed the firmware file versioning on all kernel flavors
-
-* Fri Aug 20 2009 John Kacur <jkacur@redhat.com> - 2.6.31-rc6-rt5-9
-- This patch solves the cpu_load balancing problem seen on recent kernels
-
-* Thu Aug 20 2009 John Kacur <jkacur@redhat.com> - 2.6.31-rc6-rt5-8
-- Rebased to 2.6.31-rc6-rt5
-- Trying again to enable buildperf
-
-* Wed Aug 19 2009 John Kacur <jkacur@redhat.com> - 2.6.31-rc6-rt4-7
-- changed the naming style - see above
-- Rebased to 2.6.31-rc6-rt4-7
-- Removed bz503758 which increases hung_task_timeout_secs default on RT
--  Reason 1 - We can modify this in /etc/sysctl.conf instead of with a patch
--  Reason 2 - We are turning off hung_task_panic
-- Added firmware.patch to change the location of the firmware for rt
-
-* Mon Aug 17 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.31-rc6.7
-- renamed perf subpackages to perf and perf-debuginfo
-
-* Mon Aug 17 2009 John Kacur <jkacur@redhat.com> - 2.6.31-rc6.6
-- Rebased to 2.6.31-rc6-rt2
-- Re-enabled perf subpackage creation (Luis Goncalves)
- 
-* Fri Aug 14 2009 John Kacur
-- Rebased to 2.6.31-rc5-rt1.2
-- Added the following patches that are lined up for 2.6.31-rc5-rt1.3
-- pre1.3-0002-add-hunks-dropped-in-rt-2.6.31-rc5-rt1.1-forward-por.patch
-- pre1.3-0003-ARM-5627-1-Fix-restoring-of-lr-at-the-end-of-mcoun.patch
-- pre1.3-0004-ARM-5613-1-implement-CALLER_ADDRESSx.patch
-- pre1.3-0005-futex-detect-mismatched-requeue-targets.patch
-
-* Tue Aug 11 2009 John Kacur
-- disabling buildperf for now.
-- reverting to iteration 3 (since this was somehow missed)
-
-* Tue Aug 11 2009 John Kacur
-- Two changes to linux-2.6-rt-oomkill.patch
-- move oom_kill_enabled to the right proc subdirectory/table
-- Change deprecated SPIN_LOCK_UNLOCKED to DEFINE_SPINLOCK
-* Mon Aug 10 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.31-rc5-3
-- Created the subpackage kernel-rt-perf (performance counters tool/doc)
-
-* Thu Aug 6 2009 John Kacur <jkacur@redhat.com> - 2.6.31-rc5-2
-- Rebased to 2.6.31-rc5-rt1.1
-- Dropped hw_lat-simple-solution-001.patch from the mrg patches
-- because it is already included in the 2.6.31-rc5-rt1.1
-- Dropped ibm-amd-edac-rh-v1-2.6.29_forward_port.patch as it is obsolete
-
-* Mon Aug 3 2009 John Kacur <jkacur@redhat.com> - 2.6.31-rc4-1
-- Rebased to 2.6.31-rc4-rt1
-- In other words, 2.6.30 + rc4 + rt1
-- DROPPED bz467739-ibm-add-amd64_edac-driver.patch
-- 	Much of the patch is integrated in 2.6.31-rc4, but need confirmation
-- DROPPED irq-tracer-fix.patch - also needs review
-- DROPPED jstultz-ntp.patch - already included in 2.6.31-rc4
-- DROPPED net-avoid-extra-wakeups-in-wait_for_packet.patch
--	already included in 2.6.31-rc4
-- DROPPED increase-max-lockdep-entries-chains.patch
--	already included in 2.6.31-rc4
-- Modified the following patches for 2.6.31-rc4
-- linux-2.6-rt-oomkill.patch
-- RT-die.patch
-- pci-nommconf-noseg.patch
-- RHEL-RT_AMD_TSC_sync_PN.patch
-- forward-port-of-quiet-plist-warning.patch
-- ibm-qla-disable-msi-on-rt.patch
-- ibm-amd-edac-rh-v1-2.6.29_forward_port.patch
-- stacktrace-dump_out_last_preempt_disable_locations.patch
-
-* Thu Jul 17 2009 John Kacur <jkacur@redhat.com> - 2.6.29.6-28
-- [trace] hwlat: never call wake_up() inside of stop_machine()
-
-* Thu Jul 9 2009 John Kacur <jkacur@redhat.com> - 2.6.29.6-27
-- rebased to 2.6.29.6-rt23
-
-* Fri Jun 26 2009 John Kacur <jkacur@redhat.com> - 2.6.29.5-26
-- rebased to 2.6.29.5-rt22
-- Added patch increase-max-lockdep-entries-chains.patch
-
-* Wed Jun 17 2009 John Kacur <jkacur@redhat.com> - 2.6.29.5-25
-- Rebased to 2.6.29.5-rt21
-
-* Tue Jun 16 2009 John Kacur <jkacur@redhat.com> - 2.6.29.5-24
-- Rebased to 2.6.29.5-rt20
-
-* Mon Jun 15 2009 John Kacur <jkacur@redhat.com> - 2.6.29.4-23
-- Rebased to 2.6.29.4-rt19
-
-* Sat Jun 13 2009 John Kacur <jkacur@redhat.com> - 2.6.29.4-22
-- Rebased to 2.6.29.4-rt18
-- The mrg smi-detector.patch is replaced by the following patch
-- hwlat_detector-a-system-hardware-latency-detector.patch
-
-* Thu Jun 11 2009 John Kacur <jkacur@redhat.com> - 2.6.29.4-21
-- Rebased to 2.6.29.4-rt17
-- The following mrg patches are no longer necessary.
-- Patch32, Patch33, Patch34, Patch35, Patch36, Patch37, Patch38, Patch39
-- Patch40, Patch42
-
-* Tue Jun 02 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29.4-20
-- [sched] Increase hung_task_timeout_secs defaul on RT [503758]
-
-* Mon Jun 01 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29.4-19
-- [ftrace] fix function profiler race (Steven Rostedt) [500156]
-
-* Mon May 25 2009 John Kacur <jkacur@redhat.com> - 2.6.29.4-18
-- Rebased to 2.6.29.4-rt16
-
-* Fri May 22 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29.4-17
-- Rebased to 2.6.29.4
-- Rebased rt to 2.6.29.4-rt15
-- Enhanced the stability of the function profiler
-- Avoid extra wakeups of threads blocked in wait_for_packet()
-
-* Mon May 18 2009 John Kacur <jkacur@redhat.com> - 2.6.29.3-16
-- rebased rt to 2.6.29.3-rt14
-
-* Wed May 14 2009 John Kacur <jkacur@redhat.com> - 2.6.29.3-15
-- rebased rt to 2.6.29.3-rt13
-
-* Tue May 12 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29.3-14
-- rebased to 2.6.29.3
-- rebased rt to 2.6.29.3-rt12
-
-* Tue May 05 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29.2-13
-- added the ftrace function profiler patches
-
-* Mon May 04 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29.2-12
-- rebased RT to 2.6.29.2-rt11
-
-* Wed Apr 29 2009 Clark Williams <williams@redhat.com> - 2.6.29.2-11
-- rebased to upstream stable 2.6.29.2 patch
-- rebased RT to 2.6.29.2-rt10
-- turned on modules CONFIG_KVM, CONFIG_KVM_INTEL and CONFIG_KVM_AMD
-  in config-x86-generic and config-x86_64-generic
-- added jstultz patch to change NTP parameter SHIFT_PLL from 4 to 2 
-  to improve client convergence times 
-
-
-* Mon Apr 27 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29.1-10
-- Rebased to PREEMPT_RT patch-2.6.29.1-rt9
-
-* Mon Apr 20 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29.1-9
-- Rebased to 2.6.29.1-rt8
-- Removed redundant patches
-
-* Fri Apr 17 2009 Clark Williams <williams@redhat.com> - 2.6.29.1-8
-- Disabled CONFIG_DRM_I915_KMS again.
-- Disabled CONFIG_GROUP_SCHED 
-- added patch to fix lockdep selftest
-- added ibm-amd-edac driver
-- increased stack trace entries
-- sched_yield() workaround
-
-* Wed Apr 15 2009 Clark Williams <williams@redhat.com> - 2.6.29.1-7
-- added patch for bundling f/w with AIC94xx driver
-- added patch for bundling f/w with QLA2xxx driver
-- added patch to implement rt_downgrade_write (rostedt)
-- added logarithmic timekeeping accumulation patch from jstultz
-- [rpm] added specfile logic to copy arch includes for devel package [495808]
-
-* Mon Apr 13 2009 Clark Williams <williams@redhat.com> - 2.6.29.1-6
-- rebased RT to 2.6.29.1-rt7 (lgoncalv)
-- added Nagle algorthim tunable from Chris Snook (BZ460217)
-- added IBM's rtl driver (for SMI remediation)
-- modified specfile to copy stap trace headers (BZ495560)
-- added forward ported HS21 tmid patch
-- added jvrao's QLA2XXX MSI workaround patch from LKML
-
-* Thu Apr  9 2009 Clark Williams <williams@redhat.com> - 2.6.29.1-5
-- rebased RT to 2.6.29.1-rt6
-- ported RHEL-RT_AMD_TSC_sync_PN.patch from previous MRG RT
-- ported bz465745-rtc-fix_kernel_panic_on_second_use_of_SIGIO_nofitication.patch from previous MRG RT
-- ported bz465837-rtc-compat-rhel5.patch-ported-to-V2.patch from previous MRG RT
-- ported bz467739-ibm-add-amd64_edac-driver.patch from previous MRG RT
-- ported forward-port-of-limit-i386-ram-to-16gb.patch from previous MRG RT
-- ported forward-port-of-quiet-plist-warning.patch from previous MRG RT
-- ported irq-tracer-fix.patch from previous MRG RT
-- Disabled CONFIG_DRM_I915_KMS.
-- added config sanity check script
-- reworked configs to remove duplicate definitions
-- added configs to satisfy new 2.6.29.1 requirements
-
-* Mon Apr  6 2009 Clark Williams <williams@redhat.com> - 2.6.29.1-4
-- enabled CONFIG_DYNAMIC_FTRACE for production kernels
-
-* Fri Apr  3 2009 Clark Williams <williams@redhat.com> - 2.6.29-3
-- rebased to stable 2.6.29.1
-- rebased RT to 2.6.29.1-rt4
-- added IBM RTSJ patches
-- added RHEL OOM patches
-- BZ 384881 patch forward port
-- added dynticks-off-by-default patch
-- turned off *_GROUP_SCHED in config-generic
-- added compression configs in config-generic
-
-* Thu Mar 26 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29-2
-- Redefined config options upon suggestions from the MRG-RT team
-
-* Wed Mar 25 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29-1
-- Rebased to 2.6.29-rt1
-
-* Tue Mar 24 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29-rc8-2
-- Rebased to 2.6.29-rc8-rt4
-
-* Fri Mar 20 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29-rc8-1
-- Rebased to 2.6.29-rc8-rt1
-
-* Mon Mar 16 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29-rc7-1
-- Rebased to 2.6.29-rc7-rt1
-
-* Mon Mar 09 2009 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.29-rc6-1
-- Added kernel 2.6.29-rc6
-- Added PREEMPT_RT patch-2.6.29-rc6-rt3.patch
-- Adjusted the spec file
