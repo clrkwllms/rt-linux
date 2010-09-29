@@ -8,7 +8,7 @@ Summary: The Linux RT kernel
 %define realtime rt
 
 # mrgN
-%define iteration 42
+%define iteration 43
 
 # rtN
 %define rttag rt29
@@ -446,6 +446,7 @@ Summary: Tool to record and inspect hw/sw performance counters data
 Group: Development/System
 BuildRequires: binutils-devel, elfutils-libelf-devel, elfutils-libelf
 BuildRequires: xmlto mlocate
+Provides: perl(Perf::Trace::Context), perl(Perf::Trace::Core), perl(Perf::Trace::Util)
 
 %description -n perf
 Performance counters are special hardware registers available on most modern
@@ -1412,6 +1413,9 @@ This is required to use SystemTap with %{name}-trace-%{KVERREL}.
 %endif
 
 %changelog
+* Mon Sep 27 2010 Clark Williams <williams@redhat.com> - 2.6.33.7-rt29-mrg43
+- Added manual Provides for perf subpackage
+
 * Sun Sep 26 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg42
 - Changes to perf
 
