@@ -8,7 +8,7 @@ Summary: The Linux RT kernel
 %define realtime rt
 
 # mrgN
-%define iteration 44
+%define iteration 45
 
 # rtN
 %define rttag rt29
@@ -382,6 +382,16 @@ Patch39: bz633151-drivers-net-cxgb3-cxgb3_main.c-prevent-reading-unini.patch
 ### 2.6.33.7-rt29-mrg40
 Patch40: bz634460-compat-Make-compat_alloc_user_space-incorporate-the.patch
 
+### 2.6.33.7-rt29-mrg45
+Patch41: bz607854-mm-keep-a-guard-page-below-a-grow-down-stack-segment.patch
+Patch42: bz607854-mm-fix-missing-page-table-unmap-for-stack-guard-page.patch
+Patch43: bz607854-x86-don-t-send-SIGBUS-for-kernel-page-faults.patch
+Patch44: bz607854-mm-fix-page-table-unmap-for-stack-guard-page-properl.patch
+Patch45: bz607854-mm-fix-up-some-user-visible-effects-of-the-stack-gua.patch
+Patch46: bz607854-mm-make-the-vma-list-be-doubly-linked.patch
+Patch47: bz607854-mm-make-the-mlock-stack-guard-page-checks-stricter.patch
+Patch48: bz607854-mm-make-stack-guard-page-logic-use-vm_prev-pointer.patch
+
 # END OF PATCH DEFINITIONS
 
 Patch10000: linux-2.6-build-nonintconfig.patch
@@ -728,6 +738,16 @@ ApplyPatch bz633151-drivers-net-cxgb3-cxgb3_main.c-prevent-reading-unini.patch
 
 ### 2.6.33.7-rt29-mrg40
 ApplyPatch bz634460-compat-Make-compat_alloc_user_space-incorporate-the.patch
+
+### 2.6.33.7-rt29-mrg45
+ApplyPatch bz607854-mm-keep-a-guard-page-below-a-grow-down-stack-segment.patch
+ApplyPatch bz607854-mm-fix-missing-page-table-unmap-for-stack-guard-page.patch
+ApplyPatch bz607854-x86-don-t-send-SIGBUS-for-kernel-page-faults.patch
+ApplyPatch bz607854-mm-fix-page-table-unmap-for-stack-guard-page-properl.patch
+ApplyPatch bz607854-mm-fix-up-some-user-visible-effects-of-the-stack-gua.patch
+ApplyPatch bz607854-mm-make-the-vma-list-be-doubly-linked.patch
+ApplyPatch bz607854-mm-make-the-mlock-stack-guard-page-checks-stricter.patch
+ApplyPatch bz607854-mm-make-stack-guard-page-logic-use-vm_prev-pointer.patch
 
 # END OF PATCH APPLICATIONS
 
@@ -1398,7 +1418,17 @@ This is required to use SystemTap with %{name}-trace-%{KVERREL}.
 %endif
 
 %changelog
-* Mon Oct  4 2010 Clark Williams <williams@redhat.com> - 2.6.33.7-rt29-mrg44
+* Wed Oct 6 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg45
+- Added bz607854-mm-keep-a-guard-page-below-a-grow-down-stack-segment.patch
+- Added bz607854-mm-fix-missing-page-table-unmap-for-stack-guard-page.patch
+- Added bz607854-x86-don-t-send-SIGBUS-for-kernel-page-faults.patch
+- Added bz607854-mm-fix-page-table-unmap-for-stack-guard-page-properl.patch
+- Added bz607854-mm-fix-up-some-user-visible-effects-of-the-stack-gua.patch
+- Added bz607854-mm-make-the-mlock-stack-guard-page-checks-stricter.patch
+- Added bz607854-mm-make-stack-guard-page-logic-use-vm_prev-pointer.patch
+- Added bz607854-mm-make-the-vma-list-be-doubly-linked.patch
+
+* Mon Oct 4 2010 Clark Williams <williams@redhat.com> - 2.6.33.7-rt29-mrg44
 - removed logic for generating kernel-rt-firmware and requirements for
   that package
 
