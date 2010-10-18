@@ -4143,6 +4143,7 @@ static void perf_swevent_start_hrtimer(struct perf_event *event)
 	struct hw_perf_event *hwc = &event->hw;
 
 	hrtimer_init(&hwc->hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	hwc->hrtimer.irqsafe = 1;
 	hwc->hrtimer.function = perf_swevent_hrtimer;
 	if (hwc->sample_period) {
 		u64 period;
