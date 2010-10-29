@@ -8,7 +8,7 @@ Summary: The Linux RT kernel
 %define realtime rt
 
 # mrgN
-%define iteration 45
+%define iteration 46
 
 # rtN
 %define rttag rt29
@@ -392,6 +392,10 @@ Patch46: bz607854-mm-make-the-vma-list-be-doubly-linked.patch
 Patch47: bz607854-mm-make-the-mlock-stack-guard-page-checks-stricter.patch
 Patch48: bz607854-mm-make-stack-guard-page-logic-use-vm_prev-pointer.patch
 
+### 2.6.33.7-rt29-mrg46
+Patch49: bz638480-ALSA-prevent-heap-corruption-in-snd_ctl_new.patch
+Patch50: bz647434-perf-Mark-software-events-as-irqsafe.patch 
+
 # END OF PATCH DEFINITIONS
 
 Patch10000: linux-2.6-build-nonintconfig.patch
@@ -749,6 +753,10 @@ ApplyPatch bz607854-mm-make-the-vma-list-be-doubly-linked.patch
 ApplyPatch bz607854-mm-make-the-mlock-stack-guard-page-checks-stricter.patch
 ApplyPatch bz607854-mm-make-stack-guard-page-logic-use-vm_prev-pointer.patch
 
+### 2.6.33.7-rt29-mrg46
+ApplyPatch bz638480-ALSA-prevent-heap-corruption-in-snd_ctl_new.patch
+ApplyPatch bz647434-perf-Mark-software-events-as-irqsafe.patch 
+
 # END OF PATCH APPLICATIONS
 
 # empty final patch to facilitate testing of kernel patches
@@ -935,7 +943,7 @@ cd include
 # is not finished, do not simply uncomment
 # cp -a ../arch/x86/include/asm $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include/asm-x86
 # ln -s asm-x86 asm 
-cp -a acpi config keys linux math-emu media mtd net pcmcia rdma rxrpc scsi sound video asm-generic $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include
+cp -a acpi config keys linux math-emu media mtd net pcmcia rdma rxrpc scsi sound video asm-generic crypto drm generated trace $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include
 # cp -a `readlink asm` $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include
 # While arch/powerpc/include/asm is still a symlink to the old
 # include/asm-ppc{64,} directory, include that in kernel-devel too.
@@ -1418,6 +1426,11 @@ This is required to use SystemTap with %{name}-trace-%{KVERREL}.
 %endif
 
 %changelog
+* Wed Oct 13 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg46
+- Added bz638480-ALSA-prevent-heap-corruption-in-snd_ctl_new.patch
+- Added bz647434-perf-Mark-software-events-as-irqsafe.patch 
+- Modified the kernel-rt.spec file for bz608784
+
 * Wed Oct 6 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg45
 - Added bz607854-mm-keep-a-guard-page-below-a-grow-down-stack-segment.patch
 - Added bz607854-mm-fix-missing-page-table-unmap-for-stack-guard-page.patch
