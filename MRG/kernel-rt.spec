@@ -8,7 +8,7 @@ Summary: The Linux RT kernel
 %define realtime rt
 
 # mrgN
-%define iteration 46
+%define iteration 47
 
 # rtN
 %define rttag rt29
@@ -396,6 +396,29 @@ Patch48: bz607854-mm-make-stack-guard-page-logic-use-vm_prev-pointer.patch
 Patch49: bz638480-ALSA-prevent-heap-corruption-in-snd_ctl_new.patch
 Patch50: bz647434-perf-Mark-software-events-as-irqsafe.patch 
 
+### 2.6.33.7-rt29-mrg47
+Patch51: bz648685-CVE-2010-4072-ipc-shm-fix-information-leak-to-userland.patch
+Patch52: bz648691-CVE-2010-4073-ipc-initialize-structure-memory-to-zero-for-compat-functions.patch
+Patch53: bz648696-CVE-2010-4074-USB-serialmos-prevent-reading-uninitialized-stack-memory.patch
+Patch54: bz648699-CVE-2010-4075-tty-Make-tiocgicount-a-handler.patch
+Patch55: bz648704-CVE-2010-4077-tty-icount-changeover-for-other-main-devices.patch
+Patch56: bz648831-CVE-2010-4079-V4LDVB-ivtvfb-prevent-reading-uninitialized-stack-memory.patch
+Patch57: bz648707-CVE-2010-4080-ALSA-soundpcirme9652-prevent-reading-uninitialized-stack-memory.patch
+Patch58: bz648717-CVE-2010-4082-driversvideoviaioctl.c-prevent-reading-uninitialized-stack-memory.patch
+Patch59: bz648720-CVE-2010-4083-sys_semctl-fix-kernel-stack-leakage.patch
+Patch60: bz651172-CVE-2010-4157-SCSI-gdth-integer-overflow-in-ioctl.patch
+Patch61: bz637689-CVE-2010-2962-drmi915-Sanity-check-preadpwrite.patch
+Patch62: bz642469-CVE-2010-2963-v4l1-fix-32-bit-compat-microcode-loading-translation.patch
+Patch63: bz651674-CVE-2010-4169-perf_events-Fix-perf_counter_mmap-hook-in-mprotect.patch
+Patch64: bz637680-CVE-2010-3432-sctp-Do-not-reset-the-packet-during-sctp_packet_config..patch
+Patch65: bz640460-CVE-2010-3705-sctp-Fix-out-of-bounds-reading-in-sctp_asoc_get_hmac.patch
+Patch66: bz645223-CVE-2010-3858-setup_arg_pages-diagnose-excessive-argument-size.patch
+Patch67: bz646726-CVE-2010-3861-net-clear-heap-allocation-for-ETHTOOL_GRXCLSRLALL.patch
+Patch68: bz651845-CVE-2010-3874-can-bcm-fix-minor-heap-overflow.patch
+Patch69: bz649894-CVE-2010-3876-net-packet-fix-information-leak-to-userland.patch
+Patch70: bz651265-CVE-2010-3880-inet_diag-Make-sure-we-actually-run-the-same-bytecode-we-audited..patch
+Patch71: bz651699-CVE-2010-4158-filter-make-sure-filters-dont-read-uninitialized-memory.patch
+
 # END OF PATCH DEFINITIONS
 
 Patch10000: linux-2.6-build-nonintconfig.patch
@@ -756,6 +779,29 @@ ApplyPatch bz607854-mm-make-stack-guard-page-logic-use-vm_prev-pointer.patch
 ### 2.6.33.7-rt29-mrg46
 ApplyPatch bz638480-ALSA-prevent-heap-corruption-in-snd_ctl_new.patch
 ApplyPatch bz647434-perf-Mark-software-events-as-irqsafe.patch 
+
+### 2.6.33.7-rt29-mrg47
+ApplyPatch bz648685-CVE-2010-4072-ipc-shm-fix-information-leak-to-userland.patch
+ApplyPatch bz648691-CVE-2010-4073-ipc-initialize-structure-memory-to-zero-for-compat-functions.patch
+ApplyPatch bz648696-CVE-2010-4074-USB-serialmos-prevent-reading-uninitialized-stack-memory.patch
+ApplyPatch bz648699-CVE-2010-4075-tty-Make-tiocgicount-a-handler.patch
+ApplyPatch bz648704-CVE-2010-4077-tty-icount-changeover-for-other-main-devices.patch
+ApplyPatch bz648831-CVE-2010-4079-V4LDVB-ivtvfb-prevent-reading-uninitialized-stack-memory.patch
+ApplyPatch bz648707-CVE-2010-4080-ALSA-soundpcirme9652-prevent-reading-uninitialized-stack-memory.patch
+ApplyPatch bz648717-CVE-2010-4082-driversvideoviaioctl.c-prevent-reading-uninitialized-stack-memory.patch
+ApplyPatch bz648720-CVE-2010-4083-sys_semctl-fix-kernel-stack-leakage.patch
+ApplyPatch bz651172-CVE-2010-4157-SCSI-gdth-integer-overflow-in-ioctl.patch
+ApplyPatch bz637689-CVE-2010-2962-drmi915-Sanity-check-preadpwrite.patch
+ApplyPatch bz642469-CVE-2010-2963-v4l1-fix-32-bit-compat-microcode-loading-translation.patch
+ApplyPatch bz651674-CVE-2010-4169-perf_events-Fix-perf_counter_mmap-hook-in-mprotect.patch
+ApplyPatch bz637680-CVE-2010-3432-sctp-Do-not-reset-the-packet-during-sctp_packet_config..patch
+ApplyPatch bz640460-CVE-2010-3705-sctp-Fix-out-of-bounds-reading-in-sctp_asoc_get_hmac.patch
+ApplyPatch bz645223-CVE-2010-3858-setup_arg_pages-diagnose-excessive-argument-size.patch
+ApplyPatch bz646726-CVE-2010-3861-net-clear-heap-allocation-for-ETHTOOL_GRXCLSRLALL.patch
+ApplyPatch bz651845-CVE-2010-3874-can-bcm-fix-minor-heap-overflow.patch
+ApplyPatch bz649894-CVE-2010-3876-net-packet-fix-information-leak-to-userland.patch
+ApplyPatch bz651265-CVE-2010-3880-inet_diag-Make-sure-we-actually-run-the-same-bytecode-we-audited..patch
+ApplyPatch bz651699-CVE-2010-4158-filter-make-sure-filters-dont-read-uninitialized-memory.patch
 
 # END OF PATCH APPLICATIONS
 
@@ -1426,6 +1472,29 @@ This is required to use SystemTap with %{name}-trace-%{KVERREL}.
 %endif
 
 %changelog
+* Mon Nov 22 2010 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.33.7-rt29-mrg47
+- Added bz648685-CVE-2010-4072-ipc-shm-fix-information-leak-to-userland.patch
+- Added bz648691-CVE-2010-4073-ipc-initialize-structure-memory-to-zero-for-compat-functions.patch
+- Added bz648696-CVE-2010-4074-USB-serialmos-prevent-reading-uninitialized-stack-memory.patch
+- Added bz648699-CVE-2010-4075-tty-Make-tiocgicount-a-handler.patch
+- Added bz648704-CVE-2010-4077-tty-icount-changeover-for-other-main-devices.patch
+- Added bz648831-CVE-2010-4079-V4LDVB-ivtvfb-prevent-reading-uninitialized-stack-memory.patch
+- Added bz648707-CVE-2010-4080-ALSA-soundpcirme9652-prevent-reading-uninitialized-stack-memory.patch
+- Added bz648717-CVE-2010-4082-driversvideoviaioctl.c-prevent-reading-uninitialized-stack-memory.patch
+- Added bz648720-CVE-2010-4083-sys_semctl-fix-kernel-stack-leakage.patch
+- Added bz651172-CVE-2010-4157-SCSI-gdth-integer-overflow-in-ioctl.patch
+- Added bz637689-CVE-2010-2962-drmi915-Sanity-check-preadpwrite.patch
+- Added bz642469-CVE-2010-2963-v4l1-fix-32-bit-compat-microcode-loading-translation.patch
+- Added bz651674-CVE-2010-4169-perf_events-Fix-perf_counter_mmap-hook-in-mprotect.patch
+- Added bz637680-CVE-2010-3432-sctp-Do-not-reset-the-packet-during-sctp_packet_config..patch
+- Added bz640460-CVE-2010-3705-sctp-Fix-out-of-bounds-reading-in-sctp_asoc_get_hmac.patch
+- Added bz645223-CVE-2010-3858-setup_arg_pages-diagnose-excessive-argument-size.patch
+- Added bz646726-CVE-2010-3861-net-clear-heap-allocation-for-ETHTOOL_GRXCLSRLALL.patch
+- Added bz651845-CVE-2010-3874-can-bcm-fix-minor-heap-overflow.patch
+- Added bz649894-CVE-2010-3876-net-packet-fix-information-leak-to-userland.patch
+- Added bz651265-CVE-2010-3880-inet_diag-Make-sure-we-actually-run-the-same-bytecode-we-audited..patch
+- Added bz651699-CVE-2010-4158-filter-make-sure-filters-dont-read-uninitialized-memory.patch
+
 * Wed Oct 13 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg46
 - Added bz638480-ALSA-prevent-heap-corruption-in-snd_ctl_new.patch
 - Added bz647434-perf-Mark-software-events-as-irqsafe.patch 
