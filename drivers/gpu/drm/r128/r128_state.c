@@ -1655,7 +1655,7 @@ void r128_driver_preclose(struct drm_device * dev, struct drm_file *file_priv)
 	}
 }
 
-void r128_driver_lastclose(struct drm_device * dev)
+void r128_driver_lastclose(struct drm_device *dev)
 {
 	r128_do_cleanup_cce(dev);
 }

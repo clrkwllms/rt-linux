@@ -1529,7 +1529,7 @@ struct drm_ioctl_desc i830_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(I830_IRQ_EMIT, i830_irq_emit, DRM_AUTH),
 	DRM_IOCTL_DEF_DRV(I830_IRQ_WAIT, i830_irq_wait, DRM_AUTH),
 	DRM_IOCTL_DEF_DRV(I830_GETPARAM, i830_getparam, DRM_AUTH),
-	DRM_IOCTL_DEF_DRV(I830_SETPARAM, i830_setparam, DRM_AUTH)
+	DRM_IOCTL_DEF_DRV(I830_SETPARAM, i830_setparam, DRM_AUTH),
 };
 
 int i830_max_ioctl = DRM_ARRAY_SIZE(i830_ioctls);

@@ -134,8 +134,8 @@ static struct drm_ioctl_desc vmw_ioctls[] = {
 		      DRM_AUTH | DRM_UNLOCKED),
 	VMW_IOCTL_DEF(VMW_FIFO_DEBUG, vmw_fifo_debug_ioctl,
 		      DRM_AUTH | DRM_ROOT_ONLY | DRM_MASTER | DRM_UNLOCKED),
-	VMW_IOCTL_DEF(DRM_IOCTL_VMW_FENCE_WAIT, vmw_fence_wait_ioctl,
-		      DRM_AUTH | DRM_UNLOCKED)
+	VMW_IOCTL_DEF(VMW_FENCE_WAIT, vmw_fence_wait_ioctl,
+		      DRM_AUTH | DRM_UNLOCKED),
 };
 
 static struct pci_device_id vmw_pci_id_list[] = {
