@@ -106,6 +106,7 @@ xfs_fs_geometry(
 				mp->m_sb.sb_logsectsize : BBSIZE;
 		geo->rtsectsize = mp->m_sb.sb_blocksize;
 		geo->dirblocksize = mp->m_dirblksize;
+		geo->logsunit = 0;
 	}
 	if (new_version >= 4) {
 		geo->flags |=
