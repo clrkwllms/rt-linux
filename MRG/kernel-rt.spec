@@ -8,7 +8,7 @@ Summary: The Linux RT kernel
 %define realtime rt
 
 # mrgN
-%define iteration 47
+%define iteration 50
 
 # rtN
 %define rttag rt29
@@ -316,7 +316,6 @@ Source31: perf-manpage.tar.bz2
 # Patch24: qla2xxx-inline-fw-rt.patch
 # Patch28: ibm-amd-edac-rh-v1-2.6.29_forward_port.patch
 # Patch50: perf-use-cplus_demangle.patch
-# bz465837-rtc-compat-rhel5.patch-ported-to-V2.patch
 # End Audit
 
 # START OF PATCH DEFINITIONS
@@ -418,6 +417,16 @@ Patch68: bz651845-CVE-2010-3874-can-bcm-fix-minor-heap-overflow.patch
 Patch69: bz649894-CVE-2010-3876-net-packet-fix-information-leak-to-userland.patch
 Patch70: bz651265-CVE-2010-3880-inet_diag-Make-sure-we-actually-run-the-same-bytecode-we-audited..patch
 Patch71: bz651699-CVE-2010-4158-filter-make-sure-filters-dont-read-uninitialized-memory.patch
+
+### 2.6.33.7-rt29-mrg48
+Patch72: bz651893-CVE-2010-4160-net-Truncate-recvfrom-and-sendto-length-to-INT_MAX.patch
+Patch73: bz660306-x86-Improve-TSC-calibration-using-a-delayed-workqueu.patch
+
+### 2.6.33.7-rt29-mrg49
+Patch74: bz669187.patch
+
+### 2.6.33.7-rt29-mrg50
+Patch75: bz465837-rtc-compat-rhel5.patch-ported-to-V2.patch
 
 # END OF PATCH DEFINITIONS
 
@@ -802,6 +811,16 @@ ApplyPatch bz651845-CVE-2010-3874-can-bcm-fix-minor-heap-overflow.patch
 ApplyPatch bz649894-CVE-2010-3876-net-packet-fix-information-leak-to-userland.patch
 ApplyPatch bz651265-CVE-2010-3880-inet_diag-Make-sure-we-actually-run-the-same-bytecode-we-audited..patch
 ApplyPatch bz651699-CVE-2010-4158-filter-make-sure-filters-dont-read-uninitialized-memory.patch
+
+### 2.6.33.7-rt29-mrg48
+ApplyPatch bz651893-CVE-2010-4160-net-Truncate-recvfrom-and-sendto-length-to-INT_MAX.patch
+ApplyPatch bz660306-x86-Improve-TSC-calibration-using-a-delayed-workqueu.patch
+
+### 2.6.33.7-rt29-mrg49
+ApplyPatch bz669187.patch
+
+### 2.6.33.7-rt29-mrg50
+ApplyPatch bz465837-rtc-compat-rhel5.patch-ported-to-V2.patch
 
 # END OF PATCH APPLICATIONS
 
@@ -1472,6 +1491,19 @@ This is required to use SystemTap with %{name}-trace-%{KVERREL}.
 %endif
 
 %changelog
+* Fri Feb 11 2011 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg50
+- Reenabled bz465837-rtc-compat-rhel5.patch-ported-to-V2.patch
+
+* Wed Jan 12 2011 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg49
+- Added bz669187.patch
+  The above patch includes the update for v2.6.33.7.2-rt30
+  In addition it has two fixes, asm-generic-percpu-fixup-RT-mismerge.patch
+  and x86-tsc-Prevent-delayed-init-if-initial-tsc-calibrat.patch
+
+* Tue Dec 21 2010 John Kacur <jkacur@redhat.com> - 2.6.33.7-rt29-mrg48
+- Added bz651893-CVE-2010-4160-net-Truncate-recvfrom-and-sendto-length-to-INT_MAX.patch
+- Added bz660306-x86-Improve-TSC-calibration-using-a-delayed-workqueu.patch
+
 * Mon Nov 22 2010 Luis Claudio R. Goncalves <lgoncalv@redhat.com> - 2.6.33.7-rt29-mrg47
 - Added bz648685-CVE-2010-4072-ipc-shm-fix-information-leak-to-userland.patch
 - Added bz648691-CVE-2010-4073-ipc-initialize-structure-memory-to-zero-for-compat-functions.patch
