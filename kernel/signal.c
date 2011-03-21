@@ -1868,7 +1868,7 @@ static void ptrace_stop(int exit_code, int why, int clear_code, siginfo_t *info)
 		 */
 		preempt_disable();
 		read_unlock(&tasklist_lock);
-		preempt_enable_no_resched();
+		__preempt_enable_no_resched();
 		schedule();
 	} else {
 		/*
