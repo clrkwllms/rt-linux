@@ -1,0 +1,25 @@
+#!/bin/sh
+
+for i in *.config
+do
+	echo $i
+	  if [ "$i" != ${i//vanilla/chocolate/} ]; then
+	       isvanilla=true
+	            OLDDIR=`pwd`
+	else
+	     isvanilla=false
+	fi
+	mv $i .config
+	arch=`head -1 .config | cut -b 3-`
+	if [ "$isvanilla" = "true" ]; then
+	    pushd ../vanilla-*
+	    mv $OLDDIR/.config .
+	fi
+	make ARCH=$arch oldconfig
+	echo "# $arch" > configs/$i
+	cat .config >> configs/$i
+	if [ "$isvanilla" = "true" ]; then
+	    mv configs/$i $OLDDIR/configs
+	    popd
+	fi
+done
