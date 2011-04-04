@@ -429,7 +429,7 @@ config X86_32_NON_STANDARD
 
 config X86_NUMAQ
 	bool "NUMAQ (IBM/Sequent)"
-	depends on X86_32_NON_STANDARD
+	depends on X86_32_NON_STANDARD && !PREEMPT_RT_FULL
 	depends on PCI
 	select NUMA
 	select X86_MPPARSE
@@ -1013,7 +1013,8 @@ config X86_CPUID
 choice
 	prompt "High Memory Support"
 	default HIGHMEM64G if X86_NUMAQ
-	default HIGHMEM4G
+	default HIGHMEM4G if !PREEMPT_RT_FULL
+	default NOHIGHMEM if PREEMPT_RT_FULL
 	depends on X86_32
 
 config NOHIGHMEM
@@ -1055,14 +1056,14 @@ config NOHIGHMEM
 
 config HIGHMEM4G
 	bool "4GB"
-	depends on !X86_NUMAQ
+	depends on !X86_NUMAQ && !PREEMPT_RT_FULL
 	---help---
 	  Select this if you have a 32-bit processor and between 1 and 4
 	  gigabytes of physical RAM.
 
 config HIGHMEM64G
 	bool "64GB"
-	depends on !M386 && !M486
+	depends on !M386 && !M486 && !PREEMPT_RT_FULL
 	select X86_PAE
 	---help---
 	  Select this if you have a 32-bit processor and more than 4
