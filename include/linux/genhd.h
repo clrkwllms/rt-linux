@@ -106,6 +106,7 @@ struct hd_struct {
 	struct disk_stats dkstats;
 #endif
 	struct rcu_head rcu_head;
+	struct kref ref;
 };
 
 #define GENHD_FL_REMOVABLE			1
@@ -534,6 +535,7 @@ extern int rescan_partitions(struct gendisk *disk, struct block_device *bdev);
 extern struct hd_struct * __must_check add_partition(struct gendisk *disk,
 						     int partno, sector_t start,
 						     sector_t len, int flags);
+extern void __delete_partition(struct kref *ref);
 extern void delete_partition(struct gendisk *, int);
 extern void printk_all_partitions(void);
 

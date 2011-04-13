@@ -192,6 +192,7 @@ struct request {
 	void *elevator_private2;
 
 	struct gendisk *rq_disk;
+	struct hd_struct *part;
 	unsigned long start_time;
 
 	/* Number of scatter-gather DMA addr+len pairs after
