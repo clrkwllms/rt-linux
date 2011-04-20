@@ -100,6 +100,10 @@ module_param_named(use_prio, use_prio, bool, 0444);
 MODULE_PARM_DESC(use_prio, "Enable steering by VLAN priority on ETH ports "
 		  "(0/1, default 0)");
 
+static int log_mcg_size = 8;
+module_param_named(log_mcg_size, log_mcg_size, int, 0444);
+MODULE_PARM_DESC(log_mcg_size, "Log2 size of MCG struct (8-11)");
+
 static int log_mtts_per_seg = ilog2(MLX4_MTT_ENTRY_PER_SEG);
 module_param_named(log_mtts_per_seg, log_mtts_per_seg, int, 0444);
 MODULE_PARM_DESC(log_mtts_per_seg, "Log2 number of MTT entries per segment (1-5)");
@@ -198,7 +202,14 @@ static int mlx4_dev_cap(struct mlx4_dev *dev, struct mlx4_dev_cap *dev_cap)
 	dev->caps.reserved_srqs	     = dev_cap->reserved_srqs;
 	dev->caps.max_sq_desc_sz     = dev_cap->max_sq_desc_sz;
 	dev->caps.max_rq_desc_sz     = dev_cap->max_rq_desc_sz;
-	dev->caps.num_qp_per_mgm     = MLX4_QP_PER_MGM;
+	dev->caps.max_qp_per_mcg     = dev_cap->max_qp_per_mcg;
+	dev->caps.max_mcgs           = dev_cap->max_mcgs;
+	i = 0;
+	do {
+		dev->caps.mcg_entry_size     = 1 << (log_mcg_size - i++);
+		dev->caps.num_qp_per_mcg     = 4 * (dev->caps.mcg_entry_size / 16 - 2);
+	} while (dev->caps.num_qp_per_mcg > dev->caps.max_qp_per_mcg);
+
 	/*
 	 * Subtract 1 from the limit because we need to allocate a
 	 * spare CQE so the HCA HW can tell the difference between an
@@ -635,7 +646,7 @@ static int mlx4_init_icm(struct mlx4_dev *dev, struct mlx4_dev_cap *dev_cap,
 	 * and it's a lot easier than trying to track ref counts.
 	 */
 	err = mlx4_init_icm_table(dev, &priv->mcg_table.table,
-				  init_hca->mc_base, MLX4_MGM_ENTRY_SIZE,
+				  init_hca->mc_base, dev->caps.mcg_entry_size,
 				  dev->caps.num_mgms + dev->caps.num_amgms,
 				  dev->caps.num_mgms + dev->caps.num_amgms,
 				  0, 0);
@@ -1310,6 +1321,11 @@ static int __init mlx4_verify_params(void)
 
 	if ((log_mtts_per_seg < 1) || (log_mtts_per_seg > 5)) {
 		printk(KERN_WARNING "mlx4_core: bad log_mtts_per_seg: %d\n", log_mtts_per_seg);
+		return -1;
+	}
+
+	if ((log_mcg_size < 8) || (log_mcg_size > 11)) {
+		printk(KERN_WARNING "mlx4_core: bad log_mcg_size: %d\n", log_mcg_size);
 		return -1;
 	}
 

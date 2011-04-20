@@ -140,7 +140,7 @@ static int mlx4_ib_query_device(struct ib_device *ibdev,
 		IB_ATOMIC_HCA : IB_ATOMIC_NONE;
 	props->max_pkeys	   = dev->dev->caps.pkey_table_len[1];
 	props->max_mcast_grp	   = dev->dev->caps.num_mgms + dev->dev->caps.num_amgms;
-	props->max_mcast_qp_attach = dev->dev->caps.num_qp_per_mgm;
+	props->max_mcast_qp_attach = dev->dev->caps.num_qp_per_mcg;
 	props->max_total_mcast_qp_attach = props->max_mcast_qp_attach *
 					   props->max_mcast_grp;
 	props->max_map_per_fmr = (1 << (32 - ilog2(dev->dev->caps.num_mpts))) - 1;

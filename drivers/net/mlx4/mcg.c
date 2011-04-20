@@ -46,7 +46,7 @@ struct mlx4_mgm {
 	__be32			members_count;
 	u32			reserved[2];
 	u8			gid[16];
-	__be32			qp[MLX4_QP_PER_MGM];
+	__be32			qp[MLX4_MAX_QP_PER_MGM];
 };
 
 static const u8 zero_gid[16];	/* automatically initialized to 0 */
@@ -184,12 +184,12 @@ int mlx4_multicast_attach(struct mlx4_dev *dev, struct mlx4_qp *qp, u8 gid[16],
 		}
 		index += dev->caps.num_mgms;
 
-		memset(mgm, 0, sizeof *mgm);
+		memset(mgm, 0, dev->caps.mcg_entry_size);
 		memcpy(mgm->gid, gid, 16);
 	}
 
 	members_count = be32_to_cpu(mgm->members_count);
-	if (members_count == MLX4_QP_PER_MGM) {
+	if (members_count == dev->caps.num_qp_per_mcg) {
 		mlx4_err(dev, "MGM at index %x is full.\n", index);
 		err = -ENOMEM;
 		goto out;

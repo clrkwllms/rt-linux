@@ -416,8 +416,8 @@ int mlx4_QUERY_DEV_CAP(struct mlx4_dev *dev, struct mlx4_dev_cap *dev_cap)
 		 dev_cap->reserved_mrws, dev_cap->reserved_mtts);
 	mlx4_dbg(dev, "Max PDs: %d, reserved PDs: %d, reserved UARs: %d\n",
 		 dev_cap->max_pds, dev_cap->reserved_pds, dev_cap->reserved_uars);
-	mlx4_dbg(dev, "Max QP/MCG: %d, reserved MGMs: %d\n",
-		 dev_cap->max_pds, dev_cap->reserved_mgms);
+	mlx4_dbg(dev, "Max QP/MCG: %d, Max MCGs: %d, reserved MGMs: %d\n",
+		 dev_cap->max_qp_per_mcg, dev_cap->max_mcgs, dev_cap->reserved_mgms);
 	mlx4_dbg(dev, "Max CQEs: %d, max WQEs: %d, max SRQ WQEs: %d\n",
 		 dev_cap->max_cq_sz, dev_cap->max_qp_sz, dev_cap->max_srq_sz);
 	mlx4_dbg(dev, "Local CA ACK delay: %d, max MTU: %d, port width cap: %d\n",

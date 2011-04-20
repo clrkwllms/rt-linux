@@ -216,10 +216,13 @@ struct mlx4_caps {
 	int			reserved_mtts;
 	int			reserved_mrws;
 	int			reserved_uars;
+	int			max_qp_per_mcg;
+	int			max_mcgs;
+	int			mcg_entry_size;
+	int			num_qp_per_mcg;
 	int			num_mgms;
 	int			num_amgms;
 	int			reserved_mcgs;
-	int			num_qp_per_mgm;
 	int			num_pds;
 	int			reserved_pds;
 	int			mtt_entry_sz;
