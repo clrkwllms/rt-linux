@@ -2787,7 +2787,7 @@ static void __sched_fork(struct task_struct *p)
 void sched_fork(struct task_struct *p)
 {
 	unsigned long flags;
-	int cpu = get_cpu();
+	int cpu;
 
 	__sched_fork(p);
 	/*
@@ -2827,6 +2827,7 @@ void sched_fork(struct task_struct *p)
 	if (!rt_prio(p->prio))
 		p->sched_class = &fair_sched_class;
 
+	cpu = get_cpu();
 	if (p->sched_class->task_fork)
 		p->sched_class->task_fork(p);
 
@@ -2838,8 +2839,9 @@ void sched_fork(struct task_struct *p)
 	 * Silence PROVE_RCU.
 	 */
 	raw_spin_lock_irqsave(&p->pi_lock, flags);
-	set_task_cpu(p, cpu);
+	set_task_cpu(p, smp_processor_id());
 	raw_spin_unlock_irqrestore(&p->pi_lock, flags);
+	put_cpu();
 
 #if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
 	if (likely(sched_info_on()))
@@ -2855,8 +2857,6 @@ void sched_fork(struct task_struct *p)
 #ifdef CONFIG_SMP
 	plist_node_init(&p->pushable_tasks, MAX_PRIO);
 #endif
-
-	put_cpu();
 }
 
 /*
