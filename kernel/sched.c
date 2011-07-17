@@ -4326,7 +4326,7 @@ need_resched:
 
 static inline void sched_submit_work(struct task_struct *tsk)
 {
-	if (!tsk->state)
+	if (!tsk->state || tsk_is_pi_blocked(tsk))
 		return;
 
 	/*
@@ -4346,6 +4346,9 @@ static inline void sched_submit_work(struct task_struct *tsk)
 
 static inline void sched_update_worker(struct task_struct *tsk)
 {
+	if (tsk_is_pi_blocked(tsk))
+		return;
+
 	if (tsk->flags & PF_WQ_WORKER)
 		wq_worker_running(tsk);
 }
