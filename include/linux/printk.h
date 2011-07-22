@@ -88,8 +88,11 @@ int no_printk(const char *fmt, ...)
 	return 0;
 }
 
+extern int early_console_initialized;
+
 extern asmlinkage __attribute__ ((format (printf, 1, 2)))
 void early_printk(const char *fmt, ...);
+void early_vprintk(const char *fmt, va_list args);
 
 extern int printk_needs_cpu(int cpu);
 extern void printk_tick(void);
@@ -109,6 +112,8 @@ extern int __printk_ratelimit(const char *func);
 #define printk_ratelimit() __printk_ratelimit(__func__)
 extern bool printk_timed_ratelimit(unsigned long *caller_jiffies,
 				   unsigned int interval_msec);
+
+extern void printk_kill(void);
 
 extern int printk_delay_msec;
 extern int dmesg_restrict;

@@ -171,7 +171,7 @@ static struct console early_serial_console = {
 
 /* Direct interface for emergencies */
 static struct console *early_console = &early_vga_console;
-static int __initdata early_console_initialized;
+int early_console_initialized;
 
 asmlinkage void early_printk(const char *fmt, ...)
 {
@@ -183,6 +183,15 @@ asmlinkage void early_printk(const char *fmt, ...)
 	n = vscnprintf(buf, sizeof(buf), fmt, ap);
 	early_console->write(early_console, buf, n);
 	va_end(ap);
+}
+
+asmlinkage void early_vprintk(const char *fmt, va_list ap)
+{
+	char buf[512];
+	int n;
+
+	n = vscnprintf(buf, sizeof(buf), fmt, ap);
+	early_console->write(early_console, buf, n);
 }
 
 static inline void early_console_register(struct console *con, int keep_early)

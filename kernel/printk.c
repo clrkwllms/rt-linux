@@ -519,6 +519,19 @@ static void __call_console_drivers(unsigned start, unsigned end)
 	}
 }
 
+/*
+ * This is independent of any log levels - a global
+ * kill switch that turns off all of printk.
+ *
+ * Used by the NMI watchdog if early-printk is enabled.
+ */
+static int __read_mostly printk_killswitch;
+
+void printk_kill(void)
+{
+	printk_killswitch = 1;
+}
+
 static int __read_mostly ignore_loglevel;
 
 static int __init ignore_loglevel_setup(char *str)
@@ -832,6 +845,15 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	char *p;
 	size_t plen;
 	char special;
+
+	/*
+	 * Fall back to early_printk if a debugging subsystem has
+	 * killed printk output
+	 */
+	if (unlikely(printk_killswitch)) {
+		early_vprintk(fmt, args);
+		return 1;
+	}
 
 	boot_delay_msec();
 	printk_delay();
@@ -1533,6 +1555,7 @@ void register_console(struct console *newcon)
 		for_each_console(bcon)
 			if (bcon->flags & CON_BOOT)
 				unregister_console(bcon);
+		early_console_initialized = 0;
 	} else {
 		printk(KERN_INFO "%sconsole [%s%d] enabled\n",
 			(newcon->flags & CON_BOOT) ? "boot" : "" ,
