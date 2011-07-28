@@ -37,6 +37,7 @@
 #include <linux/nmi.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/kdb.h>
 #include <linux/uaccess.h>
 #include <linux/pm_runtime.h>
 #ifdef CONFIG_SPARC
@@ -3260,7 +3261,7 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 
 	if (port->sysrq)
 		locked = 0;
-	else if (oops_in_progress)
+	else if (oops_in_progress || in_kdb_printk())
 		locked = spin_trylock_irqsave(&port->lock, flags);
 	else
 		spin_lock_irqsave(&port->lock, flags);
