@@ -1288,10 +1288,11 @@ static inline int fastpath_timer_check(struct task_struct *tsk)
 	sig = tsk->signal;
 	if (sig->cputimer.running) {
 		struct task_cputime group_sample;
+		unsigned long flags;
 
-		raw_spin_lock(&sig->cputimer.lock);
+		raw_spin_lock_irqsave(&sig->cputimer.lock, flags);
 		group_sample = sig->cputimer.cputime;
-		raw_spin_unlock(&sig->cputimer.lock);
+		raw_spin_unlock_irqrestore(&sig->cputimer.lock, flags);
 
 		if (task_cputime_expired(&group_sample, &sig->cputime_expires))
 			return 1;
