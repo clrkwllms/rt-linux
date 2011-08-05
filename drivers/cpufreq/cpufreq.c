@@ -43,7 +43,7 @@ static DEFINE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_data);
 /* This one keeps track of the previously set governor of a removed CPU */
 static DEFINE_PER_CPU(char[CPUFREQ_NAME_LEN], cpufreq_cpu_governor);
 #endif
-static DEFINE_SPINLOCK(cpufreq_driver_lock);
+static DEFINE_RAW_SPINLOCK(cpufreq_driver_lock);
 
 /*
  * cpu_policy_rwsem is a per CPU reader-writer semaphore designed to cure
@@ -138,7 +138,7 @@ struct cpufreq_policy *cpufreq_cpu_get(unsigned int cpu)
 		goto err_out;
 
 	/* get the cpufreq driver */
-	spin_lock_irqsave(&cpufreq_driver_lock, flags);
+	raw_spin_lock_irqsave(&cpufreq_driver_lock, flags);
 
 	if (!cpufreq_driver)
 		goto err_out_unlock;
@@ -156,13 +156,13 @@ struct cpufreq_policy *cpufreq_cpu_get(unsigned int cpu)
 	if (!kobject_get(&data->kobj))
 		goto err_out_put_module;
 
-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+	raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 	return data;
 
 err_out_put_module:
 	module_put(cpufreq_driver->owner);
 err_out_unlock:
-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+	raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 err_out:
 	return NULL;
 }
@@ -722,10 +722,10 @@ static int cpufreq_add_dev_policy(unsigned int cpu,
 				return -EBUSY;
 			}
 
-			spin_lock_irqsave(&cpufreq_driver_lock, flags);
+			raw_spin_lock_irqsave(&cpufreq_driver_lock, flags);
 			cpumask_copy(managed_policy->cpus, policy->cpus);
 			per_cpu(cpufreq_cpu_data, cpu) = managed_policy;
-			spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+			raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
 			pr_debug("CPU already managed, adding link\n");
 			ret = sysfs_create_link(&sys_dev->kobj,
@@ -821,14 +821,16 @@ static int cpufreq_add_dev_interface(unsigned int cpu,
 			goto err_out_kobj_put;
 	}
 
-	spin_lock_irqsave(&cpufreq_driver_lock, flags);
+	get_online_cpus();
 	for_each_cpu(j, policy->cpus) {
 		if (!cpu_online(j))
 			continue;
+		raw_spin_lock_irqsave(&cpufreq_driver_lock, flags);
 		per_cpu(cpufreq_cpu_data, j) = policy;
 		per_cpu(cpufreq_policy_cpu, j) = policy->cpu;
+		raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 	}
-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+	put_online_cpus();
 
 	ret = cpufreq_add_dev_symlink(cpu, policy);
 	if (ret)
@@ -970,10 +972,13 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 
 
 err_out_unregister:
-	spin_lock_irqsave(&cpufreq_driver_lock, flags);
-	for_each_cpu(j, policy->cpus)
+	get_online_cpus();
+	for_each_cpu(j, policy->cpus) {
+		raw_spin_lock_irqsave(&cpufreq_driver_lock, flags);
 		per_cpu(cpufreq_cpu_data, j) = NULL;
-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+		raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+	}
+	put_online_cpus();
 
 	kobject_put(&policy->kobj);
 	wait_for_completion(&policy->kobj_unregister);
@@ -1013,11 +1018,11 @@ static int __cpufreq_remove_dev(struct sys_device *sys_dev)
 
 	pr_debug("unregistering CPU %u\n", cpu);
 
-	spin_lock_irqsave(&cpufreq_driver_lock, flags);
+	raw_spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	data = per_cpu(cpufreq_cpu_data, cpu);
 
 	if (!data) {
-		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+		raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 		unlock_policy_rwsem_write(cpu);
 		return -EINVAL;
 	}
@@ -1031,7 +1036,7 @@ static int __cpufreq_remove_dev(struct sys_device *sys_dev)
 	if (unlikely(cpu != data->cpu)) {
 		pr_debug("removing link\n");
 		cpumask_clear_cpu(cpu, data->cpus);
-		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+		raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 		kobj = &sys_dev->kobj;
 		cpufreq_cpu_put(data);
 		unlock_policy_rwsem_write(cpu);
@@ -1040,6 +1045,7 @@ static int __cpufreq_remove_dev(struct sys_device *sys_dev)
 	}
 #endif
 
+	raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 #ifdef CONFIG_SMP
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -1052,15 +1058,17 @@ static int __cpufreq_remove_dev(struct sys_device *sys_dev)
 	 * per_cpu(cpufreq_cpu_data) while holding the lock, and remove
 	 * the sysfs links afterwards.
 	 */
+	get_online_cpus();
 	if (unlikely(cpumask_weight(data->cpus) > 1)) {
 		for_each_cpu(j, data->cpus) {
 			if (j == cpu)
 				continue;
+			raw_spin_lock_irqsave(&cpufreq_driver_lock, flags);
 			per_cpu(cpufreq_cpu_data, j) = NULL;
+			raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 		}
 	}
-
-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+	put_online_cpus();
 
 	if (unlikely(cpumask_weight(data->cpus) > 1)) {
 		for_each_cpu(j, data->cpus) {
@@ -1079,8 +1087,6 @@ static int __cpufreq_remove_dev(struct sys_device *sys_dev)
 			cpufreq_cpu_put(data);
 		}
 	}
-#else
-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 #endif
 
 	if (cpufreq_driver->target)
@@ -1802,13 +1808,13 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	if (driver_data->setpolicy)
 		driver_data->flags |= CPUFREQ_CONST_LOOPS;
 
-	spin_lock_irqsave(&cpufreq_driver_lock, flags);
+	raw_spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	if (cpufreq_driver) {
-		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+		raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 		return -EBUSY;
 	}
 	cpufreq_driver = driver_data;
-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+	raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
 	ret = sysdev_driver_register(&cpu_sysdev_class,
 					&cpufreq_sysdev_driver);
@@ -1842,9 +1848,9 @@ err_sysdev_unreg:
 	sysdev_driver_unregister(&cpu_sysdev_class,
 			&cpufreq_sysdev_driver);
 err_null_driver:
-	spin_lock_irqsave(&cpufreq_driver_lock, flags);
+	raw_spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	cpufreq_driver = NULL;
-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+	raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(cpufreq_register_driver);
@@ -1870,9 +1876,9 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 	sysdev_driver_unregister(&cpu_sysdev_class, &cpufreq_sysdev_driver);
 	unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
 
-	spin_lock_irqsave(&cpufreq_driver_lock, flags);
+	raw_spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	cpufreq_driver = NULL;
-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+	raw_spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
 	return 0;
 }
