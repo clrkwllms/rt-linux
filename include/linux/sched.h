@@ -91,6 +91,7 @@ struct sched_param {
 #include <linux/task_io_accounting.h>
 #include <linux/latencytop.h>
 #include <linux/cred.h>
+#include <linux/hardirq.h>
 
 #include <asm/processor.h>
 
@@ -1441,7 +1442,9 @@ struct task_struct {
 	/* mutex deadlock detection */
 	struct mutex_waiter *blocked_on;
 #endif
+#ifdef CONFIG_PREEMPT_RT_FULL
 	int pagefault_disabled;
+#endif
 #ifdef CONFIG_TRACE_IRQFLAGS
 	unsigned int irq_events;
 	unsigned long hardirq_enable_ip;
@@ -1595,6 +1598,15 @@ struct task_struct {
 	pte_t kmap_pte[KM_TYPE_NR];
 #endif
 };
+
+static inline bool pagefault_disabled(void)
+{
+	return in_atomic()
+#ifdef CONFIG_PREEMPT_RT_FULL
+		|| current->pagefault_disabled
+#endif
+		;
+}
 
 /*
  * Priority of a process goes from 0..MAX_PRIO-1, valid RT
