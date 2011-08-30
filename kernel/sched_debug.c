@@ -485,7 +485,9 @@ void proc_sched_show_task(struct task_struct *p, struct seq_file *m)
 	P(se.load.weight);
 	P(policy);
 	P(prio);
+#ifdef CONFIG_PREEMPT_RT_FULL
 	P(migrate_disable);
+#endif
 	P(rt.nr_cpus_allowed);
 #undef PN
 #undef __PN
