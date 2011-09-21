@@ -240,8 +240,7 @@ static void watchdog_overflow_callback(struct perf_event *event, int nmi,
 		 * If early-printk is enabled then make sure we do not
 		 * lock up in printk() and kill console logging:
 		 */
-		if (early_console_initialized)
-			printk_kill();
+		printk_kill();
 
 		if (hardlockup_panic) {
 			panic("Watchdog detected hard LOCKUP on cpu %d", this_cpu);

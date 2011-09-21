@@ -44,13 +44,6 @@
 
 #include <asm/uaccess.h>
 
-/*
- * Architectures can override it:
- */
-void asmlinkage __attribute__((weak)) early_printk(const char *fmt, ...)
-{
-}
-
 #define __LOG_BUF_LEN	(1 << CONFIG_LOG_BUF_SHIFT)
 
 /* printk's without a loglevel use this.. */
@@ -521,6 +514,25 @@ static void __call_console_drivers(unsigned start, unsigned end)
 	migrate_enable();
 }
 
+#ifdef CONFIG_EARLY_PRINTK
+struct console *early_console;
+
+static void early_vprintk(const char *fmt, va_list ap)
+{
+	char buf[512];
+	int n = vscnprintf(buf, sizeof(buf), fmt, ap);
+	if (early_console)
+		early_console->write(early_console, buf, n);
+}
+
+asmlinkage void early_printk(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	early_vprintk(fmt, ap);
+	va_end(ap);
+}
+
 /*
  * This is independent of any log levels - a global
  * kill switch that turns off all of printk.
@@ -533,6 +545,20 @@ void printk_kill(void)
 {
 	printk_killswitch = 1;
 }
+
+static int forced_early_printk(const char *fmt, va_list ap)
+{
+	if (!printk_killswitch)
+		return 0;
+	early_vprintk(fmt, ap);
+	return 1;
+}
+#else
+static inline int forced_early_printk(const char *fmt, va_list ap)
+{
+	return 0;
+}
+#endif
 
 static int __read_mostly ignore_loglevel;
 
@@ -858,10 +884,8 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	 * Fall back to early_printk if a debugging subsystem has
 	 * killed printk output
 	 */
-	if (unlikely(printk_killswitch)) {
-		early_vprintk(fmt, args);
+	if (unlikely(forced_early_printk(fmt, args)))
 		return 1;
-	}
 
 	boot_delay_msec();
 	printk_delay();

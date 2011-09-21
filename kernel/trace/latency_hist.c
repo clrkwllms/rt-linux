@@ -223,9 +223,8 @@ void notrace latency_hist(int latency_type, int cpu, unsigned long latency,
 	} else
 		my_hist->hist_array[latency]++;
 
-	if (latency < my_hist->min_lat)
-		my_hist->min_lat = latency;
-	if (latency > my_hist->max_lat) {
+	if (unlikely(latency > my_hist->max_lat ||
+	    my_hist->min_lat == ULONG_MAX)) {
 #if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
     defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
 		if (latency_type == WAKEUP_LATENCY ||
@@ -246,6 +245,8 @@ void notrace latency_hist(int latency_type, int cpu, unsigned long latency,
 #endif
 		my_hist->max_lat = latency;
 	}
+	if (unlikely(latency < my_hist->min_lat))
+		my_hist->min_lat = latency;
 	my_hist->total_samples++;
 	my_hist->accumulate_lat += latency;
 }
@@ -360,7 +361,7 @@ static struct file_operations latency_hist_fops = {
 static void clear_maxlatprocdata(struct maxlatproc_data *mp)
 {
 	mp->comm[0] = mp->current_comm[0] = '\0';
-	mp->prio = mp->current_prio = mp->current_pid =
+	mp->prio = mp->current_prio = mp->pid = mp->current_pid =
 	    mp->latency = mp->timeroffset = -1;
 	mp->timestamp = 0;
 }
@@ -372,7 +373,7 @@ static void hist_reset(struct hist_data *hist)
 	memset(hist->hist_array, 0, sizeof(hist->hist_array));
 	hist->below_hist_bound_samples = 0ULL;
 	hist->above_hist_bound_samples = 0ULL;
-	hist->min_lat = 0xFFFFFFFFUL;
+	hist->min_lat = ULONG_MAX;
 	hist->max_lat = 0UL;
 	hist->total_samples = 0ULL;
 	hist->accumulate_lat = 0ULL;
@@ -496,15 +497,21 @@ show_maxlatproc(struct file *file, char __user *ubuf, size_t cnt, loff_t *ppos)
 	int strmaxlen = (TASK_COMM_LEN * 2) + (8 * 8);
 	unsigned long long t;
 	unsigned long usecs, secs;
-	char *buf = kmalloc(strmaxlen, GFP_KERNEL);
+	char *buf;
 
+	if (mp->pid == -1 || mp->current_pid == -1) {
+		buf = "(none)\n";
+		return simple_read_from_buffer(ubuf, cnt, ppos, buf,
+		    strlen(buf));
+	}
+
+	buf = kmalloc(strmaxlen, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
 	t = ns2usecs(mp->timestamp);
 	usecs = do_div(t, USEC_PER_SEC);
 	secs = (unsigned long) t;
-
 	r = snprintf(buf, strmaxlen,
 	    "%d %d %ld (%ld) %s <- %d %d %s %lu.%06lu\n", mp->pid,
 	    MAX_RT_PRIO-1 - mp->prio, mp->latency, mp->timeroffset, mp->comm,

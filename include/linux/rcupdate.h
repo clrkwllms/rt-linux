@@ -80,7 +80,7 @@ extern void call_rcu_sched(struct rcu_head *head,
 extern void synchronize_sched(void);
 
 #ifdef CONFIG_PREEMPT_RT_FULL
-# define rcu_barrier_bh()	rcu_barrier()
+# define rcu_barrier_bh		rcu_barrier
 #else
 extern void rcu_barrier_bh(void);
 #endif

@@ -84,8 +84,8 @@ extern void rcu_sched_force_quiescent_state(void);
 extern void rcu_bh_force_quiescent_state(void);
 extern long rcu_batches_completed_bh(void);
 #else
-# define rcu_bh_force_quiescent_state()	rcu_force_quiescent_state()
-# define rcu_batches_completed_bh()	rcu_batches_completed()
+# define rcu_bh_force_quiescent_state	rcu_force_quiescent_state
+# define rcu_batches_completed_bh	rcu_batches_completed
 #endif
 
 /* A context switch is a grace period for RCU-sched and RCU-bh. */
