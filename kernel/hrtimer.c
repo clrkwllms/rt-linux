@@ -1294,11 +1294,9 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 	timer->state &= ~HRTIMER_STATE_CALLBACK;
 }
 
-
-#ifdef CONFIG_PREEMPT_RT_BASE
-
 static enum hrtimer_restart hrtimer_wakeup(struct hrtimer *timer);
 
+#ifdef CONFIG_PREEMPT_RT_BASE
 static void hrtimer_rt_reprogram(int restart, struct hrtimer *timer,
 				 struct hrtimer_clock_base *base)
 {
