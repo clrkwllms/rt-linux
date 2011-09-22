@@ -1598,13 +1598,15 @@ struct task_struct {
 #endif
 };
 
+#ifdef CONFIG_PREEMPT_RT_FULL
+static inline bool cur_pf_disabled(void) { return current->pagefault_disabled; }
+#else
+static inline bool cur_pf_disabled(void) { return false; }
+#endif
+
 static inline bool pagefault_disabled(void)
 {
-	return in_atomic()
-#ifdef CONFIG_PREEMPT_RT_FULL
-		|| current->pagefault_disabled
-#endif
-		;
+	return in_atomic() || cur_pf_disabled();
 }
 
 /*

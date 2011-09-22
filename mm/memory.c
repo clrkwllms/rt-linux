@@ -1290,16 +1290,6 @@ static unsigned long unmap_page_range(struct mmu_gather *tlb,
 	return addr;
 }
 
-#if defined(CONFIG_PREEMPT) && !defined(CONFIG_PREEMPT_RT_FULL)
-# define ZAP_BLOCK_SIZE	(8 * PAGE_SIZE)
-#else
-/*
- * No preempt: go for improved straight-line efficiency
- * on PREEMPT_RT this is not a critical latency-path.
- */
-# define ZAP_BLOCK_SIZE	(1024 * PAGE_SIZE)
-#endif
-
 /**
  * unmap_vmas - unmap a range of memory covered by a list of vma's
  * @tlb: address of the caller's struct mmu_gather
