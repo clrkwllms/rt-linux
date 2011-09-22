@@ -84,7 +84,7 @@
 # define softirq_count()	(preempt_count() & SOFTIRQ_MASK)
 # define in_serving_softirq()	(softirq_count() & SOFTIRQ_OFFSET)
 #else
-# define softirq_count()	(0)
+# define softirq_count()	(0U)
 extern int in_serving_softirq(void);
 #endif
 

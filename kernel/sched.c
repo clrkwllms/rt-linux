@@ -4313,7 +4313,7 @@ need_resched:
 
 static inline void sched_submit_work(struct task_struct *tsk)
 {
-	if (!tsk->state || tsk->pi_blocked_on)
+	if (!tsk->state || tsk_is_pi_blocked(tsk))
 		return;
 
 	/*
@@ -4333,7 +4333,7 @@ static inline void sched_submit_work(struct task_struct *tsk)
 
 static inline void sched_update_worker(struct task_struct *tsk)
 {
-	if (tsk->pi_blocked_on)
+	if (tsk_is_pi_blocked(tsk))
 		return;
 
 	if (tsk->flags & PF_WQ_WORKER)
@@ -4855,6 +4855,7 @@ long __sched sleep_on_timeout(wait_queue_head_t *q, long timeout)
 }
 EXPORT_SYMBOL(sleep_on_timeout);
 
+#ifdef CONFIG_RT_MUTEXES
 /*
  * task_setprio - set the current priority of a task
  * @p: task
@@ -4919,6 +4920,7 @@ void task_setprio(struct task_struct *p, int prio)
 out_unlock:
 	__task_rq_unlock(rq);
 }
+#endif
 
 void set_user_nice(struct task_struct *p, long nice)
 {

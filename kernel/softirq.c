@@ -101,7 +101,7 @@ void softirq_check_pending_idle(void)
 	}
 
 	if (warnpending) {
-		printk(KERN_ERR "NOHZ: local_softirq_pending %02lx\n",
+		printk(KERN_ERR "NOHZ: local_softirq_pending %02x\n",
 		       pending);
 		rate_limit++;
 	}
@@ -115,7 +115,7 @@ void softirq_check_pending_idle(void)
 	static int rate_limit;
 
 	if (rate_limit < 10) {
-		printk(KERN_ERR "NOHZ: local_softirq_pending %02lx\n",
+		printk(KERN_ERR "NOHZ: local_softirq_pending %02x\n",
 		       local_softirq_pending());
 		rate_limit++;
 	}

@@ -31,7 +31,7 @@ DEFINE_PER_CPU(struct mm_struct *, current_mm);
 void __init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 {
 	mm->context.id = 0;
-	spin_lock_init(&mm->context.id_lock);
+	raw_spin_lock_init(&mm->context.id_lock);
 }
 
 static void flush_context(void)
@@ -58,7 +58,7 @@ static void set_mm_context(struct mm_struct *mm, unsigned int asid)
 	 * the broadcast. This function is also called via IPI so the
 	 * mm->context.id_lock has to be IRQ-safe.
 	 */
-	spin_lock_irqsave(&mm->context.id_lock, flags);
+	raw_spin_lock_irqsave(&mm->context.id_lock, flags);
 	if (likely((mm->context.id ^ cpu_last_asid) >> ASID_BITS)) {
 		/*
 		 * Old version of ASID found. Set the new one and
@@ -67,7 +67,7 @@ static void set_mm_context(struct mm_struct *mm, unsigned int asid)
 		mm->context.id = asid;
 		cpumask_clear(mm_cpumask(mm));
 	}
-	spin_unlock_irqrestore(&mm->context.id_lock, flags);
+	raw_spin_unlock_irqrestore(&mm->context.id_lock, flags);
 
 	/*
 	 * Set the mm_cpumask(mm) bit for the current CPU.

@@ -84,7 +84,7 @@ static DEFINE_PER_CPU(int, hist_preemptirqsoff_counting);
 #endif
 
 #if defined(CONFIG_PREEMPT_OFF_HIST) || defined(CONFIG_INTERRUPT_OFF_HIST)
-static notrace void probe_preemptirqsoff_hist(int reason, int start);
+static notrace void probe_preemptirqsoff_hist(void *v, int reason, int start);
 static struct enable_data preemptirqsoff_enabled_data = {
 	.latency_type = PREEMPTIRQSOFF_LATENCY,
 	.enabled = 0,
@@ -358,6 +358,8 @@ static struct file_operations latency_hist_fops = {
 	.release = seq_release,
 };
 
+#if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
+    defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
 static void clear_maxlatprocdata(struct maxlatproc_data *mp)
 {
 	mp->comm[0] = mp->current_comm[0] = '\0';
@@ -365,6 +367,7 @@ static void clear_maxlatprocdata(struct maxlatproc_data *mp)
 	    mp->latency = mp->timeroffset = -1;
 	mp->timestamp = 0;
 }
+#endif
 
 static void hist_reset(struct hist_data *hist)
 {
@@ -735,7 +738,8 @@ static const struct file_operations maxlatproc_fops = {
 #endif
 
 #if defined(CONFIG_INTERRUPT_OFF_HIST) || defined(CONFIG_PREEMPT_OFF_HIST)
-static notrace void probe_preemptirqsoff_hist(int reason, int starthist)
+static notrace void probe_preemptirqsoff_hist(void *v, int reason,
+    int starthist)
 {
 	int cpu = raw_smp_processor_id();
 	int time_set = 0;
