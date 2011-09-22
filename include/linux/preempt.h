@@ -105,8 +105,13 @@ do { \
 # define preempt_enable_rt()		preempt_enable()
 # define preempt_disable_nort()		do { } while (0)
 # define preempt_enable_nort()		do { } while (0)
+#ifdef CONFIG_SMP
 extern void migrate_disable(void);
 extern void migrate_enable(void);
+#else /* CONFIG_SMP */
+# define migrate_disable()		do { } while (0)
+# define migrate_enable()		do { } while (0)
+#endif /* CONFIG_SMP */
 #else
 # define preempt_disable_rt()		do { } while (0)
 # define preempt_enable_rt()		do { } while (0)
