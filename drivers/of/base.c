@@ -171,6 +171,20 @@ struct property *of_find_property(const struct device_node *np,
 	return pp;
 }
 
+struct property *of_find_property(const struct device_node *np,
+				  const char *name,
+				  int *lenp)
+{
+	struct property *pp;
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&devtree_lock, flags);
+	pp = __of_find_property(np, name, lenp);
+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+
+	return pp;
+}
+
 /**
  * of_find_all_nodes - Get next node in global list
  * @prev:	Previous node or NULL to start iteration

@@ -1306,7 +1306,7 @@ static inline int fastpath_timer_check(struct task_struct *tsk)
  * already updated our counts.  We need to check if any timers fire now.
  * Interrupts are disabled.
  */
-void __run_posix_cpu_timers(struct task_struct *tsk)
+static void __run_posix_cpu_timers(struct task_struct *tsk)
 {
 	LIST_HEAD(firing);
 	struct k_itimer *timer, *next;
@@ -1370,6 +1370,7 @@ void __run_posix_cpu_timers(struct task_struct *tsk)
 	}
 }
 
+#ifdef CONFIG_PREEMPT_RT_BASE
 #include <linux/kthread.h>
 #include <linux/cpu.h>
 DEFINE_PER_CPU(struct task_struct *, posix_timer_task);
@@ -1532,14 +1533,26 @@ static struct notifier_block __devinitdata posix_cpu_thread_notifier = {
 
 static int __init posix_cpu_thread_init(void)
 {
-	void *cpu = (void *)(long)smp_processor_id();
+	void *hcpu = (void *)(long)smp_processor_id();
 	/* Start one for boot CPU. */
-	posix_cpu_thread_call(&posix_cpu_thread_notifier, CPU_UP_PREPARE, cpu);
-	posix_cpu_thread_call(&posix_cpu_thread_notifier, CPU_ONLINE, cpu);
+	unsigned long cpu;
+
+	/* init the per-cpu posix_timer_tasklets */
+	for_each_cpu_mask(cpu, cpu_possible_map)
+		per_cpu(posix_timer_tasklist, cpu) = NULL;
+
+	posix_cpu_thread_call(&posix_cpu_thread_notifier, CPU_UP_PREPARE, hcpu);
+	posix_cpu_thread_call(&posix_cpu_thread_notifier, CPU_ONLINE, hcpu);
 	register_cpu_notifier(&posix_cpu_thread_notifier);
 	return 0;
 }
 early_initcall(posix_cpu_thread_init);
+#else /* CONFIG_PREEMPT_RT_BASE */
+void run_posix_cpu_timers(struct task_struct *tsk)
+{
+	__run_posix_cpu_timers(tsk);
+}
+#endif /* CONFIG_PREEMPT_RT_BASE */
 
 /*
  * Set one of the process-wide special case CPU timers or RLIMIT_CPU.

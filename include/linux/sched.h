@@ -63,6 +63,7 @@ struct sched_param {
 #include <linux/nodemask.h>
 #include <linux/mm_types.h>
 
+#include <asm/kmap_types.h>
 #include <asm/system.h>
 #include <asm/page.h>
 #include <asm/ptrace.h>
@@ -90,6 +91,7 @@ struct sched_param {
 #include <linux/task_io_accounting.h>
 #include <linux/latencytop.h>
 #include <linux/cred.h>
+#include <linux/hardirq.h>
 
 #include <asm/processor.h>
 
@@ -1258,7 +1260,9 @@ struct task_struct {
 #endif
 
 	unsigned int policy;
+#ifdef CONFIG_PREEMPT_RT_FULL
 	int migrate_disable;
+#endif
 	cpumask_t cpus_allowed;
 
 #ifdef CONFIG_PREEMPT_RCU
@@ -1360,7 +1364,9 @@ struct task_struct {
 
 	struct task_cputime cputime_expires;
 	struct list_head cpu_timers[3];
+#ifdef CONFIG_PREEMPT_RT_BASE
 	struct task_struct *posix_timer_list;
+#endif
 
 /* process credentials */
 	const struct cred __rcu *real_cred; /* objective and real subjective task
@@ -1438,7 +1444,9 @@ struct task_struct {
 	/* mutex deadlock detection */
 	struct mutex_waiter *blocked_on;
 #endif
+#ifdef CONFIG_PREEMPT_RT_FULL
 	int pagefault_disabled;
+#endif
 #ifdef CONFIG_TRACE_IRQFLAGS
 	unsigned int irq_events;
 	unsigned long hardirq_enable_ip;
@@ -1592,6 +1600,15 @@ struct task_struct {
 	pte_t kmap_pte[KM_TYPE_NR];
 #endif
 };
+
+static inline bool pagefault_disabled(void)
+{
+	return in_atomic()
+#ifdef CONFIG_PREEMPT_RT_FULL
+		|| current->pagefault_disabled
+#endif
+		;
+}
 
 /*
  * Priority of a process goes from 0..MAX_PRIO-1, valid RT
@@ -2649,11 +2666,22 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 
 #endif /* CONFIG_SMP */
 
+static inline int __migrate_disabled(struct task_struct *p)
+{
+#ifdef CONFIG_PREEMPT_RT_FULL
+	return p->migrate_disable;
+#else
+	return 0;
+#endif
+}
+
 /* Future-safe accessor for struct task_struct's cpus_allowed. */
 static inline const struct cpumask *tsk_cpus_allowed(struct task_struct *p)
 {
+#ifdef CONFIG_PREEMPT_RT_FULL
 	if (p->migrate_disable)
 		return cpumask_of(task_cpu(p));
+#endif
 
 	return &p->cpus_allowed;
 }

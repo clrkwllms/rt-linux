@@ -2902,13 +2902,11 @@ int netif_rx_ni(struct sk_buff *skb)
 {
 	int err;
 
-	preempt_disable_nort();
-	migrate_disable_rt();
+	migrate_disable();
 	err = netif_rx(skb);
 	if (local_softirq_pending())
 		thread_do_softirq();
-	migrate_enable_rt();
-	preempt_enable_nort();
+	migrate_enable();
 
 	return err;
 }
