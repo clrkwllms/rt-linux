@@ -4098,20 +4098,6 @@ static void do_ccupdate_local(void *info, int cpu)
 }
 #endif
 
-#ifndef CONFIG_PREEMPT_RT_BASE
-static void do_ccupdate_local(void *info)
-{
-	__do_ccupdate_local(info, smp_processor_id());
-}
-#else
-static void do_ccupdate_local(void *info, int cpu)
-{
-	spin_lock_irq(&per_cpu(slab_lock, cpu).lock);
-	__do_ccupdate_local(info, cpu);
-	spin_unlock_irq(&per_cpu(slab_lock, cpu).lock);
-}
-#endif
-
 /* Always called with the cache_chain_mutex held */
 static int do_tune_cpucache(struct kmem_cache *cachep, int limit,
 				int batchcount, int shared, gfp_t gfp)
