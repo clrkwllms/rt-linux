@@ -646,7 +646,6 @@ static inline int hrtimer_enqueue_reprogram(struct hrtimer *timer,
 					    struct hrtimer_clock_base *base,
 					    int wakeup)
 {
-#ifdef CONFIG_PREEMPT_RT_BASE
 again:
 	if (base->cpu_base->hres_active && hrtimer_reprogram(timer, base)) {
 		if (!wakeup)
