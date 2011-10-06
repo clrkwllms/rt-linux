@@ -2912,6 +2912,27 @@ int netif_rx_ni(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_rx_ni);
 
+#ifdef CONFIG_PREEMPT_RT_FULL
+/*
+ * RT runs ksoftirqd as a real time thread and the root_lock
+ * is a mutex. It is best to just take the root_lock instead
+ * of trylock because we could go into an infinite loop
+ * where the root_lock is held by a task that is blocked on
+ * a mutex owned by a task that ksoftirq has preempted and
+ * wont let run.
+ */
+static inline int take_root_lock(spinlock_t *lock)
+{
+	spin_lock(lock);
+	return 1;
+}
+#else
+static inline int take_root_lock(spinlock_t *lock)
+{
+	return spin_trylock(lock);
+}
+#endif
+
 static void net_tx_action(struct softirq_action *h)
 {
 	struct softnet_data *sd = &__get_cpu_var(softnet_data);
@@ -2950,7 +2971,7 @@ static void net_tx_action(struct softirq_action *h)
 			head = head->next_sched;
 
 			root_lock = qdisc_lock(q);
-			if (spin_trylock(root_lock)) {
+			if (take_root_lock(root_lock)) {
 				smp_mb__before_clear_bit();
 				clear_bit(__QDISC_STATE_SCHED,
 					  &q->state);
