@@ -553,7 +553,16 @@ recycle:
 	 * a workqueue, so we won't get callbacks and can hold port_lock
 	 */
 	if (tty && do_push) {
+		/*
+		 * Drop the lock here since it might end up calling
+		 * gs_flush_chars, which takes the lock.
+		 */
+		spin_unlock_irq(&port->port_lock);
 		tty_flip_buffer_push(tty);
+		spin_lock_irq(&port->port_lock);
+
+		/* tty may have been closed */
+		tty = port->port_tty;
 	}
 
 
