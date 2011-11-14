@@ -25,6 +25,7 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/compiler.h>
+#include <linux/atomic.h>
 
 struct completion;
 
