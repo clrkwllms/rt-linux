@@ -25,7 +25,9 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/compiler.h>
+#ifdef __KERNEL__
 #include <linux/atomic.h>
+#endif
 
 struct completion;
 
