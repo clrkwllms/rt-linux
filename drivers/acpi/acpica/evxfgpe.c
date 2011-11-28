@@ -122,7 +122,7 @@ acpi_status acpi_enable_gpe(acpi_handle gpe_device, u32 gpe_number)
 
 	ACPI_FUNCTION_TRACE(acpi_enable_gpe);
 
-	flags = acpi_os_acquire_lock(acpi_gbl_gpe_lock);
+	raw_spin_lock_irqsave(&acpi_gbl_gpe_lock, flags);
 
 	/* Ensure that we have a valid GPE number */
 
@@ -131,7 +131,7 @@ acpi_status acpi_enable_gpe(acpi_handle gpe_device, u32 gpe_number)
 		status = acpi_ev_add_gpe_reference(gpe_event_info);
 	}
 
-	acpi_os_release_lock(acpi_gbl_gpe_lock, flags);
+	raw_spin_unlock_irqrestore(&acpi_gbl_gpe_lock, flags);
 	return_ACPI_STATUS(status);
 }
 ACPI_EXPORT_SYMBOL(acpi_enable_gpe)
@@ -159,7 +159,7 @@ acpi_status acpi_disable_gpe(acpi_handle gpe_device, u32 gpe_number)
 
 	ACPI_FUNCTION_TRACE(acpi_disable_gpe);
 
-	flags = acpi_os_acquire_lock(acpi_gbl_gpe_lock);
+	raw_spin_lock_irqsave(&acpi_gbl_gpe_lock, flags);
 
 	/* Ensure that we have a valid GPE number */
 
@@ -168,7 +168,7 @@ acpi_status acpi_disable_gpe(acpi_handle gpe_device, u32 gpe_number)
 		status = acpi_ev_remove_gpe_reference(gpe_event_info) ;
 	}
 
-	acpi_os_release_lock(acpi_gbl_gpe_lock, flags);
+	raw_spin_unlock_irqrestore(&acpi_gbl_gpe_lock, flags);
 	return_ACPI_STATUS(status);
 }
 ACPI_EXPORT_SYMBOL(acpi_disable_gpe)
@@ -215,7 +215,7 @@ acpi_setup_gpe_for_wake(acpi_handle wake_device,
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	flags = acpi_os_acquire_lock(acpi_gbl_gpe_lock);
+	raw_spin_lock_irqsave(&acpi_gbl_gpe_lock, flags);
 
 	/* Ensure that we have a valid GPE number */
 
@@ -271,7 +271,7 @@ acpi_setup_gpe_for_wake(acpi_handle wake_device,
 	status = AE_OK;
 
  unlock_and_exit:
-	acpi_os_release_lock(acpi_gbl_gpe_lock, flags);
+	raw_spin_unlock_irqrestore(&acpi_gbl_gpe_lock, flags);
 	return_ACPI_STATUS(status);
 }
 ACPI_EXPORT_SYMBOL(acpi_setup_gpe_for_wake)
@@ -301,7 +301,7 @@ acpi_status acpi_set_gpe_wake_mask(acpi_handle gpe_device, u32 gpe_number, u8 ac
 
 	ACPI_FUNCTION_TRACE(acpi_set_gpe_wake_mask);
 
-	flags = acpi_os_acquire_lock(acpi_gbl_gpe_lock);
+	raw_spin_lock_irqsave(&acpi_gbl_gpe_lock, flags);
 
 	/*
 	 * Ensure that we have a valid GPE number and that this GPE is in
@@ -347,7 +347,7 @@ acpi_status acpi_set_gpe_wake_mask(acpi_handle gpe_device, u32 gpe_number, u8 ac
 	}
 
 unlock_and_exit:
-	acpi_os_release_lock(acpi_gbl_gpe_lock, flags);
+	raw_spin_unlock_irqrestore(&acpi_gbl_gpe_lock, flags);
 	return_ACPI_STATUS(status);
 }
 
@@ -373,7 +373,7 @@ acpi_status acpi_clear_gpe(acpi_handle gpe_device, u32 gpe_number)
 
 	ACPI_FUNCTION_TRACE(acpi_clear_gpe);
 
-	flags = acpi_os_acquire_lock(acpi_gbl_gpe_lock);
+	raw_spin_lock_irqsave(&acpi_gbl_gpe_lock, flags);
 
 	/* Ensure that we have a valid GPE number */
 
@@ -386,7 +386,7 @@ acpi_status acpi_clear_gpe(acpi_handle gpe_device, u32 gpe_number)
 	status = acpi_hw_clear_gpe(gpe_event_info);
 
       unlock_and_exit:
-	acpi_os_release_lock(acpi_gbl_gpe_lock, flags);
+	raw_spin_unlock_irqrestore(&acpi_gbl_gpe_lock, flags);
 	return_ACPI_STATUS(status);
 }
 
@@ -416,7 +416,7 @@ acpi_get_gpe_status(acpi_handle gpe_device,
 
 	ACPI_FUNCTION_TRACE(acpi_get_gpe_status);
 
-	flags = acpi_os_acquire_lock(acpi_gbl_gpe_lock);
+	raw_spin_lock_irqsave(&acpi_gbl_gpe_lock, flags);
 
 	/* Ensure that we have a valid GPE number */
 
@@ -434,7 +434,7 @@ acpi_get_gpe_status(acpi_handle gpe_device,
 		*event_status |= ACPI_EVENT_FLAG_HANDLE;
 
       unlock_and_exit:
-	acpi_os_release_lock(acpi_gbl_gpe_lock, flags);
+	raw_spin_unlock_irqrestore(&acpi_gbl_gpe_lock, flags);
 	return_ACPI_STATUS(status);
 }
 
