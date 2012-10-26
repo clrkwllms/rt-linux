@@ -67,6 +67,7 @@ struct trace_entry {
 	int			pid;
 	unsigned short		migrate_disable;
 	unsigned short		padding;
+	unsigned char		preempt_lazy_count;
 };
 
 #define FTRACE_MAX_EVENT						\
