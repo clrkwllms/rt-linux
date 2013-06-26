@@ -18,6 +18,7 @@
 #include <linux/module.h>
 #include <linux/rtc.h>
 #include <linux/math64.h>
+#include <linux/swork.h>
 
 #include "ntp_internal.h"
 #include "timekeeping_internal.h"
@@ -610,6 +611,35 @@ static bool sync_cmos_clock(void)
 	return true;
 }
 
+#ifdef CONFIG_PREEMPT_RT_FULL
+
+static void run_clock_set_delay(struct swork_event *event)
+{
+	queue_delayed_work(system_power_efficient_wq, &sync_work, 0);
+}
+
+static struct swork_event ntp_cmos_swork;
+
+void ntp_notify_cmos_timer(void)
+{
+	swork_queue(&ntp_cmos_swork);
+}
+
+static __init int create_cmos_delay_thread(void)
+{
+	WARN_ON(swork_get());
+	INIT_SWORK(&ntp_cmos_swork, run_clock_set_delay);
+	return 0;
+}
+early_initcall(create_cmos_delay_thread);
+
+#else
+
+void ntp_notify_cmos_timer(void)
+{
+	queue_delayed_work(system_power_efficient_wq, &sync_work, 0);
+}
+#endif /* CONFIG_PREEMPT_RT_FULL */
 /*
  * If we have an externally synchronized Linux clock, then update RTC clock
  * accordingly every ~11 minutes. Generally RTCs can only store second
