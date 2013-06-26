@@ -18,6 +18,7 @@
 #include <linux/module.h>
 #include <linux/rtc.h>
 #include <linux/math64.h>
+#include <linux/swork.h>
 
 #include "ntp_internal.h"
 #include "timekeeping_internal.h"
@@ -629,6 +630,30 @@ static void sync_hw_clock(struct work_struct *work)
 	sync_rtc_clock();
 }
 
+#ifdef CONFIG_PREEMPT_RT_FULL
+
+static void run_clock_set_delay(struct swork_event *event)
+{
+	queue_delayed_work(system_power_efficient_wq, &sync_work, 0);
+}
+
+static struct swork_event ntp_cmos_swork;
+
+void ntp_notify_cmos_timer(void)
+{
+	swork_queue(&ntp_cmos_swork);
+}
+
+static __init int create_cmos_delay_thread(void)
+{
+	WARN_ON(swork_get());
+	INIT_SWORK(&ntp_cmos_swork, run_clock_set_delay);
+	return 0;
+}
+early_initcall(create_cmos_delay_thread);
+
+#else
+
 void ntp_notify_cmos_timer(void)
 {
 	if (!ntp_synced())
@@ -638,6 +663,7 @@ void ntp_notify_cmos_timer(void)
 	    IS_ENABLED(CONFIG_RTC_SYSTOHC))
 		queue_delayed_work(system_power_efficient_wq, &sync_work, 0);
 }
+#endif /* CONFIG_PREEMPT_RT_FULL */
 
 /*
  * Propagate a new txc->status value into the NTP state:
