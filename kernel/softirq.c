@@ -464,12 +464,12 @@ void __init softirq_early_init(void)
 
 static void lock_softirq(int which)
 {
-	__local_lock(this_cpu_ptr(&local_softirq_locks[which]));
+	local_lock(local_softirq_locks[which]);
 }
 
 static void unlock_softirq(int which)
 {
-	__local_unlock(this_cpu_ptr(&local_softirq_locks[which]));
+	local_unlock(local_softirq_locks[which]);
 }
 
 static void do_single_softirq(int which, int need_rcu_bh_qs)
