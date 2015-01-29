@@ -40,8 +40,10 @@ static inline void __clear_shadow_entry(struct address_space *mapping,
 		return;
 	if (*slot != entry)
 		return;
+	local_lock(shadow_nodes_lock);
 	__radix_tree_replace(&mapping->page_tree, node, slot, NULL,
-			     workingset_update_node);
+			     __workingset_update_node);
+	local_unlock(shadow_nodes_lock);
 	mapping->nrexceptional--;
 }
 
