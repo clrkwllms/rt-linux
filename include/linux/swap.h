@@ -12,6 +12,7 @@
 #include <linux/fs.h>
 #include <linux/atomic.h>
 #include <linux/page-flags.h>
+#include <linux/locallock.h>
 #include <asm/page.h>
 
 struct notifier_block;
@@ -299,13 +300,15 @@ void *workingset_eviction(struct address_space *mapping, struct page *page);
 bool workingset_refault(void *shadow);
 void workingset_activation(struct page *page);
 
+
 /* Do not use directly, use workingset_lookup_update */
-void workingset_update_node(struct radix_tree_node *node);
+void __workingset_update_node(struct radix_tree_node *node);
+DECLARE_LOCAL_IRQ_LOCK(shadow_nodes_lock);
 
 /* Returns workingset_update_node() if the mapping has shadow entries. */
 #define workingset_lookup_update(mapping)				\
 ({									\
-	radix_tree_update_node_t __helper = workingset_update_node;	\
+	radix_tree_update_node_t __helper = __workingset_update_node;	\
 	if (dax_mapping(mapping) || shmem_mapping(mapping))		\
 		__helper = NULL;					\
 	__helper;							\
