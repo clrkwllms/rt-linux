@@ -5845,7 +5845,7 @@ void mem_cgroup_swapout(struct page *page, swp_entry_t entry)
 		page_counter_uncharge(&memcg->memory, 1);
 
 	/* XXX: caller holds IRQ-safe mapping->tree_lock */
-	VM_BUG_ON(!irqs_disabled());
+	VM_BUG_ON(!spin_is_locked(&page_mapping(page)->tree_lock));
 
 	mem_cgroup_charge_statistics(memcg, page, -1);
 	memcg_check_events(memcg, page);
