@@ -1450,7 +1450,8 @@ void update_process_times(int user_tick)
 	run_local_timers();
 	rcu_check_callbacks(user_tick);
 #if defined(CONFIG_IRQ_WORK) && !defined(CONFIG_PREEMPT_RT_FULL)
-	irq_work_tick();
+	if (in_irq())
+		irq_work_tick();
 #endif
 	run_posix_cpu_timers(p);
 }
