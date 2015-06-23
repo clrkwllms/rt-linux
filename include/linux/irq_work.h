@@ -21,6 +21,9 @@
 
 #define IRQ_WORK_CLAIMED	(IRQ_WORK_PENDING | IRQ_WORK_BUSY)
 
+ /* Run hard IRQ context, even on RT */
+#define IRQ_WORK_HARD_IRQ	BIT(3)
+
 struct irq_work {
 	unsigned long flags;
 	struct llist_node llnode;
