@@ -256,6 +256,7 @@ config IOMMU_HELPER
 
 config KERNEL_MODE_NEON
 	def_bool y
+	depends on !PREEMPT_RT_BASE
 
 config FIX_EARLYCON_MEM
 	def_bool y
@@ -846,7 +847,7 @@ config XEN_DOM0
 
 config XEN
 	bool "Xen guest support on ARM64"
-	depends on ARM64 && OF
+	depends on ARM64 && OF && !PREEMPT_RT_FULL
 	select SWIOTLB_XEN
 	select PARAVIRT
 	help
