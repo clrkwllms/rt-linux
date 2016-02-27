@@ -36,6 +36,7 @@
 #include <drm/drm_rect.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_plane_helper.h>
+#include <linux/locallock.h>
 #include "intel_drv.h"
 #include "intel_frontbuffer.h"
 #include <drm/i915_drm.h>
@@ -74,6 +75,7 @@ int intel_usecs_to_scanlines(const struct drm_display_mode *adjusted_mode,
 #define VBLANK_EVASION_TIME_US 100
 #endif
 
+static DEFINE_LOCAL_IRQ_LOCK(pipe_update_lock);
 /**
  * intel_pipe_update_start() - start update of a set of display registers
  * @new_crtc_state: the new crtc state
@@ -107,7 +109,7 @@ void intel_pipe_update_start(const struct intel_crtc_state *new_crtc_state)
 						      VBLANK_EVASION_TIME_US);
 	max = vblank_start - 1;
 
-	local_irq_disable();
+	local_lock_irq(pipe_update_lock);
 
 	if (min <= 0 || max <= 0)
 		return;
@@ -137,11 +139,11 @@ void intel_pipe_update_start(const struct intel_crtc_state *new_crtc_state)
 			break;
 		}
 
-		local_irq_enable();
+		local_unlock_irq(pipe_update_lock);
 
 		timeout = schedule_timeout(timeout);
 
-		local_irq_disable();
+		local_lock_irq(pipe_update_lock);
 	}
 
 	finish_wait(wq, &wait);
@@ -206,7 +208,7 @@ void intel_pipe_update_end(struct intel_crtc_state *new_crtc_state)
 		new_crtc_state->base.event = NULL;
 	}
 
-	local_irq_enable();
+	local_unlock_irq(pipe_update_lock);
 
 	if (intel_vgpu_active(dev_priv))
 		return;
