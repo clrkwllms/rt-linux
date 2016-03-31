@@ -43,13 +43,24 @@ struct hlist_bl_node {
 	struct hlist_bl_node *next, **pprev;
 };
 
-static inline void INIT_HLIST_BL_HEAD(struct hlist_bl_head *h)
-{
-	h->first = NULL;
 #ifdef CONFIG_PREEMPT_RT_BASE
-	raw_spin_lock_init(&h->lock);
+#ifdef CONFIG_LOCKDEP
+#define INIT_HLIST_BL_HEAD(h)		\
+do {					\
+	static struct lock_class_key k;	\
+	(h)->first = NULL;		\
+	__raw_spin_lock_init(&(h)->lock, #h, &k);	\
+} while (0)
+#else
+#define INIT_HLIST_BL_HEAD(h)		\
+do {					\
+	(h)->first = NULL;		\
+	raw_spin_lock_init(&(h)->lock);	\
+} while (0)
 #endif
-}
+#else
+#define INIT_HLIST_BL_HEAD(h) (h)->first = NULL
+#endif
 
 static inline void INIT_HLIST_BL_NODE(struct hlist_bl_node *h)
 {
