@@ -279,7 +279,11 @@ static inline void do_raw_spin_unlock(raw_spinlock_t *lock) __releases(lock)
 })
 
 /* Include rwlock functions */
-#include <linux/rwlock.h>
+#ifdef CONFIG_PREEMPT_RT_FULL
+# include <linux/rwlock_rt.h>
+#else
+# include <linux/rwlock.h>
+#endif
 
 /*
  * Pull the _spin_*()/_read_*()/_write_*() functions/declarations:
@@ -289,6 +293,10 @@ static inline void do_raw_spin_unlock(raw_spinlock_t *lock) __releases(lock)
 #else
 # include <linux/spinlock_api_up.h>
 #endif
+
+#ifdef CONFIG_PREEMPT_RT_FULL
+# include <linux/spinlock_rt.h>
+#else /* PREEMPT_RT_FULL */
 
 /*
  * Map the spin_lock functions to the raw variants for PREEMPT_RT=n
@@ -408,5 +416,7 @@ static __always_inline int spin_is_contended(spinlock_t *lock)
 extern int _atomic_dec_and_lock(atomic_t *atomic, spinlock_t *lock);
 #define atomic_dec_and_lock(atomic, lock) \
 		__cond_lock(lock, _atomic_dec_and_lock(atomic, lock))
+
+#endif /* !PREEMPT_RT_FULL */
 
 #endif /* __LINUX_SPINLOCK_H */
