@@ -131,8 +131,8 @@ int __sched __down_read_common(struct rw_semaphore *sem, int state)
 	 */
 	rt_mutex_init_waiter(&waiter, false);
 	ret = rt_mutex_slowlock_locked(m, TASK_UNINTERRUPTIBLE, NULL,
-				 RT_MUTEX_MIN_CHAINWALK,
-				 &waiter);
+				       RT_MUTEX_MIN_CHAINWALK, NULL,
+				       &waiter);
 	/* if we did't get the lock cleanup and return -EINTR */
 	if (ret) {
 		raw_spin_unlock_irq(&m->wait_lock);
