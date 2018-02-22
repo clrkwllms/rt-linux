@@ -608,11 +608,20 @@ do {									\
 			  "IRQs not disabled as expected\n");		\
 	} while (0)
 
+#ifdef CONFIG_PREEMPT_RT_FULL
+# define lockdep_assert_irqs_enabled_nonrt() do { } while (0)
+# define lockdep_assert_irqs_disabled_nonrt() do { } while (0)
+#else
+# define lockdep_assert_irqs_enabled_nonrt() lockdep_assert_irqs_enabled()
+# define lockdep_assert_irqs_disabled_nonrt() lockdep_assert_irqs_disabled()
+#endif
 #else
 # define might_lock(lock) do { } while (0)
 # define might_lock_read(lock) do { } while (0)
 # define lockdep_assert_irqs_enabled() do { } while (0)
 # define lockdep_assert_irqs_disabled() do { } while (0)
+# define lockdep_assert_irqs_enabled_nonrt() do { } while (0)
+# define lockdep_assert_irqs_disabled_nonrt() do { } while (0)
 #endif
 
 #ifdef CONFIG_LOCKDEP
