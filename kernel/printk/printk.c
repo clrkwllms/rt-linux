@@ -1726,6 +1726,10 @@ static int console_trylock_spinning(void)
 	bool spin = false;
 	unsigned long flags;
 
+	if (IS_ENABLED(CONFIG_PREEMPT_RT_FULL) &&
+	    (preempt_count() || irqs_disabled()))
+		return 0;
+
 	if (console_trylock())
 		return 1;
 
@@ -1734,7 +1738,8 @@ static int console_trylock_spinning(void)
 	raw_spin_lock(&console_owner_lock);
 	owner = READ_ONCE(console_owner);
 	waiter = READ_ONCE(console_waiter);
-	if (!waiter && owner && owner != current) {
+	if (!IS_ENABLED(CONFIG_PREEMPT_RT_FULL) &&
+	    !waiter && owner && owner != current) {
 		WRITE_ONCE(console_waiter, true);
 		spin = true;
 	}
@@ -1992,16 +1997,6 @@ asmlinkage int vprintk_emit(int facility, int level,
 
 	/* If called from the scheduler, we can not call up(). */
 	if (!in_sched) {
-		int may_trylock = 1;
-
-#ifdef CONFIG_PREEMPT_RT_FULL
-		/*
-		 * we can't take a sleeping lock with IRQs or preeption disabled
-		 * so we can't print in these contexts
-		 */
-		if (preempt_count() != 0 || irqs_disabled())
-			may_trylock = 0;
-#endif
 		/*
 		 * Disable preemption to avoid being preempted while holding
 		 * console_sem which would prevent anyone from printing to
@@ -2013,7 +2008,7 @@ asmlinkage int vprintk_emit(int facility, int level,
 		 * semaphore.  The release will print out buffers and wake up
 		 * /dev/kmsg and syslog() users.
 		 */
-		if (may_trylock && console_trylock_spinning())
+		if (console_trylock_spinning())
 			console_unlock();
 		preempt_enable_nort();
 	}
@@ -2473,18 +2468,18 @@ skip:
 		console_seq++;
 		raw_spin_unlock(&logbuf_lock);
 
+
+#ifdef CONFIG_PREEMPT_RT_FULL
+		printk_safe_exit_irqrestore(flags);
+		call_console_drivers(ext_text, ext_len, text, len);
+#else
 		/*
 		 * While actively printing out messages, if another printk()
 		 * were to occur on another CPU, it may wait for this one to
 		 * finish. This task can not be preempted if there is a
 		 * waiter waiting to take over.
 		 */
-		console_lock_spinning_enable();
-
-#ifdef CONFIG_PREEMPT_RT_FULL
-		printk_safe_exit_irqrestore(flags);
-		call_console_drivers(ext_text, ext_len, text, len);
-#else
+ 		console_lock_spinning_enable();
 		stop_critical_timings();	/* don't trace print latency */
 		call_console_drivers(ext_text, ext_len, text, len);
 		start_critical_timings();
